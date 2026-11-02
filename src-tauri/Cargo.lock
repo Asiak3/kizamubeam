@@ -1829,7 +1829,7 @@ dependencies = [
 
 [[package]]
 name = "kizamubeam"
-version = "1.16.0-beta"
+version = "1.17.0-beta"
 dependencies = [
  "dirs",
  "fontdb",
@@ -1849,7 +1849,7 @@ dependencies = [
 
 [[package]]
 name = "kizamubeam-core"
-version = "1.16.0-beta"
+version = "1.17.0-beta"
 dependencies = [
  "rayon",
  "serde",
