@@ -4,7 +4,8 @@ import { strict as assert } from 'node:assert';
 import { buildGen, defaultParams, normalizeParams } from '../src/generators';
 import { decodeShapes, encodeShapes, JIG, jigLayout, JigParams, JigShape, outlineFromPolys } from '../src/generators/jig';
 import { flattenSub } from '../src/clip';
-import { IDENT, Pt } from '../src/model';
+import { apply, IDENT, mul, Obj, Pt, rotate, translate } from '../src/model';
+import { fillJig, findJigs, jigMarkCenters, parseSlotRange, placeMatrix, setVtOffset, slotAt, slotCenter } from '../src/jigUse';
 
 let failed = 0;
 async function test(name: string, fn: () => void | Promise<void>) {
@@ -100,6 +101,80 @@ await test('Generator: ein Teil mit Platte, Aussparungen und Gravur', () => {
   assert.ok((part.marks?.length ?? 0) > 0);
   const empty = buildGen(JIG, normalizeParams(JIG, { shapes: '[]' }));
   assert.ok(empty.issues.some((i) => i.level === 'error'));
+});
+
+const jigObj = (m = IDENT, patch: Partial<JigParams> = {}): Obj => {
+  const p = params(patch) as never;
+  const r = buildGen(JIG, p);
+  return { id: 501, m, layer: 0, shape: r.parts[0].shape };
+};
+
+await test('Jig finden, auch in einer Gruppe und gedreht', () => {
+  const W = mul(translate(150, 120), rotate(Math.PI / 2));
+  const part = jigObj();
+  const grp: Obj = { id: 502, m: W, layer: 0, shape: { kind: 'group', children: [part] } };
+  const [j] = findJigs([grp]);
+  assert.equal(j.top, grp);
+  assert.equal(j.part, part);
+  assert.equal(j.layout.slots.length, 6);
+  const c0 = j.layout.slots[0].c;
+  const w0 = slotCenter(j, 0);
+  const exp = apply(W, c0.x, c0.y);
+  near(w0.x, exp.x);
+  near(w0.y, exp.y);
+  assert.equal(jigMarkCenters(j).length, 3);
+  assert.equal(slotAt(j, w0), 0);
+  assert.equal(slotAt(j, { x: w0.x + 30, y: w0.y + 300 }), -1);
+});
+
+await test('Design auf Fächer: mit Bezugsfach gleiche Lage im Fach, sonst Mitte auf Mitte', () => {
+  const [j] = findJigs([jigObj(mul(translate(200, 150), rotate(0.3)))]);
+  // Design 2 mm rechts der Mitte von Fach 0
+  const c0 = slotCenter(j, 0);
+  const d = { x: c0.x + 2 * Math.cos(0.3), y: c0.y + 2 * Math.sin(0.3) };
+  for (let i = 1; i < 6; i++) {
+    const M = placeMatrix(j, i, 0, d);
+    const q = apply(M, d.x, d.y);
+    const ci = slotCenter(j, i);
+    near(Math.hypot(q.x - ci.x, q.y - ci.y), 2, 1e-6);
+  }
+  const far = { x: 10, y: 10 };
+  const M = placeMatrix(j, 3, -1, far);
+  const q = apply(M, far.x, far.y);
+  const c3 = slotCenter(j, 3);
+  near(q.x, c3.x);
+  near(q.y, c3.y);
+});
+
+await test('Fächer-Auswahl und Seriennummer je Kopie', () => {
+  assert.deepEqual(parseSlotRange('', 4), [0, 1, 2, 3]);
+  assert.deepEqual(parseSlotRange('alle', 3), [0, 1, 2]);
+  assert.deepEqual(parseSlotRange('3-1, 5, 9', 6), [0, 1, 2, 4]);
+  assert.equal(parseSlotRange('a-b', 6), null);
+  const txt: Obj = { id: 1, m: IDENT, layer: 0, shape: { kind: 'text', text: '%#', vt: { offset: 0 } } as never };
+  const g: Obj = { id: 2, m: IDENT, layer: 0, shape: { kind: 'group', children: [txt] } };
+  assert.equal(setVtOffset(g, 4), 1);
+  assert.equal((txt.shape as { vt: { offset: number } }).vt.offset, 4);
+});
+
+await test('Auf Fächer legen: Original bleibt in seinem Fach, Kopien zählen weiter, Jig ausgeblendet', () => {
+  const jo = jigObj();
+  const objs: Obj[] = [jo];
+  const [j] = findJigs(objs);
+  const c2 = slotCenter(j, 2);
+  const label: Obj = { id: 900, m: translate(c2.x, c2.y), layer: 1, shape: { kind: 'path', subs: [{ closed: true, nodes: [{ x: -3, y: -3 }, { x: 3, y: -3 }, { x: 3, y: 3 }, { x: -3, y: 3 }] }] } };
+  objs.push(label);
+  const made = fillJig(objs, [label], j, [0, 1, 2, 3], { series: true, group: false, hideJig: true, hideTemplate: true });
+  assert.equal(made.length, 3);
+  assert.equal(objs.length, 5);
+  assert.ok(jo.hidden);
+  assert.ok(!label.hidden);
+  const centers = made.map((o) => apply(o.m, 0, 0));
+  for (const [k, slot] of [[0, 0], [1, 1], [2, 3]]) {
+    const c = slotCenter(j, slot);
+    near(centers[k].x, c.x, 1e-6);
+    near(centers[k].y, c.y, 1e-6);
+  }
 });
 
 if (failed) {

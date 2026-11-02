@@ -9,7 +9,8 @@ import { jogLines, pointerGCode, rotaryOn } from './gcode';
 import { dec, t, tn } from './i18n';
 import { device, setStartFrom } from './laser';
 import { machine } from './machine';
-import { mul, Obj, Pt } from './model';
+import { mul, Pt } from './model';
+import { findJigs, jigMarkCenters } from './jigUse';
 import { designToMachine, findMarks, Fit, FitMode, fitTransform, machineToDesign, makeMark, markCenter, markPlaces, minMarks, nextMarkNr } from './printcut';
 
 const KEY = 'kizamubeam.printcut';
@@ -40,7 +41,14 @@ function save(s: Settings) {
 }
 
 /** Gemessene Markenmitten (Design-Koordinaten) je Objekt-ID; bleiben erhalten, solange das Programm läuft */
-const measured = new Map<number, Pt>();
+const measured = new Map<string, Pt>();
+
+/** Eine Marke zum Einmessen: Passermarke (Objekt) oder gravierte Marke eines Jigs */
+interface Target {
+  key: string;
+  label: string;
+  center: Pt;
+}
 
 const f2 = (v: number) => dec(v.toFixed(2));
 
@@ -76,7 +84,7 @@ export function openPrintCutDialog(ed: Editor) {
     if (old.length && !confirm(t('Die vorhandenen Passermarken werden ersetzt.'))) return;
     ed.snapshot(t('Passermarken setzen'));
     ed.doc.objs = ed.doc.objs.filter((o) => !old.includes(o));
-    old.forEach((o) => measured.delete(o.id));
+    old.forEach((o) => measured.delete(`o${o.id}`));
     const layer = design[0]?.layer ?? 0;
     const made = markPlaces(box, st.size, st.margin, bed).map((p, i) => makeMark(i + 1, p, st.size, layer, t('Passermarke {n}', { n: i + 1 })));
     ed.doc.objs.push(...made);
@@ -107,7 +115,7 @@ export function openPrintCutDialog(ed: Editor) {
     ed.snapshot(t('Passermarke entfernen'));
     for (const o of sel) {
       delete o.reg;
-      measured.delete(o.id);
+      measured.delete(`o${o.id}`);
     }
     ed.emit('doc');
     render();
@@ -161,22 +169,22 @@ export function openPrintCutDialog(ed: Editor) {
     h('button', { class: 'btn small', onclick: () => views[0]?.refresh() && camShow() }, t('Neues Kamerabild')),
     h('button', { class: 'btn small', onclick: () => ((camFor = null), (camBox.hidden = true)) }, t('Schließen')),
   ));
-  let camFor: Obj | null = null;
+  let camFor: Target | null = null;
   const CAM_MM = 30;
   let camC: Pt = { x: 0, y: 0 };
   const camShow = () => {
     const o = camFor;
     const img = views[0]?.image;
     if (!o || !img) return;
-    camC = measured.get(o.id) ?? markCenter(o)!;
-    camTitle.textContent = t('Passermarke {n}: Mitte anklicken', { n: o.reg! });
+    camC = measured.get(o.key) ?? o.center;
+    camTitle.textContent = t('Passermarke {n}: Mitte anklicken', { n: o.label });
     const ctx = camCv.getContext('2d')!;
     const kx = img.width / bed.w,
       ky = img.height / bed.h;
     ctx.fillStyle = '#222';
     ctx.fillRect(0, 0, camCv.width, camCv.height);
     ctx.drawImage(img, (camC.x - CAM_MM / 2) * kx, (camC.y - CAM_MM / 2) * ky, CAM_MM * kx, CAM_MM * ky, 0, 0, camCv.width, camCv.height);
-    const m = measured.get(o.id);
+    const m = measured.get(o.key);
     if (m) {
       const px = ((m.x - camC.x + CAM_MM / 2) / CAM_MM) * camCv.width,
         py = ((m.y - camC.y + CAM_MM / 2) / CAM_MM) * camCv.height;
@@ -195,7 +203,7 @@ export function openPrintCutDialog(ed: Editor) {
     if (!camFor) return;
     const r = camCv.getBoundingClientRect();
     const p = { x: camC.x - CAM_MM / 2 + ((e.clientX - r.left) / r.width) * CAM_MM, y: camC.y - CAM_MM / 2 + ((e.clientY - r.top) / r.height) * CAM_MM };
-    measured.set(camFor.id, p);
+    measured.set(camFor.key, p);
     camShow();
     render();
   });
@@ -214,38 +222,45 @@ export function openPrintCutDialog(ed: Editor) {
   const alignBtn = h('button', { class: 'btn primary' }, t('Ausrichten')) as HTMLButtonElement;
 
   let fit: Fit | null = null;
-  let pairs: { o: Obj; d: Pt; m: Pt }[] = [];
+  let pairs: { o: Target; d: Pt; m: Pt }[] = [];
+  /** Passermarken und die gravierten Marken aller Jigs der Seite */
+  const targets = (): Target[] => [
+    ...marks().map((o) => ({ key: `o${o.id}`, label: String(o.reg), center: markCenter(o)! })),
+    ...findJigs(ed.doc.objs).flatMap((j, ji, all) =>
+      jigMarkCenters(j).map((c, k) => ({ key: `j${j.part.id}-${k}`, label: (all.length > 1 ? `J${ji + 1}.` : 'J') + (k + 1), center: c })),
+    ),
+  ];
   const mode = (n: number): FitMode => (st.mode === 'auto' ? (n >= 3 ? 'affine' : 'rigid') : st.mode);
 
   function render() {
-    const ms = marks();
+    const ms = targets();
     markInfo.textContent = tn('{n} Passermarke auf dieser Seite', '{n} Passermarken auf dieser Seite', ms.length);
     table.textContent = '';
     table.append(h('span', { class: 'pc-h' }, t('Marke')), h('span', { class: 'pc-h' }, t('Im Design (X / Y)')), h('span', { class: 'pc-h' }, t('Gemessen (X / Y)')), h('span'));
     for (const o of ms) {
-      const c = markCenter(o)!;
+      const c = o.center;
       const dm = designToMachine(c, bed.h);
-      const m = measured.get(o.id);
+      const m = measured.get(o.key);
       const mm = m ? designToMachine(m, bed.h) : null;
       const err = m ? Math.hypot(m.x - c.x, m.y - c.y) : null;
       table.append(
-        h('span', {}, String(o.reg)),
+        h('span', {}, o.label),
         h('span', {}, `${f2(dm.x)} / ${f2(dm.y)}`),
         h('span', { class: mm ? '' : 'muted' }, mm ? `${f2(mm.x)} / ${f2(mm.y)}` + (err !== null ? `  (Δ ${f2(err)})` : '') : '–'),
         h('span', { class: 'pc-btns' },
-          h('button', { class: 'btn small', title: t('Laser zur Marke fahren, wie sie im Design liegt (oder zur gemessenen Stelle)'), onclick: () => goTo(measured.get(o.id) ?? c) }, t('Hinfahren')),
+          h('button', { class: 'btn small', title: t('Laser zur Marke fahren, wie sie im Design liegt (oder zur gemessenen Stelle)'), onclick: () => goTo(measured.get(o.key) ?? c) }, t('Hinfahren')),
           h('button', { class: 'btn small', title: t('Aktuelle Laserposition als Mitte dieser Marke übernehmen'), onclick: () => {
             const p = here();
             if (!p) return say(t('Die Laserposition ist nicht bekannt. Laser verbinden.'), true);
-            measured.set(o.id, p);
+            measured.set(o.key, p);
             render();
           } }, t('Übernehmen')),
           views.length ? h('button', { class: 'btn small', title: t('Marke im Kamerabild anklicken'), onclick: () => ((camFor = o), camShow()) }, t('Kamera')) : null,
-          m ? h('button', { class: 'btn small', title: t('Messung verwerfen'), onclick: () => (measured.delete(o.id), render()) }, '×') : null,
+          m ? h('button', { class: 'btn small', title: t('Messung verwerfen'), onclick: () => (measured.delete(o.key), render()) }, '×') : null,
         ),
       );
     }
-    pairs = ms.filter((o) => measured.has(o.id)).map((o) => ({ o, d: markCenter(o)!, m: measured.get(o.id)! }));
+    pairs = ms.filter((o) => measured.has(o.key)).map((o) => ({ o, d: o.center, m: measured.get(o.key)! }));
     const md = mode(pairs.length);
     fit = fitTransform(pairs.map((p) => p.d), pairs.map((p) => p.m), md);
     if (!ms.length) result.textContent = t('Noch keine Passermarken. „Marken setzen“ oder eigene Objekte als Marke wählen.');
@@ -271,7 +286,8 @@ export function openPrintCutDialog(ed: Editor) {
     ed.snapshot(t('An Passermarken ausrichten'));
     for (const o of ed.doc.objs) o.m = mul(fit.m, o.m);
     // Gemessene Mitten sind jetzt die Lage der Marken
-    for (const p of pairs) measured.set(p.o.id, markCenter(p.o)!);
+    const now = new Map(targets().map((x) => [x.key, x.center]));
+    for (const p of pairs) if (now.has(p.o.key)) measured.set(p.o.key, now.get(p.o.key)!);
     if (device.startFrom !== 'absolute' && absInput.checked) setStartFrom('absolute');
     ed.emit('doc');
     save(st);

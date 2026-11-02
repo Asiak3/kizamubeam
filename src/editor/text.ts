@@ -101,8 +101,12 @@ export class EditorText {
   /** Nach einem gestarteten Job oder gespeicherten G-Code: bei „Automatisch weiterzählen“ die Nummer erhöhen */
   afterJob(this: Editor) {
     const vt = this.doc.vt;
-    if (!vt?.autoAdvance || !this.varTextObjs(false).length) return;
-    this.stepVarText(1);
+    const objs = this.varTextObjs(false);
+    if (!vt?.autoAdvance || !objs.length) return;
+    // Mehrere Kopien mit Versatz (z. B. ein Jig voller Schilder): um so viele Nummern weiter, wie der Job verbraucht hat
+    let maxOff = 0;
+    for (const o of objs) if ((o.shape.kind === 'text' || o.shape.kind === 'barcode') && o.shape.vt) maxOff = Math.max(maxOff, o.shape.vt.offset || 0);
+    this.stepVarText(maxOff + 1);
     this.hint = t('Variabler Text: weiter mit Nummer {n}.', { n: vt.current });
     this.emit('tool');
   }

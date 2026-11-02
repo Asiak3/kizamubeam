@@ -46,6 +46,7 @@ import { openFocusTestDialog } from './focustestDialog';
 import { openPrintCutDialog } from './printcutDialog';
 import { encodeShapes } from './generators/jig';
 import { shapesFromSelection } from './generators/jigPanel';
+import { openJigFillDialog } from './jigFillDialog';
 import { buildParamsPanel, openShowIfDialog } from './paramsPanel';
 import { buildNotesPanel } from './notesPanel';
 import { buildView3dPanel } from './view3d/panel';
@@ -997,6 +998,7 @@ function buildBars(ed: Editor) {
     { id: 'devices', cat: L, short: t('Geräte'), label: t('Geräte …'), run: () => openDevicesDialog(ed) },
     { id: 'rotary', cat: L, icon: 'rotary', short: t('Rotary'), label: t('Drehachse (Rotary) …'), run: () => openRotaryDialog() },
     { id: 'slots', cat: M, icon: 'slots', label: t('Schlitze an Materialdicke anpassen …'), run: () => openSlotDialog(ed) },
+    { id: 'jigfill', cat: A, icon: 'jigfill', label: t('Auf Jig-Fächer legen: gewähltes Design in jedes Fach eines Jigs kopieren, auf Wunsch mit Seriennummer je Fach'), run: () => openJigFillDialog(ed), enabled: sel1 },
     { id: 'workpiece', cat: A, icon: 'workpiece', label: t('Auf Werkstücke übertragen (Kamera) …'), run: () => openWorkpieceDialog(ed), enabled: sel1 },
     { id: 'bgremove', cat: I, icon: 'bgremove', label: t('Hintergrund entfernen …'), run: () => openBackgroundDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'series', cat: F, icon: 'series', label: t('Serie aus Tabelle (CSV) …'), run: () => openSeriesDialog(ed) },
