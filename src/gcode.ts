@@ -1396,6 +1396,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   const bounds = emptyBox();
   let skippedOpen = 0;
   for (const [o, world] of visibleLeaves(roots)) {
+    if (o.reg) continue; // Passermarken nur drucken, nicht lasern
     const L = layerOf(o.layer);
     if (!L.output) continue;
     const s = o.shape;
@@ -1902,4 +1903,18 @@ export function frameGCode(job: Job, d: Device, contour: boolean): string[] | nu
   }
   out.push(...fw.footer.filter((l) => l !== 'M2'));
   return out;
+}
+
+/**
+ * Laserpunkt zum Zielen (z. B. auf Passermarken): Laser mit sehr kleiner Leistung im Stand einschalten bzw. aus.
+ * GRBL/grblHAL/FluidNC feuern im Laser-Modus nur im Modus G1 und mit M3 (konstante Leistung) auch ohne Bewegung,
+ * Marlin feuert mit M3 sofort, Smoothieware hat dafür den Befehl „fire“.
+ */
+export function pointerGCode(d: Device, on: boolean, percent: number): string[] {
+  const p = Math.max(0, Math.min(10, percent));
+  if (d.fw === 'smoothie') return on ? [`fire ${num(p)}`] : ['fire off'];
+  if (!on) return ['M5'];
+  const s = sValue(p / 100, d);
+  if (d.fw === 'marlin') return [`M3 S${s}`];
+  return ['G1 F1000', `M3 S${s}`];
 }

@@ -300,6 +300,8 @@ export interface Obj {
   showIf?: string;
   /** Hinweis aus dem Import (übersprungene Elemente der Quelldatei), für „Konstruktion prüfen“ */
   importNote?: string;
+  /** Passermarke Nummer 1, 2, … für Print and Cut (printcut.ts): wird gezeichnet, gedruckt und exportiert, aber nie gelasert */
+  reg?: number;
 }
 
 /**

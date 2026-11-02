@@ -43,6 +43,7 @@ import { buildLibraryPanel, openAddSelectionDialog } from './libraryPanel';
 import { buildCheckPanel, openCheck } from './checkPanel';
 import { openCalibrateDialog } from './calibrateDialog';
 import { openFocusTestDialog } from './focustestDialog';
+import { openPrintCutDialog } from './printcutDialog';
 import { buildParamsPanel, openShowIfDialog } from './paramsPanel';
 import { buildNotesPanel } from './notesPanel';
 import { buildView3dPanel } from './view3d/panel';
@@ -987,6 +988,7 @@ function buildBars(ed: Editor) {
     { id: 'materialtest', cat: L, icon: 'mattest', short: t('Test'), label: t('Materialtest …'), run: () => openMaterialTestDialog(ed) },
     { id: 'testphoto', cat: L, icon: 'testphoto', short: t('Auswerten'), label: t('Materialtest auswerten: Foto des gelaserten Tests laden und die beste Zelle anklicken'), run: () => openTestPhotoDialog(ed) },
     { id: 'focustest', cat: L, icon: 'focus', short: t('Fokus'), label: t('Fokustest: richtigen Abstand zwischen Laserkopf und Material finden'), run: () => openFocusTestDialog(ed) },
+    { id: 'printcut', cat: L, icon: 'printcut', short: t('Print and Cut'), label: t('Print and Cut: gedrucktes Blatt an Passermarken einmessen und passgenau schneiden'), run: () => openPrintCutDialog(ed) },
     { id: 'calibrate', cat: L, icon: 'calibrate', short: t('Passung'), label: t('Passung kalibrieren: Schnittfuge und Steckspiel für ein Material ermitteln'), run: () => openCalibrateDialog(ed) },
     { id: 'devsettings', cat: L, icon: 'settings', label: t('Geräteeinstellungen'), run: () => openDeviceDialog(ed) },
     { id: 'devices', cat: L, short: t('Geräte'), label: t('Geräte …'), run: () => openDevicesDialog(ed) },

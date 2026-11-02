@@ -32,6 +32,11 @@ function deviceChanged() {
 /** Wird bei jedem Geräte- oder Einstellungswechsel aufgerufen; liefert eine Abmeldefunktion */
 export const onDeviceChange = (f: () => void) => (deviceListeners.add(f), () => deviceListeners.delete(f));
 const fw = () => FIRMWARES[device.fw];
+/** Startmodus des gewählten Geräts ändern (z. B. Print and Cut braucht absolute Koordinaten) */
+export function setStartFrom(v: StartFrom) {
+  device.startFrom = v;
+  deviceChanged();
+}
 
 /** Arbeitsfläche an das Bett des gewählten Geräts anpassen */
 function applyBed(ed: Editor) {

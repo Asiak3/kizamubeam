@@ -3851,3 +3851,48 @@ input.bound {
   align-self: center;
   margin: 6px 0;
 }
+
+/* Print and Cut */
+.pc-dialog {
+  max-width: 620px;
+}
+.pc-dialog h4 {
+  margin: 12px 0 4px;
+}
+.pc-table {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  margin: 10px 0;
+  font-variant-numeric: tabular-nums;
+}
+.pc-table .pc-h {
+  color: var(--muted);
+  font-size: 12px;
+}
+.pc-btns {
+  display: flex;
+  gap: 3px;
+}
+.pc-dot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pc-cam-canvas {
+  width: 320px;
+  height: 320px;
+  cursor: crosshair;
+  border: 1px solid var(--line);
+}
+.pc-result.error,
+.pc-info.error {
+  color: var(--danger, #c0392b);
+}
+.pc-dialog .form {
+  grid-template-columns: 170px 90px;
+}
+.pc-dialog .form.pc-mode {
+  grid-template-columns: 170px 260px;
+}
