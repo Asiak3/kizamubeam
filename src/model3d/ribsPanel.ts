@@ -7,6 +7,7 @@ import type { Params } from '../generators/types';
 import { getMesh } from './store';
 import type { Mesh } from './mesh';
 import type { V3 } from './slice';
+import { suggestSections } from './suggest';
 import { materialAlong, parseSections, ribsLayout, Section, View, VIEWS, worldMesh } from '../generators/ribs';
 
 const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -45,6 +46,31 @@ export function ribsPanel(p: Params, set: (patch: Params) => void): GenPanel {
   const addBtn = h('button', { class: 'small', onclick: () => startDrawing() }, t('+ Abschnitt zeichnen'));
   const simpleBtn = h('button', { class: 'small', onclick: () => commit([]) }, t('Einfache Achse'));
   const manualBtn = h('button', { class: 'small', onclick: () => toManual() }, t('Abschnitte von Hand festlegen'));
+  const suggestBtn = h('button', {
+    class: 'small',
+    title: t('Rumpf, Beine und Schwanz im Modell suchen und als Abschnitte anlegen; danach von Hand korrigieren'),
+    onclick: () => {
+      const m = getMesh(String(np.model ?? ''));
+      if (!m) return;
+      hint.textContent = t('Modell wird untersucht …');
+      suggestBtn.disabled = true;
+      // Erst zeichnen lassen, dann rechnen
+      setTimeout(() => {
+        try {
+          const res = suggestSections(m, np);
+          if (res.sections.length) {
+            sel = 0;
+            view = res.sections[0].view;
+            syncTabs();
+            commit(res.sections);
+            hint.textContent = t('Vorschlag: {found}. Achsen prüfen und bei Bedarf ziehen.', { found: res.found });
+          } else hint.textContent = res.found;
+        } finally {
+          suggestBtn.disabled = false;
+        }
+      }, 30);
+    },
+  }, t('Vorschlagen'));
 
   const commit = (next: Section[]) => {
     secs = next;
@@ -463,7 +489,7 @@ export function ribsPanel(p: Params, set: (patch: Params) => void): GenPanel {
   });
 
   const el = h('div', { class: 'ribs-panel' },
-    h('div', { class: 'ribs-bar' }, h('b', {}, t('Abschnitte')), ...tabs, h('span', { class: 'grow' }), manualBtn, addBtn, simpleBtn),
+    h('div', { class: 'ribs-bar' }, h('b', {}, t('Abschnitte')), ...tabs, h('span', { class: 'grow' }), suggestBtn, manualBtn, addBtn, simpleBtn),
     canvas,
     hint,
     list,

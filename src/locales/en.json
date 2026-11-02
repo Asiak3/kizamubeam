@@ -3306,5 +3306,14 @@
   "Kopie (bei Versatz gespiegelt, z. B. für das zweite Bein)": "Copy (mirrored if offset, e.g. for the second leg)",
   "Abschnitt löschen": "Delete section",
   "Klicken setzt Punkte der Achse, Doppelklick oder Enter beendet, Esc bricht ab.": "Click to set axis points, double-click or Enter to finish, Esc to cancel.",
-  "Punkte ziehen verschiebt die Achse, die Linie ziehen verschiebt den ganzen Abschnitt; in einer anderen Ansicht verschiebt Ziehen die Ebene. Rechtsklick auf einen Punkt löscht ihn.": "Drag points to move the axis, drag the line to move the whole section; in another view dragging moves the plane. Right-click a point to delete it."
+  "Punkte ziehen verschiebt die Achse, die Linie ziehen verschiebt den ganzen Abschnitt; in einer anderen Ansicht verschiebt Ziehen die Ebene. Rechtsklick auf einen Punkt löscht ihn.": "Drag points to move the axis, drag the line to move the whole section; in another view dragging moves the plane. Right-click a point to delete it.",
+  "Rumpf, Beine und Schwanz im Modell suchen und als Abschnitte anlegen; danach von Hand korrigieren": "Find body, legs and tail in the model and create them as sections; then correct by hand",
+  "Modell wird untersucht …": "Analyzing model …",
+  "Vorschlag: {found}. Achsen prüfen und bei Bedarf ziehen.": "Suggestion: {found}. Check the axes and drag them if needed.",
+  "Vorschlagen": "Suggest",
+  "Im Modell wurde kein Körper gefunden.": "No solid body was found in the model.",
+  "Ende {n}": "End {n}",
+  "Schwanz": "Tail",
+  "Bein {n}": "Leg {n}",
+  "{n} Beine": "{n} legs"
 }

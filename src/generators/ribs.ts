@@ -12,8 +12,8 @@
 // +L-Seite (L = D beim eigenen Rückgrat, sonst die Schnittgerade nach oben gerichtet). Die Rippen werden also von
 // oben aufgesetzt, Beinplatten von unten in die Rumpf-Rippen geschoben.
 //
-// Abschnitte grenzen sich gegenseitig ab: Eine Rippe verliert, was im Schlauch (Radius r) um die Achse eines anderen
-// Abschnitts liegt, und wird auf einen Kreis mit ihrem eigenen r begrenzt. Rückgrate gleicher Ebene werden ein Teil;
+// Abschnitte grenzen sich gegenseitig ab: Eine Rippe verliert, was im Schlauch (Radius r, flache Enden) um die Achse
+// eines anderen Abschnitts liegt, und wird auf einen Kreis mit ihrem eigenen r begrenzt. Rückgrate gleicher Ebene werden ein Teil;
 // jedes Rückgrat reicht nur so weit wie der Schlauch um seine Achsen (an den Enden um „Rückgrat verlängern“ länger,
 // damit z. B. die Beinplatte in den Rumpf reicht).
 import type { Pt, SubPath } from '../model';
@@ -334,12 +334,28 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
   // ---- Rippenorte ----
   const ribs: Rib[] = [];
   const secRibs: number[][] = secs.map(() => []);
+  // Standfläche: Endet eine Achse steil am Boden (Pfote, Hals), liegt die unterste Rippe genau auf dem Boden
+  let floor = Infinity;
+  for (let i = 2; i < mesh.pos.length; i += 3) floor = Math.min(floor, mesh.pos[i]);
   secs.forEach((s, si) => {
     const len = s.cum[s.cum.length - 1];
-    const n = Math.max(1, Math.floor((len - th) / s.spacing) + 1);
-    const start = (len - (n - 1) * s.spacing) / 2;
+    let n = Math.max(1, Math.floor((len - th) / s.spacing) + 1);
+    let start = (len - (n - 1) * s.spacing) / 2;
+    let step = s.spacing;
+    const grounded = (l: number) => {
+      const tz = Math.abs(tangent(s, l, Math.min(s.spacing / 2, len / 2))[2]);
+      return at(s, l)[2] <= floor + th && tz > 0.7 ? th / 2 / tz : -1;
+    };
+    const g0 = grounded(0),
+      g1 = g0 < 0 ? grounded(len) : -1;
+    if (g0 >= 0 || g1 >= 0) {
+      const first = g0 >= 0 ? g0 : len - g1;
+      n = Math.max(1, Math.floor((len - (g0 >= 0 ? g0 : g1) - th / 2) / s.spacing) + 1);
+      start = first;
+      step = g0 >= 0 ? s.spacing : -s.spacing;
+    }
     for (let i = 0; i < n; i++) {
-      const l = start + i * s.spacing;
+      const l = start + i * step;
       const q = at(s, l);
       const T = tangent(s, l, Math.min(s.spacing / 2, len / 2));
       // T liegt in der Ebene; kleine Abweichungen herausrechnen
@@ -462,12 +478,39 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
         if (si === r.sec) return;
         const L = s.cum[s.cum.length - 1];
         const step = Math.max(0.5, s.radius / 3);
+        let own: Region = [];
         for (let l = 0; l <= L + 1e-9; l += step) {
           const q = at(s, l);
           const d = dot(q, r.T) - r.h;
           if (Math.abs(d) >= s.radius) continue;
-          other = unionRegions(other, circleRegion(to2(f, q), Math.sqrt(s.radius * s.radius - d * d), 32));
+          own = unionRegions(own, circleRegion(to2(f, q), Math.sqrt(s.radius * s.radius - d * d), 32));
         }
+        // Flache Enden: Was hinter dem Ende der Achse liegt (z. B. der Schwanz hinter dem Rumpf), gehört nicht dazu
+        for (const [l, sign] of [[0, 1], [L, -1]] as const) {
+          if (!own.length) break;
+          const T0 = tangent(s, l, Math.min(L / 2, s.radius / 2 || L / 2));
+          const P0 = at(s, l);
+          // sign·(a·X + b·Y + c) ≥ 0 in der Rippenebene
+          const a = sign * dot(f.u, T0),
+            b = sign * dot(f.v, T0),
+            c = sign * (r.h * dot(r.T, T0) - dot(P0, T0));
+          const nl = Math.hypot(a, b);
+          if (nl < 1e-6) {
+            if (c < 0) own = [];
+            continue;
+          }
+          const nx = a / nl,
+            ny = b / nl,
+            d0 = -c / nl;
+          const B = 1e4;
+          own = intersect(own, polyRegion([
+            { x: nx * d0 - ny * B, y: ny * d0 + nx * B },
+            { x: nx * d0 + ny * B, y: ny * d0 - nx * B },
+            { x: nx * (d0 + B) + ny * B, y: ny * (d0 + B) - nx * B },
+            { x: nx * (d0 + B) - ny * B, y: ny * (d0 + B) + nx * B },
+          ]));
+        }
+        if (own.length) other = unionRegions(other, own);
       });
       if (other.length) {
         const before = cleanRegion(reg, p.minArea).polys.length;
@@ -508,12 +551,12 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
           }
           const m = (c0 + c1) / 2;
           // Rippe: von ihrem Rand auf der −L-Seite bis zur Mitte (nicht in die nächste Insel davor)
-          cuts.push(...rect(lr, Math.max(reach(rp, w, m, r0, -1) - 0.5, (r0 + prevR) / 2), m));
+          cuts.push(...rect(lr, Math.max(reach(rp, w, m, r0, -1) - 0.5, (r0 + prevR) / 2), m + 0.05));
           holds.push(fromLine(lr, 0, m + hold));
           // Rückgrat: von der Mitte bis zu seinem Rand auf der +L-Seite
           const nextS = sIv.find((iv) => iv[0] > q1)?.[0] ?? Infinity;
           const sEnd = Math.min(reach(sp, w, m, q1, 1) + 0.5, (q1 + nextS) / 2);
-          sCuts.push({ g: gi, cut: rect(ls, m, sEnd), hold: fromLine(ls, 0, m - hold), mark: { ln: ls, m, y0: q0 } });
+          sCuts.push({ g: gi, cut: rect(ls, m - 0.05, sEnd), hold: fromLine(ls, 0, m - hold), mark: { ln: ls, m, y0: q0 } });
         }
     });
     if (!holds.length) {
