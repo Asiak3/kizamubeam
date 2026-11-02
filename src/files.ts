@@ -2,7 +2,7 @@
 import type { Editor } from './editor';
 import { parseMeshFile } from './model3d/mesh';
 import { addMesh } from './model3d/store';
-import { openGenDialog } from './generators/dialog';
+import { askModelKind, openGenDialog } from './generators/dialog';
 import { IDENT, Mat, mul, Obj, pageName, TextShape, visibleLeaves, PALETTE } from './model';
 import { boundsOf, subsToD, shapeSubs, textLayout, textOutline } from './geom';
 import { assetImage, assetUrl, flipImageV, hashId, processedPng, readDpi, registerAsset } from './images';
@@ -456,7 +456,7 @@ async function parseFile(name: string, bytes: Uint8Array, bedH: () => number): P
 /** Dateiinhalt anhand von Endung bzw. Dateikopf importieren; Fehler werden geworfen */
 export async function importBytesOrThrow(ed: Editor, name: string, bytes: Uint8Array) {
   if (/\.(stl|obj)$/i.test(name)) {
-    openModel(ed, name, bytes);
+    await openModel(ed, name, bytes);
     return;
   }
   if (/\.kza$/i.test(name)) {
@@ -598,21 +598,23 @@ export async function importFile(ed: Editor) {
 }
 
 /**
- * 3D-Modell einlesen und den Dialog des Schichtmodells öffnen. Das Netz kommt in den Modell-Speicher; die Teile
- * tragen nur seine Kennung. Fehler werden geworfen.
+ * 3D-Modell einlesen und den Dialog des Schichtmodells bzw. Rippenmodells öffnen (ohne Vorgabe wird gefragt).
+ * Das Netz kommt in den Modell-Speicher; die Teile tragen nur seine Kennung. Fehler werden geworfen.
  */
-export function openModel(ed: Editor, name: string, bytes: Uint8Array) {
+export async function openModel(ed: Editor, name: string, bytes: Uint8Array, gen?: 'stack' | 'ribs') {
   const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   const mesh = parseMeshFile(name, buf);
+  const kind = gen ?? (await askModelKind());
+  if (!kind) return;
   const id = addMesh(mesh);
-  openGenDialog(ed, 'stack', undefined, { model: id, name: name.replace(/\.[^.]*$/, '') });
+  openGenDialog(ed, kind, undefined, { model: id, name: name.replace(/\.[^.]*$/, '') });
 }
 
-/** Datei → Importieren → 3D-Modell …: nur STL und OBJ anbieten */
-export async function importModel(ed: Editor) {
+/** Kachel Schichtmodell/Rippenmodell: nur STL und OBJ anbieten */
+export async function importModel(ed: Editor, gen: 'stack' | 'ribs') {
   const run = async (name: string, bytes: Uint8Array) => {
     try {
-      openModel(ed, name, bytes);
+      await openModel(ed, name, bytes, gen);
     } catch (e) {
       alert(t('{name} konnte nicht importiert werden: {message}', { name, message: (e as Error).message }));
     }

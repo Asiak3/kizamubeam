@@ -950,7 +950,8 @@ function buildBars(ed: Editor) {
     { id: 'drawer', cat: W, icon: 'drawer', label: t('Schublade erstellen (Korpus, Schubkasten und Blende als Baugruppe)'), run: () => openGenDialog(ed, 'drawer') },
     { id: 'insert', cat: W, icon: 'insert', label: t('Einsatz mit Fächern erstellen (gesteckte Stege für Box oder Schublade)'), run: () => openGenDialog(ed, 'insert') },
     { id: 'shelf', cat: W, icon: 'shelf', label: t('Steckregal erstellen (Seiten und Böden gesteckt)'), run: () => openGenDialog(ed, 'shelf') },
-    { id: 'stack', cat: W, icon: 'stack', label: t('Schichtmodell aus einem 3D-Modell (STL, OBJ) erstellen'), run: () => importModel(ed) },
+    { id: 'stack', cat: W, icon: 'stack', label: t('Schichtmodell aus einem 3D-Modell (STL, OBJ) erstellen'), run: () => importModel(ed, 'stack') },
+    { id: 'ribs', cat: W, icon: 'ribs', label: t('Rippenmodell aus einem 3D-Modell (STL, OBJ) erstellen'), run: () => importModel(ed, 'ribs') },
     { id: 'discsphere', cat: W, icon: 'discsphere', label: t('Scheibenkugel erstellen (Lampe aus gesteckten Scheiben)'), run: () => openGenDialog(ed, 'discsphere') },
     { id: 'box', cat: W, icon: 'box', label: t('Box mit Fingerzinken erstellen (Baugruppe, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'box') },
     { id: 'vartext', cat: W, icon: 'vartext', short: t('Var. Text'), label: t('Variabler Text …'), run: () => openVarTextDialog(ed) },
@@ -1004,7 +1005,7 @@ function buildBars(ed: Editor) {
     { id: 'grp:align', cat: A, label: t('Ausrichten und verteilen (Gruppe)'), items: ['alignl', 'alignhc', 'alignr', 'alignt', 'alignvc', 'alignb', 'disth', 'distv'], run: () => {} },
     { id: 'grp:zoom', cat: V, label: t('Zoom (Gruppe)'), items: ['zoompage', 'zoomsel', 'zoomin', 'zoomout'], run: () => {} },
     { id: 'grp:bool', cat: M, label: t('Boolesche Operationen (Gruppe)'), items: ['union', 'subtract', 'intersect', 'boolopts'], run: () => {} },
-    { id: 'grp:gen', cat: W, label: t('Generatoren (Gruppe)'), items: ['gear', 'rack', 'pulley', 'cam', 'gearpair', 'box', 'drawer', 'insert', 'shelf', 'discsphere', 'stack'], run: () => {} },
+    { id: 'grp:gen', cat: W, label: t('Generatoren (Gruppe)'), items: ['gear', 'rack', 'pulley', 'cam', 'gearpair', 'box', 'drawer', 'insert', 'shelf', 'discsphere', 'stack', 'ribs'], run: () => {} },
     { id: 'grp:array', cat: M, label: t('Arrays (Gruppe)'), items: ['gridarray', 'circarray'], run: () => {} },
     { id: 'grp:path', cat: M, label: t('Pfad-Werkzeuge (Gruppe)'), items: ['tool:trim', 'tool:start', 'closepath', 'join', 'breakapart', 'reverse', 'corners'], run: () => {} },
   ];
