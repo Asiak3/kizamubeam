@@ -8,9 +8,9 @@ import { boundsOf, subsToD, shapeSubs, textLayout, textOutline } from './geom';
 import { assetImage, assetUrl, flipImageV, hashId, processedPng, readDpi, registerAsset } from './images';
 import { convertLbrn, finishLbrnTexts, isLbrn, LbrnResult, TextMeasure } from './lbrn';
 import { loadFont, textToSubs } from './fonts';
-import { importDxf, importSvg, ImportResult, transformSubs } from './importers';
+import { importDxf, importSvg, ImportResult, PathBuilder, transformSubs } from './importers';
 import { buildDxf, buildPdf, ExportItem, ExportPage, LayerInfo } from './vecexport';
-import { importPdfPages, isPdf } from './pdfimport';
+import { FallbackResolver, importPdfPages, isPdf } from './pdfimport';
 import { t, tn } from './i18n';
 import { tabNameFromPath } from './editor/tabs';
 
@@ -384,6 +384,48 @@ function bytesToDataUrl(bytes: Uint8Array, mime: string): Promise<string> {
 
 type ParsedFile = { kind: 'vectors'; res: ImportResult } | { kind: 'pdf'; pages: ImportResult[] } | { kind: 'image'; dataUrl: string; dpi: number | null } | { kind: 'lbrn'; res: LbrnResult };
 
+/**
+ * Ersatz für Schriften, die eine PDF-Datei nicht eingebettet hat: erst die Familie selbst (Systemschrift oder
+ * im Font-Manager geladen), sonst die Ersatzschrift der App.
+ */
+const pdfFontFallback: FallbackResolver = async (families, bold, italic) => {
+  let lf: Awaited<ReturnType<typeof loadFont>> | null = null,
+    name = families[0] ?? '';
+  for (const f of families) {
+    const r = await loadFont(f, bold, italic);
+    if (!r.fallback) {
+      lf = r;
+      name = f;
+      break;
+    }
+    lf ??= r;
+  }
+  if (!lf) return null;
+  const font = lf.font;
+  const upm = font.unitsPerEm || 1000;
+  return {
+    unitsPerEm: upm,
+    name: lf.fallback ? (font.names.fontFamily?.en ?? 'Roboto') : name,
+    substituted: lf.fallback,
+    glyph(ch: string) {
+      const g = font.charToGlyph(ch);
+      if (!g || !g.index) return null;
+      // getPath liefert y nach unten; zurück in Schrifteinheiten mit y nach oben
+      const pb = new PathBuilder();
+      for (const c of g.getPath(0, 0, upm).commands) {
+        if (c.type === 'M') pb.moveTo({ x: c.x, y: -c.y });
+        else if (c.type === 'L') pb.lineTo({ x: c.x, y: -c.y });
+        else if (c.type === 'C') pb.curveTo({ x: c.x1, y: -c.y1 }, { x: c.x2, y: -c.y2 }, { x: c.x, y: -c.y });
+        else if (c.type === 'Q') {
+          const p0 = pb.pos;
+          pb.curveTo({ x: p0.x + (2 / 3) * (c.x1 - p0.x), y: p0.y + (2 / 3) * (-c.y1 - p0.y) }, { x: c.x + (2 / 3) * (c.x1 - c.x), y: -c.y + (2 / 3) * (-c.y1 + c.y) }, { x: c.x, y: -c.y });
+        } else if (c.type === 'Z') pb.close();
+      }
+      return { subs: pb.subs.filter((sp) => sp.nodes.length > 1), advance: g.advanceWidth ?? upm / 2 };
+    },
+  };
+};
+
 /** Dateiinhalt anhand von Endung bzw. Dateikopf lesen; Fehler werden geworfen */
 async function parseFile(name: string, bytes: Uint8Array, bedH: () => number): Promise<ParsedFile> {
   const ext = (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? '').toLowerCase();
@@ -400,7 +442,7 @@ async function parseFile(name: string, bytes: Uint8Array, bedH: () => number): P
           ? t('Diese Illustrator-Datei enthält keine PDF-Fassung (altes Format). Bitte in Illustrator mit „PDF-kompatible Datei erstellen“ speichern oder als PDF/SVG exportieren.')
           : t('Keine gültige PDF-Datei'),
       );
-    return { kind: 'pdf', pages: importPdfPages(bytes) };
+    return { kind: 'pdf', pages: await importPdfPages(bytes, { fallback: pdfFontFallback }) };
   }
   if (ext === 'svg' || head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg')))
     return { kind: 'vectors', res: importSvg(new TextDecoder().decode(bytes)) };

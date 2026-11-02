@@ -3243,11 +3243,11 @@
   "{what} exportiert.": "{what} exported.",
   "Diese Illustrator-Datei enthält keine PDF-Fassung (altes Format). Bitte in Illustrator mit „PDF-kompatible Datei erstellen“ speichern oder als PDF/SVG exportieren.": "This Illustrator file contains no PDF version (old format). Please save it in Illustrator with “Create PDF Compatible File” or export it as PDF/SVG.",
   "Keine gültige PDF-Datei": "Not a valid PDF file",
-  "Die PDF-Datei ist verschlüsselt. Bitte ohne Kennwort/Schutz speichern und erneut importieren.": "The PDF file is encrypted. Please save it without password/protection and import it again.",
+  "Die PDF-Datei ist mit einem Kennwort zum Öffnen geschützt. Bitte ohne Kennwort speichern und erneut importieren.": "The PDF file is protected with a password to open it. Please save it without a password and import it again.",
   "Die PDF-Datei enthält keine lesbare Seite.": "The PDF file contains no readable page.",
   "Die Datei hat {n} Seiten; übernommen wurde Seite {page}.": "The file has {n} pages; page {page} was imported.",
-  "{n} Text wurde übersprungen (vorher in Pfade umwandeln).": "{n} text was skipped (convert to outlines first).",
-  "{n} Texte wurden übersprungen (vorher in Pfade umwandeln).": "{n} texts were skipped (convert to outlines first).",
+  "{n} Text wurde übersprungen (Schrift nicht eingebettet und nicht vorhanden).": "{n} text was skipped (font not embedded and not available).",
+  "{n} Texte wurden übersprungen (Schrift nicht eingebettet und nicht vorhanden).": "{n} texts were skipped (font not embedded and not available).",
   "{n} Farbverlauf wurde übersprungen.": "{n} gradient was skipped.",
   "{n} Farbverläufe wurden übersprungen.": "{n} gradients were skipped.",
   "Zu tief verschachtelte Inhalte wurden übersprungen.": "Too deeply nested content was skipped.",
@@ -3260,5 +3260,8 @@
   "Als Illustrator-Datei (AI) exportieren": "Export as Illustrator file (AI)",
   "PDF importieren": "Import PDF",
   "{name}: {n} Seite importiert.": "{name}: {n} page imported.",
-  "{name}: {n} Seiten importiert, ab Seite 2 auf neuen Projektseiten.": "{name}: {n} pages imported, page 2 onwards on new project pages."
+  "{name}: {n} Seiten importiert, ab Seite 2 auf neuen Projektseiten.": "{name}: {n} pages imported, page 2 onwards on new project pages.",
+  "{n} Zeichen fehlte in der Schrift.": "{n} character was missing from the font.",
+  "{n} Zeichen fehlten in der Schrift.": "{n} characters were missing from the font.",
+  "Nicht eingebettete Schriften ersetzt: {list}.": "Fonts that were not embedded were replaced: {list}."
 }

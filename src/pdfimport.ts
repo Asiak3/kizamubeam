@@ -3,9 +3,11 @@
 // Durchsuchen der Datei), Objekt-Streams, die üblichen Filter und die Zeichenbefehle für Pfade und Bilder.
 // Pfade bleiben Bézierkurven; Farben werden wie beim SVG-Import auf die nächstliegende Layerfarbe abgebildet.
 import { inflateSync, unzlibSync, zlibSync } from 'fflate';
-import { apply, IDENT, Mat, mul } from './model';
-import { ImportedImage, ImportedPath, ImportResult, nearestLayer, PathBuilder } from './importers';
+import { apply, IDENT, Mat, mul, SubPath } from './model';
+import { ImportedImage, ImportedPath, ImportResult, nearestLayer, PathBuilder, transformSubs } from './importers';
+import { FontProgram, nameToUnicode, parseCFF, parseTrueType, parseType1, STANDARD, WIN_ANSI } from './pdffonts';
 import { t, tn } from './i18n';
+import { EncryptInfo, PdfDecryptor } from './pdfcrypt';
 
 // ---------- Objekte ----------
 
@@ -352,6 +354,11 @@ class PdfDoc {
   xref = new Map<number, XEntry>();
   trailer = new Dict();
   cache = new Map<number, Obj>();
+  /** Datei ist verschlüsselt; crypt fehlt, wenn ein Kennwort zum Öffnen nötig ist oder das Verfahren unbekannt ist */
+  encrypted = false;
+  crypt: PdfDecryptor | null = null;
+  private encryptNum = -1;
+  private lastGen = 0;
   constructor(public b: Uint8Array) {
     try {
       this.readXref();
@@ -364,6 +371,74 @@ class PdfDoc {
       this.trailer = new Dict();
       this.scan();
     }
+    this.setupCrypt();
+  }
+
+  /** Standard-Sicherheitsverfahren mit leerem Benutzerkennwort (nur Bearbeitungsschutz) einrichten */
+  private setupCrypt() {
+    const enc = this.trailer.get('Encrypt') as Obj | undefined;
+    if (enc === undefined || enc === null) return;
+    this.encrypted = true;
+    if (enc instanceof Ref) this.encryptNum = enc.num;
+    const d = this.dict(enc);
+    if (!d) return;
+    const R = (k: string) => this.resolve(d.get(k) as Obj);
+    const bytes = (k: string) => {
+      const v = R(k);
+      return v instanceof Str ? v.b : undefined;
+    };
+    const id = this.resolve(this.trailer.get('ID') as Obj);
+    const id0 = Array.isArray(id) && this.resolve(id[0]) instanceof Str ? (this.resolve(id[0]) as Str).b : new Uint8Array(0);
+    const v = num(R('V'), 0);
+    const cf = this.dict(d.get('CF'));
+    const method = (name: string): EncryptInfo['stmMethod'] => {
+      if (v < 4) return 'RC4';
+      if (name === 'Identity' || !name) return 'Identity';
+      const cfm = nameOf(this.resolve(this.dict(cf?.get(name))?.get('CFM') as Obj));
+      return cfm === 'AESV2' ? 'AESV2' : cfm === 'AESV3' ? 'AESV3' : cfm === 'V2' ? 'RC4' : 'Identity';
+    };
+    const em = R('EncryptMetadata');
+    try {
+      this.crypt = new PdfDecryptor({
+        filter: nameOf(R('Filter')),
+        v,
+        r: num(R('R'), 2),
+        length: num(R('Length'), 40),
+        o: bytes('O') ?? new Uint8Array(0),
+        u: bytes('U') ?? new Uint8Array(0),
+        oe: bytes('OE'),
+        ue: bytes('UE'),
+        p: num(R('P'), -1) | 0,
+        id0,
+        encryptMetadata: em !== false,
+        stmMethod: method(nameOf(R('StmF'))),
+        strMethod: method(nameOf(R('StrF'))),
+      });
+    } catch {
+      this.crypt = null;
+      return;
+    }
+    // Bisher gelesene Objekte waren noch verschlüsselt
+    const keep = this.cache.get(this.encryptNum);
+    this.cache.clear();
+    if (keep !== undefined) this.cache.set(this.encryptNum, keep);
+  }
+
+  private decryptObj(v: Obj, n: number, g: number): Obj {
+    const c = this.crypt!;
+    if (v instanceof Str) return new Str(c.string(n, g, v.b));
+    if (Array.isArray(v)) return v.map((x) => this.decryptObj(x, n, g));
+    if (v instanceof Dict) {
+      for (const [k, x] of v.m) v.m.set(k, this.decryptObj(x as Obj, n, g));
+      return v;
+    }
+    if (v instanceof Stream) {
+      this.decryptObj(v.dict, n, g);
+      const type = nameOf(v.dict.get('Type'));
+      if (type === 'XRef') return v;
+      return new Stream(v.dict, c.stream(n, g, v.raw));
+    }
+    return v;
   }
 
   private readXref() {
@@ -478,7 +553,7 @@ class PdfDoc {
   private parseAt(off: number): Obj {
     const lx = new Lexer(this.b, off);
     lx.next();
-    lx.next();
+    const gen = num(lx.next());
     const kw = lx.next();
     if (!(kw instanceof Op) || kw.op !== 'obj') throw new Error('obj');
     const v = lx.value() ?? null;
@@ -500,10 +575,12 @@ class PdfDoc {
           end = k < 0 ? this.b.length : p + k;
           while (end > p && (this.b[end - 1] === 10 || this.b[end - 1] === 13)) end--;
         }
+        this.lastGen = gen;
         return new Stream(v, this.b.subarray(p, end));
       }
       lx.p = save;
     }
+    this.lastGen = gen;
     return v;
   }
 
@@ -515,6 +592,7 @@ class PdfDoc {
     if (e?.type === 1) {
       try {
         v = this.parseAt(e.off);
+        if (this.crypt && n !== this.encryptNum) v = this.decryptObj(v, n, this.lastGen);
       } catch {
         v = null;
       }
@@ -728,6 +806,105 @@ interface GState {
   strokeCs: ColorSpace;
   fill: RGB;
   stroke: RGB;
+  // Textzustand
+  font: PFont | null;
+  fs: number;
+  tc: number;
+  tw: number;
+  th: number;
+  tl: number;
+  rise: number;
+  mode: number;
+}
+
+// ---------- Schriften ----------
+
+/** Ersatz für nicht eingebettete Schriften (von der App geliefert): Glyphen in Schrifteinheiten, y nach oben */
+export interface FallbackFont {
+  unitsPerEm: number;
+  glyph(ch: string): { subs: SubPath[]; advance: number } | null;
+  /** Name der tatsächlich verwendeten Schrift */
+  name: string;
+  /** true, wenn die gewünschte Schrift fehlte und eine andere einspringt */
+  substituted: boolean;
+}
+/** Schrift laden: Kandidaten für den Familiennamen (bester zuerst), fett, kursiv */
+export type FallbackResolver = (families: string[], bold: boolean, italic: boolean) => Promise<FallbackFont | null>;
+
+interface PFont {
+  name: string;
+  /** Codes aus einer Zeichenkette lesen */
+  codes(b: Uint8Array): { code: number; cid: number; len: number }[];
+  /** Vorschub in Textraum-Einheiten (1 = Schriftgröße) */
+  width(code: number, cid: number): number;
+  /** Umriss im Geviert (y nach oben); null = keine Glyphe */
+  outline(code: number, cid: number): SubPath[] | null;
+  /** Type-3-Schrift: Glyphe als Inhalts-Stream */
+  type3?: { proc(code: number): Stream | null; matrix: Mat; resources: Dict | null };
+  /** Kein Schriftprogramm lesbar: Ersatz nötig */
+  needsFallback: boolean;
+  families: string[];
+  bold: boolean;
+  italic: boolean;
+  fallback: FallbackFont | null;
+  unicode(code: number, cid: number): string;
+}
+
+/** Familienname aus dem PostScript-Namen (ohne Teilmengen-Präfix) mit Varianten für die Suche */
+function familyCandidates(base: string): { families: string[]; bold: boolean; italic: boolean } {
+  const n = base.replace(/^[A-Z]{6}\+/, '');
+  const bold = /bold|black|heavy|semibold|demi/i.test(n);
+  const italic = /italic|oblique|kursiv/i.test(n);
+  const STD: Record<string, string> = { helvetica: 'Arial', arial: 'Arial', times: 'Times New Roman', timesnewroman: 'Times New Roman', courier: 'Courier New', couriernew: 'Courier New' };
+  let fam = n.split(/[-,]/)[0].replace(/(PSMT|MT|PS)$/, '');
+  const std = STD[fam.toLowerCase().replace(/[^a-z]/g, '').replace(/roman$/, '')] ?? STD[fam.toLowerCase().replace(/[^a-z]/g, '')];
+  if (std) return { families: [std], bold, italic };
+  fam = fam.replace(/(Bold|Italic|Oblique|Regular|Medium|Light|Black|Semibold|SemiBold)+$/g, '') || fam;
+  const spaced = fam.replace(/([a-z])([A-Z])/g, '$1 $2');
+  return { families: [...new Set([spaced, fam])], bold, italic };
+}
+
+/** ToUnicode- oder Kodierungs-CMap lesen */
+function parseCMap(data: Uint8Array) {
+  const s = latin1(data);
+  const hexNum = (h: string) => parseInt(h || '0', 16);
+  const ranges: { lo: number; hi: number; len: number }[] = [];
+  for (const m of s.matchAll(/begincodespacerange([\s\S]*?)endcodespacerange/g))
+    for (const r of m[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g)) ranges.push({ lo: hexNum(r[1]), hi: hexNum(r[2]), len: r[1].length / 2 });
+  const cid = new Map<number, number>();
+  const cidRanges: [number, number, number][] = [];
+  for (const m of s.matchAll(/begincidrange([\s\S]*?)endcidrange/g))
+    for (const r of m[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(\d+)/g)) cidRanges.push([hexNum(r[1]), hexNum(r[2]), parseInt(r[3], 10)]);
+  for (const m of s.matchAll(/begincidchar([\s\S]*?)endcidchar/g)) for (const r of m[1].matchAll(/<([0-9A-Fa-f]+)>\s*(\d+)/g)) cid.set(hexNum(r[1]), parseInt(r[2], 10));
+  const uni = new Map<number, string>();
+  const utf16 = (h: string) => {
+    let out = '';
+    for (let i = 0; i + 3 < h.length; i += 4) out += String.fromCharCode(parseInt(h.substr(i, 4), 16));
+    return out;
+  };
+  for (const m of s.matchAll(/beginbfchar([\s\S]*?)endbfchar/g)) for (const r of m[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]*)>/g)) uni.set(hexNum(r[1]), utf16(r[2]));
+  for (const m of s.matchAll(/beginbfrange([\s\S]*?)endbfrange/g))
+    for (const r of m[1].matchAll(/<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(<([0-9A-Fa-f]*)>|\[([^\]]*)\])/g)) {
+      const lo = hexNum(r[1]),
+        hi = hexNum(r[2]);
+      if (hi - lo > 65535) continue;
+      if (r[4] !== undefined) {
+        const base = utf16(r[4]);
+        for (let c = lo; c <= hi; c++) uni.set(c, base.slice(0, -1) + String.fromCharCode(base.charCodeAt(base.length - 1) + c - lo));
+      } else {
+        const list = [...(r[5] ?? '').matchAll(/<([0-9A-Fa-f]*)>/g)].map((x) => utf16(x[1]));
+        list.forEach((u, i) => uni.set(lo + i, u));
+      }
+    }
+  return {
+    ranges,
+    cid: (c: number) => {
+      if (cid.has(c)) return cid.get(c)!;
+      for (const [lo, hi, st] of cidRanges) if (c >= lo && c <= hi) return st + c - lo;
+      return undefined;
+    },
+    uni,
+  };
 }
 
 const PT = 25.4 / 72;
@@ -757,36 +934,333 @@ export interface PdfImportResult extends ImportResult {
   pageSize: { w: number; h: number };
 }
 
+const fontCache = new WeakMap<PdfDoc, Map<Dict, PFont>>();
+
+/** Schrift aus einem /Font-Eintrag lesen (zwischengespeichert je Dokument) */
+function loadPFont(doc: PdfDoc, fd: Dict): PFont {
+  let cache = fontCache.get(doc);
+  if (!cache) fontCache.set(doc, (cache = new Map()));
+  const hit = cache.get(fd);
+  if (hit) return hit;
+  const R = (v: unknown) => doc.resolve(v as Obj);
+  const sub = nameOf(R(fd.get('Subtype')));
+  const baseName = nameOf(R(fd.get('BaseFont'))) || nameOf(R(fd.get('Name'))) || 'Font';
+  const cand = familyCandidates(baseName);
+  const desc0 = sub === 'Type0' ? doc.dict((R(fd.get('DescendantFonts')) as Obj[] | null)?.[0]) : fd;
+  const fdesc = doc.dict(desc0?.get('FontDescriptor'));
+  const flags = num(R(fdesc?.get('Flags')));
+  if (num(R(fdesc?.get('FontWeight'))) >= 600 || flags & (1 << 18)) cand.bold = true;
+  if (flags & 64 || num(R(fdesc?.get('ItalicAngle'))) !== 0) cand.italic = true;
+  // ToUnicode (für Ersatzschriften)
+  const tu = R(fd.get('ToUnicode'));
+  let toUni: Map<number, string> | null = null;
+  if (tu instanceof Stream) {
+    try {
+      toUni = parseCMap(doc.decode(tu)).uni;
+    } catch {
+      toUni = null;
+    }
+  }
+  // Schriftprogramm
+  let prog: FontProgram | null = null;
+  const ff = (k: string) => {
+    const v = R(fdesc?.get(k));
+    return v instanceof Stream ? v : null;
+  };
+  try {
+    const f2 = ff('FontFile2'),
+      f3 = ff('FontFile3'),
+      f1 = ff('FontFile');
+    if (f2) prog = parseTrueType(doc.decode(f2));
+    else if (f3) {
+      const st = nameOf(R(f3.dict.get('Subtype')));
+      const d = doc.decode(f3);
+      prog = st === 'OpenType' ? parseTrueType(d) : parseCFF(d);
+    } else if (f1) prog = parseType1(doc.decode(f1), num(R(f1.dict.get('Length1'))));
+    if (prog && prog.numGlyphs === 0) prog = null;
+  } catch {
+    prog = null;
+  }
+  const gcache = new Map<number, SubPath[] | null>();
+  const outlineGid = (gid: number | undefined, key: number): SubPath[] | null => {
+    if (gcache.has(key)) return gcache.get(key)!;
+    let res: SubPath[] | null = null;
+    if (prog && gid !== undefined && gid >= 0 && gid < Math.max(prog.numGlyphs, 1)) {
+      const g = prog.glyph(gid);
+      res = g ? transformSubs(g, prog.matrix) : null;
+    }
+    gcache.set(key, res);
+    return res;
+  };
+  const fallbackOutline = (pf: PFont, code: number, cid: number): SubPath[] | null => {
+    const fb = pf.fallback;
+    if (!fb) return null;
+    const ch = pf.unicode(code, cid);
+    const key = -1 - code;
+    if (gcache.has(key)) return gcache.get(key)!;
+    const g = ch ? fb.glyph(ch) : null;
+    const res = g ? transformSubs(g.subs, [1 / fb.unitsPerEm, 0, 0, 1 / fb.unitsPerEm, 0, 0]) : null;
+    gcache.set(key, res);
+    return res;
+  };
+  let pf: PFont;
+  if (sub === 'Type3') {
+    const procs = doc.dict(fd.get('CharProcs'));
+    const fmA = R(fd.get('FontMatrix'));
+    const matrix: Mat = Array.isArray(fmA) && fmA.length === 6 ? (fmA.map((x) => num(R(x))) as Mat) : [0.001, 0, 0, 0.001, 0, 0];
+    const names = simpleEncoding(doc, fd, null, false);
+    const first = num(R(fd.get('FirstChar')));
+    const wa = R(fd.get('Widths'));
+    pf = {
+      name: baseName,
+      codes: (b) => [...b].map((c) => ({ code: c, cid: c, len: 1 })),
+      width: (c) => (Array.isArray(wa) ? num(R(wa[c - first])) * matrix[0] : 0),
+      outline: () => null,
+      type3: {
+        proc: (c) => {
+          const v = R(procs?.get(names[c] ?? ''));
+          return v instanceof Stream ? v : null;
+        },
+        matrix,
+        resources: doc.dict(fd.get('Resources')),
+      },
+      needsFallback: false,
+      ...cand,
+      fallback: null,
+      unicode: (c) => toUni?.get(c) ?? '',
+    };
+  } else if (sub === 'Type0') {
+    const encO = R(fd.get('Encoding'));
+    let cm: ReturnType<typeof parseCMap> | null = null;
+    if (encO instanceof Stream) {
+      try {
+        cm = parseCMap(doc.decode(encO));
+      } catch {
+        cm = null;
+      }
+    }
+    const ranges = cm?.ranges.length ? cm.ranges : [{ lo: 0, hi: 0xffff, len: 2 }];
+    const W = new Map<number, number>();
+    const wa = R(desc0?.get('W'));
+    if (Array.isArray(wa))
+      for (let i = 0; i < wa.length; ) {
+        const c1 = num(R(wa[i]));
+        const nx = R(wa[i + 1]);
+        if (Array.isArray(nx)) {
+          nx.forEach((w, k) => W.set(c1 + k, num(R(w))));
+          i += 2;
+        } else {
+          const c2 = num(nx),
+            w = num(R(wa[i + 2]));
+          for (let c = c1; c <= c2 && c - c1 < 65536; c++) W.set(c, w);
+          i += 3;
+        }
+      }
+    const dw = num(R(desc0?.get('DW')), 1000);
+    const c2g = R(desc0?.get('CIDToGIDMap'));
+    let c2gMap: Uint8Array | null = null;
+    if (c2g instanceof Stream) {
+      try {
+        c2gMap = doc.decode(c2g);
+      } catch {
+        c2gMap = null;
+      }
+    }
+    const gidOf = (cid: number) => {
+      if (c2gMap) return 2 * cid + 1 < c2gMap.length ? (c2gMap[2 * cid] << 8) | c2gMap[2 * cid + 1] : undefined;
+      if (prog?.cidToGid) return prog.cidToGid(cid);
+      return cid;
+    };
+    pf = {
+      name: baseName,
+      codes: (b) => {
+        const out: { code: number; cid: number; len: number }[] = [];
+        for (let i = 0; i < b.length; ) {
+          let done = false;
+          for (let len = 1; len <= 4 && !done; len++) {
+            if (i + len > b.length) break;
+            let c = 0;
+            for (let k = 0; k < len; k++) c = c * 256 + b[i + k];
+            if (ranges.some((r) => r.len === len && c >= r.lo && c <= r.hi)) {
+              out.push({ code: c, cid: cm ? (cm.cid(c) ?? c) : c, len });
+              i += len;
+              done = true;
+            }
+          }
+          if (!done) i++;
+        }
+        return out;
+      },
+      width: (_c, cid) => (W.get(cid) ?? dw) / 1000,
+      outline: (code, cid) => (prog ? outlineGid(gidOf(cid), cid) : fallbackOutline(pf, code, cid)),
+      needsFallback: !prog,
+      ...cand,
+      fallback: null,
+      unicode: (c) => toUni?.get(c) ?? '',
+    };
+  } else {
+    // einfache Schrift (Type1, MMType1, TrueType)
+    const symbolic = (flags & 4) !== 0 && (flags & 32) === 0;
+    const names = simpleEncoding(doc, fd, prog, sub === 'TrueType');
+    const first = num(R(fd.get('FirstChar')));
+    const wa = R(fd.get('Widths'));
+    const missing = num(R(fdesc?.get('MissingWidth')));
+    const gidFor = (code: number): number | undefined => {
+      if (!prog) return undefined;
+      const nm = names[code];
+      if (sub === 'TrueType' || prog.cmap) {
+        const c30 = prog.cmap?.(3, 0),
+          c31 = prog.cmap?.(3, 1),
+          c10 = prog.cmap?.(1, 0);
+        if (symbolic || !c31) {
+          const g = c30?.get(0xf000 + code) ?? c30?.get(code) ?? c10?.get(code);
+          if (g) return g;
+        }
+        const u = nm ? nameToUnicode(nm) : undefined;
+        const g = (u ? c31?.get(u.charCodeAt(0)) : undefined) ?? (nm ? prog.nameToGid(nm) : undefined) ?? c10?.get(code) ?? c30?.get(0xf000 + code);
+        if (g) return g;
+        return code < prog.numGlyphs ? code : undefined;
+      }
+      return (nm ? prog.nameToGid(nm) : undefined) ?? prog.builtinCode(code);
+    };
+    pf = {
+      name: baseName,
+      codes: (b) => [...b].map((c) => ({ code: c, cid: c, len: 1 })),
+      width: (c) => {
+        const w = Array.isArray(wa) ? R(wa[c - first]) : null;
+        if (typeof w === 'number') return w / 1000;
+        if (missing) return missing / 1000;
+        if (prog) {
+          const g = gidFor(c);
+          if (g !== undefined) return prog.advance(g) * prog.matrix[0];
+        }
+        const fb = pf.fallback;
+        const ch = pf.unicode(c, c);
+        const gl = fb && ch ? fb.glyph(ch) : null;
+        return gl ? gl.advance / fb!.unitsPerEm : 0.5;
+      },
+      outline: (code) => (prog ? outlineGid(gidFor(code), code) : fallbackOutline(pf, code, code)),
+      needsFallback: !prog,
+      ...cand,
+      fallback: null,
+      unicode: (c) => toUni?.get(c) ?? (names[c] ? (nameToUnicode(names[c]!) ?? '') : c >= 32 && c < 127 ? String.fromCharCode(c) : ''),
+    };
+  }
+  cache.set(fd, pf);
+  return pf;
+}
+
+/** Glyphennamen je Code für einfache Schriften: Differences vor Basiskodierung */
+function simpleEncoding(doc: PdfDoc, fd: Dict, prog: FontProgram | null, trueType: boolean): (string | undefined)[] {
+  const enc = doc.resolve(fd.get('Encoding') as Obj);
+  const baseOf = (n: string) => (n === 'WinAnsiEncoding' || n === 'MacRomanEncoding' || n === 'MacExpertEncoding' ? WIN_ANSI : n === 'StandardEncoding' ? STANDARD : null);
+  let base: (string | undefined)[] | null = null;
+  if (enc instanceof Name) base = baseOf(enc.n);
+  else if (enc instanceof Dict) base = baseOf(nameOf(doc.resolve(enc.get('BaseEncoding') as Obj)));
+  // Ohne Angabe: eingebaute Kodierung des Schriftprogramms (Type 1/CFF) bzw. Standard (TrueType)
+  const names: (string | undefined)[] = [];
+  if (base) base.forEach((n, c) => (names[c] = n));
+  else if (trueType || !prog) STANDARD.forEach((n, c) => (names[c] = n));
+  if (enc instanceof Dict) {
+    const diff = doc.resolve(enc.get('Differences') as Obj);
+    if (Array.isArray(diff)) {
+      let code = 0;
+      for (const d of diff) {
+        const v = doc.resolve(d);
+        if (typeof v === 'number') code = v;
+        else if (v instanceof Name) names[code++] = v.n;
+      }
+    }
+  }
+  return names;
+}
+
+/** Alle Schriften, die auf den Seiten (auch in Formularen und Type-3-Schriften) benutzt werden */
+function collectFonts(doc: PdfDoc, res: Dict | null, out: Set<Dict>, seen: Set<Dict>, depth = 0) {
+  if (!res || seen.has(res) || depth > 12) return;
+  seen.add(res);
+  const fonts = doc.dict(res.get('Font'));
+  if (fonts)
+    for (const v of fonts.m.values()) {
+      const f = doc.dict(v);
+      if (f && !out.has(f)) {
+        out.add(f);
+        collectFonts(doc, doc.dict(f.get('Resources')), out, seen, depth + 1);
+      }
+    }
+  const xo = doc.dict(res.get('XObject'));
+  if (xo)
+    for (const v of xo.m.values()) {
+      const x = doc.resolve(v as Obj);
+      if (x instanceof Stream && nameOf(x.dict.get('Subtype')) === 'Form') collectFonts(doc, doc.dict(x.dict.get('Resources')), out, seen, depth + 1);
+    }
+}
+
 export const isPdf = (b: Uint8Array) => latin1(b, 0, Math.min(b.length, 1024)).includes('%PDF-');
 
-/** PDF bzw. PDF-kompatible .ai-Datei lesen; page: Seite ab 0 */
-export function importPdf(bytes: Uint8Array, opts: { page?: number } = {}): PdfImportResult {
+export interface PdfImportOptions {
+  /** Seite ab 0 (nur importPdf) */
+  page?: number;
+  /** Ersatz für nicht eingebettete Schriften; ohne werden solche Texte übersprungen */
+  fallback?: FallbackResolver;
+}
+
+/** PDF bzw. PDF-kompatible .ai-Datei lesen (eine Seite) */
+export async function importPdf(bytes: Uint8Array, opts: PdfImportOptions = {}): Promise<PdfImportResult> {
   const { doc, pages } = openPdf(bytes);
-  return readPage(doc, pages, Math.max(0, Math.min(pages.length - 1, opts.page ?? 0)));
+  const pi = Math.max(0, Math.min(pages.length - 1, opts.page ?? 0));
+  const subst = await prepareFonts(doc, [pages[pi]], opts.fallback);
+  return readPage(doc, pages, pi, subst);
 }
 
 /** Alle Seiten einer PDF-Datei (je Seite ein Ergebnis) */
-export function importPdfPages(bytes: Uint8Array): PdfImportResult[] {
+export async function importPdfPages(bytes: Uint8Array, opts: PdfImportOptions = {}): Promise<PdfImportResult[]> {
   const { doc, pages } = openPdf(bytes);
-  return pages.map((_, i) => readPage(doc, pages, i));
+  const subst = await prepareFonts(doc, pages, opts.fallback);
+  return pages.map((_, i) => readPage(doc, pages, i, subst));
+}
+
+/** Nicht eingebettete Schriften vorab über die App laden; liefert die Namen ersetzter Schriften */
+async function prepareFonts(doc: PdfDoc, pages: ReturnType<PdfDoc['pages']>, fallback?: FallbackResolver): Promise<Map<string, string>> {
+  const subst = new Map<string, string>();
+  if (!fallback) return subst;
+  const fonts = new Set<Dict>();
+  const seen = new Set<Dict>();
+  for (const pg of pages) collectFonts(doc, pg.resources, fonts, seen);
+  const byKey = new Map<string, Promise<FallbackFont | null>>();
+  for (const fd of fonts) {
+    let pf: PFont;
+    try {
+      pf = loadPFont(doc, fd);
+    } catch {
+      continue;
+    }
+    if (!pf.needsFallback || pf.type3) continue;
+    const key = `${pf.families.join('|')}/${pf.bold}/${pf.italic}`;
+    if (!byKey.has(key)) byKey.set(key, fallback(pf.families, pf.bold, pf.italic).catch(() => null));
+    pf.fallback = await byKey.get(key)!;
+    if (pf.fallback?.substituted) subst.set(pf.families[0], pf.fallback.name);
+  }
+  return subst;
 }
 
 function openPdf(bytes: Uint8Array) {
   if (!isPdf(bytes)) throw new Error(t('Keine gültige PDF-Datei'));
   const doc = new PdfDoc(bytes);
-  if (doc.trailer.get('Encrypt') !== undefined)
-    throw new Error(t('Die PDF-Datei ist verschlüsselt. Bitte ohne Kennwort/Schutz speichern und erneut importieren.'));
+  if (doc.encrypted && !doc.crypt)
+    throw new Error(t('Die PDF-Datei ist mit einem Kennwort zum Öffnen geschützt. Bitte ohne Kennwort speichern und erneut importieren.'));
   const pages = doc.pages();
   if (!pages.length) throw new Error(t('Die PDF-Datei enthält keine lesbare Seite.'));
   return { doc, pages };
 }
 
-function readPage(doc: PdfDoc, pages: ReturnType<PdfDoc['pages']>, pi: number): PdfImportResult {
+function readPage(doc: PdfDoc, pages: ReturnType<PdfDoc['pages']>, pi: number, subst: Map<string, string>): PdfImportResult {
   const pg = pages[pi];
   const P = pageMatrix(pg.box, pg.rotate);
   const items: (ImportedPath | ImportedImage)[] = [];
   const notes: string[] = [];
   let texts = 0,
+    missingGlyphs = 0,
     shadings = 0,
     inlineImgs = 0,
     badImgs = 0,
@@ -955,8 +1429,68 @@ function readPage(doc: PdfDoc, pages: ReturnType<PdfDoc['pages']>, pi: number): 
     let gs: GState = { ...gs0 };
     let ops: Obj[] = [];
     let pb = new PathBuilder();
-    let shown = false;
+    let tm: Mat = IDENT,
+      tlm: Mat = IDENT;
+    let textAcc = new Map<number, ImportedPath>();
+    let lostText = false;
     const T = () => mul(P.m, gs.ctm);
+    /** Zeichenkette setzen: Glyphen als Umrisse sammeln, Textmatrix weiterschieben */
+    const show = (b: Uint8Array) => {
+      const f = gs.font;
+      if (!f) {
+        lostText = true;
+        return;
+      }
+      const th = gs.th;
+      const visible = gs.mode !== 3 && gs.mode !== 7;
+      const strokeOnly = gs.mode === 1 || gs.mode === 5;
+      const layer = nearestLayer(strokeOnly ? gs.stroke : gs.fill);
+      for (const { code, cid, len } of f.codes(b)) {
+        const w0 = f.width(code, cid);
+        if (visible) {
+          const gm: Mat = mul(tm, [gs.fs * th, 0, 0, gs.fs, 0, gs.rise]);
+          if (f.type3) {
+            const proc = f.type3.proc(code);
+            if (proc && depth < 24) {
+              const data = safeDecode(proc);
+              const before = items.length;
+              if (data) run(data, f.type3.resources ?? res, { ...gs, ctm: mul(gs.ctm, mul(gm, f.type3.matrix)) }, depth + 1, forms);
+              // Glyphen eines Textes zu einem Objekt je Farbe zusammenfassen
+              for (const it of items.splice(before)) {
+                if (it.kind !== 'path') {
+                  items.push(it);
+                  continue;
+                }
+                let acc = textAcc.get(it.layer);
+                if (!acc) {
+                  acc = { kind: 'path', subs: [], layer: it.layer };
+                  textAcc.set(it.layer, acc);
+                  items.push(acc);
+                }
+                acc.subs.push(...it.subs);
+              }
+            }
+          } else {
+            const ol = f.outline(code, cid);
+            if (ol === null) {
+              if (f.needsFallback && !f.fallback) lostText = true;
+              else if (code !== 32 && f.unicode(code, cid).trim()) missingGlyphs++;
+            } else if (ol.length) {
+              let acc = textAcc.get(layer);
+              if (!acc) {
+                acc = { kind: 'path', subs: [], layer };
+                textAcc.set(layer, acc);
+                items.push(acc);
+              }
+              acc.subs.push(...transformSubs(ol, mul(P.m, mul(gs.ctm, gm))));
+            }
+          }
+        }
+        const tx = (w0 * gs.fs + gs.tc + (len === 1 && code === 32 ? gs.tw : 0)) * th;
+        tm = mul(tm, [1, 0, 0, 1, tx, 0]);
+      }
+    };
+    const strBytes = (v: Obj | undefined) => (v instanceof Str ? v.b : null);
     const pt = (x: unknown, y: unknown) => apply(T(), num(x), num(y));
     const paint = (stroke: boolean, fill: boolean) => {
       if (fill)
@@ -1098,18 +1632,84 @@ function readPage(doc: PdfDoc, pages: ReturnType<PdfDoc['pages']>, pi: number): 
           if (gs.strokeCs.kind !== 'pattern') gs.stroke = toRgb(gs.strokeCs, nums());
           break;
         case 'BT':
-          shown = false;
+          tm = tlm = IDENT;
+          textAcc = new Map();
+          lostText = false;
           break;
         case 'ET':
-          if (shown) texts++;
-          shown = false;
+          if (lostText) texts++;
+          lostText = false;
+          textAcc = new Map();
           break;
-        case 'Tj':
-        case 'TJ':
+        case 'Tf': {
+          const fname = a[a.length - 2];
+          gs.fs = num(a[a.length - 1], gs.fs);
+          const fdict = fname instanceof Name ? doc.dict(doc.dict(res?.get('Font'))?.get(fname.n)) : null;
+          try {
+            gs.font = fdict ? loadPFont(doc, fdict) : null;
+          } catch {
+            gs.font = null;
+          }
+          break;
+        }
+        case 'Tc':
+          gs.tc = num(a[a.length - 1]);
+          break;
+        case 'Tw':
+          gs.tw = num(a[a.length - 1]);
+          break;
+        case 'Tz':
+          gs.th = num(a[a.length - 1], 100) / 100;
+          break;
+        case 'TL':
+          gs.tl = num(a[a.length - 1]);
+          break;
+        case 'Ts':
+          gs.rise = num(a[a.length - 1]);
+          break;
+        case 'Tr':
+          gs.mode = num(a[a.length - 1]);
+          break;
+        case 'Td':
+        case 'TD': {
+          const [tx, ty] = nums().slice(-2);
+          if (v.op === 'TD') gs.tl = -(ty ?? 0);
+          tm = tlm = mul(tlm, [1, 0, 0, 1, tx ?? 0, ty ?? 0]);
+          break;
+        }
+        case 'Tm': {
+          const n6 = nums().slice(-6);
+          if (n6.length === 6) tm = tlm = n6 as Mat;
+          break;
+        }
+        case 'T*':
+          tm = tlm = mul(tlm, [1, 0, 0, 1, 0, -gs.tl]);
+          break;
+        case 'Tj': {
+          const b = strBytes(a[a.length - 1]);
+          if (b) show(b);
+          break;
+        }
         case "'":
-        case '"':
-          shown = true;
+        case '"': {
+          if (v.op === '"') {
+            gs.tw = num(a[a.length - 3]);
+            gs.tc = num(a[a.length - 2]);
+          }
+          tm = tlm = mul(tlm, [1, 0, 0, 1, 0, -gs.tl]);
+          const b = strBytes(a[a.length - 1]);
+          if (b) show(b);
           break;
+        }
+        case 'TJ': {
+          const arr = a[a.length - 1];
+          if (!Array.isArray(arr)) break;
+          for (const el of arr) {
+            if (el instanceof Str) show(el.b);
+            else if (typeof el === 'number') tm = mul(tm, [1, 0, 0, 1, (-el / 1000) * gs.fs * gs.th, 0]);
+          }
+          break;
+        }
         case 'sh':
           shadings++;
           break;
@@ -1167,9 +1767,22 @@ function readPage(doc: PdfDoc, pages: ReturnType<PdfDoc['pages']>, pi: number): 
     all.set(p, o);
     o += p.length;
   }
-  run(all, pg.resources, { ctm: IDENT, fillCs: GRAY, strokeCs: GRAY, fill: [0, 0, 0], stroke: [0, 0, 0] }, 0, new Set());
+  run(
+    all,
+    pg.resources,
+    { ctm: IDENT, fillCs: GRAY, strokeCs: GRAY, fill: [0, 0, 0], stroke: [0, 0, 0], font: null, fs: 0, tc: 0, tw: 0, th: 1, tl: 0, rise: 0, mode: 0 },
+    0,
+    new Set(),
+  );
+  // Textsammler ohne Glyphen entfernen
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.kind === 'path' && !it.subs.length) items.splice(i, 1);
+  }
 
-  if (texts) notes.push(tn('{n} Text wurde übersprungen (vorher in Pfade umwandeln).', '{n} Texte wurden übersprungen (vorher in Pfade umwandeln).', texts));
+  if (texts) notes.push(tn('{n} Text wurde übersprungen (Schrift nicht eingebettet und nicht vorhanden).', '{n} Texte wurden übersprungen (Schrift nicht eingebettet und nicht vorhanden).', texts));
+  if (missingGlyphs) notes.push(tn('{n} Zeichen fehlte in der Schrift.', '{n} Zeichen fehlten in der Schrift.', missingGlyphs));
+  if (subst.size) notes.push(t('Nicht eingebettete Schriften ersetzt: {list}.', { list: [...subst].map(([a, b]) => `${a} → ${b}`).join(', ') }));
   if (shadings) notes.push(tn('{n} Farbverlauf wurde übersprungen.', '{n} Farbverläufe wurden übersprungen.', shadings));
   if (inlineImgs || badImgs) notes.push(tn('{n} Bild ließ sich nicht lesen.', '{n} Bilder ließen sich nicht lesen.', inlineImgs + badImgs));
   if (depthHit) notes.push(t('Zu tief verschachtelte Inhalte wurden übersprungen.'));

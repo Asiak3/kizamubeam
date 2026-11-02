@@ -2,7 +2,7 @@
 // Optional: KIZAMUBEAM_DUMP=<ordner> schreibt die erzeugten Dateien zum Prüfen mit Fremdprogrammen.
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { zlibSync } from 'fflate';
 const { buildDxf, buildPdf } = await import('../src/vecexport');
 const { importPdf, importPdfPages, encodePng, pageMatrix } = await import('../src/pdfimport');
@@ -67,7 +67,7 @@ function sameSub(a: SubPath, b: SubPath, tol: number) {
   });
 }
 
-await test('DXF: Rundreise über den eigenen Import ist genau (Kurven als Bézier-Spline)', () => {
+await test('DXF: Rundreise über den eigenen Import ist genau (Kurven als Bézier-Spline)', async () => {
   const { text, skippedImages } = buildDxf(items, layers, bed.h);
   save('test.dxf', text);
   assert.equal(skippedImages, 0);
@@ -96,14 +96,14 @@ await test('DXF: Rundreise über den eigenen Import ist genau (Kurven als Bézie
   assert.equal(res.notes.length, 0, res.notes.join(' '));
 });
 
-await test('DXF: Layer mit Namen, Echtfarbe und $INSUNITS = mm', () => {
+await test('DXF: Layer mit Namen, Echtfarbe und $INSUNITS = mm', async () => {
   const { text } = buildDxf(items, layers, bed.h);
   assert.match(text, /\$INSUNITS\r\n 70\r\n4|\$INSUNITS\r\n70\r\n4/);
   assert.ok(text.includes('C01 Gravur \\U+00C4pfel'), 'Layername (ANSI mit \\U+)');
   assert.ok(text.includes('\r\n420\r\n255\r\n'), 'Echtfarbe Blau (0x0000ff)');
 });
 
-await test('DXF: Bilder werden gezählt und übersprungen', () => {
+await test('DXF: Bilder werden gezählt und übersprungen', async () => {
   const r = buildDxf([...items, { kind: 'image', m: [10, 0, 0, 10, 0, 0], layer: 0, pxW: 0, pxH: 0 }], layers, bed.h);
   assert.equal(r.skippedImages, 1);
   assert.equal(importDxf(r.text).items.length, 4);
@@ -114,7 +114,7 @@ const rgb = new Uint8Array([255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255]);
 const alpha = new Uint8Array([255, 255, 255, 128]);
 const imgM: [number, number, number, number, number, number] = [40, 0, 0, 20, 200, 20];
 
-await test('PDF: Rundreise über den eigenen Import (Pfade, Layerfarben, Bild, zwei Seiten)', () => {
+await test('PDF: Rundreise über den eigenen Import (Pfade, Layerfarben, Bild, zwei Seiten)', async () => {
   const pdf = buildPdf(
     [
       { name: 'Seite 1', items: [...items, { kind: 'image', m: imgM, layer: 0, pxW: 2, pxH: 2, rgb, alpha }] },
@@ -126,7 +126,7 @@ await test('PDF: Rundreise über den eigenen Import (Pfade, Layerfarben, Bild, z
   save('test.ai', pdf);
   const head = new TextDecoder().decode(pdf.subarray(0, 8));
   assert.equal(head, '%PDF-1.5');
-  const r = importPdf(pdf);
+  const r = await importPdf(pdf);
   assert.equal(r.pageCount, 2);
   near(r.pageSize.w, 300, 1e-3, 'Breite');
   near(r.pageSize.h, 200, 1e-3, 'Höhe');
@@ -142,17 +142,17 @@ await test('PDF: Rundreise über den eigenen Import (Pfade, Layerfarben, Bild, z
   assert.equal(imgs.length, 1);
   imgM.forEach((v, i) => near(imgs[0].m[i], v, 1e-3, `Bildmatrix[${i}]`));
   assert.ok(imgs[0].href.startsWith('data:image/png;base64,iVBORw0KGgo'), 'PNG');
-  const p2 = importPdf(pdf, { page: 1 });
+  const p2 = await importPdf(pdf, { page: 1 });
   assert.equal(p2.items.length, 1);
   assert.equal((p2.items[0] as ImportedPath).layer, 3);
-  const all = importPdfPages(pdf);
+  const all = await importPdfPages(pdf);
   assert.deepEqual(all.map((p) => p.items.length), [5, 1]);
 });
 
-await test('PDF: JPEG wird unverändert eingebettet und wieder ausgelesen', () => {
+await test('PDF: JPEG wird unverändert eingebettet und wieder ausgelesen', async () => {
   const fakeJpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 0xff, 0xd9]);
   const pdf = buildPdf([{ name: '', items: [{ kind: 'image', m: imgM, layer: 0, pxW: 8, pxH: 8, jpeg: fakeJpeg }] }], { bed, layers });
-  const r = importPdf(pdf);
+  const r = await importPdf(pdf);
   const img = r.items[0] as ImportedImage;
   assert.equal(img.href, 'data:image/jpeg;base64,' + Buffer.from(fakeJpeg).toString('base64'));
 });
@@ -189,7 +189,7 @@ function classicPdf(bodies: (string | Uint8Array)[], trailerExtra = '', breakOff
 }
 const streamObj = (dict: string, data: Uint8Array) => concat([`<< ${dict} /Length ${data.length} >>\nstream\n`, data, '\nendstream']);
 
-await test('PDF: Form-XObject, cm, re, CMYK, gedrehte Seite (Rotate 90)', () => {
+await test('PDF: Form-XObject, cm, re, CMYK, gedrehte Seite (Rotate 90)', async () => {
   const form = enc.encode('0 1 0 0 K 0 0 m 10 0 l S');
   const content = enc.encode('q 2 0 0 2 0 0 cm 0 1 1 0 k 10 10 20 30 re f Q q 1 0 0 1 100 100 cm /Fm0 Do Q');
   const pdf = classicPdf([
@@ -199,7 +199,7 @@ await test('PDF: Form-XObject, cm, re, CMYK, gedrehte Seite (Rotate 90)', () => 
     streamObj('', content),
     streamObj('/Type /XObject /Subtype /Form /BBox [0 0 50 50] /Matrix [1 0 0 1 5 0]', form),
   ]);
-  const r = importPdf(pdf);
+  const r = await importPdf(pdf);
   const K = 25.4 / 72;
   near(r.pageSize.w, 100 * K, 1e-6, 'gedrehte Breite');
   near(r.pageSize.h, 200 * K, 1e-6, 'gedrehte Höhe');
@@ -218,7 +218,7 @@ await test('PDF: Form-XObject, cm, re, CMYK, gedrehte Seite (Rotate 90)', () => 
   near(a.y, 105 * K, 1e-6, 'Linie y (aus x)');
 });
 
-await test('PDF: Querverweis-Stream mit Objekt-Stream, PNG-Prädiktor und Flate', () => {
+await test('PDF: Querverweis-Stream mit Objekt-Stream, PNG-Prädiktor und Flate', async () => {
   // Objekte 1–3 im Objekt-Stream 5, Inhalt 4 als normaler Stream, Querverweise in Stream 6
   const objs = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Contents 4 0 R >>'];
   let hdr = '',
@@ -258,7 +258,7 @@ await test('PDF: Querverweis-Stream mit Objekt-Stream, PNG-Prädiktor und Flate'
     '\nendobj\n',
   ]);
   const pdf = concat([head, o4, o5, o6, `startxref\n${off6}\n%%EOF\n`]);
-  const r = importPdf(pdf);
+  const r = await importPdf(pdf);
   const paths = r.items as ImportedPath[];
   assert.equal(paths.length, 1);
   assert.equal(paths[0].layer, 2);
@@ -266,7 +266,7 @@ await test('PDF: Querverweis-Stream mit Objekt-Stream, PNG-Prädiktor und Flate'
   near(paths[0].subs[0].nodes[1].y, (100 - 72) * (25.4 / 72), 1e-6, 'y gespiegelt');
 });
 
-await test('PDF: kaputte Querverweise → Datei wird durchsucht', () => {
+await test('PDF: kaputte Querverweise → Datei wird durchsucht', async () => {
   const pdf = classicPdf(
     [
       '<< /Type /Catalog /Pages 2 0 R >>',
@@ -277,13 +277,13 @@ await test('PDF: kaputte Querverweise → Datei wird durchsucht', () => {
     '',
     true,
   );
-  const r = importPdf(pdf);
+  const r = await importPdf(pdf);
   assert.equal(r.items.length, 1);
   assert.equal((r.items[0] as ImportedPath).layer, 1, 'blau');
   assert.ok((r.items[0] as ImportedPath).subs[0].closed);
 });
 
-await test('PDF: Filter LZW, ASCII85, ASCIIHex; Text und Inline-Bild werden gemeldet', () => {
+await test('PDF: Filter LZW, ASCII85, ASCIIHex; Text und Inline-Bild werden gemeldet', async () => {
   // „1 0 0 RG 0 0 m 10 10 l S“ in ASCIIHex, dahinter Text und ein Inline-Bild
   const c = '1 0 0 RG 0 0 m 10 10 l S BT /F1 12 Tf (Hallo) Tj ET BI /W 1 /H 1 /BPC 8 /CS /G ID \x00 EI 0 0 1 RG 5 5 m 6 6 l S';
   const hex = Buffer.from(c, 'latin1').toString('hex') + '>';
@@ -298,18 +298,18 @@ await test('PDF: Filter LZW, ASCII85, ASCIIHex; Text und Inline-Bild werden geme
     streamObj('/Filter /LZWDecode', lzwData),
     streamObj('/Filter /ASCII85Decode', enc.encode('0H`(m0Ha7`+>Fun+Di5]+?:Q\\+B&~>')),
   ]);
-  const r = importPdf(pdf);
+  const r = await importPdf(pdf);
   assert.equal(r.items.length, 3, 'zwei Linien aus Hex + eine aus ASCII85');
   assert.ok(r.notes.some((n) => /Text|text/.test(n)), r.notes.join(' | '));
   assert.ok(r.notes.some((n) => /Bild|image/.test(n)), r.notes.join(' | '));
 });
 
-await test('PDF: verschlüsselte Datei wird abgelehnt', () => {
+await test('PDF: verschlüsselte Datei wird abgelehnt', async () => {
   const pdf = classicPdf(['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [] /Count 0 >>'], '/Encrypt << /Filter /Standard >> ');
-  assert.throws(() => importPdf(pdf), /verschlüsselt|encrypted/);
+  await assert.rejects(() => importPdf(pdf), /Kennwort|password/);
 });
 
-await test('PDF: Bild mit Indexed-Farbraum und Maske, 1-Bit-Graustufen', () => {
+await test('PDF: Bild mit Indexed-Farbraum und Maske, 1-Bit-Graustufen', async () => {
   const idx = zlibSync(new Uint8Array([0, 1, 1, 0]));
   const bits = new Uint8Array([0b10000000, 0b01000000]);
   const pdf = classicPdf([
@@ -320,7 +320,7 @@ await test('PDF: Bild mit Indexed-Farbraum und Maske, 1-Bit-Graustufen', () => {
     streamObj('/Subtype /Image /Width 2 /Height 2 /BitsPerComponent 8 /ColorSpace [/Indexed /DeviceRGB 1 <FF000000FF00>] /Filter /FlateDecode', idx),
     streamObj('/Subtype /Image /Width 2 /Height 2 /BitsPerComponent 1 /ColorSpace /DeviceGray', bits),
   ]);
-  const r = importPdf(pdf);
+  const r = await importPdf(pdf);
   const imgs = r.items as ImportedImage[];
   assert.equal(imgs.length, 2);
   near(imgs[0].m[0], 25.4, 1e-6, 'Bildbreite 72 pt');
@@ -329,7 +329,86 @@ await test('PDF: Bild mit Indexed-Farbraum und Maske, 1-Bit-Graustufen', () => {
   assert.equal(r.notes.length, 0, r.notes.join(' '));
 });
 
-await test('PNG-Kodierer erzeugt gültige Kopfzeilen', () => {
+// ---------- Text und Verschlüsselung (Dateien in scripts/fixtures/pdf, siehe README dort) ----------
+
+const fixture = (n: string) => new Uint8Array(readFileSync(new URL(`./fixtures/pdf/${n}`, import.meta.url)));
+type Item = ImportedPath | ImportedImage;
+const summary = (items: Item[]) =>
+  items.map((it) => {
+    if (it.kind !== 'path') return 'Bild';
+    const xs = it.subs.flatMap((s) => s.nodes.map((n) => n.x)),
+      ys = it.subs.flatMap((s) => s.nodes.map((n) => n.y));
+    return { layer: it.layer, contours: it.subs.length, x: Math.min(...xs), y: Math.min(...ys) };
+  });
+const boxFont = async () => ({
+  unitsPerEm: 1000,
+  name: 'Box',
+  substituted: true,
+  glyph: (ch: string) => (ch.trim() ? { subs: [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: 500, y: 0 }, { x: 500, y: 700 }, { x: 0, y: 700 }] }], advance: 600 } : { subs: [], advance: 600 }),
+});
+
+await test('Text: CFF (Type1C, CIDFontType0C mit Identity-H, OpenType) wird zu Umrissen', async () => {
+  const r = await importPdf(fixture('text-cff.pdf'));
+  assert.deepEqual(r.notes, []);
+  const s = summary(r.items) as { layer: number; contours: number; x: number; y: number }[];
+  // „Hallo CFF Grüße“ = 18 Konturen (blau), „Hallo“ = 7 (rot), „Grüße“ = 8 (schwarz)
+  assert.deepEqual(s.map((x) => [x.layer, x.contours]), [[1, 18], [2, 7], [0, 8]]);
+  near(s[0].x, 7.75, 0.05, 'linker Rand');
+  near(s[2].y, 44.84, 0.05, 'Oberkante „Grüße“');
+});
+
+await test('Text: TrueType und Type 1 eingebettet, Zeichenabstand und Breite', async () => {
+  const r = await importPdf(fixture('text-rl.pdf'));
+  const s = summary(r.items) as { layer: number; contours: number; x: number; y: number }[];
+  assert.deepEqual(s.map((x) => [x.layer, x.contours]), [[0, 34], [1, 26], [1, 29]]);
+  // Helvetica ist nicht eingebettet: ohne Ersatz übersprungen und gemeldet
+  assert.equal(r.notes.length, 1);
+  assert.match(r.notes[0], /1/);
+});
+
+await test('Text: nicht eingebettete Schrift über Ersatzschrift der App', async () => {
+  const r = await importPdf(fixture('text-rl.pdf'), { fallback: boxFont });
+  const s = summary(r.items) as { layer: number; contours: number; x: number; y: number }[];
+  // „Helvetica Bold nicht eingebettet“ hat 29 Zeichen ohne Leerzeichen, rot
+  assert.deepEqual(s[1], { ...s[1], layer: 2, contours: 29 });
+  near(s[1].x, 10, 1e-4, 'Start bei 10 mm');
+  assert.ok(r.notes.some((n) => /Box/.test(n)), r.notes.join(' | '));
+});
+
+await test('Text: Type-3-Schrift und CID-TrueType aus Chromium, gedrehter Text', async () => {
+  const r = await importPdf(fixture('text-chrome.pdf'));
+  const s = summary(r.items) as { layer: number; contours: number; x: number; y: number }[];
+  assert.deepEqual(s.map((x) => x.contours), [36, 32, 11]);
+  assert.deepEqual(r.notes, []);
+});
+
+await test('Verschlüsselung: RC4 40/128, AES-128 und AES-256 ohne Öffnungskennwort', async () => {
+  for (const f of ['enc-rc4-40.pdf', 'enc-rc4-128.pdf', 'enc-aes128.pdf', 'enc-aes256r6.pdf']) {
+    const r = await importPdf(fixture(f));
+    assert.equal(r.items.length, 3, f);
+    assert.equal((r.items[0] as ImportedPath).layer, 2, `${f}: rotes Rechteck`);
+  }
+  await assert.rejects(() => importPdf(fixture('enc-userpw.pdf')), /Kennwort|password/);
+});
+
+await test('Krypto-Bausteine: bekannte Prüfwerte', async () => {
+  const { md5, sha256, sha512, rc4, aesCbcDecrypt, aesCbcEncrypt } = await import('../src/pdfcrypt');
+  const hex = (b: Uint8Array) => Buffer.from(b).toString('hex');
+  const abc = new TextEncoder().encode('abc');
+  assert.equal(hex(md5(abc)), '900150983cd24fb0d6963f7d28e17f72');
+  assert.equal(hex(sha256(abc)), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  assert.equal(hex(sha512(abc, true)).slice(0, 16), 'cb00753f45a35e8b');
+  assert.equal(hex(sha512(abc)).slice(0, 16), 'ddaf35a193617aba');
+  assert.equal(hex(rc4(new TextEncoder().encode('Key'), new TextEncoder().encode('Plaintext'))), 'bbf316e8d940af0ad3');
+  // FIPS-197: AES-128 mit Schlüssel 000102…0f
+  const key = Uint8Array.from({ length: 16 }, (_, i) => i);
+  const pt = Uint8Array.from({ length: 16 }, (_, i) => i * 0x11);
+  const ct = aesCbcEncrypt(key, new Uint8Array(16), pt);
+  assert.equal(hex(ct), '69c4e0d86a7b0430d8cdb78070b4c55a');
+  assert.equal(hex(aesCbcDecrypt(key, new Uint8Array(16), ct, false)), hex(pt));
+});
+
+await test('PNG-Kodierer erzeugt gültige Kopfzeilen', async () => {
   const png = encodePng(1, 1, new Uint8Array([1, 2, 3, 4]));
   assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   assert.equal(new TextDecoder().decode(png.subarray(12, 16)), 'IHDR');
