@@ -3896,3 +3896,38 @@ input.bound {
 .pc-dialog .form.pc-mode {
   grid-template-columns: 170px 260px;
 }
+
+/* Jig-Generator */
+.jig-panel {
+  margin-top: 8px;
+}
+.jig-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.jig-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.jig-thumb {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.jig-col {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.jig-name {
+  width: 100%;
+}
+input.jig-count {
+  width: 60px;
+}

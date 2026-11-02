@@ -87,6 +87,7 @@
         "Arbeitsbereichs-Check vor jedem Job und Rahmen, inklusive gemeldetem Werkstück-Offset",
         "Materialtest-Raster mit Auswertung per Foto, Fokustest (Rampe oder Z-Reihe), Rotationsachse (Rolle oder Futter), eigene G-Code-Skripte pro Gerät",
         "Print and Cut: Passermarken mitdrucken, mit schwachem Laserpunkt oder Kamera einmessen, Design passgenau auf den Druck legen",
+        "Jig-Generator: Halteplatten mit passgenauen Aussparungen für Werkstücke aus Vektordatei, Foto oder Kamera, mit Nummern und Passermarken",
         "G-Code speichern oder direkt streamen – das Streaming läuft im Rust-Kern",
         "Leistung und Geschwindigkeit während des Jobs nachsteuern; FluidNC: Job auf SD-Karte oder Flash laden und dort starten, config.yaml mit Sicherung bearbeiten, Steuerung im WLAN finden"
       ]

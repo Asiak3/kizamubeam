@@ -44,6 +44,8 @@ import { buildCheckPanel, openCheck } from './checkPanel';
 import { openCalibrateDialog } from './calibrateDialog';
 import { openFocusTestDialog } from './focustestDialog';
 import { openPrintCutDialog } from './printcutDialog';
+import { encodeShapes } from './generators/jig';
+import { shapesFromSelection } from './generators/jigPanel';
 import { buildParamsPanel, openShowIfDialog } from './paramsPanel';
 import { buildNotesPanel } from './notesPanel';
 import { buildView3dPanel } from './view3d/panel';
@@ -943,6 +945,7 @@ function buildBars(ed: Editor) {
     },
     { id: 'qr', cat: W, icon: 'qr', label: t('QR-Code erstellen'), run: () => openQrDialog(ed) },
     { id: 'barcode', cat: W, icon: 'barcode', label: t('Strichcode erstellen (Code 128, EAN, UPC, Code 39, ITF)'), run: () => openBarcodeDialog(ed) },
+    { id: 'jig', cat: W, icon: 'jig', label: t('Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken'), run: () => openGenDialog(ed, 'jig', undefined, ed.sel.length ? { shapes: encodeShapes(shapesFromSelection(ed)) } : undefined) },
     { id: 'gear', cat: W, icon: 'gear', label: t('Zahnrad erstellen (Evolventenverzahnung, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'gear') },
     { id: 'rack', cat: W, icon: 'rack', label: t('Zahnstange erstellen (passend zum Zahnrad, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'rack') },
     { id: 'pulley', cat: W, icon: 'pulley', label: t('Riemenscheibe erstellen (GT2, HTD; Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'pulley') },
