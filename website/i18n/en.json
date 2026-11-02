@@ -1,7 +1,7 @@
 {
   "lang": "en",
   "locale": "en_US",
-  "version": "1.16.0-beta",
+  "version": "1.17.0-beta",
   "meta": {
     "title": "KizamuBeam – Free laser engraving & cutting software",
     "description": "Free, open-source laser software for macOS, Windows and Linux. Design, engrave photos, generate boxes and gears, and send jobs straight to FluidNC, GRBL, grblHAL, Marlin and Smoothieware lasers.",
@@ -29,7 +29,7 @@
     "lang_short": "DE"
   },
   "hero": {
-    "badge": "New: version 1.16.0-beta",
+    "badge": "New: version 1.17.0-beta",
     "title": "Your laser. Your software. Free.",
     "subtitle": "KizamuBeam is open-source software to design, engrave and cut – made for diode lasers running FluidNC, GRBL and friends. Free on macOS, Windows and Linux.",
     "cta_primary": "Download for free",
@@ -86,6 +86,8 @@
         "Preview with time estimate and scrubber; “Start Here” resumes an interrupted job",
         "Work-area check before every job and frame, including the reported work offset",
         "Material test grid with photo evaluation, focus test (ramp or Z series), rotary support (roller or chuck), custom G-code scripts per device",
+        "Print and Cut: print registration marks, measure them with a low-power laser dot or the camera, and lay the design precisely onto the print",
+        "Jig generator: holding plates with precise cut-outs for workpieces from a vector file, photo or camera, with slot numbers and registration marks",
         "Save G-code or stream it directly – streaming runs in the Rust core",
         "Adjust power and speed during a job; FluidNC: upload jobs to SD card or flash and run them there, edit config.yaml with backups, find the controller on Wi-Fi"
       ]

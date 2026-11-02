@@ -14,9 +14,10 @@ import type { Generator, Params, ParamSpec } from './types';
 import { library, entryLabel } from '../materials';
 import { genFitPatch } from '../fitcheck';
 import { ribsPanel, type GenPanel } from '../model3d/ribsPanel';
+import { jigPanel } from './jigPanel';
 
 /** Generatoren mit eigener Zeichenfläche unter den Feldern */
-const PANELS: Record<string, (p: Params, set: (patch: Params) => void) => GenPanel> = { ribs: ribsPanel };
+const PANELS: Record<string, (p: Params, set: (patch: Params) => void, ed: Editor) => GenPanel> = { ribs: ribsPanel, jig: jigPanel };
 
 const LAST_KEY = (id: string) => `kizamubeam.gen.${id}`;
 
@@ -160,7 +161,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   const panel = PANELS[g.id]?.(p, (patch) => {
     Object.assign(p, patch);
     update();
-  });
+  }, ed);
 
   const update = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde

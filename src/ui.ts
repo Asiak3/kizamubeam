@@ -43,6 +43,10 @@ import { buildLibraryPanel, openAddSelectionDialog } from './libraryPanel';
 import { buildCheckPanel, openCheck } from './checkPanel';
 import { openCalibrateDialog } from './calibrateDialog';
 import { openFocusTestDialog } from './focustestDialog';
+import { openPrintCutDialog } from './printcutDialog';
+import { encodeShapes } from './generators/jig';
+import { shapesFromSelection } from './generators/jigPanel';
+import { openJigFillDialog } from './jigFillDialog';
 import { buildParamsPanel, openShowIfDialog } from './paramsPanel';
 import { buildNotesPanel } from './notesPanel';
 import { buildView3dPanel } from './view3d/panel';
@@ -942,6 +946,7 @@ function buildBars(ed: Editor) {
     },
     { id: 'qr', cat: W, icon: 'qr', label: t('QR-Code erstellen'), run: () => openQrDialog(ed) },
     { id: 'barcode', cat: W, icon: 'barcode', label: t('Strichcode erstellen (Code 128, EAN, UPC, Code 39, ITF)'), run: () => openBarcodeDialog(ed) },
+    { id: 'jig', cat: W, icon: 'jig', label: t('Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken'), run: () => openGenDialog(ed, 'jig', undefined, ed.sel.length ? { shapes: encodeShapes(shapesFromSelection(ed)) } : undefined) },
     { id: 'gear', cat: W, icon: 'gear', label: t('Zahnrad erstellen (Evolventenverzahnung, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'gear') },
     { id: 'rack', cat: W, icon: 'rack', label: t('Zahnstange erstellen (passend zum Zahnrad, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'rack') },
     { id: 'pulley', cat: W, icon: 'pulley', label: t('Riemenscheibe erstellen (GT2, HTD; Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'pulley') },
@@ -987,11 +992,13 @@ function buildBars(ed: Editor) {
     { id: 'materialtest', cat: L, icon: 'mattest', short: t('Test'), label: t('Materialtest …'), run: () => openMaterialTestDialog(ed) },
     { id: 'testphoto', cat: L, icon: 'testphoto', short: t('Auswerten'), label: t('Materialtest auswerten: Foto des gelaserten Tests laden und die beste Zelle anklicken'), run: () => openTestPhotoDialog(ed) },
     { id: 'focustest', cat: L, icon: 'focus', short: t('Fokus'), label: t('Fokustest: richtigen Abstand zwischen Laserkopf und Material finden'), run: () => openFocusTestDialog(ed) },
+    { id: 'printcut', cat: L, icon: 'printcut', short: t('Print and Cut'), label: t('Print and Cut: gedrucktes Blatt an Passermarken einmessen und passgenau schneiden'), run: () => openPrintCutDialog(ed) },
     { id: 'calibrate', cat: L, icon: 'calibrate', short: t('Passung'), label: t('Passung kalibrieren: Schnittfuge und Steckspiel für ein Material ermitteln'), run: () => openCalibrateDialog(ed) },
     { id: 'devsettings', cat: L, icon: 'settings', label: t('Geräteeinstellungen'), run: () => openDeviceDialog(ed) },
     { id: 'devices', cat: L, short: t('Geräte'), label: t('Geräte …'), run: () => openDevicesDialog(ed) },
     { id: 'rotary', cat: L, icon: 'rotary', short: t('Rotary'), label: t('Drehachse (Rotary) …'), run: () => openRotaryDialog() },
     { id: 'slots', cat: M, icon: 'slots', label: t('Schlitze an Materialdicke anpassen …'), run: () => openSlotDialog(ed) },
+    { id: 'jigfill', cat: A, icon: 'jigfill', label: t('Auf Jig-Fächer legen: gewähltes Design in jedes Fach eines Jigs kopieren, auf Wunsch mit Seriennummer je Fach'), run: () => openJigFillDialog(ed), enabled: sel1 },
     { id: 'workpiece', cat: A, icon: 'workpiece', label: t('Auf Werkstücke übertragen (Kamera) …'), run: () => openWorkpieceDialog(ed), enabled: sel1 },
     { id: 'bgremove', cat: I, icon: 'bgremove', label: t('Hintergrund entfernen …'), run: () => openBackgroundDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'series', cat: F, icon: 'series', label: t('Serie aus Tabelle (CSV) …'), run: () => openSeriesDialog(ed) },

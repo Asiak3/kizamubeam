@@ -3,6 +3,7 @@
 // Undo-Schritt (siehe Editor.batch in agent.ts). Koordinaten: Maschine, Ursprung unten links, y nach oben, mm.
 import type { Editor } from './editor';
 import { boundsOf, Box, segments, shapeSubs, textLayout } from './geom';
+import { fillJig, findJigs, parseSlotRange, refSlot } from './jigUse';
 import { about, apply, BarcodeShape, CutSettings, defaultSubLayer, SubLayer, LinearType, IDENT, NOTE_KEYS, ObjBindKey, leaves, Mat, mul, newId, Obj, QrLevel, rotate, scale, Shape, SubPath, TextShape, translate } from './model';
 import { barcodeData, qrMatrix } from './barcode';
 import { encodeLinear, LINEAR_TYPES } from './barcode1d';
@@ -1390,6 +1391,36 @@ export const EDIT_TOOLS: ToolDef[] = [
       });
       ed.applyArray(mats, bool(a, 'group', false), t('Kreisarray'));
       return result(ed, before);
+    },
+  },
+  {
+    name: 'jig_fill',
+    title: 'Auf Jig-Fächer legen',
+    description:
+      'Kopiert ein Design (ids, oberste Ebene) in die Fächer eines Jigs (Generator „jig“) der aktuellen Seite. jig: id des Jig-Objekts (ohne: der Jig, auf dem das Design liegt, sonst der erste). slots: Fachnummern wie „1-5, 8“ (Standard alle). kind: nur Fächer dieser Werkstückart (Index ab 0). Liegt das Design auf einem Fach, behalten die Kopien seine Lage im Fach, sonst kommt seine Mitte auf jede Fachmitte. series: variabler Text zählt je Fach weiter (Fach 1 = aktuelle Nummer bzw. CSV-Zeile). hide_jig: Jig danach ausblenden (nicht lasern, Standard true). group: je Fach gruppieren.',
+    tier: Tier.Edit,
+    inputSchema: obj({
+      ids: IDS, jig: { type: 'integer' }, slots: { type: 'string' }, kind: { type: 'integer', minimum: 0 },
+      series: { type: 'boolean' }, hide_jig: { type: 'boolean' }, group: { type: 'boolean' },
+    }, ['ids']),
+    run: async (ed, a) => {
+      const jigs = findJigs(ed.doc.objs);
+      if (!jigs.length) throw new ToolError('Auf der aktuellen Seite gibt es keinen Jig');
+      const tops = new Set(jigs.map((j) => j.top));
+      const design = topObjs(ed, ids(a)).filter((o) => !tops.has(o));
+      if (!design.length) throw new ToolError('Kein Design: ids dürfen nicht nur der Jig sein');
+      const b = boundsOf(design);
+      const jig = a.jig !== undefined ? jigs.find((j) => j.top.id === a.jig || j.part.id === a.jig) : (b ? jigs.find((j) => refSlot(j, b) >= 0) : undefined) ?? jigs[0];
+      if (!jig) throw new ToolError('„jig“ ist keine id eines Jigs auf dieser Seite');
+      const all = parseSlotRange(typeof a.slots === 'string' ? a.slots : '', jig.layout.slots.length);
+      if (!all) throw new ToolError('„slots“ nicht lesbar, Beispiel: 1-5, 8');
+      const kind = a.kind === undefined ? -1 : num(a, 'kind', { int: true, min: 0 });
+      const picks = all.filter((i) => kind < 0 || jig.layout.slots[i].shape === kind);
+      if (!picks.length) throw new ToolError('Keine passenden Fächer');
+      ed.snapshot('Auf Jig-Fächer legen');
+      const made = fillJig(ed.doc.objs, design, jig, picks, { series: bool(a, 'series', true), group: bool(a, 'group', false), hideJig: bool(a, 'hide_jig', true), hideTemplate: true });
+      ed.emit('doc');
+      return { slots: picks.map((i) => i + 1), created: made.map((o) => o.id), jig: jig.top.id, jig_hidden: !!jig.top.hidden };
     },
   },
   {
