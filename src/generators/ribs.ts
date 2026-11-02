@@ -39,6 +39,8 @@ export interface RibsParams {
   size: number;
   thickness: number;
   spacing: number;
+  /** Kleinster Abstand an Stellen, wo sich der Umriss schnell ändert (0 = überall gleich) */
+  minSpacing: number;
   spineInset: number;
   spineOffset: number;
   play: number;
@@ -173,7 +175,7 @@ const cache = new Map<string, RibsLayout | null>();
 /** Zerlegung in Rippen und Rückgrate (zwischengespeichert); null, wenn das Modell fehlt */
 export function ribsLayout(raw: Params): RibsLayout | null {
   const p = P(raw);
-  const key = [p.model, p.sections, p.up, p.axis, p.spineDir, p.size, p.thickness, p.spacing, p.spineInset, p.spineOffset, p.play, p.minArea, p.kerf, p.numbers, p.numberSize, p.maxPlate].join('|');
+  const key = [p.model, p.sections, p.up, p.axis, p.spineDir, p.size, p.thickness, p.spacing, p.minSpacing, p.spineInset, p.spineOffset, p.play, p.minArea, p.kerf, p.numbers, p.numberSize, p.maxPlate].join('|');
   if (cache.has(key)) return cache.get(key)!;
   const mesh = p.model ? getMesh(p.model) : null;
   if (!mesh) return null;
@@ -261,6 +263,8 @@ function upward(L: V3): V3 {
 
 interface Rib {
   sec: number;
+  /** Abstand zur nächsten Rippe des Abschnitts (für die Schlitzmarken) */
+  gap: number;
   P: V3;
   T: V3;
   D: V3;
@@ -268,7 +272,7 @@ interface Rib {
   h: number;
 }
 
-function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
+function compute(p: RibsParams, rawMesh: Mesh, skip = new Set<number>()): RibsLayout {
   const { mesh, dims } = worldMesh(rawMesh, p.up, p.size);
   const th = p.thickness;
   const w = th + p.play;
@@ -344,32 +348,87 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
   // Standfläche: Endet eine Achse steil am Boden (Pfote, Hals), liegt die unterste Rippe genau auf dem Boden
   let floor = Infinity;
   for (let i = 2; i < mesh.pos.length; i += 3) floor = Math.min(floor, mesh.pos[i]);
+  // Abstände: gleichmäßig oder (mit „Dichter an Details“) dichter, wo sich die Größe des Querschnitts schnell
+  // ändert. Gerechnet wird in C(l) = ∫ 1/Abstand dl; die Rippen liegen dort, wo C ganzzahlig weiterzählt.
+  const minSp = Number(p.minSpacing) || 0;
+  const density = (s: Sec, len: number): { C: (l: number) => number; inv: (c: number) => number } => {
+    const lin0 = { C: (l: number) => l / s.spacing, inv: (c: number) => c * s.spacing };
+    if (!(minSp > 0 && minSp < s.spacing - 1e-6) || len < 2 * minSp) return lin0;
+    const n = Math.max(8, Math.min(s.pts.length > 2 ? 40 : 240, Math.ceil(len / Math.max(0.5, minSp / 2))));
+    const ls: number[] = [],
+      rs: number[] = [];
+    for (let i = 0; i <= n; i++) {
+      const l = (len * i) / n;
+      const q = at(s, l);
+      const T = tangent(s, l, Math.min(s.spacing / 2, len / 2));
+      const Tp = norm(add(T, s.N, -dot(T, s.N)));
+      const f = { u: s.N, v: neg(cross(s.N, Tp)), w: Tp };
+      const c = { x: dot(q, f.u), y: dot(q, f.v) };
+      const isl = regionIslands(sliceIn(f, dot(q, Tp)), p.minArea).find((x) => inside(x, c));
+      ls.push(l);
+      rs.push(isl ? Math.sqrt(regionArea(isl) / Math.PI) : 0);
+    }
+    // Erlaubter Sprung im Umriss zwischen zwei Rippen; bei voller Steigung (45°) rücken sie auf 30 % zusammen
+    const e = 0.3 * s.spacing;
+    const raw = ls.map((_, i) => {
+      const a = Math.max(0, i - 1),
+        b = Math.min(n, i + 1);
+      const slope = Math.abs(rs[b] - rs[a]) / (ls[b] - ls[a] || 1);
+      return Math.max(minSp, Math.min(s.spacing, e / Math.max(slope, 1e-9)));
+    });
+    // Ein Detail wirkt auch auf die Nachbarschaft (bis zum halben Abstand), sonst springt eine Rippe darüber
+    const hs = raw.map((h0, i) => {
+      let h = h0;
+      for (let j = 0; j <= n; j++) if (Math.abs(ls[j] - ls[i]) <= Math.max(h0, raw[j]) / 2) h = Math.min(h, raw[j]);
+      return h;
+    });
+    const cs = [0];
+    for (let i = 1; i <= n; i++) cs.push(cs[i - 1] + ((ls[i] - ls[i - 1]) * (1 / hs[i] + 1 / hs[i - 1])) / 2);
+    const C = (l: number) => {
+      if (l <= 0) return l / hs[0];
+      if (l >= len) return cs[n] + (l - len) / hs[n];
+      const k = Math.min(n - 1, Math.floor((l / len) * n));
+      return cs[k] + ((cs[k + 1] - cs[k]) * (l - ls[k])) / (ls[k + 1] - ls[k]);
+    };
+    const inv = (c: number) => {
+      if (c <= 0) return c * hs[0];
+      if (c >= cs[n]) return len + (c - cs[n]) * hs[n];
+      let k = 0;
+      while (k < n - 1 && cs[k + 1] < c) k++;
+      return ls[k] + ((ls[k + 1] - ls[k]) * (c - cs[k])) / (cs[k + 1] - cs[k] || 1);
+    };
+    return { C, inv };
+  };
   secs.forEach((s, si) => {
     const len = s.cum[s.cum.length - 1];
-    let n = Math.max(1, Math.floor((len - th) / s.spacing) + 1);
-    let start = (len - (n - 1) * s.spacing) / 2;
-    let step = s.spacing;
+    const { C, inv } = density(s, len);
     const grounded = (l: number) => {
       const tz = Math.abs(tangent(s, l, Math.min(s.spacing / 2, len / 2))[2]);
       return at(s, l)[2] <= floor + th && tz > 0.7 ? th / 2 / tz : -1;
     };
     const g0 = grounded(0),
       g1 = g0 < 0 ? grounded(len) : -1;
-    if (g0 >= 0 || g1 >= 0) {
-      const first = g0 >= 0 ? g0 : len - g1;
-      n = Math.max(1, Math.floor((len - (g0 >= 0 ? g0 : g1) - th / 2) / s.spacing) + 1);
-      start = first;
-      step = g0 >= 0 ? s.spacing : -s.spacing;
+    const ca = C(th / 2),
+      cb = C(len - th / 2);
+    const ls: number[] = [];
+    if (g0 >= 0) for (let c = C(g0); c <= cb + 1e-9 || !ls.length; c++) ls.push(inv(c));
+    else if (g1 >= 0) {
+      for (let c = C(len - g1); c >= ca - 1e-9 || !ls.length; c--) ls.push(inv(c));
+    } else {
+      const span = Math.max(0, cb - ca);
+      const n = Math.floor(span + 1e-9) + 1;
+      const c0 = ca + (span - (n - 1)) / 2;
+      for (let i = 0; i < n; i++) ls.push(inv(c0 + i));
     }
-    for (let i = 0; i < n; i++) {
-      const l = start + i * step;
+    ls.forEach((l, i) => {
       const q = at(s, l);
       const T = tangent(s, l, Math.min(s.spacing / 2, len / 2));
       // T liegt in der Ebene; kleine Abweichungen herausrechnen
       const Tp = norm(add(T, s.N, -dot(T, s.N)));
+      const gap = Math.min(i > 0 ? Math.abs(l - ls[i - 1]) : Infinity, i + 1 < ls.length ? Math.abs(ls[i + 1] - l) : Infinity);
       secRibs[si].push(ribs.length);
-      ribs.push({ sec: si, P: q, T: Tp, D: cross(s.N, Tp), N: s.N, h: dot(q, Tp) });
-    }
+      ribs.push({ sec: si, gap: isFinite(gap) ? gap : s.spacing, P: q, T: Tp, D: cross(s.N, Tp), N: s.N, h: dot(q, Tp) });
+    });
   });
   const ribFrame = (r: Rib) => ({ u: r.N, v: neg(r.D), w: r.T });
   const to2 = (f: { u: V3; v: V3 }, q: V3): Pt => ({ x: dot(q, f.u), y: dot(q, f.v) });
@@ -474,7 +533,13 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
   const keptPolys: (Pt[][] | null)[] = ribs.map(() => null);
   let lostRibs = 0,
     lostPieces = 0;
+  // Rippenort je Nummer (für Rippen, deren Rückgrat-Stück am Ende wegfällt)
+  const nrToRib: number[] = [];
   ribs.forEach((r, ri) => {
+    if (skip.has(ri)) {
+      lostRibs++;
+      return;
+    }
     const f = ribFrame(r);
     let reg = raw[ri];
     if (multi && reg.length) {
@@ -578,10 +643,11 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
       return;
     }
     const nr = out.length + 1;
+    nrToRib[nr] = ri;
     for (const sc of sCuts) {
       spineCuts[sc.g].push(...sc.cut);
       spineHolds[sc.g].push(sc.hold);
-      spineMarks[sc.g].push({ ...sc.mark, nr, spacing: secs[r.sec].spacing });
+      spineMarks[sc.g].push({ ...sc.mark, nr, spacing: r.gap });
     }
     const all = kept.flat();
     keptPolys[ri] = all;
@@ -597,7 +663,7 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
 
   // ---- Biegungen: stoßen benachbarte Rippen innen aneinander? ----
   const bend = secs.map(() => false);
-  secs.forEach((s, si) => {
+  secs.forEach((_s, si) => {
     const ids = secRibs[si];
     for (let k = 0; k + 1 < ids.length; k++) {
       const a = ribs[ids[k]],
@@ -605,7 +671,7 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
       const theta = Math.acos(Math.max(-1, Math.min(1, dot(a.T, b.T))));
       if (theta < 0.02) continue;
       // Krümmungsmittelpunkt liegt in Richtung b.T − a.T, im Abstand R = Abstand / Winkel
-      const R = s.spacing / theta;
+      const R = Math.hypot(...sub(b.P, a.P)) / theta;
       const kdir = norm(sub(b.T, a.T));
       for (const [rib, polys] of [[a, keptPolys[ids[k]]], [b, keptPolys[ids[k + 1]]]] as [Rib, Pt[][] | null][]) {
         if (!polys) continue;
@@ -650,6 +716,10 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
     }
   });
   spine.forEach((s, i) => (s.key = spine.length > 1 ? `S${i + 1}` : 'S'));
+  // Steckt eine Rippe nur in einem Stück Rückgrat, das zu klein war und wegfiel, hätte sie keinen Halt: ohne sie neu
+  const held = new Set(spine.flatMap((x) => x.slots ?? []));
+  const orphans = out.map((_, i) => i + 1).filter((nr) => !held.has(nr)).map((nr) => nrToRib[nr]);
+  if (orphans.length && skip.size < ribs.length) return compute(p, rawMesh, new Set([...skip, ...orphans]));
   // Zu lange Platten mit Schwalbenschwanz teilen (Stücke a, b, …; gleiche Lage im Raum)
   if (p.maxPlate > 0) {
     const split: RibPart[] = [];
@@ -830,6 +900,10 @@ export const RIBS: Generator = {
     { key: 'thickness', type: 'length', label: t('Materialdicke'), min: 0.3, max: 30, def: 3 },
     { key: 'spacing', type: 'length', label: t('Rippenabstand (Mitte zu Mitte)'), min: 1, max: 500, def: 10 },
     {
+      key: 'minSpacing', type: 'length', label: t('Dichter an Details bis'), min: 0, max: 500, def: 0,
+      title: t('Wo sich der Umriss schnell ändert (Nase, Ohren, runde Enden), rücken die Rippen bis auf diesen Abstand zusammen; an glatten Stellen bleibt der Rippenabstand. 0 = überall gleich.'),
+    },
+    {
       key: 'spineInset', type: 'length', label: t('Rückgrat nach innen versetzt'), min: 0, max: 100, def: 2,
       title: t('Das Rückgrat wird um so viel kleiner als der Umriss, damit es zwischen den Rippen nicht heraussteht. 0 = voller Umriss.'),
     },
@@ -851,6 +925,10 @@ export const RIBS: Generator = {
     }
     if (p.spacing < p.thickness + 0.5) {
       out.push({ key: 'spacing', level: 'error', msg: t('Der Rippenabstand muss mindestens 0,5 mm größer als die Materialdicke sein.') });
+      return out;
+    }
+    if (p.minSpacing > 0 && p.minSpacing < p.thickness + 0.5) {
+      out.push({ key: 'minSpacing', level: 'error', msg: t('Der kleinste Abstand muss mindestens 0,5 mm größer als die Materialdicke sein.') });
       return out;
     }
     for (const s of parseSections(p.sections) ?? [])

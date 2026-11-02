@@ -85,7 +85,7 @@ const rows = (t: (s: string) => string): AppInfo[] => [
   { id: 'testphoto', group: 'laser', name: t('Materialtest auswerten'), desc: t('Foto des gelaserten Tests laden, beste Zelle anklicken, Werte übernehmen.'), keys: t('Foto Kamera Auswertung Material Test|Suchwörter'), since: '1.5.0' },
   { id: 'focustest', group: 'laser', name: t('Fokustest'), desc: t('Rampe auf schrägem Material oder Linienreihe mit Z-Versatz lasern und die schärfste Stelle anklicken.'), keys: t('Fokus Brennpunkt Brennweite Abstand Höhe Schärfe Rampe Z-Achse einstellen|Suchwörter'), since: '1.12.0' },
   { id: 'calibrate', group: 'laser', name: t('Passung kalibrieren'), desc: t('Testteile lasern, nachmessen und Schnittfuge und Steckspiel übernehmen.'), keys: t('Kerf Fuge Schnittbreite Passung Spiel kalibrieren|Suchwörter') },
-  { id: 'check', group: 'laser', name: t('Konstruktion prüfen'), desc: t('Doppelte Linien, offene Umrisse, schmale Stege, Passungen und Arbeitsbereich prüfen.'), keys: t('Prüfen Fehler doppelt offen Steg Kontrolle|Suchwörter') },
+  { id: 'check', group: 'laser', name: t('Konstruktion prüfen'), desc: t('Doppelte Linien, offene Umrisse, schmale Stege, Passungen, Steckbarkeit und Arbeitsbereich prüfen.'), keys: t('Prüfen Fehler doppelt offen Steg Kontrolle|Suchwörter') },
   { id: 'setup', group: 'laser', name: t('Laser einrichten'), desc: t('Schritt für Schritt von der Verbindung bis zum ersten Testauftrag.'), keys: t('Einrichten Assistent Verbinden erste Schritte Gerät|Suchwörter') },
   { id: 'rotary', group: 'laser', name: t('Drehachse'), desc: t('Rotary einstellen: Walzen oder Futter, Anschluss, Durchmesser, Testdrehung.'), keys: t('Rotary Drehachse Walze Futter Becher Glas zylindrisch|Suchwörter') },
 ];

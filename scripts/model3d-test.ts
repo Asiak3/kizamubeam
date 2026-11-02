@@ -466,6 +466,25 @@ test('Rippenmodell: lange Platten mit Schwalbenschwanz geteilt, Bauplan mit Stec
   assert.equal(buildGen(RIBS, bp({ plan: false })).plan, undefined);
 });
 
+test('Rippenmodell: dichter an Details, wo sich der Umriss schnell ändert', () => {
+  const even = ribsLayout(rp())!;
+  const p = rp({ minSpacing: 4 });
+  const L = ribsLayout(p)!;
+  assert.ok(L.count > even.count && L.count < 2.5 * even.count, `${L.count} statt ${even.count} Rippen`);
+  // Abstände entlang der Achse: an den runden Enden enger als in der Mitte, nie unter 4 und nie über 10 mm
+  const xs = L.ribs.map((r) => r.pose.o[0] + r.pose.n[0] * 1.5).sort((a, b) => a - b);
+  const gaps = xs.slice(1).map((x, i) => x - xs[i]);
+  for (const g of gaps) assert.ok(g >= 4 - 0.05 && g <= 10 + 0.05, `Abstand ${g}`);
+  const mid = gaps[Math.floor(gaps.length / 2)];
+  assert.ok(gaps[0] < mid - 2 && gaps[gaps.length - 1] < mid - 2, `Enden ${gaps[0]} / ${gaps[gaps.length - 1]}, Mitte ${mid}`);
+  assert.deepEqual(findOverlaps(asmSolids('ribs', p, 3)!).map((x) => `${x.a}/${x.b}`), []);
+  // Mit Abschnitten (Tier) ebenso ohne Durchdringung; zu kleiner Abstand ist ein Fehler
+  assert.deepEqual(findOverlaps(asmSolids('ribs', bp({ minSpacing: 4 }), 3)!).map((x) => `${x.a}/${x.b}`), []);
+  assert.ok(RIBS.validate(rp({ minSpacing: 3.2 })).some((i) => i.key === 'minSpacing' && i.level === 'error'));
+  // Gleich großer kleinster Abstand ändert nichts
+  assert.equal(ribsLayout(rp({ minSpacing: 10 }))!.count, even.count);
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

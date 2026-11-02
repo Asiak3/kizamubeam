@@ -19,6 +19,8 @@ const KIND_NAMES = (): Record<CheckKind, string> => ({
   import: t('Import'),
   fit: t('Passung'),
   thickness: t('Materialdicke'),
+  loose: t('Zusammenhalt'),
+  insert: t('Stecken'),
 });
 
 let openPanel: (() => void) | null = null;
