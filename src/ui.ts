@@ -6,7 +6,7 @@ import { DITHER_MODES, DitherMode, ImageAdjust, ImageLayer, ImageShape, isCellMo
 import { evaluate, formatNumber, namesIn } from './params';
 import { deletePreset, loadPresets, presetOutput, savePreset } from './imagePresets';
 import { openFillDialog, openSaveTemplateDialog, openSeriesDialog, openTemplateLibrary } from './templateDialogs';
-import { exportSvg, importFile, importModel, installDropAndPaste, openProject, saveProcessedBitmap, saveProject } from './files';
+import { exportDxf, exportPdf, exportSvg, importFile, importModel, installDropAndPaste, openProject, saveProcessedBitmap, saveProject } from './files';
 import { onMeshReady } from './model3d/store';
 import { assetImage, displayCanvas, onImageReady, outputGrid } from './images';
 import { onFontListChanged, systemFonts } from './fonts';
@@ -209,7 +209,12 @@ function buildMenu(ed: Editor) {
       'sep',
       [t('Importieren …'), 'Ctrl+I', () => importFile(ed)],
       [t('3D-Modell importieren …'), '', () => importModel(ed)],
-      [t('Als SVG exportieren …'), '', () => exportSvg(ed)],
+      { sub: t('Exportieren'), items: [
+        [t('Als SVG exportieren …'), '', () => exportSvg(ed)],
+        [t('Als DXF exportieren …'), '', () => exportDxf(ed)],
+        [t('Als PDF exportieren …'), '', () => exportPdf(ed, 'pdf')],
+        [t('Als Illustrator-Datei (AI) exportieren …'), '', () => exportPdf(ed, 'ai')],
+      ] },
       [t('Bearbeitetes Bild speichern …'), '', () => saveProcessedBitmap(ed)],
       'sep',
       [t('Schriften …'), '', () => openFontManager(ed)],
@@ -512,7 +517,7 @@ function showHelp() {
     [t('Ctrl beim Ziehen'), t('Fangen vorübergehend umkehren (aus, wenn eingeschaltet)')],
     [t('Alt beim Ziehen'), t('Stärker fangen und Ausrichtungshilfen an anderen Objekten')],
     [t('Aus dem Lineal ziehen'), t('Hilfslinie auf T1 (zurück ins Lineal: verwerfen)')],
-    ['Ctrl+I', t('Importieren (Bilder, SVG, DXF, 3D-Modelle); Dateien auch auf die Arbeitsfläche ziehen oder mit Ctrl+V einfügen')],
+    ['Ctrl+I', t('Importieren (Bilder, SVG, DXF, PDF, AI, 3D-Modelle); Dateien auch auf die Arbeitsfläche ziehen oder mit Ctrl+V einfügen')],
     ['Ctrl+Shift+A', t('Rasterarray')],
     ['Alt++ / Alt+- / Alt+*', t('Vereinen / Abziehen / Schnittmenge')],
     ['Alt+T', t('Bild nachzeichnen')],
@@ -899,8 +904,11 @@ function buildBars(ed: Editor) {
     { id: 'new', cat: F, icon: 'new', label: t('Neues Projekt in neuem Tab (Ctrl+N)'), run: () => ed.newTab() },
     { id: 'open', cat: F, icon: 'open', label: t('Öffnen'), run: () => openProject(ed) },
     { id: 'save', cat: F, icon: 'save', label: t('Speichern'), run: () => saveProject(ed) },
-    { id: 'import', cat: F, icon: 'import', label: t('Importieren: Bilder, SVG, DXF, LightBurn, 3D-Modelle (Ctrl+I)'), run: () => importFile(ed) },
+    { id: 'import', cat: F, icon: 'import', label: t('Importieren: Bilder, SVG, DXF, PDF, AI, LightBurn, 3D-Modelle (Ctrl+I)'), run: () => importFile(ed) },
     { id: 'export', cat: F, icon: 'export', label: t('Als SVG exportieren'), run: () => exportSvg(ed) },
+    { id: 'export-dxf', cat: F, short: 'DXF', label: t('Als DXF exportieren'), run: () => exportDxf(ed) },
+    { id: 'export-pdf', cat: F, short: 'PDF', label: t('Als PDF exportieren'), run: () => exportPdf(ed, 'pdf') },
+    { id: 'export-ai', cat: F, short: 'AI', label: t('Als Illustrator-Datei (AI) exportieren'), run: () => exportPdf(ed, 'ai') },
     { id: 'undo', cat: B, icon: 'undo', label: t('Rückgängig (Ctrl+Z)'), run: () => ed.doUndo() },
     { id: 'redo', cat: B, icon: 'redo', label: t('Wiederholen (Ctrl+Y)'), run: () => ed.doRedo() },
     { id: 'cut', cat: B, icon: 'cut', label: t('Ausschneiden (Ctrl+X)'), run: () => ed.cut(), enabled: sel1 },

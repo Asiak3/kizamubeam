@@ -109,7 +109,7 @@ async fn save_binary_file(
     Ok(Some(path.display().to_string()))
 }
 
-fn decode_base64(s: &str) -> Option<Vec<u8>> {
+pub(crate) fn decode_base64(s: &str) -> Option<Vec<u8>> {
     let val = |c: u8| -> Option<u32> {
         Some(match c {
             b'A'..=b'Z' => c - b'A',

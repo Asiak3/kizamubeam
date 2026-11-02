@@ -246,20 +246,24 @@ pub fn agent_respond(state: State<'_, Agent>, id: u64, response: Value) {
     }
 }
 
-/// Speichern für Agenten (Projekt oder SVG) unter einem absoluten Pfad; nur diese Endungen,
-/// vorhandene Dateien nur mit `overwrite`
+/// Speichern für Agenten (Projekt, SVG, DXF, PDF, AI, G-Code) unter einem absoluten Pfad; nur diese
+/// Endungen, vorhandene Dateien nur mit `overwrite`. `base64`: contents sind Binärdaten in Base64 (PDF/AI).
 #[tauri::command]
-pub fn agent_write_file(path: String, contents: String, overwrite: bool) -> Result<(), String> {
+pub fn agent_write_file(path: String, contents: String, overwrite: bool, base64: Option<bool>) -> Result<(), String> {
     let p = PathBuf::from(&path);
     if !p.is_absolute() {
         return Err(format!("{path}: Pfad muss absolut sein"));
     }
     let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-    if !matches!(ext.as_str(), "kzb" | "lwk" | "svg" | "gcode" | "nc") {
-        return Err(format!("{path}: nur .kzb, .lwk, .svg, .gcode oder .nc"));
+    if !matches!(ext.as_str(), "kzb" | "lwk" | "svg" | "dxf" | "pdf" | "ai" | "gcode" | "nc") {
+        return Err(format!("{path}: nur .kzb, .lwk, .svg, .dxf, .pdf, .ai, .gcode oder .nc"));
     }
     if p.exists() && !overwrite {
         return Err(format!("{path}: Datei gibt es schon (overwrite setzen, um sie zu ersetzen)"));
+    }
+    if base64.unwrap_or(false) {
+        let data = crate::decode_base64(&contents).ok_or("Ungültige Daten")?;
+        return std::fs::write(&p, data).map_err(|e| format!("{path}: {e}"));
     }
     std::fs::write(&p, contents).map_err(|e| format!("{path}: {e}"))
 }

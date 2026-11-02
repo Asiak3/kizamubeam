@@ -71,7 +71,7 @@ export async function insertAssetFile(ed: Editor, text: string) {
 
 // ---------- Hinzufügen ----------
 
-/** Dateien (SVG, DXF, Bilder, .kza) als Einträge übernehmen; Fehler werden gesammelt gemeldet */
+/** Dateien (SVG, DXF, PDF, AI, Bilder, .kza) als Einträge übernehmen; Fehler werden gesammelt gemeldet */
 export async function addFilesToLibrary(ed: Editor, files: { name: string; bytes: Uint8Array }[]) {
   const ok: string[] = [];
   const bad: string[] = [];
@@ -192,7 +192,7 @@ export function buildLibraryPanel(ed: Editor) {
   // Herkunft bzw. Gruppe: eigene, aus Erweiterungen oder eine Gruppe der mitgelieferten Einträge
   const grp = h('select', { class: 'lib-grp', title: t('Gruppe') }) as HTMLSelectElement;
   const btnAdd = h('button', { class: 'small', title: t('Auswahl zur Bibliothek hinzufügen'), onclick: () => openAddSelectionDialog(ed) }, t('+ Auswahl'));
-  const btnFiles = h('button', { class: 'small', title: t('SVG, DXF, Bilder oder .kza-Dateien übernehmen (oder hierher ziehen)'), onclick: () => pickFiles(ed) }, t('Dateien …'));
+  const btnFiles = h('button', { class: 'small', title: t('SVG, DXF, PDF, AI, Bilder oder .kza-Dateien übernehmen (oder hierher ziehen)'), onclick: () => pickFiles(ed) }, t('Dateien …'));
   const btnFolder = hasLibraryFolder()
     ? h('button', { class: 'small', title: t('Bibliotheks-Ordner zeigen'), onclick: () => openLibraryFolder().catch((e) => alert(errText(e))) }, t('Ordner'))
     : null;

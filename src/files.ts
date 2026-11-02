@@ -3,13 +3,15 @@ import type { Editor } from './editor';
 import { parseMeshFile } from './model3d/mesh';
 import { addMesh } from './model3d/store';
 import { openGenDialog } from './generators/dialog';
-import { IDENT, Obj, pageName, TextShape, visibleLeaves, PALETTE } from './model';
+import { IDENT, Mat, mul, Obj, pageName, TextShape, visibleLeaves, PALETTE } from './model';
 import { boundsOf, subsToD, shapeSubs, textLayout, textOutline } from './geom';
-import { assetUrl, flipImageV, hashId, processedPng, readDpi, registerAsset } from './images';
+import { assetImage, assetUrl, flipImageV, hashId, processedPng, readDpi, registerAsset } from './images';
 import { convertLbrn, finishLbrnTexts, isLbrn, LbrnResult, TextMeasure } from './lbrn';
 import { loadFont, textToSubs } from './fonts';
-import { importDxf, importSvg, ImportResult } from './importers';
-import { t } from './i18n';
+import { importDxf, importSvg, ImportResult, PathBuilder, transformSubs } from './importers';
+import { buildDxf, buildPdf, ExportItem, ExportPage, LayerInfo } from './vecexport';
+import { FallbackResolver, importPdfPages, isPdf } from './pdfimport';
+import { t, tn } from './i18n';
 import { tabNameFromPath } from './editor/tabs';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
@@ -218,12 +220,155 @@ export async function exportSvg(ed: Editor) {
   await saveText('export.svg', 'SVG', 'svg', 'image/svg+xml', buildSvg(ed));
 }
 
+// ---------- DXF, PDF, Illustrator ----------
+
+/** Anzahl Farbkanäle einer JPEG-Datei (aus dem SOF-Block), 0 wenn unklar */
+function jpegComponents(b: Uint8Array): number {
+  let p = 2;
+  while (p + 9 < b.length && b[p] === 0xff) {
+    const mk = b[p + 1];
+    const len = (b[p + 2] << 8) | b[p + 3];
+    if (mk >= 0xc0 && mk <= 0xcf && mk !== 0xc4 && mk !== 0xc8 && mk !== 0xcc) return b[p + 9];
+    p += 2 + len;
+  }
+  return 0;
+}
+
+const dataUrlBytes = (url: string) => {
+  const bin = atob(url.slice(url.indexOf(',') + 1));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+};
+
+/**
+ * Sichtbare Objekte als Exportdaten: Konturen in Weltkoordinaten, Texte als Umrisse, Bilder mit Bildpunkten.
+ * notes sammelt, was nicht mitkommt.
+ */
+async function exportItems(ed: Editor, objs: Obj[], withImages: boolean, notes: Set<string>): Promise<ExportItem[]> {
+  const items: ExportItem[] = [];
+  for (const [o, m] of visibleLeaves(objs)) {
+    const L = ed.layer(o.layer);
+    if (!L.show) continue;
+    const fill = L.mode === 'fill';
+    if (o.shape.kind === 'image') {
+      if (!withImages) {
+        items.push({ kind: 'image', m, layer: o.layer, pxW: 0, pxH: 0 });
+        continue;
+      }
+      const s = o.shape;
+      const img = assetImage(s.asset);
+      const url = assetUrl(s.asset);
+      if (!img || !url) {
+        notes.add(t('Ein Bild ließ sich nicht einbetten.'));
+        continue;
+      }
+      const im: Mat = mul(m, [s.w, 0, 0, s.h, 0, 0]);
+      const pxW = img.naturalWidth || img.width,
+        pxH = img.naturalHeight || img.height;
+      if (url.startsWith('data:image/jpeg')) {
+        const jpeg = dataUrlBytes(url);
+        if (jpegComponents(jpeg) === 3) {
+          items.push({ kind: 'image', m: im, layer: o.layer, pxW, pxH, jpeg });
+          continue;
+        }
+      }
+      const c = document.createElement('canvas');
+      c.width = pxW;
+      c.height = pxH;
+      const ctx = c.getContext('2d');
+      if (!ctx) continue;
+      ctx.drawImage(img, 0, 0);
+      const px = ctx.getImageData(0, 0, pxW, pxH).data;
+      const rgb = new Uint8Array(pxW * pxH * 3),
+        alpha = new Uint8Array(pxW * pxH);
+      for (let i = 0, j = 0; i < pxW * pxH; i++, j += 4) {
+        rgb[i * 3] = px[j];
+        rgb[i * 3 + 1] = px[j + 1];
+        rgb[i * 3 + 2] = px[j + 2];
+        alpha[i] = px[j + 3];
+      }
+      items.push({ kind: 'image', m: im, layer: o.layer, pxW, pxH, rgb, alpha });
+      continue;
+    }
+    if (o.shape.kind === 'text') {
+      const ts = o.shape;
+      let ol = textOutline(ts);
+      if (!ol) {
+        try {
+          await loadFont(ts.font, ts.bold, ts.italic);
+        } catch {
+          /* unten vermerkt */
+        }
+        ol = textOutline(ts);
+      }
+      if (!ol) {
+        notes.add(t('Ein Text konnte nicht in Umrisse umgewandelt werden (Schrift fehlt).'));
+        continue;
+      }
+      items.push({ kind: 'path', subs: transformSubs(ol.subs, m), layer: o.layer, fill });
+      continue;
+    }
+    items.push({ kind: 'path', subs: transformSubs(shapeSubs(o.shape), m), layer: o.layer, fill });
+  }
+  return items;
+}
+
+const layerInfos = (ed: Editor): LayerInfo[] => Array.from({ length: PALETTE.length }, (_, i) => ({ index: i, name: ed.layer(i).name }));
+
+const exportName = (ed: Editor, ext: string) => {
+  return `${ed.tab?.name || 'export'}.${ext}`;
+};
+
+/** DXF der aktuellen Seite (mm, Kurven als Splines); Bilder kann DXF nicht aufnehmen */
+export async function buildDxfText(ed: Editor): Promise<{ text: string; notes: string[] }> {
+  const notes = new Set<string>();
+  const items = await exportItems(ed, ed.doc.objs, false, notes);
+  const r = buildDxf(items, layerInfos(ed), ed.doc.bed.h);
+  if (r.skippedImages) notes.add(tn('{n} Bild wurde nicht übernommen (DXF kann keine Bilder enthalten).', '{n} Bilder wurden nicht übernommen (DXF kann keine Bilder enthalten).', r.skippedImages));
+  return { text: r.text, notes: [...notes] };
+}
+
+export async function exportDxf(ed: Editor) {
+  const { text, notes } = await buildDxfText(ed);
+  if (await saveText(exportName(ed, 'dxf'), 'DXF', 'dxf', 'image/vnd.dxf', text)) exportHint(ed, 'DXF', notes);
+}
+
+/** PDF aller Seiten (eine PDF-Seite je Projektseite in Bettgröße) */
+export async function buildPdfBytes(ed: Editor, opts: { currentOnly?: boolean } = {}): Promise<{ bytes: Uint8Array; notes: string[] }> {
+  const notes = new Set<string>();
+  const pages: ExportPage[] = [];
+  const list = opts.currentOnly ? [ed.doc.pages[ed.doc.page]] : ed.doc.pages;
+  for (const p of list) pages.push({ name: p.name, items: await exportItems(ed, p.objs, true, notes) });
+  const title = ed.tab?.name || 'KizamuBeam';
+  return { bytes: buildPdf(pages, { bed: ed.doc.bed, layers: layerInfos(ed), title }), notes: [...notes] };
+}
+
+/** PDF oder Illustrator-Datei (PDF-kompatibel, öffnet in Illustrator, Inkscape, Affinity …) speichern */
+export async function exportPdf(ed: Editor, format: 'pdf' | 'ai' = 'pdf') {
+  const { bytes, notes } = await buildPdfBytes(ed);
+  const url = 'data:application/pdf;base64,' + bytesToBase64(bytes);
+  const ok = await saveDataUrl(exportName(ed, format), format === 'ai' ? 'Adobe Illustrator' : 'PDF', format, url);
+  if (ok) exportHint(ed, format === 'ai' ? 'AI' : 'PDF', notes);
+}
+
+function exportHint(ed: Editor, what: string, notes: string[]) {
+  ed.hint = [t('{what} exportiert.', { what }), ...notes].join(' ');
+  ed.emit('tool');
+}
+
+export function bytesToBase64(b: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < b.length; i += 8192) s += String.fromCharCode(...b.subarray(i, i + 8192));
+  return btoa(s);
+}
+
 // ---------- Import ----------
 
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'tif', 'tiff'];
 /** Was Importieren annimmt; .kza = Eintrag der Bibliothek */
 export const MODEL_EXT = ['stl', 'obj'];
-export const IMPORT_EXT = ['svg', 'dxf', 'lbrn2', 'lbrn', ...IMAGE_EXT, ...MODEL_EXT, 'kza'];
+export const IMPORT_EXT = ['svg', 'dxf', 'pdf', 'ai', 'lbrn2', 'lbrn', ...IMAGE_EXT, ...MODEL_EXT, 'kza'];
 const MIME: Record<string, string> = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', bmp: 'image/bmp', gif: 'image/gif', webp: 'image/webp',
 };
@@ -237,7 +382,49 @@ function bytesToDataUrl(bytes: Uint8Array, mime: string): Promise<string> {
   });
 }
 
-type ParsedFile = { kind: 'vectors'; res: ImportResult } | { kind: 'image'; dataUrl: string; dpi: number | null } | { kind: 'lbrn'; res: LbrnResult };
+type ParsedFile = { kind: 'vectors'; res: ImportResult } | { kind: 'pdf'; pages: ImportResult[] } | { kind: 'image'; dataUrl: string; dpi: number | null } | { kind: 'lbrn'; res: LbrnResult };
+
+/**
+ * Ersatz für Schriften, die eine PDF-Datei nicht eingebettet hat: erst die Familie selbst (Systemschrift oder
+ * im Font-Manager geladen), sonst die Ersatzschrift der App.
+ */
+const pdfFontFallback: FallbackResolver = async (families, bold, italic) => {
+  let lf: Awaited<ReturnType<typeof loadFont>> | null = null,
+    name = families[0] ?? '';
+  for (const f of families) {
+    const r = await loadFont(f, bold, italic);
+    if (!r.fallback) {
+      lf = r;
+      name = f;
+      break;
+    }
+    lf ??= r;
+  }
+  if (!lf) return null;
+  const font = lf.font;
+  const upm = font.unitsPerEm || 1000;
+  return {
+    unitsPerEm: upm,
+    name: lf.fallback ? (font.names.fontFamily?.en ?? 'Roboto') : name,
+    substituted: lf.fallback,
+    glyph(ch: string) {
+      const g = font.charToGlyph(ch);
+      if (!g || !g.index) return null;
+      // getPath liefert y nach unten; zurück in Schrifteinheiten mit y nach oben
+      const pb = new PathBuilder();
+      for (const c of g.getPath(0, 0, upm).commands) {
+        if (c.type === 'M') pb.moveTo({ x: c.x, y: -c.y });
+        else if (c.type === 'L') pb.lineTo({ x: c.x, y: -c.y });
+        else if (c.type === 'C') pb.curveTo({ x: c.x1, y: -c.y1 }, { x: c.x2, y: -c.y2 }, { x: c.x, y: -c.y });
+        else if (c.type === 'Q') {
+          const p0 = pb.pos;
+          pb.curveTo({ x: p0.x + (2 / 3) * (c.x1 - p0.x), y: p0.y + (2 / 3) * (-c.y1 - p0.y) }, { x: c.x + (2 / 3) * (c.x1 - c.x), y: -c.y + (2 / 3) * (-c.y1 + c.y) }, { x: c.x, y: -c.y });
+        } else if (c.type === 'Z') pb.close();
+      }
+      return { subs: pb.subs.filter((sp) => sp.nodes.length > 1), advance: g.advanceWidth ?? upm / 2 };
+    },
+  };
+};
 
 /** Dateiinhalt anhand von Endung bzw. Dateikopf lesen; Fehler werden geworfen */
 async function parseFile(name: string, bytes: Uint8Array, bedH: () => number): Promise<ParsedFile> {
@@ -248,12 +435,21 @@ async function parseFile(name: string, bytes: Uint8Array, bedH: () => number): P
     await finishLbrnTexts(res, measureText);
     return { kind: 'lbrn', res };
   }
+  if (ext === 'pdf' || ext === 'ai' || isPdf(bytes)) {
+    if (!isPdf(bytes))
+      throw new Error(
+        ext === 'ai'
+          ? t('Diese Illustrator-Datei enthält keine PDF-Fassung (altes Format). Bitte in Illustrator mit „PDF-kompatible Datei erstellen“ speichern oder als PDF/SVG exportieren.')
+          : t('Keine gültige PDF-Datei'),
+      );
+    return { kind: 'pdf', pages: await importPdfPages(bytes, { fallback: pdfFontFallback }) };
+  }
   if (ext === 'svg' || head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg')))
     return { kind: 'vectors', res: importSvg(new TextDecoder().decode(bytes)) };
   if (ext === 'dxf' || /^\s*0\s*\r?\n\s*SECTION/.test(head)) return { kind: 'vectors', res: importDxf(new TextDecoder().decode(bytes)) };
   if (ext === 'tif' || ext === 'tiff' || isTiff(bytes)) return { kind: 'image', ...(await decodeTiff(bytes)) };
   const mime = MIME[ext] ?? sniffImage(bytes);
-  if (!mime) throw new Error(t('Dateiformat wird nicht unterstützt (SVG, DXF, PNG, JPG, BMP, GIF, WebP, TIFF).'));
+  if (!mime) throw new Error(t('Dateiformat wird nicht unterstützt (SVG, DXF, PDF, AI, PNG, JPG, BMP, GIF, WebP, TIFF).'));
   return { kind: 'image', dataUrl: await bytesToDataUrl(bytes, mime), dpi: readDpi(bytes) };
 }
 
@@ -270,6 +466,7 @@ export async function importBytesOrThrow(ed: Editor, name: string, bytes: Uint8A
   }
   const f = await parseFile(name, bytes, () => ed.doc.bed.h);
   if (f.kind === 'vectors') await ed.importVectors(f.res, name);
+  else if (f.kind === 'pdf') await ed.importPdfPages(f.pages, name);
   else if (f.kind === 'lbrn') ed.importLbrn(f.res, name);
   else await ed.importImage(f.dataUrl, f.dpi, name);
 }
@@ -281,6 +478,12 @@ export async function fileObjs(ed: Editor, name: string, bytes: Uint8Array): Pro
   if (f.kind === 'lbrn') {
     for (const [id, url] of Object.entries(f.res.assets)) registerAsset(id, url);
     return { objs: f.res.objs, notes: f.res.notes };
+  }
+  if (f.kind === 'pdf') {
+    // Bibliothek: nur die erste Seite
+    const res = f.pages[0];
+    if (f.pages.length > 1) res.notes.push(t('Die Datei hat {n} Seiten; übernommen wurde Seite {page}.', { n: f.pages.length, page: 1 }));
+    return { objs: await ed.vectorObjs(res, name), notes: res.notes };
   }
   return { objs: await ed.vectorObjs(f.res, name), notes: f.res.notes };
 }
@@ -373,7 +576,7 @@ export async function importFile(ed: Editor) {
       filters: [
         [t('Alle unterstützten Dateien'), IMPORT_EXT],
         [t('Bilder'), IMAGE_EXT],
-        [t('Vektoren (SVG, DXF)'), ['svg', 'dxf']],
+        [t('Vektoren (SVG, DXF, PDF, AI)'), ['svg', 'dxf', 'pdf', 'ai']],
         [t('LightBurn-Projekte'), ['lbrn2', 'lbrn']],
         [t('3D-Modelle (STL, OBJ)'), MODEL_EXT],
         [t('Bibliotheks-Einträge'), ['kza']],
@@ -471,16 +674,18 @@ export function installDropAndPaste(ed: Editor, stage: HTMLElement) {
 
 // ---------- Bearbeitetes Bild speichern ----------
 
-export async function saveDataUrl(name: string, filterName: string, ext: string, dataUrl: string) {
+/** Binärdatei (als Data-URL) speichern; false, wenn der Dialog abgebrochen wurde */
+export async function saveDataUrl(name: string, filterName: string, ext: string, dataUrl: string): Promise<boolean> {
   if (isTauri()) {
     const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('save_binary_file', { defaultName: name, filterName, extensions: [ext], base64: dataUrl.slice(dataUrl.indexOf(',') + 1) });
-    return;
+    const path = await invoke<string | null>('save_binary_file', { defaultName: name, filterName, extensions: [ext], base64: dataUrl.slice(dataUrl.indexOf(',') + 1) });
+    return path !== null;
   }
   const a = document.createElement('a');
   a.href = dataUrl;
   a.download = name;
   a.click();
+  return true;
 }
 
 /** Das gerasterte/geditherte Bild so speichern, wie es gelasert würde */
