@@ -2257,6 +2257,10 @@ body.dock-resizing #canvas {
 }
 
 /* Generatoren (Zahnrad …) */
+.offset-dialog.gen-dialog {
+  max-height: calc(100vh - 130px);
+  overflow: auto;
+}
 .gen-dialog .form {
   grid-template-columns: 170px 150px;
 }
@@ -2298,6 +2302,77 @@ body.dock-resizing #canvas {
   max-width: 560px;
 }
 .gen-issues .warn {
+  color: #b7791f;
+}
+
+/* Rippenmodell: Abschnitte zeichnen */
+.ribs-panel {
+  margin-top: 10px;
+  max-width: 560px;
+}
+.ribs-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-bottom: 4px;
+}
+.ribs-bar .grow {
+  flex: 1;
+}
+.ribs-bar button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.ribs-canvas {
+  width: 560px;
+  height: 300px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: crosshair;
+  display: block;
+}
+.ribs-canvas:focus {
+  outline: 1px solid var(--accent);
+}
+.ribs-hint:empty {
+  display: none;
+}
+.ribs-list {
+  margin: 6px 0;
+  font-size: 12px;
+}
+.ribs-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px 50px 64px 50px 44px 54px;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ribs-row.on {
+  background: var(--accent-soft);
+}
+.ribs-row.ribs-head {
+  cursor: default;
+  font-size: 11px;
+}
+.ribs-row input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.ribs-off {
+  display: flex;
+  gap: 2px;
+}
+.ribs-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.ribs-count.warn {
   color: #b7791f;
 }
 

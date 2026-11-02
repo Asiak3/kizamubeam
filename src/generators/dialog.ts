@@ -13,6 +13,10 @@ import { evaluate, formatNumber, namesIn, projectParams } from '../params';
 import type { Generator, Params, ParamSpec } from './types';
 import { library, entryLabel } from '../materials';
 import { genFitPatch } from '../fitcheck';
+import { ribsPanel, type GenPanel } from '../model3d/ribsPanel';
+
+/** Generatoren mit eigener Zeichenfläche unter den Feldern */
+const PANELS: Record<string, (p: Params, set: (patch: Params) => void) => GenPanel> = { ribs: ribsPanel };
 
 const LAST_KEY = (id: string) => `kizamubeam.gen.${id}`;
 
@@ -153,6 +157,10 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   const infoEl = h('div', { class: 'gen-info' });
   const kerfNote = h('div', { class: 'note' });
   let built: BuildResult | null = null;
+  const panel = PANELS[g.id]?.(p, (patch) => {
+    Object.assign(p, patch);
+    update();
+  });
 
   const update = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde
@@ -172,6 +180,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     }
     infoEl.replaceChildren(...r.info.map(([k, v]) => h('div', {}, h('span', { class: 'muted' }, k), ' ', v)));
     okBtn.disabled = !built;
+    panel?.refresh(np);
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -247,6 +256,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       ),
       h('div', {}, canvas, infoEl),
     ),
+    panel?.el ?? null,
     issuesEl,
     calibNote,
     kerfNote,

@@ -100,7 +100,7 @@
         "Living hinges in seven patterns",
         "Disc sphere: a lamp shade made of round discs with angled slots, 6 to 32 discs, no glue",
         "Layered model: slice an STL or OBJ model into stacked, numbered sheets",
-        "Rib model: ribs with half slots on a spine, from STL or OBJ",
+        "Rib model: ribs with half slots on a spine, from STL or OBJ; body, legs and a curved tail as separate sections",
         "3D view with explode slider – collisions show up in red before you waste material, engravings appear on the parts",
         "Material looks in 3D: wood grain, slate, acrylic with refraction, metal – engravings as they will look on the material, also as a mockup with shadows and PNG export for customers",
         "Design check and fit calibration: find and fix thin bridges, open outlines and too-tight slots"
