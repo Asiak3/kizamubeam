@@ -10,9 +10,10 @@ import { SCALE } from './clip';
 import { copySub, extract, joinSubs } from './pathtools';
 import { dec, t, tn } from './i18n';
 import { checkFits, FitFinding } from './fitcheck';
+import { AsmFinding, checkAssemblies } from './asmcheck';
 import type { Params } from './generators/types';
 
-export type CheckKind = 'double' | 'open' | 'unjoined' | 'web' | 'hole' | 'bed' | 'import' | 'fit' | 'thickness';
+export type CheckKind = 'double' | 'open' | 'unjoined' | 'web' | 'hole' | 'bed' | 'import' | 'fit' | 'thickness' | 'loose' | 'insert';
 export type CheckLevel = 'error' | 'warn' | 'info';
 
 /** Korrektur zu einem Befund; ausgeführt vom Editor (src/editor/check.ts) */
@@ -205,6 +206,8 @@ export interface CheckInput {
   settings: CheckSettings;
   /** Lage auf dem Bett nicht prüfen (Start ab Benutzer-Ursprung oder aktueller Position, Drehachse) */
   skipBed?: boolean;
+  /** Objekte aller Seiten (Baugruppen, deren Teile nach dem Verschachteln verteilt liegen); sonst nur objs */
+  allObjs?: Obj[];
 }
 
 function collect(inp: CheckInput): Contour[] {
@@ -732,6 +735,9 @@ export function checkDesign(inp: CheckInput): CheckIssue[] {
       key: f.key, kind: f.kind, level: f.level, msg: f.msg, objs: f.objs, lines: f.lines, pts: [],
       fix: f.gen ? { kind: 'gen', obj: f.gen.obj, patch: f.gen.patch, calibrated: f.calibrated } : undefined,
     });
+  const asm: AsmFinding[] = [];
+  checkAssemblies(inp.objs, inp.allObjs ?? inp.objs, inp.layer, asm);
+  for (const f of asm) out.push({ key: f.key, kind: f.kind, level: f.level, msg: f.msg, objs: f.objs, lines: f.lines, pts: [] });
   return out.map((x, i) => [x, i] as const).sort((a, b) => ORDER[a[0].level] - ORDER[b[0].level] || a[1] - b[1]).map(([x]) => x);
 }
 

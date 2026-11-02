@@ -982,7 +982,7 @@ function buildBars(ed: Editor) {
     { id: 'addpage', cat: S, short: t('+ Seite'), label: t('Neue Seite'), run: () => ed.addPage() },
     { id: 'prevpage', cat: S, icon: 'up', label: t('Vorherige Seite (Bild ↑)'), run: () => ed.setPage(ed.doc.page - 1), enabled: () => ed.doc.page > 0 },
     { id: 'nextpage', cat: S, icon: 'down', label: t('Nächste Seite (Bild ↓)'), run: () => ed.setPage(ed.doc.page + 1), enabled: () => ed.doc.page < ed.doc.pages.length - 1 },
-    { id: 'check', cat: L, icon: 'check', label: t('Konstruktion prüfen: doppelte Linien, offene Umrisse, schmale Stege, kleine Ausschnitte, Passungen und Arbeitsbereich'), run: () => openCheck() },
+    { id: 'check', cat: L, icon: 'check', label: t('Konstruktion prüfen: doppelte Linien, offene Umrisse, schmale Stege, kleine Ausschnitte, Passungen, Steckbarkeit und Arbeitsbereich'), run: () => openCheck() },
     { id: 'preview', cat: L, icon: 'preview', label: t('Vorschau (Alt+P)'), run: () => openPreview(ed) },
     { id: 'start', cat: L, icon: 'play', label: t('Job starten'), run: () => startJob(ed) },
     { id: 'frame', cat: L, icon: 'frame', label: t('Rahmen: Rechteck um den Job abfahren'), run: () => frameJob(ed, false) },

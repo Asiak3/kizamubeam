@@ -337,6 +337,68 @@ test('Schräge Platten: Durchdringung wird gefunden', () => {
   near(ov[0].volume, (40 * 4) / sn, 0.5, 'Volumen');
 });
 
+// ---------- Steckprüfung ----------
+const { analyzeAssembly } = await import('../src/view3d/assembly');
+const ClipperLib = (await import('clipper-lib')).default;
+const { execute, SCALE } = await import('../src/clip');
+
+test('Steckprüfung: Generator-Baugruppen hängen zusammen und lassen sich stecken', () => {
+  for (const [gen, o] of [['box', {}], ['box', { top: 'closed' }], ['drawer', {}], ['insert', {}], ['shelf', {}]] as const) {
+    const r = analyzeAssembly(solids(gen, o));
+    assert.equal(r.groups.length, 1, `${gen}: ${r.groups.length} Gruppen`);
+    assert.deepEqual(r.conflicts, [], gen);
+    assert.equal(r.order.length, r.pieces.length, gen);
+  }
+  // Regal und Einsatz: Halbschlitze, also feste Steckrichtungen
+  assert.ok(analyzeAssembly(solids('shelf')).crossings.length >= 4);
+  // Scheibenkugel aus starren Scheiben: Ringe schließen sich, nicht alles lässt sich gerade stecken
+  const ds = analyzeAssembly(solids('discsphere'));
+  assert.equal(ds.groups.length, 1);
+  assert.ok(ds.conflicts.length > 0);
+});
+
+test('Steckprüfung: loses Teil, eigene Gruppe und widersprüchliche Steckrichtungen', () => {
+  const th = 3;
+  // Rechteck minus Schlitze, in lokalen Koordinaten (x, y)
+  const plate = (w: [number, number], h: [number, number], cuts: [number, number, number, number][]) => {
+    const r = (x0: number, y0: number, x1: number, y1: number) => [{ X: x0 * SCALE, Y: y0 * SCALE }, { X: x1 * SCALE, Y: y0 * SCALE }, { X: x1 * SCALE, Y: y1 * SCALE }, { X: x0 * SCALE, Y: y1 * SCALE }];
+    const res = execute(ClipperLib.ClipType.ctDifference, [r(w[0], h[0], w[1], h[1])], cuts.map((c) => r(...c)), ClipperLib.PolyFillType.pftNonZero);
+    return res.map((p) => p.map((q) => ({ x: q.X / SCALE, y: q.Y / SCALE })));
+  };
+  const W = th / 2 + 0.05;
+  // Zwei Rückgrate (Ebene y = 0 und y = 20, in x/z), zwei Rippen (Ebene x = 30 und x = 70, in y/z)
+  // top: Schlitz von oben (sonst von unten) an x = 30 / 70 bzw. y = 0 / 20
+  const cut = (c: number, top: boolean): [number, number, number, number] => (top ? [c - W, 20, c + W, 41] : [c - W, -1, c + W, 20]);
+  const spine = (y: number, t30: boolean, t70: boolean): Solid => ({
+    key: `S${y}`, label: `S${y}`, th, pose: { o: [0, y - th / 2, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, 1, 0] },
+    polys: plate([0, 100], [0, 40], [cut(30, t30), cut(70, t70)]),
+  });
+  const rib = (x: number, t0: boolean, t20: boolean): Solid => ({
+    key: `R${x}`, label: `R${x}`, th, pose: { o: [x - th / 2, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] },
+    polys: plate([-10, 30], [0, 40], [cut(0, t0), cut(20, t20)]),
+  });
+  const good = () => [spine(0, true, true), spine(20, true, true), rib(30, false, false), rib(70, false, false)];
+  const ok = analyzeAssembly(good());
+  assert.equal(ok.groups.length, 1);
+  assert.equal(ok.crossings.length, 4);
+  assert.deepEqual(ok.conflicts, []);
+  // Gemischt, aber in passender Reihenfolge steckbar (Rippe 70 von oben auf das hintere Rückgrat)
+  assert.deepEqual(analyzeAssembly([spine(0, true, true), spine(20, true, false), rib(30, false, false), rib(70, false, true)]).conflicts, []);
+  // Jedes Teil müsste auf seine beiden Nachbarn in entgegengesetzten Richtungen: geht in keiner Reihenfolge
+  const bad = analyzeAssembly([spine(0, true, false), spine(20, false, true), rib(30, false, true), rib(70, true, false)]);
+  assert.equal(bad.groups.length, 1);
+  assert.equal(bad.crossings.length, 4);
+  assert.equal(bad.conflicts.length, 1, JSON.stringify(bad.conflicts));
+  // Loses Teil daneben und ein Teil aus zwei Inseln
+  const far: Solid = { ...rib(30, false, false), key: 'X', label: 'X', pose: { ...rib(30, false, false).pose, o: [200, 0, 0] } };
+  const two: Solid = { key: 'T', label: 'T', th, pose: { o: [0, 50, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, 1, 0] }, polys: [...plate([0, 10], [0, 10], []), ...plate([20, 30], [0, 10], [])] };
+  const lo = analyzeAssembly([...good(), far, two]);
+  assert.equal(lo.pieces.length, 7);
+  assert.equal(lo.groups.length, 4);
+  assert.equal(lo.groups[0].length, 4);
+  assert.deepEqual(lo.pieces.filter((p) => p.key === 'T').map((p) => p.island), [1, 2]);
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
