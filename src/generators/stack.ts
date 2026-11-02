@@ -231,7 +231,7 @@ export const STACK: Generator = {
     const p = P(raw);
     const out: Issue[] = [];
     if (!p.model || !getMesh(p.model)) {
-      out.push({ level: 'error', msg: t('Das 3D-Modell fehlt. Bitte über Datei → 3D-Modell importieren … neu einlesen.') });
+      out.push({ level: 'error', msg: t('Das 3D-Modell fehlt. Bitte über Datei → Importieren … neu einlesen.') });
       return out;
     }
     const L = stackLayout(raw);

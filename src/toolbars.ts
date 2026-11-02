@@ -34,7 +34,7 @@ export type BarKey = BarId | 'numbar' | 'palette' | 'status';
 type IconSize = 's' | 'm' | 'l';
 
 interface Config {
-  /** Version der gespeicherten Belegung (2: Knopfgruppen, 3: Knopf Werkzeugkasten) */
+  /** Version der gespeicherten Belegung (2: Knopfgruppen, 3: Knopf Werkzeugkasten, 4: Generatoren und Verbindungen nur noch im Werkzeugkasten) */
   v: number;
   bars: Record<BarId, string[]>;
   size: Record<BarId, IconSize>;
@@ -55,9 +55,33 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 3;
+const CONFIG_V = 4;
 /** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende) */
 const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [{ v: 3, bar: 'tools', id: 'apps', after: 'grp:gen' }];
+/** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
+ *  Leiste verliert sie nur, wenn die Folge seq noch genau so dasteht; sie wird durch keep ersetzt.
+ *  Selbst umgestellte Leisten bleiben, wie sie sind. */
+const REMOVED: { v: number; bar: BarId; seq: string[]; keep: string[] }[] = [
+  { v: 4, bar: 'tools', seq: ['grp:gen', 'apps'], keep: ['apps'] },
+  { v: 4, bar: 'tools', seq: ['tool:joint', 'lidhinge', 'hinge'], keep: [] },
+  { v: 4, bar: 'main', seq: ['check', 'preview', 'devsettings'], keep: ['check', 'preview'] },
+];
+
+/** Gespeicherte Leiste auf die aktuelle Standardbelegung heben (raw: Version der gespeicherten Belegung) */
+export function upgradeBar(bar: BarId, list: string[], raw: number): string[] {
+  const out = [...list];
+  // Knöpfe, die mit einer späteren Version dazukamen, einmal aufnehmen
+  for (const a of ADDED) if (a.bar === bar && !(raw >= a.v) && !out.includes(a.id)) insertAfter(out, a.id, a.after);
+  for (const r of REMOVED) {
+    if (r.bar !== bar || raw >= r.v) continue;
+    for (let i = 0; i + r.seq.length <= out.length; i++)
+      if (r.seq.every((x, k) => out[i + k] === x)) {
+        out.splice(i, r.seq.length, ...r.keep);
+        break;
+      }
+  }
+  return out;
+}
 
 function insertAfter(list: string[], id: string, after: string) {
   const i = list.indexOf(after);
@@ -162,8 +186,7 @@ function load(): Config {
         if (Array.isArray(raw.bars?.[id])) {
           let list: string[] = raw.bars[id];
           if (!(raw.v >= 2)) list = migrate(list);
-          // Knöpfe, die mit einer späteren Version dazukamen, einmal in gespeicherte Leisten aufnehmen
-          for (const a of ADDED) if (a.bar === id && !(raw.v >= a.v) && !list.includes(a.id)) insertAfter(list, a.id, a.after);
+          list = upgradeBar(id, list, Number(raw.v) || 1);
           c.bars[id] = list.filter((x) => x === SEP || actions.has(x));
         }
         if (['s', 'm', 'l'].includes(raw.size?.[id])) c.size[id] = raw.size[id];
