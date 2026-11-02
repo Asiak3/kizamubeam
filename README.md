@@ -10,7 +10,7 @@
 English · [Deutsch](README.de.md) · [Website](https://negurvulkan.github.io/kizamubeam/en/)
 
 Free laser software for designing, editing images and sending jobs straight to the laser. The workflow follows LightBurn, so people switching over find their way around right away.
-Stack: Tauri 2, TypeScript (UI, editor, G-code), Rust (desktop shell, machine connection, MCP server). License: GPL-3.0-or-later (see `LICENSE`). Version: 1.13.0-beta.
+Stack: Tauri 2, TypeScript (UI, editor, G-code), Rust (desktop shell, machine connection, MCP server). License: GPL-3.0-or-later (see `LICENSE`). Version: 1.14.0-beta.
 
 “Kizamu” (刻む) is Japanese for to carve, to engrave, to cut finely.
 
@@ -30,7 +30,7 @@ npm run dev            # UI only, in the browser: http://localhost:1420
 npm run tauri build    # installer package
 ```
 
-On Windows, `npm run tauri build` only builds the NSIS installer (`.exe`, see `src-tauri/tauri.windows.conf.json`), because the MSI installer does not accept pre-release versions such as `1.13.0-beta`. On Linux it builds AppImage and .deb; RPM does not accept a hyphen in the version (see `src-tauri/tauri.linux.conf.json`).
+On Windows, `npm run tauri build` only builds the NSIS installer (`.exe`, see `src-tauri/tauri.windows.conf.json`), because the MSI installer does not accept pre-release versions such as `1.14.0-beta`. On Linux it builds AppImage and .deb; RPM does not accept a hyphen in the version (see `src-tauri/tauri.linux.conf.json`).
 
 Releases: publishing a release on GitHub (Releases → Draft a new release → new tag → Publish release) runs `.github/workflows/release.yml`, which builds the installers for macOS (universal, Apple Silicon and Intel), Windows (NSIS) and Linux (AppImage, .deb) and attaches them to that release. An already published release can be built with Actions → Release → Run workflow. The builds are not code-signed yet, so macOS and Windows show a warning on first launch.
 
