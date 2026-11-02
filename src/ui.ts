@@ -475,6 +475,8 @@ function showAbout() {
     h('img', { src: isDark() ? logoDark : logoLight, alt: 'KizamuBeam' }),
     h('p', {}, t('Version {version}', { version: APP_VERSION })),
     h('p', {}, t('„Kizamu“ (刻む) ist japanisch und heißt einritzen, gravieren, fein schneiden.')),
+    h('p', {}, t('© 2026 Hanjo Winter · github.com/negurvulkan')),
+    h('p', { class: 'note' }, t('Entwickelt mit Unterstützung von Claude Code.')),
     h('p', { class: 'note' }, t('Freie Software unter der GNU General Public License, Version 3 oder neuer.')),
     h('p', {}, h('button', { class: 'btn', onclick: () => dlg.close() }, t('Schließen'))),
   );

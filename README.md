@@ -32,7 +32,7 @@ It is open source (GPL-3.0), free of charge, and needs no account or license key
 | **Windows** (64-bit) | `KizamuBeam_…_x64-setup.exe` |
 | **Linux** (64-bit) | `KizamuBeam_…_amd64.AppImage` or `.deb` |
 
-Get the latest version from the [releases page](https://github.com/negurvulkan/kizamubeam/releases) or the [website](https://negurvulkan.github.io/kizamubeam/en/#download). Current version: **1.17.0-beta**. Once installed, KizamuBeam keeps itself up to date (Help → Check for Updates).
+Get the latest version from the [releases page](https://github.com/negurvulkan/kizamubeam/releases) or the [website](https://negurvulkan.github.io/kizamubeam/en/#download). Current version: **2.0.0-rc.1**. Once installed, KizamuBeam keeps itself up to date (Help → Check for Updates).
 
 > **First start on macOS:** if macOS says the app cannot be checked, open System Settings → Privacy & Security and click “Open Anyway”.
 
@@ -87,6 +87,8 @@ Releases, updates, translations and the code structure are described in the [dev
 ## License
 
 KizamuBeam is free software under the [GNU General Public License v3.0 or later](LICENSE). Built with Tauri 2, TypeScript and Rust. “Kizamu” (刻む) is Japanese for to carve, to engrave, to cut finely.
+
+Copyright © 2026 [Hanjo Winter](https://github.com/negurvulkan). Developed with assistance from [Claude Code](https://claude.com/claude-code).
 
 ## Trademarks
 
