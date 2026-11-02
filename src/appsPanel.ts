@@ -8,7 +8,7 @@ import type { Editor } from './editor';
 import { h } from './dom';
 import { t, tn } from './i18n';
 import { ICONS } from './icons';
-import { dockWindow, isNewWindow } from './dock';
+import { dockWindow, isNewWindow, showWindow } from './dock';
 import { getAction } from './toolbars';
 import { AppGroup, appGroups, appList, fold, isNewIn, pushRecent, searchApps } from './apps';
 import { ensurePacks, onPacksChanged, packTemplates } from './packs';
@@ -81,6 +81,18 @@ function hint(ed: Editor, msg: string) {
   ed.emit('tool');
 }
 
+/** Suchfeld des Fensters (für openAppsPanel) */
+let searchBox: HTMLInputElement | null = null;
+
+/** Werkzeugkasten einblenden und die Suche fokussieren (Menü Werkzeuge → Werkzeugkasten …) */
+export function openAppsPanel() {
+  showWindow('apps');
+  requestAnimationFrame(() => {
+    searchBox?.focus();
+    searchBox?.select();
+  });
+}
+
 export function buildAppsPanel(ed: Editor) {
   const body = dockWindow('apps', t('Werkzeugkasten'), { left: true });
   const st = load();
@@ -123,6 +135,7 @@ export function buildAppsPanel(ed: Editor) {
   let all: Tile[] = [...tools, ...packTiles()];
 
   const search = h('input', { type: 'search', class: 'apps-search', placeholder: t('Werkzeuge suchen …'), 'aria-label': t('Werkzeuge suchen') }) as HTMLInputElement;
+  searchBox = search;
   const chips = h('div', { class: 'apps-chips' });
   const list = h('div', { class: 'apps-list' });
   body.append(h('div', { class: 'apps-top' }, h('label', { class: 'apps-searchbox' }, h('span', { class: 'apps-sicon', html: ICONS.search }), search), chips), list);

@@ -46,7 +46,7 @@ import { openFocusTestDialog } from './focustestDialog';
 import { buildParamsPanel, openShowIfDialog } from './paramsPanel';
 import { buildNotesPanel } from './notesPanel';
 import { buildView3dPanel } from './view3d/panel';
-import { buildAppsPanel } from './appsPanel';
+import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, windowList } from './dock';
 import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
 import { dec, LangPref, langPref, LANGUAGES, setLangPref, t, tn } from './i18n';
@@ -208,7 +208,6 @@ function buildMenu(ed: Editor) {
       [t('Serie aus Tabelle (CSV) …'), '', () => openSeriesDialog(ed)],
       'sep',
       [t('Importieren …'), 'Ctrl+I', () => importFile(ed)],
-      [t('3D-Modell importieren …'), '', () => importModel(ed)],
       { sub: t('Exportieren'), items: [
         [t('Als SVG exportieren …'), '', () => exportSvg(ed)],
         [t('Als DXF exportieren …'), '', () => exportDxf(ed)],
@@ -238,6 +237,8 @@ function buildMenu(ed: Editor) {
       [t('Zur Bibliothek hinzufügen …'), '', () => openAddSelectionDialog(ed)],
     ]],
     [t('Werkzeuge'), [
+      [t('Werkzeugkasten …'), '', () => openAppsPanel()],
+      'sep',
       [t('Auswählen'), 'Esc', () => ed.setTool('select')],
       [t('Knoten bearbeiten'), 'Ctrl+`', () => ed.setTool('node')],
       'sep',
@@ -246,23 +247,6 @@ function buildMenu(ed: Editor) {
       [t('Ellipse'), 'Ctrl+E', () => ed.setTool('ellipse')],
       [t('Polygon'), '', () => ed.setTool('polygon')],
       [t('Text'), 'Ctrl+T', () => ed.setTool('text')],
-      [t('QR-Code …'), '', () => openQrDialog(ed)],
-      [t('Strichcode …'), '', () => openBarcodeDialog(ed)],
-      { sub: t('Generatoren'), items: [
-        [t('Zahnrad …'), '', () => openGenDialog(ed, 'gear')],
-        [t('Zahnstange …'), '', () => openGenDialog(ed, 'rack')],
-        [t('Riemenscheibe …'), '', () => openGenDialog(ed, 'pulley')],
-        [t('Nocken …'), '', () => openGenDialog(ed, 'cam')],
-        'sep',
-        [t('Zahnradpaar …'), '', () => openGenDialog(ed, 'gearpair')],
-        [t('Box mit Fingerzinken …'), '', () => openGenDialog(ed, 'box')],
-        [t('Schublade …'), '', () => openGenDialog(ed, 'drawer')],
-        [t('Einsatz mit Fächern …'), '', () => openGenDialog(ed, 'insert')],
-        [t('Steckregal …'), '', () => openGenDialog(ed, 'shelf')],
-        'sep',
-        [t('Scheibenkugel …'), '', () => openGenDialog(ed, 'discsphere')],
-        [t('Schichtmodell aus 3D-Modell …'), '', () => importModel(ed)],
-      ] },
       'sep',
       { sub: t('Boolesche Operationen'), items: [
         [t('Vereinen'), 'Alt++', () => ed.booleanSel('union')],
@@ -290,10 +274,6 @@ function buildMenu(ed: Editor) {
         [t('Rasterarray …'), 'Ctrl+Shift+A', () => openGridArrayDialog(ed)],
         [t('Kreisarray …'), '', () => openCircularArrayDialog(ed)],
       ] },
-      [t('Verbindungen (Zinken, Zapfen, Keil, T-Slot) …'), '', () => ed.setTool('joint')],
-      [t('Scharnier für Deckel …'), '', () => ed.startHingeTool()],
-      [t('Biegeschnitte (Living Hinge) …'), '', () => openHingeDialog(ed)],
-      [t('Schlitze an Materialdicke anpassen …'), '', () => openSlotDialog(ed)],
       'sep',
       { sub: t('Textfunktionen'), items: [
         [t('Text auf Pfad'), '', () => ed.applyPathToText()],
@@ -334,7 +314,6 @@ function buildMenu(ed: Editor) {
       ] },
       'sep',
       [t('Verschachteln …'), '', () => openNestDialog(ed)],
-      [t('Auf Werkstücke übertragen (Kamera) …'), '', () => openWorkpieceDialog(ed)],
     ]],
     [t('Seiten'), [
       [t('Neue Seite'), '', () => ed.addPage()],
@@ -358,12 +337,13 @@ function buildMenu(ed: Editor) {
       [t('Rahmen'), '', () => frameJob(ed, false)],
       [t('Kontur-Rahmen'), '', () => frameJob(ed, true)],
       'sep',
-      [t('Materialtest …'), '', () => openMaterialTestDialog(ed)],
-      [t('Materialtest auswerten …'), '', () => openTestPhotoDialog(ed)],
-      [t('Fokustest …'), '', () => openFocusTestDialog(ed)],
-      [t('Passung kalibrieren …'), '', () => openCalibrateDialog(ed)],
-      'sep',
       [t('Laser einrichten …'), '', () => openSetupWizard(ed)],
+      { sub: t('Test und Kalibrieren'), items: [
+        [t('Materialtest …'), '', () => openMaterialTestDialog(ed)],
+        [t('Materialtest auswerten …'), '', () => openTestPhotoDialog(ed)],
+        [t('Fokustest …'), '', () => openFocusTestDialog(ed)],
+        [t('Passung kalibrieren …'), '', () => openCalibrateDialog(ed)],
+      ] },
       { sub: t('Gerät'), items: [
         [t('Geräte …'), '', () => openDevicesDialog(ed)],
         [t('Geräteeinstellungen …'), '', () => openDeviceDialog(ed)],
@@ -381,7 +361,6 @@ function buildMenu(ed: Editor) {
       [t('Verkleinern'), '-', () => ed.zoomAt(0.8)],
       'sep',
       [t('Drahtgitter / Gefüllt'), 'Alt+W', () => ((ed.filled = !ed.filled), ed.emit('view'))],
-      [t('3D-Ansicht'), '', () => toggleWindow('view3d'), () => !isHidden('view3d')],
       'sep',
       { sub: t('Design'), items: [
         [t('Wie System|Design'), '', () => applyTheme(ed, 'system'), () => themeMode === 'system'],
@@ -1034,12 +1013,12 @@ function buildBars(ed: Editor) {
     {
       main: [
         'new', 'open', 'save', 'import', 'export', SEP, 'undo', 'redo', SEP, 'cut', 'copy', 'paste', 'delete', SEP,
-        'grp:zoom', 'view3d', SEP, 'check', 'preview', 'devsettings', SEP,
+        'grp:zoom', 'view3d', SEP, 'check', 'preview', SEP,
         'group', 'ungroup', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'grp:gen', 'apps', SEP,
-        'grp:bool', 'offset', 'warp', 'grp:path', 'grp:array', 'nest', 'tool:joint', 'lidhinge', 'hinge',
+        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
+        'grp:bool', 'offset', 'warp', 'grp:path', 'grp:array', 'nest',
       ],
     },
     // Gespeicherte Leisten von vor den Knopfgruppen: die alten Standardfolgen durch die Gruppe ersetzen

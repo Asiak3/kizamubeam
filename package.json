@@ -1,6 +1,6 @@
 {
   "name": "kizamubeam",
-  "version": "1.14.0-beta",
+  "version": "1.15.0-beta",
   "description": "Freie Laser-Software, angelehnt an die Bedienung von LightBurn (Prototyp)",
   "scripts": {
     "dev": "vite",

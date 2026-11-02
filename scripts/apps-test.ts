@@ -85,6 +85,29 @@ test('Zuletzt benutzt: vorne, ohne Doppelte, begrenzt', () => {
   assert.deepEqual(pushRecent([], 'x'), ['x']);
 });
 
+const { upgradeBar } = await import('../src/toolbars');
+
+test('Gespeicherte Leisten: Generatoren und Verbindungen wandern in den Werkzeugkasten', () => {
+  const v3 = ['tool:select', 'tool:text', 'qr', 'grp:gen', 'apps', '|', 'grp:bool', 'nest', 'tool:joint', 'lidhinge', 'hinge'];
+  assert.deepEqual(upgradeBar('tools', v3, 3), ['tool:select', 'tool:text', 'qr', 'apps', '|', 'grp:bool', 'nest']);
+  // v2 (ohne Werkzeugkasten-Knopf): erst einfügen, dann die Generatoren-Gruppe entfernen
+  assert.deepEqual(upgradeBar('tools', ['qr', 'grp:gen', '|', 'tool:joint', 'lidhinge', 'hinge'], 2), ['qr', 'apps', '|']);
+  assert.deepEqual(upgradeBar('main', ['check', 'preview', 'devsettings', '|', 'group'], 3), ['check', 'preview', '|', 'group']);
+  // selbst umgestellt: bleibt
+  const own = ['grp:gen', 'tool:select', 'apps', 'hinge', 'tool:joint'];
+  assert.deepEqual(upgradeBar('tools', own, 3), own);
+  assert.deepEqual(upgradeBar('main', ['devsettings', 'check'], 3), ['devsettings', 'check']);
+  // schon aktuell: nichts ändern
+  assert.deepEqual(upgradeBar('tools', ['grp:gen', 'apps'], 4), ['grp:gen', 'apps']);
+});
+
+test('Standardleisten ohne Generatoren-Gruppe und Verbindungswerkzeuge', () => {
+  const m = /initToolbars\(\s*list,\s*\{([\s\S]*?)\n\s*\},/.exec(ui);
+  assert.ok(m, 'Standardbelegung in ui.ts nicht gefunden');
+  for (const id of ['grp:gen', 'tool:joint', 'lidhinge', 'hinge', 'devsettings']) assert.ok(!m[1].includes(`'${id}'`), id);
+  assert.ok(m[1].includes(`'apps'`));
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
