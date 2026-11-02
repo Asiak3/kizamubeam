@@ -228,6 +228,51 @@ export class EditorImages {
   }
 
   /**
+   * Mehrseitige PDF/AI-Datei einfügen: Seite 1 kommt auf die aktuelle Projektseite, jede weitere Seite auf eine
+   * neue Projektseite dahinter. Ein einziger Undo-Schritt.
+   */
+  async importPdfPages(this: Editor, pages: ImportResult[], name: string) {
+    if (pages.length <= 1) return this.importVectors(pages[0] ?? { items: [], notes: [] }, name);
+    const groups: (Obj | null)[] = [];
+    for (const res of pages) {
+      const objs = await this.vectorObjs(res, name);
+      if (!objs.length) {
+        groups.push(null);
+        continue;
+      }
+      const o: Obj = objs.length > 1 ? { id: newId(), m: IDENT, layer: objs[0].layer, shape: { kind: 'group', children: objs } } : objs[0];
+      const b = boundsOf([o]);
+      const bed = this.doc.bed;
+      if (b && (b.x < -1e-6 || b.y < -1e-6 || b.x + b.w > bed.w + 1e-6 || b.y + b.h > bed.h + 1e-6))
+        o.m = mul(translate(bed.w / 2 - (b.x + b.w / 2), bed.h / 2 - (b.y + b.h / 2)), o.m);
+      groups.push(o);
+    }
+    if (!groups.some(Boolean)) {
+      this.hint = t('{name}: keine verwertbaren Formen gefunden. {notes}', { name, notes: [...new Set(pages.flatMap((p) => p.notes))].join(' ') });
+      this.emit('tool');
+      return;
+    }
+    this.snapshot(t('PDF importieren'));
+    const start = this.doc.page;
+    const base = name.replace(/\.[a-z0-9]+$/i, '');
+    groups.forEach((o, i) => {
+      if (i === 0) {
+        if (o) this.doc.objs.push(o);
+        return;
+      }
+      this.doc.pages.splice(start + i, 0, { name: `${base} ${i + 1}`, objs: o ? [o] : [] });
+    });
+    this.clearPageState();
+    this.doc.page = start;
+    this.setTool('select');
+    this.setSel(groups[0] ? [groups[0]] : []);
+    const notes = [...new Set(pages.flatMap((p) => p.notes))];
+    this.hint = [tn('{name}: {n} Seite importiert.', '{name}: {n} Seiten importiert, ab Seite 2 auf neuen Projektseiten.', pages.length, { name }), ...notes].join(' ');
+    this.emit('doc');
+    this.emit('sel');
+  }
+
+  /**
    * LightBurn-Projekt (.lbrn2) einfügen. Layer-Einstellungen aus der Datei gelten nur für Layer, auf denen im
    * Projekt noch nichts liegt; belegte Layer behalten ihre Einstellungen.
    */

@@ -60,7 +60,8 @@
         "Font-Manager: alle Google Fonts mit Vorschau durchsuchen und per Klick laden, eigene TTF/OTF-Dateien, Favoriten – fehlende Schriften eines Projekts werden nachgeladen",
         "Verformen: Text, Formen und Bilder als Bogen, Wölbung, Flagge oder in Perspektive, als saubere Bézierkurven",
         "Raster- und Kreis-Arrays mit Live-Vorschau, mehrseitige Projekte und ein Verlauf zum Zurückspringen",
-        "Import von SVG, DXF, Bildern und LightBurn-Projekten (.lbrn2) – Farben landen direkt auf der passenden Ebene",
+        "Import von SVG, DXF, PDF, Illustrator (.ai), Bildern und LightBurn-Projekten (.lbrn2) – Farben landen direkt auf der passenden Ebene",
+        "Export als SVG, DXF, PDF und Illustrator (.ai) – Kurven bleiben Kurven, Layer bleiben getrennt",
         "Andockbare Fenster, anpassbare Werkzeugleisten, helles und dunkles Theme"
       ]
     },
@@ -190,7 +191,7 @@
       { "q": "Ist KizamuBeam wirklich kostenlos?", "a": "Ja. KizamuBeam steht unter der GPL-3.0-or-later: keine Lizenzgebühr, kein Abo, kein Konto – auch nicht für gewerbliche Nutzung." },
       { "q": "Funktioniert es mit meinem Laser?", "a": "Wenn dein Laser FluidNC, GRBL, grblHAL, Marlin oder Smoothieware nutzt, sehr wahrscheinlich – das betrifft die meisten Diodenlaser. Galvo-Laser und Ruida-/DSP-Controller werden nicht unterstützt." },
       { "q": "Warum warnt mein Rechner bei der Installation?", "a": "Die Installer sind noch nicht code-signiert. Das ist bei jungen Open-Source-Projekten üblich. Auf macOS: Systemeinstellungen → Datenschutz & Sicherheit → „Dennoch öffnen“; auf Windows: „Weitere Informationen“ → „Trotzdem ausführen“." },
-      { "q": "Kann ich meine bisherigen Materialeinstellungen mitnehmen?", "a": "Ja. LightBurn-Materialbibliotheken (.clb) lassen sich importieren, soweit es passende Felder gibt. LightBurn-Projekte (.lbrn2) öffnest du mit Formen, Bildern und Layer-Einstellungen. Projekte und Bibliotheken aus Laserwerk öffnen direkt. SVG und DXF importierst du wie gewohnt." },
+      { "q": "Kann ich meine bisherigen Materialeinstellungen mitnehmen?", "a": "Ja. LightBurn-Materialbibliotheken (.clb) lassen sich importieren, soweit es passende Felder gibt. LightBurn-Projekte (.lbrn2) öffnest du mit Formen, Bildern und Layer-Einstellungen. Projekte und Bibliotheken aus Laserwerk öffnen direkt. SVG, DXF, PDF und Illustrator-Dateien (.ai) importierst du wie gewohnt." },
       { "q": "Ist die Beta stabil genug für echte Projekte?", "a": "Für die meisten Arbeiten ja – sie wird täglich auf echter Hardware genutzt. Einzelne neue Funktionen sind noch ungetestet (siehe Hinweis oben). Sichere wichtige Projekte und prüfe neue Jobs mit Vorschau und Rahmen." },
       { "q": "Was hat es mit dem MCP-Server auf sich?", "a": "Damit können KI-Agenten Entwürfe lesen und bearbeiten. Er ist standardmäßig aus, läuft nur lokal mit Token, und an die Maschine geht nichts ohne deine Bestätigung in KizamuBeam." },
       { "q": "Wie kann ich mithelfen?", "a": "Teste die Beta mit deinem Laser, melde Fehler und Wünsche auf GitHub, übersetze die Oberfläche in deine Sprache oder schick einen Pull Request." }

@@ -30,7 +30,7 @@ export interface ImportResult {
 
 // ---------- Pfadaufbau ----------
 
-class PathBuilder {
+export class PathBuilder {
   subs: SubPath[] = [];
   private cur: SubPath | null = null;
   start: Pt = { x: 0, y: 0 };
@@ -576,6 +576,8 @@ export function importDxf(text: string): ImportResult {
   if (!pairs.some(([c, v]) => c === 0 && v === 'SECTION')) throw new Error(t('Keine gültige DXF-Datei'));
   let unit = 1;
   const layerColor = new Map<string, number>();
+  // Echtfarben (Gruppencode 420, ab AutoCAD 2004) gehen vor dem Farbindex
+  const layerTrue = new Map<string, [number, number, number]>();
   const blocks = new Map<string, { base: Pt; ents: DxfEnt[] }>();
   const entities: DxfEnt[] = [];
   const notes: string[] = [];
@@ -613,7 +615,9 @@ export function importDxf(text: string): ImportResult {
       if (e.type === 'LAYER') {
         const name = e.g.find(([k]) => k === 2)?.[1];
         const col = e.g.find(([k]) => k === 62)?.[1];
+        const tc = e.g.find(([k]) => k === 420)?.[1];
         if (name && col) layerColor.set(name, Math.abs(parseInt(col, 10)));
+        if (name && tc) layerTrue.set(name, trueColor(tc));
       }
       continue;
     }
@@ -651,16 +655,25 @@ export function importDxf(text: string): ImportResult {
 
   const items: ImportedPath[] = [];
   const skipped = new Map<string, number>();
-  const emit = (e: DxfEnt, m: Mat, inheritColor: number | null, depth: number) => {
+  const emit = (e: DxfEnt, m: Mat, inheritColor: number | null, inheritRgb: [number, number, number] | null, depth: number) => {
     const get = (k: number, d = 0) => {
       const p = e.g.find(([c]) => c === k);
       return p ? parseFloat(p[1]) : d;
     };
     const lname = e.g.find(([c]) => c === 8)?.[1] ?? '0';
     let aci = get(62, 256);
-    if (aci === 256) aci = layerColor.get(lname) ?? 7;
-    if (aci === 0) aci = inheritColor ?? 7;
-    const layer = nearestLayer(ACI[aci] ?? ACI[7]);
+    const tc = e.g.find(([c]) => c === 420)?.[1];
+    let rgb: [number, number, number] | null = tc !== undefined ? trueColor(tc) : null;
+    if (!rgb && aci === 256) {
+      rgb = layerTrue.get(lname) ?? null;
+      aci = layerColor.get(lname) ?? 7;
+    }
+    if (!rgb && aci === 0) {
+      rgb = inheritRgb;
+      aci = inheritColor ?? 7;
+    }
+    rgb ??= ACI[aci] ?? ACI[7];
+    const layer = nearestLayer(rgb);
     const pb = new PathBuilder();
     switch (e.type) {
       case 'LINE':
@@ -711,9 +724,14 @@ export function importDxf(text: string): ImportResult {
         break;
       }
       case 'SPLINE': {
+        const bz = bezierSpline(e);
+        if (bz) {
+          pb.subs.push(bz);
+          break;
+        }
         const pts = splinePoints(e);
         if (pts.length >= 2) {
-          const closed = (get(70) & 1) === 1;
+          const closed = (get(70) & 1) === 1 || (pts.length > 2 && Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) < 1e-6);
           const sp = fitPolyline(pts, closed, 0.005);
           pb.subs.push(sp);
         }
@@ -730,7 +748,7 @@ export function importDxf(text: string): ImportResult {
           mul([1, 0, 0, 1, get(10), get(20)], [Math.cos(rot), Math.sin(rot), -Math.sin(rot), Math.cos(rot), 0, 0]),
           mul([sx, 0, 0, sy, 0, 0], [1, 0, 0, 1, -blk.base.x, -blk.base.y]),
         );
-        for (const be of blk.ents) emit(be, mul(m, t), aci, depth + 1);
+        for (const be of blk.ents) emit(be, mul(m, t), aci, rgb, depth + 1);
         return;
       }
       default:
@@ -740,7 +758,7 @@ export function importDxf(text: string): ImportResult {
     if (pb.subs.length) items.push({ kind: 'path', subs: transformSubs(pb.subs, m), layer });
   };
   // Einheit anwenden, y bleibt nach oben (der Aufrufer spiegelt am Bett)
-  for (const e of entities) emit(e, [unit, 0, 0, unit, 0, 0], null, 0);
+  for (const e of entities) emit(e, [unit, 0, 0, unit, 0, 0], null, null, 0);
   if (skipped.size) notes.push(t('Übersprungen: {list}.', { list: [...skipped].map(([what, n]) => `${n}× ${what}`).join(', ') }));
   return { items: joinPaths(items), notes, yUp: true };
 }
@@ -770,6 +788,63 @@ function polyBulge(pb: PathBuilder, vs: { x: number; y: number; b: number }[], c
     }
   }
   if (closed) pb.close();
+}
+
+const trueColor = (v: string): [number, number, number] => {
+  const n = parseInt(v, 10) & 0xffffff;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+
+/**
+ * Kubische Spline, die aus aneinandergereihten Bézier-Segmenten besteht (Knoten 0000 111 222 … nnnn, ohne
+ * Gewichte; so schreiben KizamuBeam, Inkscape und viele CAD-Programme Kurven): genau übernehmen statt annähern.
+ */
+function bezierSpline(e: DxfEnt): SubPath | null {
+  if (parseInt(e.g.find(([c]) => c === 71)?.[1] ?? '3', 10) !== 3) return null;
+  const knots: number[] = [],
+    ctrl: Pt[] = [],
+    weights: number[] = [];
+  for (const [c, v] of e.g) {
+    const f = parseFloat(v);
+    if (c === 40) knots.push(f);
+    else if (c === 10) ctrl.push({ x: f, y: 0 });
+    else if (c === 20 && ctrl.length) ctrl[ctrl.length - 1].y = f;
+    else if (c === 41) weights.push(f);
+  }
+  const n = (ctrl.length - 1) / 3;
+  if (!Number.isInteger(n) || n < 1 || knots.length !== ctrl.length + 4) return null;
+  if (weights.some((w) => Math.abs(w - weights[0]) > 1e-9)) return null;
+  const eq = (a: number, b: number) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+  for (let k = 0; k < 4; k++) if (!eq(knots[k], knots[0]) || !eq(knots[knots.length - 1 - k], knots[knots.length - 1])) return null;
+  for (let s = 1; s < n; s++) {
+    const i = 1 + 3 * s;
+    if (!eq(knots[i], knots[i + 1]) || !eq(knots[i + 1], knots[i + 2]) || !(knots[i] > knots[i - 1])) return null;
+  }
+  const first = ctrl[0],
+    last = ctrl[ctrl.length - 1];
+  const closed = Math.hypot(first.x - last.x, first.y - last.y) < 1e-6;
+  const nodes: Node[] = [{ x: first.x, y: first.y }];
+  for (let s = 0; s < n; s++) {
+    const c1 = ctrl[3 * s + 1],
+      c2 = ctrl[3 * s + 2],
+      p = ctrl[3 * s + 3];
+    const a = nodes[nodes.length - 1];
+    const line = (q: Pt) => {
+      // Anfasser genau auf der Sehne: Gerade
+      const dx = p.x - a.x,
+        dy = p.y - a.y,
+        L = Math.hypot(dx, dy);
+      return L > 0 && Math.abs((q.x - a.x) * dy - (q.y - a.y) * dx) / L < 1e-7;
+    };
+    const straight = line(c1) && line(c2);
+    if (!straight) a.cout = { x: c1.x, y: c1.y };
+    nodes.push(straight ? { x: p.x, y: p.y } : { x: p.x, y: p.y, cin: { x: c2.x, y: c2.y } });
+  }
+  if (closed) {
+    const end = nodes.pop()!;
+    if (end.cin) nodes[0].cin = end.cin;
+  }
+  return { nodes, closed };
 }
 
 /** NURBS-Kurve mit de Boor auswerten (oder Stützpunkte verwenden) */
