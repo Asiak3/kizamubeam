@@ -7,9 +7,10 @@ const { parseStl, parseObj, weld, meshInfo, encodeMesh, decodeMesh, meshId } = a
 const { prepare, sliceAt, region, sliceRegion, cleanRegion, regionArea, deepestPoint } = await import('../src/model3d/slice');
 const { addMesh } = await import('../src/model3d/store');
 const { STACK, stackLayout, numberStrokes, FRAMES } = await import('../src/generators/stack');
-const { RIBS, ribsLayout, worldMesh, materialAlong } = await import('../src/generators/ribs');
+const { RIBS, ribsLayout, worldMesh, materialAlong, ranges, splitPlate } = await import('../src/generators/ribs');
 const { buildGen, defaultParams, normalizeParams } = await import('../src/generators/index');
 const { asmSolids, findOverlaps, solidBounds } = await import('../src/view3d/solids');
+const { suggestSections, voxelize } = await import('../src/model3d/suggest');
 
 let failed = 0;
 function test(name: string, fn: () => void) {
@@ -397,6 +398,72 @@ test('Rippenmodell mit Abschnitten: Rumpf, Beine, gebogener Schwanz', () => {
   const iv = materialAlong(worldMesh(beast, 'z', bsize).mesh, [W(-35, 10)[0], -40, W(-35, 10)[1]], [0, 1, 0]);
   assert.equal(iv.length, 2);
   near((iv[0][0] + iv[0][1]) / 2 - 40, -12, 0.5, 'Bein links');
+});
+
+test('Rippenmodell: Vorschlag findet Rumpf, vier Beine und Schwanz; unterste Beinrippe auf dem Boden', () => {
+  const p0 = bp({ sections: '' });
+  const sg = suggestSections(beast, p0);
+  const legs = sg.sections.filter((s) => s.extend > 0 && s.offset !== sg.sections[0].offset);
+  assert.equal(legs.length, 4, sg.found);
+  for (const l of legs) near(Math.abs(l.offset), 12, 1.5, `Bein ${l.name} quer`);
+  // Rumpf liegt in der Spiegelebene y = 0 und ist fast waagerecht
+  const r = sg.sections[0];
+  assert.equal(r.view, 'xz');
+  near(r.offset, 0, 1, 'Spiegelebene');
+  assert.ok(Math.abs(r.pts[1][1] - r.pts[0][1]) < 0.25 * Math.abs(r.pts[1][0] - r.pts[0][0]), 'Rumpf waagerecht');
+  // Schwanz als eigener, gebogener Abschnitt
+  const tail = sg.sections.find((s) => s !== r && !legs.includes(s));
+  assert.ok(tail && tail.pts.length >= 3, `Schwanz: ${JSON.stringify(tail?.pts)}`);
+  const p = bp({ sections: JSON.stringify(sg.sections) });
+  const L = ribsLayout(p)!;
+  for (const s of L.sections) assert.ok(s.ribs >= 2, `${s.name}: ${s.ribs} Rippen`);
+  assert.deepEqual(findOverlaps(asmSolids('ribs', p, 3)!).map((x) => `${x.a}/${x.b}`), []);
+  // Standfläche: Die Beinrippen sind vom Boden aus gesetzt (Unterseite bei z = 0, 10, 20 …; die Spitze des
+  // Test-Beins ist für eine Rippe zu klein)
+  for (let si = 1; si < L.sections.length; si++) {
+    if (!legs.some((l) => l.name === L.sections[si].name)) continue;
+    for (const x of L.ribs.filter((q) => q.section === si)) {
+      const bottom = x.pose.o[2] + x.pose.n[2] * 1.5 - 1.5;
+      const k = Math.round(bottom / 10);
+      near(bottom, k * 10, 0.2, `${L.sections[si].name}: Rippe ab Boden`);
+    }
+  }
+});
+
+test('Voxel-Raster: Kugel füllt etwa π/6 ihres Würfels', () => {
+  const g = voxelize(sphere(20, 48), 40);
+  let n = 0;
+  for (const x of g.v) n += x;
+  near(n / (g.nx * g.ny * g.nz), Math.PI / 6, 0.03, 'Füllgrad');
+});
+
+test('Rippenmodell: lange Platten mit Schwalbenschwanz geteilt, Bauplan mit Steckreihenfolge', () => {
+  assert.equal(ranges([3, 1, 2, 7, 9, 10]), '1–3, 7, 9–10');
+  // Rechteck 200 × 40 in Stücke bis 80 mm: drei Stücke, Zapfen greift ins Nachbarstück
+  const rect = [[{ x: -100, y: -20 }, { x: 100, y: -20 }, { x: 100, y: 20 }, { x: -100, y: 20 }]];
+  const pcs = splitPlate(rect, 80, 3, 0.1, 1)!;
+  assert.equal(pcs.length, 3);
+  for (const pc of pcs) {
+    const xs = pc.flat().map((q) => q.x);
+    assert.ok(Math.max(...xs) - Math.min(...xs) <= 80 + 12 + 1e-6, `Stück ${Math.min(...xs)}…${Math.max(...xs)}`);
+  }
+  const area = pcs.reduce((s, pc) => s + regionArea(pc), 0);
+  near(area, 200 * 40, 40, 'Fläche bleibt (bis aufs Spiel)');
+  // Am Tier: Rückgrat über 60 mm wird geteilt, alles steckt ohne Durchdringung
+  const p = bp({ maxPlate: 60 });
+  const L = ribsLayout(p)!;
+  const pieces = L.spine.filter((x) => x.piece);
+  assert.ok(pieces.length >= 2, `${pieces.length} Stücke`);
+  assert.ok(pieces.every((x) => /^S\d*[a-z]$/.test(x.key)), pieces.map((x) => x.key).join(','));
+  assert.deepEqual(findOverlaps(asmSolids('ribs', p, 3)!).map((x) => `${x.a}/${x.b}`), []);
+  const r = buildGen(RIBS, p);
+  assert.ok(r.plan, 'Bauplan');
+  assert.ok(r.plan!.lines.length > 10);
+  assert.ok(r.plan!.labels.some((l) => l.text === '1'));
+  assert.ok(r.plan!.steps.some((s) => /Schwalbenschwanz|dovetail/.test(s)), r.plan!.steps.join(' | '));
+  assert.ok(r.plan!.steps.some((s) => /Bein|Leg/.test(s)), r.plan!.steps.join(' | '));
+  for (const l of r.plan!.lines) for (const q of l) assert.ok(q.x >= 14.9 && q.x <= 195.1 && q.y >= 21.9 && q.y <= 132.1, 'Zeichnung im Feld');
+  assert.equal(buildGen(RIBS, bp({ plan: false })).plan, undefined);
 });
 
 if (failed) {

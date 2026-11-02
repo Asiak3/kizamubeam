@@ -433,6 +433,61 @@ export const EDIT_TOOLS: ToolDef[] = [
     },
   },
   {
+    name: 'model_to_parts',
+    title: '3D-Modell in Steckteile umwandeln',
+    description:
+      'Liest ein 3D-Modell (STL oder OBJ, absoluter Pfad) und macht daraus eine Baugruppe zum Lasern: kind "stack" = Schichtmodell (dichte Scheiben zum Verleimen), "ribs" = Rippenmodell (Rippen mit Halbschlitzen auf Rückgrat-Platten). Bei ribs schlägt suggest=true (Standard) Abschnitte für Rumpf, Beine und Schwanz vor; ohne Vorschlag gibt es eine gerade Achse (params axis, spineDir). params wie bei generate_part (z. B. size = längste Seite in mm, thickness, spacing, maxPlate). Das Rippenmodell legt zusätzlich eine Bauplan-Seite an (params plan=false: ohne). x/y = Mitte der Anordnung. Später ändern mit edit_generator.',
+    tier: Tier.Edit,
+    inputSchema: obj({
+      path: { type: 'string' },
+      kind: { type: 'string', enum: ['stack', 'ribs'] },
+      suggest: { type: 'boolean' },
+      params: { type: 'object' },
+      x: { type: 'number' }, y: { type: 'number' }, layer: LAYER,
+    }, ['path', 'kind']),
+    run: async (ed, a) => {
+      const path = String(a.path ?? '');
+      if (!isTauri()) throw new ToolError('Nur in der Desktop-App');
+      const { invoke } = await import('@tauri-apps/api/core');
+      let buf: ArrayBuffer;
+      try {
+        buf = await invoke<ArrayBuffer>('read_file', { path });
+      } catch (e) {
+        throw new ToolError(`${path}: ${e}`);
+      }
+      const file = path.split(/[\\/]/).pop() ?? path;
+      const { parseMeshFile } = await import('./model3d/mesh');
+      const { addMesh } = await import('./model3d/store');
+      let mesh;
+      try {
+        mesh = parseMeshFile(file, buf);
+      } catch (e) {
+        throw new ToolError(`${file}: ${(e as Error).message}`);
+      }
+      const kind = a.kind === 'stack' ? 'stack' : 'ribs';
+      const g = getGenerator(kind)!;
+      const raw = { ...paramArg(a), model: addMesh(mesh), name: file.replace(/\.[^.]*$/, '') };
+      const bad = checkInput(g, raw);
+      if (bad.length) throw new ToolError(bad.map((i) => i.msg).join('; '));
+      let params = normalizeParams(g, raw);
+      let found = '';
+      if (kind === 'ribs' && a.suggest !== false && !params.sections) {
+        const { suggestSections } = await import('./model3d/suggest');
+        const sg = suggestSections(mesh, params);
+        found = sg.found;
+        if (sg.sections.length) params = normalizeParams(g, { ...params, sections: JSON.stringify(sg.sections) });
+      }
+      const r = buildGen(g, params);
+      if (!r.parts.length) throw new ToolError(r.issues.map((i) => i.msg).join('; '));
+      const p = W(ed, num(a, 'x', { def: ed.doc.bed.w / 2 }), num(a, 'y', { def: ed.doc.bed.h / 2 }));
+      const objs = ed.addGen(r, layerOf(ed, a), p);
+      return {
+        ids: objs.map((o) => o.id), parts: objs.length, info: Object.fromEntries(r.info), warnings: r.issues.map((i) => i.msg),
+        ...(found ? { suggestion: found } : {}), ...(r.plan ? { planPage: ed.doc.page + 2 } : {}),
+      };
+    },
+  },
+  {
     name: 'edit_generator',
     title: 'Parameter eines Bauteils ändern',
     description:

@@ -13,7 +13,7 @@ import { RACK } from './rack';
 import { DISCSPHERE } from './discsphere';
 import { STACK } from './stack';
 import { RIBS } from './ribs';
-import type { Generator, Issue, Params, ParamSpec, ParamValue } from './types';
+import type { Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet } from './types';
 import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
 export type { GenPart, Generator, Issue, Params, ParamSpec } from './types';
@@ -87,6 +87,7 @@ export interface BuildResult {
   parts: BuiltPart[];
   issues: Issue[];
   info: [string, string][];
+  plan?: PlanSheet;
 }
 
 /** Parameter prüfen und, wenn kein Fehler vorliegt, die Teile erzeugen (Baugruppen: part = Schlüssel des Teils) */
@@ -100,7 +101,7 @@ export function buildGen(g: Generator, params: Params): BuildResult {
       if (g.kind === 'assembly') shape.part = p.key;
       return p.marks?.length ? { shape, at: p.at, marks: p.marks } : { shape, at: p.at };
     });
-    return { parts, issues, info: r.info };
+    return r.plan ? { parts, issues, info: r.info, plan: r.plan } : { parts, issues, info: r.info };
   } catch (e) {
     return { parts: [], issues: [...issues, { level: 'error', msg: String(e instanceof Error ? e.message : e) }], info: [] };
   }
