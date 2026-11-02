@@ -374,6 +374,37 @@ test('Kalibrierung → Generator: kein Befund, Layer-Kerf ersetzt die Fuge im Ba
   library.remove(e.id);
 });
 
+// ---------- Steckprüfung ----------
+
+const asmOnly = (xs: CheckIssue[]) => xs.filter((x) => x.kind === 'loose' || x.kind === 'insert');
+
+test('Steckprüfung: Regal und Einsatz ohne Befund, Scheibenkugel lässt sich nicht gerade stecken', () => {
+  assert.deepEqual(asmOnly(run(genObjs('shelf', {}))), []);
+  assert.deepEqual(asmOnly(run(genObjs('insert', {}))), []);
+  const ds = asmOnly(run(genObjs('discsphere', {})));
+  assert.equal(ds.length, 1);
+  assert.equal(ds[0].kind, 'insert');
+  assert.equal(ds[0].level, 'warn');
+  assert.match(ds[0].msg, /gerade stecken|straight/);
+  assert.ok(ds[0].objs.length > 0 && ds[0].lines.length === 1);
+});
+
+test('Steckprüfung: Fehlt ein Teil, hängen andere lose; Teile auf anderen Seiten zählen mit', () => {
+  const all = genObjs('insert', {});
+  const parts = all.map((o) => (o.shape as { part?: string }).part);
+  // Ohne das Teil, in dem die anderen stecken, hält nichts mehr zusammen
+  let hit = '';
+  for (let i = 0; i < all.length && !hit; i++) {
+    const xs = asmOnly(run(all.filter((_, j) => j !== i)));
+    if (xs.some((x) => x.kind === 'loose' && x.level === 'error')) hit = parts[i] ?? '?';
+  }
+  assert.ok(hit, 'Kein Teil, dessen Fehlen etwas löst');
+  // Liegt ein Teil auf einer anderen Seite, ist es nicht gelöscht
+  const half = all.slice(0, 1);
+  const xs = checkDesign({ objs: half, allObjs: all, layer: layerOf, bed: { w: 400, h: 400 }, settings: DEFAULT_CHECK });
+  assert.deepEqual(asmOnly(xs), []);
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
