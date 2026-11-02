@@ -1,6 +1,6 @@
 [package]
 name = "kizamubeam-core"
-version = "1.15.0-beta"
+version = "1.16.0-beta"
 description = "Rechenkern von KizamuBeam ohne Oberfläche: Bildverarbeitung, Rasterzeilen, G-Code"
 license = "GPL-3.0-or-later"
 edition = "2021"

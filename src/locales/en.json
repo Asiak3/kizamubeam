@@ -3315,5 +3315,17 @@
   "Ende {n}": "End {n}",
   "Schwanz": "Tail",
   "Bein {n}": "Leg {n}",
-  "{n} Beine": "{n} legs"
+  "{n} Beine": "{n} legs",
+  "Bauplan": "Assembly plan",
+  "Platten teilen ab": "Split plates above",
+  "Rückgrat-Platten, die länger sind (z. B. als das Bett), werden mit einem Schwalbenschwanz geteilt. 0 = nie teilen.": "Spine plates that are longer (e.g. than the bed) are split with a dovetail. 0 = never split.",
+  "Bauplan als eigene Seite": "Assembly plan as its own page",
+  "Beim Erstellen eine Seite mit Ansicht, Teilenummern und Steckreihenfolge anlegen. Sie wird nicht gelasert.": "When creating, add a page with a view, part numbers and assembly order. It is not lasered.",
+  "Längste Platte": "Longest plate",
+  "Geteilte Platten zuerst am Schwalbenschwanz zusammenstecken und verleimen: {list}.": "First join and glue the split plates at their dovetails: {list}.",
+  "Rippen {r} von oben auf Platte {s} stecken; die Nummer am Schlitz zeigt, welche Rippe wohin gehört.": "Push ribs {r} onto plate {s} from above; the number at each slot shows which rib goes where.",
+  "Platte {s} von unten in die Schlitze der Rippen {r} schieben.": "Slide plate {s} into the slots of ribs {r} from below.",
+  "Teile: {r} Rippen, {s} Platten, Materialdicke {t} mm.": "Parts: {r} ribs, {s} plates, material thickness {t} mm.",
+  "Bauplan: {name}": "Assembly plan: {name}",
+  "Rippen {r} auf Platte {s} stecken.": "Push ribs {r} onto plate {s}."
 }

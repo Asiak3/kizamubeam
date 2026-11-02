@@ -53,10 +53,20 @@ export interface GenPart {
   marks?: SubPath[];
 }
 
+/** Bauplan für eine eigene Seite (mm, y nach unten): Zeichnung, Beschriftungen und Arbeitsschritte */
+export interface PlanSheet {
+  title: string;
+  lines: Pt[][];
+  labels: { x: number; y: number; text: string; size: number }[];
+  steps: string[];
+}
+
 export interface GenResult {
   parts: GenPart[];
   /** Kennwerte für den Dialog (z. B. Teilkreis- und Kopfkreisdurchmesser) */
   info: [string, string][];
+  /** Bauplan (nur Baugruppen, die einen anbieten); der Editor legt ihn beim Erstellen auf eine eigene Seite */
+  plan?: PlanSheet;
 }
 
 export interface Generator {

@@ -20,11 +20,11 @@ import type { Pt, SubPath } from '../model';
 import { t } from '../i18n';
 import { fitPolyline } from '../fit';
 import { packParts } from './build';
-import type { Generator, GenPart, Issue, Params } from './types';
+import type { Generator, GenPart, Issue, Params, PlanSheet } from './types';
 import { getMesh } from '../model3d/store';
 import type { Mesh } from '../model3d/mesh';
 import {
-  capsuleRegion, circleRegion, cleanRegion, inside, intersect, intervalsAtX, intervalsInBand, offsetRegion, polyRegion, prepare, Prepared, regionArea,
+  capsuleRegion, circleRegion, cleanRegion, region, inside, intersect, intervalsAtX, intervalsInBand, offsetRegion, polyRegion, prepare, Prepared, regionArea,
   regionIslands, sliceAt, sliceRegion, subtractRegions, unionRegions, V3,
 } from '../model3d/slice';
 import { numberStrokes, numberWidth, placeNumber, worldOf } from './stack';
@@ -46,6 +46,8 @@ export interface RibsParams {
   numberSize: number;
   minArea: number;
   kerf: number;
+  maxPlate: number;
+  plan: boolean;
 }
 
 /** Ansicht, in der eine Achse gezeichnet ist: Ebene (e1, e2), Normale n */
@@ -125,6 +127,11 @@ export interface RibPart {
   pose: { o: V3; u: V3; v: V3; n: V3 };
   /** Zusätzliche Gravuren (Schlitzmarken am Rückgrat) in denselben Koordinaten */
   extra?: SubPath[];
+  /** Rückgrat: Nummern der Rippen, die darin stecken, und die Abschnitte, zu denen es gehört */
+  slots?: number[];
+  secs?: number[];
+  /** Rückgrat: geteilt, weil länger als „Platten teilen ab“ (Schwalbenschwanz) */
+  piece?: boolean;
 }
 
 export interface SectionInfo {
@@ -166,7 +173,7 @@ const cache = new Map<string, RibsLayout | null>();
 /** Zerlegung in Rippen und Rückgrate (zwischengespeichert); null, wenn das Modell fehlt */
 export function ribsLayout(raw: Params): RibsLayout | null {
   const p = P(raw);
-  const key = [p.model, p.sections, p.up, p.axis, p.spineDir, p.size, p.thickness, p.spacing, p.spineInset, p.spineOffset, p.play, p.minArea, p.kerf, p.numbers, p.numberSize].join('|');
+  const key = [p.model, p.sections, p.up, p.axis, p.spineDir, p.size, p.thickness, p.spacing, p.spineInset, p.spineOffset, p.play, p.minArea, p.kerf, p.numbers, p.numberSize, p.maxPlate].join('|');
   if (cache.has(key)) return cache.get(key)!;
   const mesh = p.model ? getMesh(p.model) : null;
   if (!mesh) return null;
@@ -635,10 +642,37 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
           if (!corners.every((q) => inside(isl, q))) continue;
           extra.push(...numberStrokes(label, { x: cc.x - c.x, y: cc.y - c.y }, h));
         }
-      spine.push({ key: '', section: -1, polys: local, pose: { o: lin(g.u, c.x, g.v, c.y, g.n, g.off - th / 2), u: g.u, v: g.v, n: g.n }, extra: extra.length ? extra : undefined });
+      const slots = spineMarks[gi].filter((mk) => inside(isl, fromLine(mk.ln, 0, mk.m - hold))).map((mk) => mk.nr);
+      spine.push({
+        key: '', section: -1, polys: local, pose: { o: lin(g.u, c.x, g.v, c.y, g.n, g.off - th / 2), u: g.u, v: g.v, n: g.n },
+        extra: extra.length ? extra : undefined, slots: [...new Set(slots)].sort((a, b) => a - b), secs: g.secs,
+      });
     }
   });
   spine.forEach((s, i) => (s.key = spine.length > 1 ? `S${i + 1}` : 'S'));
+  // Zu lange Platten mit Schwalbenschwanz teilen (Stücke a, b, …; gleiche Lage im Raum)
+  if (p.maxPlate > 0) {
+    const split: RibPart[] = [];
+    for (const sp of spine) {
+      const pieces = splitPlate(sp.polys, p.maxPlate, th, p.play, p.minArea);
+      if (!pieces) {
+        split.push(sp);
+        continue;
+      }
+      pieces.forEach((pc, i) => {
+        const c = center(pc);
+        const local = pc.map((poly) => poly.map((q) => ({ x: q.x - c.x, y: q.y - c.y })));
+        // Schlitzmarken zum Stück, in dem sie liegen
+        const extra = (sp.extra ?? [])
+          .filter((m) => m.nodes.length && inside(pc, { x: m.nodes[0].x, y: m.nodes[0].y }))
+          .map((m) => ({ ...m, nodes: m.nodes.map((nd) => ({ ...nd, x: nd.x - c.x, y: nd.y - c.y, ...(nd.cin ? { cin: { x: nd.cin.x - c.x, y: nd.cin.y - c.y } } : {}), ...(nd.cout ? { cout: { x: nd.cout.x - c.x, y: nd.cout.y - c.y } } : {}) })) }));
+        const o = add(add(sp.pose.o, sp.pose.u, c.x), sp.pose.v, c.y);
+        split.push({ ...sp, key: sp.key + String.fromCharCode(97 + i), polys: local, pose: { ...sp.pose, o }, extra: extra.length ? extra : undefined, piece: true });
+      });
+    }
+    spine.length = 0;
+    spine.push(...split);
+  }
 
   return {
     dims,
@@ -652,6 +686,80 @@ function compute(p: RibsParams, rawMesh: Mesh): RibsLayout {
     open,
     bad,
   };
+}
+
+/**
+ * Platte (Inseln in Teilkoordinaten) quer zu ihrer längsten Richtung in Stücke von höchstens max teilen. Die
+ * Schnitte liegen möglichst an Stellen ohne Schlitz in der Nähe, wo das Material ein einziges, langes Stück ist;
+ * dort greift ein Schwalbenschwanz vom linken in das rechte Stück (mit Steckspiel). null = nicht nötig.
+ */
+export function splitPlate(polys: Pt[][], max: number, th: number, play: number, minArea: number): Pt[][][] | null {
+  let x0 = Infinity,
+    x1 = -Infinity,
+    y0 = Infinity,
+    y1 = -Infinity;
+  for (const poly of polys) for (const q of poly) (x0 = Math.min(x0, q.x)), (x1 = Math.max(x1, q.x)), (y0 = Math.min(y0, q.y)), (y1 = Math.max(y1, q.y));
+  const rot = y1 - y0 > x1 - x0;
+  const fw = (q: Pt): Pt => (rot ? { x: q.y, y: -q.x } : q);
+  const bw = (q: Pt): Pt => (rot ? { x: -q.y, y: q.x } : q);
+  const P = polys.map((poly) => poly.map(fw));
+  const a0 = rot ? y0 : x0,
+    a1 = rot ? y1 : x1;
+  const len = a1 - a0;
+  const k = Math.ceil(len / max - 1e-9);
+  if (k < 2) return null;
+  const off = 1.5 * th;
+  const cuts: { x: number; iv: [number, number] }[] = [];
+  let prev = a0;
+  for (let i = 1; i < k; i++) {
+    const ideal = a0 + (i * len) / k;
+    const lo = Math.max(prev + 2 * th, ideal - (0.3 * len) / k),
+      hi = Math.min(prev + max - 1, ideal + (0.3 * len) / k);
+    let best: { x: number; iv: [number, number]; score: number } | null = null;
+    for (let x = lo; x <= hi + 1e-9; x += 0.5) {
+      const ivs = [x - off, x, x + off].map((xx) => intervalsAtX(P, xx));
+      const here = ivs[1];
+      if (!here.length) continue;
+      const iv = here.reduce((m, v) => (v[1] - v[0] > m[1] - m[0] ? v : m));
+      const clean = ivs.every((v) => v.length === 1) && Math.abs(ivs[0][0][1] - ivs[0][0][0] - (iv[1] - iv[0])) < 2 && Math.abs(ivs[2][0][1] - ivs[2][0][0] - (iv[1] - iv[0])) < 2;
+      const score = (clean ? 1000 : 0) + (iv[1] - iv[0]) - 2 * Math.abs(x - ideal);
+      if (!best || score > best.score) best = { x, iv, score };
+    }
+    if (!best) continue;
+    cuts.push({ x: best.x, iv: best.iv });
+    prev = best.x;
+  }
+  if (!cuts.length) return null;
+  const R = region(P);
+  const B = 1e4;
+  const rect = (xa: number, xb: number) => polyRegion([{ x: xa, y: -B }, { x: xb, y: -B }, { x: xb, y: B }, { x: xa, y: B }]);
+  // Schwalbenschwanz an einem Schnitt: greift nach rechts, ausgehend vom Stück links
+  const tab = (c: { x: number; iv: [number, number] }, grow: number, back = grow) => {
+    const hgt = c.iv[1] - c.iv[0],
+      ym = (c.iv[0] + c.iv[1]) / 2;
+    const n = Math.min(20, 0.35 * hgt),
+      d = Math.min(12, Math.max(2 * th, 0.25 * hgt)),
+      fl = 0.35 * n;
+    return polyRegion([
+      { x: c.x - back, y: ym - n / 2 - grow },
+      { x: c.x - grow, y: ym - n / 2 - grow },
+      { x: c.x + d + grow, y: ym - n / 2 - fl - grow },
+      { x: c.x + d + grow, y: ym + n / 2 + fl + grow },
+      { x: c.x - grow, y: ym + n / 2 + grow },
+      { x: c.x - back, y: ym + n / 2 + grow },
+    ]);
+  };
+  const out: Pt[][][] = [];
+  const edges = [a0 - 1, ...cuts.map((c) => c.x), a1 + 1];
+  for (let i = 0; i + 1 < edges.length; i++) {
+    // 0,05 mm Fuge am geraden Schnitt, damit sich die Stücke nicht berühren
+    let piece = intersect(R, rect(edges[i] + 0.025, edges[i + 1] - 0.025));
+    // links: Zapfen des eigenen rechten Schnitts dazu; rechts: Aussparung für den Zapfen des linken Schnitts
+    if (i + 1 < edges.length - 1) piece = unionRegions(piece, intersect(R, tab(cuts[i], 0, 1)));
+    if (i > 0) piece = subtractRegions(piece, tab(cuts[i - 1], Math.max(0, play) / 2));
+    for (const isl of regionIslands(piece, minArea)) out.push(isl.map((poly) => poly.map(bw)));
+  }
+  return out;
 }
 
 /**
@@ -731,6 +839,8 @@ export const RIBS: Generator = {
     { key: 'numberSize', type: 'length', label: t('Größte Schrifthöhe'), min: 1.5, max: 30, def: 6, advanced: true, showIf: (p) => !!p.numbers },
     { key: 'minArea', type: 'number', label: t('Kleinste Fläche (mm²)'), min: 0, max: 10000, def: 4, advanced: true, title: t('Inseln und Löcher, die kleiner sind, werden weggelassen bzw. gefüllt.') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.1, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Schlitze werden schmaler. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
+    { key: 'maxPlate', type: 'length', label: t('Platten teilen ab'), min: 0, max: 3000, def: 0, advanced: true, title: t('Rückgrat-Platten, die länger sind (z. B. als das Bett), werden mit einem Schwalbenschwanz geteilt. 0 = nie teilen.') },
+    { key: 'plan', type: 'bool', label: t('Bauplan als eigene Seite'), def: true, title: t('Beim Erstellen eine Seite mit Ansicht, Teilenummern und Steckreihenfolge anlegen. Sie wird nicht gelasert.') },
   ],
   validate(raw) {
     const p = P(raw);
@@ -796,8 +906,14 @@ export const RIBS: Generator = {
       [t('Rippen'), String(L.ribs.length)],
     ];
     if (L.manual) info.push([t('Abschnitte'), L.sections.map((s) => `${s.name} ${s.ribs}`).join(', ')]);
+    let longest = 0;
+    for (const sp of L.spine) {
+      const c = center(sp.polys);
+      for (const poly of sp.polys) for (const q of poly) longest = Math.max(longest, 2 * Math.abs(q.x - c.x), 2 * Math.abs(q.y - c.y));
+    }
+    info.push([t('Längste Platte'), `${fmt(longest, 0)} mm`]);
     info.push([t('Fläche gesamt'), `${fmt(area / 100, 0)} cm²`]);
-    return { parts, info };
+    return p.plan ? { parts, info, plan: ribsPlan(p, L) } : { parts, info };
   },
   label(raw, part) {
     const p = P(raw);
@@ -810,6 +926,77 @@ export const RIBS: Generator = {
     return `${base}: ${t('Rippe {n}', { n: part.slice(1) })}${sec ? ` (${sec})` : ''}`;
   },
 };
+
+/** Nummern als Bereiche: 1–4, 7, 9–10 */
+export function ranges(ns: number[]): string {
+  const s = [...new Set(ns)].sort((a, b) => a - b);
+  const out: string[] = [];
+  for (let i = 0; i < s.length; ) {
+    let j = i;
+    while (j + 1 < s.length && s[j + 1] === s[j] + 1) j++;
+    out.push(j > i ? `${s[i]}–${s[j]}` : String(s[i]));
+    i = j + 1;
+  }
+  return out.join(', ');
+}
+
+/** Bauplan: Ansicht mit Teilenummern und Steckreihenfolge */
+export function ribsPlan(p: RibsParams, L: RibsLayout): PlanSheet {
+  const V = VIEWS[L.sections[0]?.view ?? 'xz'];
+  const th = p.thickness;
+  const proj = (q: V3): Pt => ({ x: dot(q, V.e1), y: -dot(q, V.e2) });
+  const world = (part: RibPart, q: Pt): V3 => add(add(add(part.pose.o, part.pose.u, q.x), part.pose.v, q.y), part.pose.n, th / 2);
+  const raw: Pt[][] = [];
+  const marks: { at: Pt; text: string; size: number }[] = [];
+  for (const part of [...L.spine, ...L.ribs]) {
+    for (const poly of part.polys) raw.push([...poly, poly[0]].map((q) => proj(world(part, q))));
+    marks.push({ at: proj(world(part, { x: 0, y: 0 })), text: part.key.startsWith('R') ? part.key.slice(1) : part.key, size: part.key.startsWith('R') ? 2.5 : 4 });
+  }
+  // In ein Feld von 180 × 110 mm ab (15, 22) einpassen
+  let x0 = Infinity,
+    y0 = Infinity,
+    x1 = -Infinity,
+    y1 = -Infinity;
+  for (const l of raw) for (const q of l) (x0 = Math.min(x0, q.x)), (y0 = Math.min(y0, q.y)), (x1 = Math.max(x1, q.x)), (y1 = Math.max(y1, q.y));
+  const k = Math.min(180 / Math.max(1, x1 - x0), 110 / Math.max(1, y1 - y0));
+  const T = (q: Pt): Pt => ({ x: 15 + (q.x - x0) * k, y: 22 + (q.y - y0) * k });
+  const lines = raw.map((l) => l.map(T));
+  const labels = marks.map((m) => ({ ...T(m.at), text: m.text, size: m.size }));
+
+  // Steckreihenfolge
+  const name = (si: number) => L.sections[si]?.name ?? '';
+  const ribsOf = (secs: number[]) => L.ribs.filter((r) => secs.includes(r.section)).map((r) => Number(r.key.slice(1)));
+  const steps: string[] = [];
+  const pieces = L.spine.filter((s) => s.piece).map((s) => s.key);
+  if (pieces.length) steps.push(t('Geteilte Platten zuerst am Schwalbenschwanz zusammenstecken und verleimen: {list}.', { list: pieces.join(', ') }));
+  // Platten ohne Buchstaben zusammenfassen (S1a + S1b = S1)
+  const plates = new Map<string, RibPart[]>();
+  for (const s of L.spine) {
+    const base = s.piece ? s.key.slice(0, -1) : s.key;
+    plates.set(base, [...(plates.get(base) ?? []), s]);
+  }
+  const order = [...plates.entries()].sort((a, b) => Number(!(a[1][0].secs ?? []).includes(0)) - Number(!(b[1][0].secs ?? []).includes(0)));
+  for (const [key, parts] of order) {
+    const secs = parts[0].secs ?? [];
+    const slots = parts.flatMap((x) => x.slots ?? []);
+    const own = ribsOf(secs).filter((n) => slots.includes(n));
+    const cross = slots.filter((n) => !own.includes(n));
+    // Namen nur der Abschnitte, deren Rippen wirklich auf diesem Stück stecken (gleiche Ebene ≠ gleiche Platte)
+    const ownSecs = [...new Set(L.ribs.filter((r) => own.includes(Number(r.key.slice(1)))).map((r) => r.section))];
+    const names = L.manual ? ownSecs.map(name).filter(Boolean).join(', ') : '';
+    const plate = names ? `${key} (${names})` : key;
+    const main = steps.length === (pieces.length ? 1 : 0);
+    if (own.length)
+      steps.push(
+        main
+          ? t('Rippen {r} von oben auf Platte {s} stecken; die Nummer am Schlitz zeigt, welche Rippe wohin gehört.', { r: ranges(own), s: plate })
+          : t('Rippen {r} auf Platte {s} stecken.', { r: ranges(own), s: plate }),
+      );
+    if (cross.length) steps.push(t('Platte {s} von unten in die Schlitze der Rippen {r} schieben.', { s: key, r: ranges(cross) }));
+  }
+  steps.push(t('Teile: {r} Rippen, {s} Platten, Materialdicke {t} mm.', { r: L.ribs.length, s: L.spine.length, t: fmt(th, 1) }));
+  return { title: t('Bauplan: {name}', { name: t('Rippenmodell {name}', { name: p.name || '' }).trim() }), lines, labels, steps: steps.map((s2, i) => (i < steps.length - 1 ? `${i + 1}. ${s2}` : s2)) };
+}
 
 /** Lage jedes Teils im Raum (für die 3D-Ansicht) */
 export function ribsPoses(raw: Params): Record<string, { o: V3; u: V3; v: V3; n: V3 }> | null {

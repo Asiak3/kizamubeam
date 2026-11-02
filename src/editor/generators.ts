@@ -3,6 +3,7 @@
 import { defaultCutSettings, GenShape, IDENT, leaves, mul, newAsmId, newId, Obj, SubPath, translate } from '../model';
 import { boundsOf } from '../geom';
 import { BuildResult, GenPart, genLabel, getGenerator, normalizeParams } from '../generators';
+import type { PlanSheet } from '../generators/types';
 import { t } from '../i18n';
 import type { Editor } from '../editor';
 import { RULER } from './shared';
@@ -72,6 +73,37 @@ export class EditorGenerators {
     const g: Obj = { id: newId(), m: part.m, layer: part.layer, shape: { kind: 'group', children: [{ ...part, m: IDENT }, mark] } };
     return g;
   }
+  /** Bauplan einer Baugruppe als neue Seite hinter der aktuellen (ohne Seitenwechsel), auf einem Layer, der nicht gelasert wird */
+  addPlanPage(this: Editor, plan: PlanSheet, name: string) {
+    let li = -1;
+    for (let k = 0; k < 30 && li < 0; k++) if (this.doc.layers[k]?.name === t('Bauplan') && !this.doc.layers[k].output) li = k;
+    if (li < 0) {
+      const used = new Set<number>();
+      for (const pg of this.doc.pages) for (const [o] of leaves(pg.objs)) used.add(o.layer);
+      for (let k = 29; k >= 0 && li < 0; k--) if (!used.has(k) && !this.doc.layers[k]) li = k;
+      for (let k = 29; k >= 0 && li < 0; k--) if (!used.has(k)) li = k;
+      if (li < 0) li = 29;
+      Object.assign(this.layer(li), defaultCutSettings('line'), { mode: 'line', name: t('Bauplan'), output: false });
+    }
+    const text = (s: string, x: number, y: number, size: number, align: 'left' | 'center' = 'left'): Obj => ({
+      id: newId(), m: translate(x, y), layer: li,
+      shape: { kind: 'text', text: s, font: 'Arial', size, bold: false, italic: false, upper: false, align, hSpace: 0, vSpace: 0 },
+    });
+    const objs: Obj[] = [text(plan.title, 15, 12, 6)];
+    if (plan.lines.length)
+      objs.push({ id: newId(), m: IDENT, layer: li, shape: { kind: 'path', subs: plan.lines.map((l) => ({ closed: false, nodes: l.map((q) => ({ x: q.x, y: q.y })) })) } });
+    for (const lb of plan.labels) objs.push(text(lb.text, lb.x, lb.y + lb.size / 3, lb.size, 'center'));
+    let y = 22 + 110 + 12;
+    for (const st of plan.steps) {
+      objs.push(text(st, 15, y, 4));
+      y += 7;
+    }
+    const at = this.doc.page + 1;
+    const used = new Set(this.doc.pages.map((p) => p.name));
+    let pn = name;
+    for (let i = 2; used.has(pn); i++) pn = `${name} ${i}`;
+    this.doc.pages.splice(at, 0, { name: pn, objs });
+  }
   addGen(this: Editor, r: BuildResult, layer = this.currentLayer, center?: { x: number; y: number }): Obj[] {
     if (!r.parts.length) return [];
     let c = center ?? this.toWorld(RULER + (this.w - RULER) / 2, RULER + (this.h - RULER) / 2);
@@ -90,6 +122,7 @@ export class EditorGenerators {
       for (const o of objs) o.m = mul(translate(bed.w / 2 - (b.x + b.w / 2), bed.h / 2 - (b.y + b.h / 2)), o.m);
     this.layer(layer);
     this.doc.objs.push(...objs);
+    if (r.plan) this.addPlanPage(r.plan, t('Bauplan'));
     if (!this.agentCall) this.setTool('select');
     this.setSel(objs);
     const name = groupLabel(r.parts[0].shape);
