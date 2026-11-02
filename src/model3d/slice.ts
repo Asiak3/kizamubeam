@@ -364,3 +364,65 @@ export function deepestPoint(polys: Pt[][]): { p: Pt; r: number } | null {
   }
   return best;
 }
+
+// ---------- Für gesteckte Modelle (Rippen auf Rückgrat) ----------
+
+/** Rechteck x0..x1 × y0..y1 (mm) als Fläche */
+export const rectRegion = (x0: number, y0: number, x1: number, y1: number): IntPath[] => [
+  [
+    { X: Math.round(x0 * SCALE), Y: Math.round(y0 * SCALE) },
+    { X: Math.round(x1 * SCALE), Y: Math.round(y0 * SCALE) },
+    { X: Math.round(x1 * SCALE), Y: Math.round(y1 * SCALE) },
+    { X: Math.round(x0 * SCALE), Y: Math.round(y1 * SCALE) },
+  ],
+];
+/** a ohne b */
+export const subtractRegions = (a: IntPath[], b: IntPath[]): IntPath[] =>
+  b.length ? clip(ClipperLib.ClipType.ctDifference, a, b, ClipperLib.PolyFillType.pftNonZero) : a;
+
+/** Einzelne Inseln (Außenkontur mit ihren Löchern), kleine Inseln und Löcher wie bei cleanRegion entfernt */
+export function regionIslands(paths: IntPath[], minArea: number): Pt[][][] {
+  if (!paths.length) return [];
+  const c = new ClipperLib.Clipper();
+  c.AddPaths(paths, ClipperLib.PolyType.ptSubject, true);
+  const tree = new ClipperLib.PolyTree();
+  c.Execute(ClipperLib.ClipType.ctUnion, tree, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
+  const min = minArea * SCALE * SCALE;
+  const out: Pt[][][] = [];
+  const conv = (poly: IntPath): Pt[] | null => {
+    if (Math.abs(ClipperLib.Clipper.Area(poly)) < min) return null;
+    const clean = ClipperLib.Clipper.CleanPolygon(poly, 0.01 * SCALE);
+    return clean.length < 3 ? null : clean.map((q) => ({ x: q.X / SCALE, y: q.Y / SCALE }));
+  };
+  // Tiefe 0: Inseln, 1: Löcher, 2: Inseln in Löchern (wieder eigene Inseln) …
+  const visit = (node: ClipperLib.PolyNode) => {
+    for (const isl of node.Childs()) {
+      const outer = conv(isl.Contour());
+      if (!outer) continue;
+      const group = [outer];
+      for (const hole of isl.Childs()) {
+        const hp = conv(hole.Contour());
+        if (hp) group.push(hp);
+        visit(hole);
+      }
+      out.push(group);
+    }
+  };
+  visit(tree);
+  return out;
+}
+
+/** Abschnitte (y von, y bis) einer senkrechten Linie bei x, die im Inneren liegen (Gerade-Ungerade), aufsteigend */
+export function intervalsAtX(polys: Pt[][], x: number): [number, number][] {
+  const ys: number[] = [];
+  for (const p of polys)
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const a = p[j],
+        b = p[i];
+      if (a.x > x !== b.x > x) ys.push(a.y + ((x - a.x) * (b.y - a.y)) / (b.x - a.x));
+    }
+  ys.sort((p, q) => p - q);
+  const out: [number, number][] = [];
+  for (let i = 0; i + 1 < ys.length; i += 2) if (ys[i + 1] - ys[i] > 1e-9) out.push([ys[i], ys[i + 1]]);
+  return out;
+}

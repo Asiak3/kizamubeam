@@ -20,6 +20,7 @@ export const ICONS: Record<string, string> = {
   drawer: svg('<rect x="3.5" y="4" width="17" height="16" rx="1"/><path d="M3.5 12h17"/><path d="M9.5 8h5M9.5 16h5"/>'),
   insert: svg('<rect x="3.5" y="5" width="17" height="14" rx="1"/><path d="M9.2 5v14M14.8 5v14M3.5 12h17"/>'),
   discsphere: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5c-4 2.5-4 14.5 0 17M12 3.5c4 2.5 4 14.5 0 17M3.5 12c2.5-3 14.5-3 17 0"/>'),
+  ribs: svg('<path d="M3 12h18"/><path d="M6 6v12M10 4v16M14 4v16M18 6v12"/>'),
   stack: svg('<path d="M5 19h14M6 16h12M5 13h14M7 10h10M8 7h8M10 4h4"/>'),
   shelf: svg('<path d="M6 3v18M18 3v18M3.5 7h17M3.5 13h17M3.5 19h17"/>'),
   box: svg('<path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/><path d="M6.7 10.5v1.6M9.3 12v1.6M14.7 13.6V12M17.3 12.1v-1.6"/>'),

@@ -22,6 +22,7 @@ export const GEN_FITS: Record<string, { kind: FitKind; play: string }> = {
   insert: { kind: 'slot', play: 'play' },
   shelf: { kind: 'slot', play: 'play' },
   discsphere: { kind: 'slot', play: 'play' },
+  ribs: { kind: 'slot', play: 'play' },
 };
 
 /** Verbindungsarten des Verbindungs-Werkzeugs: Zinken und Haken sind Teil-in-Teil, die übrigen stecken in Schlitzen */

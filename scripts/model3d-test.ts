@@ -7,6 +7,7 @@ const { parseStl, parseObj, weld, meshInfo, encodeMesh, decodeMesh, meshId } = a
 const { prepare, sliceAt, region, sliceRegion, cleanRegion, regionArea, deepestPoint } = await import('../src/model3d/slice');
 const { addMesh } = await import('../src/model3d/store');
 const { STACK, stackLayout, numberStrokes, FRAMES } = await import('../src/generators/stack');
+const { RIBS, ribsLayout } = await import('../src/generators/ribs');
 const { buildGen, defaultParams, normalizeParams } = await import('../src/generators/index');
 const { asmSolids, findOverlaps, solidBounds } = await import('../src/view3d/solids');
 
@@ -249,6 +250,92 @@ test('Schichtmodell: Querschnitt-Fläche passt zur Kugel', () => {
   }
   const pts: Pt[] = L.layers[0].polys[0];
   assert.ok(pts.length > 10);
+});
+
+
+// ---------- Rippenmodell ----------
+
+const ellipsoid = (rx: number, ry: number, rz: number, c: [number, number, number] = [0, 0, 0], n = 64) =>
+  gridMesh(n, n / 2, (u, v) => {
+    const th = u * 2 * Math.PI,
+      ph = v * Math.PI;
+    return [c[0] + rx * Math.sin(ph) * Math.cos(th), c[1] + ry * Math.sin(ph) * Math.sin(th), c[2] + rz * Math.cos(ph)];
+  }, false);
+function merge(...ms: Mesh[]): Mesh {
+  let off = 0;
+  const pos: number[] = [],
+    tri: number[] = [];
+  for (const m of ms) {
+    pos.push(...m.pos);
+    tri.push(...[...m.tri].map((i) => i + off));
+    off += m.pos.length / 3;
+  }
+  return { pos: Float32Array.from(pos), tri: Uint32Array.from(tri) };
+}
+// Fisch: Ellipsoid 120 × 40 × 60 mm; Tier: Rumpf + vier Beine (seitlich der Mitte)
+const fishId = addMesh(ellipsoid(60, 20, 30));
+const animalId = addMesh(merge(ellipsoid(60, 22, 25, [0, 0, 60]), ...[[-35, -14], [-35, 14], [35, -14], [35, 14]].map(([x, y]) => ellipsoid(7, 7, 18, [x, y, 20]))));
+const rp = (o: Record<string, unknown> = {}) => normalizeParams(RIBS, { ...defaultParams(RIBS), model: fishId, name: 'Fisch', size: 120, kerf: 0, ...o });
+
+test('Rippenmodell: Anzahl, Schlitze in Rippen und Rückgrat, Nummern', () => {
+  const L = ribsLayout(rp())!;
+  // Länge 120, Abstand 10, Dicke 3: 12 Rippen
+  assert.equal(L.count, 12);
+  assert.equal(L.ribs.length + L.lostRibs, 12);
+  assert.ok(L.ribs.length >= 10, `${L.ribs.length} Rippen`);
+  assert.equal(L.spine.length, 1);
+  assert.deepEqual(L.ribs.map((r) => r.key), L.ribs.map((_, i) => `R${i + 1}`));
+  // Mittlere Rippe: Ellipse 40 × 60 minus Schlitz (Breite 3,1, halbe Höhe)
+  const mid = L.ribs[Math.floor(L.ribs.length / 2)];
+  const full = Math.PI * 20 * 30;
+  const a = regionArea(mid.polys);
+  assert.ok(a < full - 3.1 * 20 && a > full - 3.1 * 40, `Rippe ${a} von ${full}`);
+  // Rückgrat (nach innen versetzt um 2 mm): ein Schlitz je Rippe
+  const sa = regionArea(L.spine[0].polys);
+  const sfull = Math.PI * 58 * 28;
+  assert.ok(sa < sfull - L.ribs.length * 3.1 * 10, `Rückgrat ${sa}`);
+  // Nummern: Rippen und Schlitzmarken
+  const r = buildGen(RIBS, rp());
+  assert.equal(r.parts.length, L.ribs.length + 1);
+  assert.ok(r.parts.filter((x) => x.marks?.length).length >= L.ribs.length - 2);
+  assert.ok(r.parts.find((x) => x.shape.part === 'S')!.marks!.length > 0, 'Schlitzmarken');
+  assert.deepEqual(RIBS.validate(rp()).filter((i) => i.level === 'error'), []);
+  assert.ok(RIBS.validate(rp({ spacing: 3 })).some((i) => i.key === 'spacing' && i.level === 'error'));
+});
+
+test('Rippenmodell in 3D: gesteckt ohne Durchdringung, Presspassung wird erkannt', () => {
+  for (const o of [{}, { axis: 'z', spineDir: 'x', size: 120 }, { spineDir: 'y' }]) {
+    const s = asmSolids('ribs', rp(o), 3)!;
+    assert.ok(s.length > 5);
+    assert.deepEqual(findOverlaps(s).map((x) => `${x.a}/${x.b}`), [], JSON.stringify(o));
+  }
+  // Schlitze schmaler als die Dicke: Rippen und Rückgrat durchdringen sich
+  assert.ok(findOverlaps(asmSolids('ribs', rp({ play: -0.5 }), 3)!).length > 5);
+  // Teile liegen im Modell: Ausdehnung = Fisch
+  const lo = [Infinity, Infinity, Infinity],
+    hi = [-Infinity, -Infinity, -Infinity];
+  for (const x of asmSolids('ribs', rp({ spineInset: 0 }), 3)!) {
+    const b = solidBounds(x);
+    for (let k = 0; k < 3; k++) (lo[k] = Math.min(lo[k], b.min[k])), (hi[k] = Math.max(hi[k], b.max[k]));
+  }
+  near(hi[2] - lo[2], 60, 1, 'Höhe');
+  near(hi[1] - lo[1], 40, 1, 'Breite');
+  assert.ok(hi[0] - lo[0] > 110 && hi[0] - lo[0] <= 120.01, 'Länge');
+});
+
+test('Rippenmodell: Beine neben dem Rückgrat fallen weg, Torus hat zwei Rückgrate', () => {
+  const L = ribsLayout(rp({ model: animalId, size: 120 }))!;
+  assert.ok(L.lostPieces > 0, 'Beinstücke');
+  assert.ok(RIBS.validate(rp({ model: animalId, size: 120 })).some((i) => i.key === 'spineOffset'));
+  // Keine Rippe enthält ein Bein: alles liegt über dem Rumpfboden (Rumpf ab z = 35 von 85)
+  for (const r of L.ribs) {
+    const s = asmSolids('ribs', rp({ model: animalId, size: 120 }), 3)!.find((x) => x.key === r.key)!;
+    assert.ok(solidBounds(s).min[2] > 30, r.key);
+  }
+  const T = ribsLayout(rp({ model: torusId, size: 100 }))!;
+  assert.equal(T.spine.length, 2);
+  assert.ok(T.lostRibs > 0);
+  assert.ok(RIBS.validate(rp({ model: torusId, size: 100 })).some((i) => i.key === 'spineInset'));
 });
 
 if (failed) {

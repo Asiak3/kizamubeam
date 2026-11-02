@@ -268,6 +268,29 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   update();
 }
 
+/** Beim Import eines 3D-Modells: Schichtmodell oder Rippenmodell? null = abgebrochen */
+export function askModelKind(): Promise<'stack' | 'ribs' | null> {
+  return new Promise((resolve) => {
+    let answer: 'stack' | 'ribs' | null = null;
+    const done = (a: typeof answer) => ((answer = a), dlg.close());
+    const dlg = h(
+      'dialog',
+      { class: 'offset-dialog gen-guard' },
+      h('h3', {}, t('Was soll aus dem 3D-Modell werden?')),
+      h('p', {}, t('Schichtmodell: dicht gestapelte Scheiben, die verleimt werden. Rippenmodell: Rippen mit Abstand, die mit Schlitzen auf einem Rückgrat stecken.')),
+      h('div', { class: 'dialog-buttons' },
+        h('button', { class: 'btn', onclick: () => done(null) }, t('Abbrechen')),
+        h('button', { class: 'btn', onclick: () => done('ribs') }, t('Rippenmodell')),
+        h('button', { class: 'btn primary', onclick: () => done('stack') }, t('Schichtmodell')),
+      ),
+    );
+    dlg.addEventListener('keydown', (e) => e.stopPropagation());
+    dlg.addEventListener('close', () => (dlg.remove(), resolve(answer)));
+    document.body.append(dlg);
+    setTimeout(() => dlg.showModal(), 0);
+  });
+}
+
 /** Kleine Rückfrage, bevor eine Aktion parametrische Bauteile in gewöhnliche Pfade umwandelt */
 export function askGenConvert(objs: Obj[], action: string): Promise<'convert' | 'edit' | 'cancel'> {
   return new Promise((resolve) => {
