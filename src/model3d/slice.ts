@@ -426,3 +426,37 @@ export function intervalsAtX(polys: Pt[][], x: number): [number, number][] {
   for (let i = 0; i + 1 < ys.length; i += 2) if (ys[i + 1] - ys[i] > 1e-9) out.push([ys[i], ys[i + 1]]);
   return out;
 }
+
+/** Wie intervalsAtX, aber über einen Streifen der Breite 2·half: Material irgendwo im Streifen zählt (Vereinigung) */
+export function intervalsInBand(polys: Pt[][], half: number): [number, number][] {
+  const all = [-1, -0.5, 0, 0.5, 1].flatMap((k) => intervalsAtX(polys, k * half * 0.999)).sort((a, b) => a[0] - b[0]);
+  const out: [number, number][] = [];
+  for (const iv of all) {
+    const last = out[out.length - 1];
+    if (last && iv[0] <= last[1]) last[1] = Math.max(last[1], iv[1]);
+    else out.push([iv[0], iv[1]]);
+  }
+  return out;
+}
+
+/** Vieleck (mm) als Fläche */
+export const polyRegion = (pts: Pt[]): IntPath[] => [pts.map((q) => ({ X: Math.round(q.x * SCALE), Y: Math.round(q.y * SCALE) }))];
+
+/** Kreis (mm) als Vieleck-Fläche */
+export function circleRegion(c: Pt, r: number, n = 32): IntPath[] {
+  const pts: Pt[] = [];
+  for (let i = 0; i < n; i++) pts.push({ x: c.x + r * Math.cos((2 * Math.PI * i) / n), y: c.y + r * Math.sin((2 * Math.PI * i) / n) });
+  return polyRegion(pts);
+}
+
+/** Schlauch mit Radius r um einen offenen Linienzug (runde Enden) */
+export function capsuleRegion(line: Pt[], r: number): IntPath[] {
+  const co = new ClipperLib.ClipperOffset(2, 0.01 * SCALE);
+  co.AddPath(line.map((q) => ({ X: Math.round(q.x * SCALE), Y: Math.round(q.y * SCALE) })), ClipperLib.JoinType.jtRound, ClipperLib.EndType.etOpenRound);
+  const out: IntPath[] = [];
+  co.Execute(out, r * SCALE);
+  return out;
+}
+
+/** Schnittmenge zweier Flächen */
+export const intersect = (a: IntPath[], b: IntPath[]): IntPath[] => (a.length && b.length ? intersectRegions(a, b) : []);

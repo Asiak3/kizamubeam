@@ -7,7 +7,7 @@ const { parseStl, parseObj, weld, meshInfo, encodeMesh, decodeMesh, meshId } = a
 const { prepare, sliceAt, region, sliceRegion, cleanRegion, regionArea, deepestPoint } = await import('../src/model3d/slice');
 const { addMesh } = await import('../src/model3d/store');
 const { STACK, stackLayout, numberStrokes, FRAMES } = await import('../src/generators/stack');
-const { RIBS, ribsLayout } = await import('../src/generators/ribs');
+const { RIBS, ribsLayout, worldMesh, materialAlong } = await import('../src/generators/ribs');
 const { buildGen, defaultParams, normalizeParams } = await import('../src/generators/index');
 const { asmSolids, findOverlaps, solidBounds } = await import('../src/view3d/solids');
 
@@ -336,6 +336,67 @@ test('Rippenmodell: Beine neben dem Rückgrat fallen weg, Torus hat zwei Rückgr
   assert.equal(T.spine.length, 2);
   assert.ok(T.lostRibs > 0);
   assert.ok(RIBS.validate(rp({ model: torusId, size: 100 })).some((i) => i.key === 'spineInset'));
+});
+
+
+// Tier mit Abschnitten: Rumpf, vier Beine (mit dem Rumpf verschmolzen), gebogener Schwanz aus Kugeln
+const beastParts: Mesh[] = [ellipsoid(60, 22, 25, [0, 0, 60])];
+for (const [x, y] of [[-35, -12], [-35, 12], [35, -12], [35, 12]]) beastParts.push(ellipsoid(7, 7, 32, [x, y, 30]));
+const tailAt = (a: number): [number, number, number] => [90 + 26 * Math.cos(a), 0, 66 + 26 * Math.sin(a)];
+for (let a = Math.PI * 1.05; a >= Math.PI * 0.55; a -= 0.08) beastParts.push(ellipsoid(7, 7, 7, tailAt(a), 24));
+const beast = merge(...beastParts);
+const beastId = addMesh(beast);
+// Maßstab 1: Größe = längste Seite; Welt = Modell verschoben (Mitte in X/Y, Boden bei Z = 0)
+const bw = worldMesh(beast, 'z', 1);
+const blo = [Infinity, Infinity, Infinity],
+  bhi = [-Infinity, -Infinity, -Infinity];
+for (let i = 0; i < beast.pos.length; i += 3)
+  for (let k = 0; k < 3; k++) (blo[k] = Math.min(blo[k], beast.pos[i + k])), (bhi[k] = Math.max(bhi[k], beast.pos[i + k]));
+const bsize = Math.max(bhi[0] - blo[0], bhi[1] - blo[1], bhi[2] - blo[2]);
+void bw;
+const W = (x: number, z: number): [number, number] => [x - (blo[0] + bhi[0]) / 2, z - blo[2]];
+const sections = [
+  { name: 'Rumpf', view: 'xz', pts: [W(-60, 60), W(60, 60)], offset: 0 },
+  ...[[-35, -12], [-35, 12], [35, -12], [35, 12]].map(([x, y], i) => ({ name: `Bein ${i + 1}`, view: 'xz', pts: [W(x, 24), W(x, 0)], offset: y, extend: 25 })),
+  { name: 'Schwanz', view: 'xz', pts: [Math.PI * 1.0, Math.PI * 0.9, Math.PI * 0.8, Math.PI * 0.7, Math.PI * 0.6].map((a) => W(tailAt(a)[0], tailAt(a)[2])), offset: 0, spacing: 7 },
+];
+const bp = (o: Record<string, unknown> = {}) => rp({ model: beastId, name: 'Tier', size: bsize, sections: JSON.stringify(sections), ...o });
+
+test('Rippenmodell mit Abschnitten: Rumpf, Beine, gebogener Schwanz', () => {
+  const L = ribsLayout(bp())!;
+  assert.ok(L.manual);
+  assert.deepEqual(L.bad, []);
+  for (const s of L.sections) assert.ok(s.ribs >= 2, `${s.name}: ${s.ribs} Rippen`);
+  // Rückgrate: Rumpf + Schwanz in einer Ebene, dazu vier Beinplatten
+  const legSpines = L.spine.filter((x) => Math.abs(Math.abs(x.pose.o[1] + x.pose.n[1] * 1.5) - 12) < 0.5);
+  assert.equal(legSpines.length, 4, 'Beinplatten');
+  assert.ok(L.spine.length >= 5 && L.spine.length <= 6, `${L.spine.length} Rückgrate`);
+  const s = asmSolids('ribs', bp(), 3)!;
+  assert.deepEqual(findOverlaps(s).map((x) => `${x.a}/${x.b}`), []);
+  const z = (k: string) => solidBounds(s.find((x) => x.key === k)!);
+  for (const r of L.ribs) {
+    if (r.section === 0) assert.ok(z(r.key).min[2] > 28, `Rumpf-Rippe ${r.key} ohne Bein`);
+    if (r.section >= 1 && r.section <= 4) assert.ok(z(r.key).max[2] < 30, `Bein-Rippe ${r.key}`);
+  }
+  // Beinplatten stecken in Rumpf-Rippen: ohne Spiel durchdringen sie sich
+  const tight = findOverlaps(asmSolids('ribs', bp({ play: -0.5 }), 3)!);
+  const legKeys = new Set(legSpines.map((x) => x.key));
+  const body = new Set(L.ribs.filter((r) => r.section === 0).map((r) => r.key));
+  assert.ok(tight.some((o) => (legKeys.has(o.a) && body.has(o.b)) || (legKeys.has(o.b) && body.has(o.a))), 'Beinplatte ↔ Rumpf-Rippe');
+  // Schwanz-Rippen stehen schräg (gebogene Achse)
+  const tail = L.ribs.filter((r) => r.section === 5);
+  assert.ok(tail.some((r) => Math.abs(r.pose.n[2]) > 0.3), 'schräge Schwanz-Rippe');
+  assert.deepEqual(RIBS.validate(bp()).filter((i) => i.level === 'error'), []);
+  // Beinplatte reicht nur knapp in den Rumpf: Kerbe statt Schlitz, trotzdem keine Durchdringung
+  const short = JSON.stringify(sections.map((x, i) => (i >= 1 && i <= 4 ? { ...x, extend: 6 } : x)));
+  assert.deepEqual(findOverlaps(asmSolids('ribs', bp({ sections: short }), 3)!).map((x) => `${x.a}/${x.b}`), []);
+  // Gebogen und zu eng: Hinweis
+  const tight2 = JSON.stringify([{ ...sections[5], spacing: 3.6, pts: [W(64, 66), W(80, 66), W(80, 90)] }, sections[0]]);
+  assert.ok(RIBS.validate(bp({ sections: tight2 })).some((i) => /Biegung|bend/.test(i.msg)), 'Biegung');
+  // Material entlang eines Strahls (für „Mitte“ im Dialog): Bein bei y = ±12
+  const iv = materialAlong(worldMesh(beast, 'z', bsize).mesh, [W(-35, 10)[0], -40, W(-35, 10)[1]], [0, 1, 0]);
+  assert.equal(iv.length, 2);
+  near((iv[0][0] + iv[0][1]) / 2 - 40, -12, 0.5, 'Bein links');
 });
 
 if (failed) {
