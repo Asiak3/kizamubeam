@@ -370,6 +370,7 @@ export class EditorRender {
     }
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.renderGuides(ctx);
     this.renderOverlay(ctx);
     this.renderRulers(ctx);
   }

@@ -1163,7 +1163,6 @@
   "Alt beim Ziehen": "Alt while dragging",
   "Stärker fangen und Ausrichtungshilfen an anderen Objekten": "Snap more strongly and alignment guides on other objects",
   "Aus dem Lineal ziehen": "Drag from the ruler",
-  "Hilfslinie auf T1 (zurück ins Lineal: verwerfen)": "Guide on T1 (back into the ruler: discard)",
   "Vorschau mit Zeitschätzung": "Preview with time estimate",
   "Palette": "Palette",
   "Farbe anklicken = Auswahl diesem Layer zuordnen": "Click a color = assign the selection to this layer",
@@ -3488,5 +3487,18 @@
   "Mittelpunkte zeigen": "Show centers",
   "Aus|Mittelpunkte": "Off",
   "Bei Auswahl und unter dem Mauszeiger": "Selected and under the pointer",
-  "Immer|Mittelpunkte": "Always"
+  "Immer|Mittelpunkte": "Always",
+  "Hilfslinien": "Guides",
+  "Hilfslinien löschen": "Delete guides",
+  "Hilfslinie verschieben": "Move guide",
+  "Hilfslinien aus dem Lineal ziehen. Sie gelten für alle Seiten und werden nie gelasert oder exportiert. Zurück ins Lineal ziehen löscht eine Hilfslinie.": "Drag guides out of the ruler. They apply to all pages and are never lasered or exported. Dragging a guide back into the ruler deletes it.",
+  "Alle Hilfslinien löschen (rückgängig machbar)": "Delete all guides (can be undone)",
+  "Hilfslinien ausblenden": "Hide guides",
+  "Hilfslinien einblenden": "Show guides",
+  "Hilfslinien entsperren": "Unlock guides",
+  "Hilfslinien sperren (nicht verschiebbar)": "Lock guides (cannot be moved)",
+  "Hilfslinien anzeigen": "Show guides",
+  "Hilfslinien sperren": "Lock guides",
+  "Alle Hilfslinien löschen": "Delete all guides",
+  "Hilfslinie auf eigener Ebene, wird nie gelasert (verschieben durch Ziehen, zurück ins Lineal: löschen)": "Guide on its own layer, never lasered (drag to move, back into the ruler: delete)"
 }

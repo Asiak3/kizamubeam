@@ -26,7 +26,7 @@ const READ_TOOLS: ToolDef[] = [
     name: 'get_document',
     title: 'Dokument lesen',
     description:
-      'Überblick über das geöffnete Projekt: Bettgröße, die Seiten (page 1 … n, aktuelle Seite), alle Objekte der aktuellen Seite (oder der Seite page) mit id, Typ, Layer, Rahmen in mm, Drehung, Text, Name aus dem Objekte-Fenster, hidden/locked usw., Kreise und Bögen in Pfaden (circles: Mittelpunkt, Radius), die Auswahl der Person, die benutzten Layer mit ihren Laser-Einstellungen und die Projekt-Notizen (notes: material, setup, process; ändern mit project_notes). Layer-Einstellungen gelten für alle Seiten; bearbeitet, gelasert und exportiert wird nur die aktuelle Seite (wechseln mit switch_page). Rahmen: x/y = linke untere Ecke in Maschinenkoordinaten.',
+      'Überblick über das geöffnete Projekt: Bettgröße, die Seiten (page 1 … n, aktuelle Seite), alle Objekte der aktuellen Seite (oder der Seite page) mit id, Typ, Layer, Rahmen in mm, Drehung, Text, Name aus dem Objekte-Fenster, hidden/locked usw., Kreise und Bögen in Pfaden (circles: Mittelpunkt, Radius), die Auswahl der Person, die benutzten Layer mit ihren Laser-Einstellungen und die Projekt-Notizen (notes: material, setup, process; ändern mit project_notes). guides: Hilfslinien der Person aus dem Lineal (eigene Ebene, keine Objekte, werden nie gelasert; gelten für alle Seiten). Layer-Einstellungen gelten für alle Seiten; bearbeitet, gelasert und exportiert wird nur die aktuelle Seite (wechseln mit switch_page). Rahmen: x/y = linke untere Ecke in Maschinenkoordinaten.',
     tier: Tier.Read,
     inputSchema: {
       type: 'object',
@@ -53,6 +53,14 @@ const READ_TOOLS: ToolDef[] = [
         selection: idx === ed.doc.page ? ed.sel.map((o) => o.id) : [],
         layers: ed.usedLayers().map((i) => layerInfo(ed, i)),
         ...(ed.doc.notes ? { notes: ed.doc.notes } : {}),
+        ...(ed.guideList().length
+          ? {
+              guides: ed.guideList().map((g) => {
+                const m = ed.toMachine({ x: g.v, y: g.v });
+                return g.axis === 'x' ? { vertical: true, x: +m.x.toFixed(3) } : { horizontal: true, y: +m.y.toFixed(3) };
+              }),
+            }
+          : {}),
       });
     },
   },

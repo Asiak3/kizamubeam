@@ -26,6 +26,7 @@ import { EditorPointer } from './editor/pointer';
 import { EditorRender } from './editor/render';
 import { EditorShapeOps } from './editor/shapeops';
 import { EditorSnapping } from './editor/snapping';
+import { EditorGuides } from './editor/guides';
 import { EditorText } from './editor/text';
 import { EditorGenerators } from './editor/generators';
 import { EditorParams } from './editor/params';
@@ -431,6 +432,7 @@ export interface Editor
     EditorPointer,
     EditorKeyboard,
     EditorSnapping,
+    EditorGuides,
     EditorNodes,
     EditorPaths,
     EditorShapeOps,
@@ -456,6 +458,7 @@ const PARTS = [
   EditorPointer,
   EditorKeyboard,
   EditorSnapping,
+  EditorGuides,
   EditorNodes,
   EditorPaths,
   EditorShapeOps,

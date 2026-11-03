@@ -1,5 +1,5 @@
 // Editor: Fangen an Raster, Objekten und Hilfslinien.
-import { newId, Obj, Pt, translate } from '../model';
+import { Obj, Pt } from '../model';
 import { alignBox, alignPoint, buildSnapSet, findSnap, SnapHit, SnapSet } from '../snap';
 import type { Editor } from '../editor';
 import { Drag, SNAP_PX } from './shared';
@@ -7,9 +7,6 @@ import { Drag, SNAP_PX } from './shared';
 const SNAP_KEY = 'kizamubeam.snap';
 
 const SNAP_PX_ALT = 20;
-
-/** Werkzeug-Layer T1: Hilfslinien liegen dort und werden nie gelasert */
-const GUIDE_LAYER = 30;
 
 type Mods = { altKey: boolean; ctrlKey: boolean; metaKey: boolean };
 
@@ -42,9 +39,18 @@ export class EditorSnapping {
     this.snapHit = null;
     this.alignGuides = [];
   }
-  /** Fangpunkte aller sichtbaren Objekte außer skip */
+  /** Fangpunkte aller sichtbaren Objekte außer skip, dazu die sichtbaren Hilfslinien (Fang an der ganzen Linie und an Kreuzungen) */
   buildSnap(this: Editor, skip: Obj[] = []): SnapSet {
-    return buildSnapSet(this.doc.objs, (o) => this.layer(o.layer).show, new Set(skip));
+    const set = buildSnapSet(this.doc.objs, (o) => this.layer(o.layer).show, new Set(skip));
+    if (this.guidesShown()) {
+      const { w, h } = this.doc.bed;
+      const m = Math.max(w, h) * 10;
+      for (const g of this.guideList()) {
+        if (g.axis === 'x') set.addPiece(g.v, -m, g.v, h + m);
+        else set.addPiece(-m, g.v, w + m, g.v);
+      }
+    }
+    return set;
   }
   /** Fangpunkte aller Objekte, zwischengespeichert bis zur nächsten Änderung */
   hoverSnapSet(this: Editor): SnapSet {
@@ -147,14 +153,5 @@ export class EditorSnapping {
       }
     }
     return md.grid ? this.gridRound(wp)[ax] : wp[ax];
-  }
-  /** Neue Hilfslinie (Werkzeug-Layer T1) über das ganze Bett */
-  makeGuide(this: Editor, axis: 'x' | 'y', v: number): Obj {
-    const { w, h } = this.doc.bed;
-    const nodes = axis === 'y' ? [{ x: 0, y: 0 }, { x: w, y: 0 }] : [{ x: 0, y: 0 }, { x: 0, y: h }];
-    return {
-      id: newId(), m: axis === 'y' ? translate(0, v) : translate(v, 0), layer: GUIDE_LAYER,
-      shape: { kind: 'path', subs: [{ nodes, closed: false }] },
-    };
   }
 }

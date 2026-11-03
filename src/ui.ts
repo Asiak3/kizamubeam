@@ -373,6 +373,12 @@ function buildMenu(ed: Editor) {
         [t('Immer|Mittelpunkte'), '', () => ed.setSnap({ centers: 'all' }), () => ed.centerMarks === 'all'],
       ] },
       'sep',
+      { sub: t('Hilfslinien'), items: [
+        [t('Hilfslinien anzeigen'), '', () => ed.setGuideLayer({ hidden: ed.guidesShown() }), () => ed.guidesShown()],
+        [t('Hilfslinien sperren'), '', () => ed.setGuideLayer({ locked: !ed.doc.guidesLocked }), () => !!ed.doc.guidesLocked],
+        [t('Alle Hilfslinien löschen'), '', () => ed.clearGuides()],
+      ] },
+      'sep',
       { sub: t('Design'), items: [
         [t('Wie System|Design'), '', () => applyTheme(ed, 'system'), () => themeMode === 'system'],
         [t('Hell|Design'), '', () => applyTheme(ed, 'light'), () => themeMode === 'light'],
@@ -508,7 +514,7 @@ function showHelp() {
     ['Alt+W', t('Drahtgitter / Gefüllt')],
     [t('Ctrl beim Ziehen'), t('Fangen vorübergehend umkehren (aus, wenn eingeschaltet)')],
     [t('Alt beim Ziehen'), t('Stärker fangen und Ausrichtungshilfen an anderen Objekten')],
-    [t('Aus dem Lineal ziehen'), t('Hilfslinie auf T1 (zurück ins Lineal: verwerfen)')],
+    [t('Aus dem Lineal ziehen'), t('Hilfslinie auf eigener Ebene, wird nie gelasert (verschieben durch Ziehen, zurück ins Lineal: löschen)')],
     ['Ctrl+I', t('Importieren (Bilder, SVG, DXF, PDF, AI, 3D-Modelle); Dateien auch auf die Arbeitsfläche ziehen oder mit Ctrl+V einfügen')],
     ['Ctrl+Shift+A', t('Rasterarray')],
     ['Alt++ / Alt+- / Alt+*', t('Vereinen / Abziehen / Schnittmenge')],
