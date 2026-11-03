@@ -52,7 +52,7 @@ export class EditorPointer {
     // Aus dem Lineal ziehen: Hilfslinie (oben waagrecht, links senkrecht)
     if ((sy < RULER) !== (sx < RULER) && !this.drag) {
       if (this.draft) this.finishLine();
-      this.drag = { type: 'guide', axis: sy < RULER ? 'y' : 'x', obj: null, snapSet: this.hoverSnapSet() };
+      this.drag = { type: 'guide', axis: sy < RULER ? 'y' : 'x', idx: null, orig: null, moved: false, snapSet: this.hoverSnapSet() };
       return;
     }
     switch (this.tool) {
@@ -98,6 +98,13 @@ export class EditorPointer {
             anchor: own && own.kind !== 'line' ? own.p : null, box: this.selBounds()!, snapSet: this.buildSnap(this.sel),
           };
         } else {
+          // Vorhandene Hilfslinie greifen (nicht bei gesperrter oder ausgeblendeter Ebene „Hilfslinien“)
+          const gi = this.guideAt(sx, sy);
+          if (gi >= 0) {
+            const g = this.guideList()[gi];
+            this.drag = { type: 'guide', axis: g.axis, idx: gi, orig: g.v, moved: false, snapSet: this.hoverSnapSet() };
+            return;
+          }
           const mode = e.shiftKey && ctrl ? 'remove' : ctrl ? 'toggle' : e.shiftKey ? 'add' : 'set';
           if (mode === 'set' && this.sel.length) this.setSel([]);
           this.drag = { type: 'marquee', start: wp, end: wp, base: [...this.sel], mode };
@@ -283,7 +290,11 @@ export class EditorPointer {
               ? ROTATE_CURSOR
               : this.space
                 ? 'grab'
-                : 'default';
+                : this.guideAt(sx, sy) >= 0
+                  ? this.guideList()[this.guideAt(sx, sy)].axis === 'y'
+                    ? 'row-resize'
+                    : 'col-resize'
+                  : 'default';
       } else if (this.tool === 'node') this.updateNodeHover(sx, sy);
       else if (this.tool === 'joint') this.updateJointHover(sx, sy);
       else if (this.tool === 'trim') this.updateTrimHover(sx, sy);
@@ -375,14 +386,15 @@ export class EditorPointer {
       case 'guide': {
         const v = this.snapGuide(d, wp, e);
         const onRuler = d.axis === 'y' ? sy < RULER : sx < RULER;
-        if (!d.obj) {
+        if (d.idx === null) {
           if (onRuler) return;
           this.snapshot(t('Hilfslinie'));
-          d.obj = this.makeGuide(d.axis, v);
-          this.doc.objs.push(d.obj);
-          this.setSel([d.obj]);
+          d.idx = this.pushGuide({ axis: d.axis, v });
+        } else if (!d.moved && d.orig !== null) {
+          this.snapshot(t('Hilfslinie verschieben'));
         }
-        d.obj.m = d.axis === 'y' ? translate(0, v) : translate(v, 0);
+        d.moved = true;
+        this.guideList()[d.idx].v = v;
         const mv = this.toMachine({ x: v, y: v });
         this.hint = t('Hilfslinie {axis} = {pos} mm · zurück ins Lineal ziehen verwirft sie', { axis: d.axis === 'y' ? 'y' : 'x', pos: (d.axis === 'y' ? mv.y : mv.x).toFixed(2) });
         this.emit('doc');
@@ -502,14 +514,13 @@ export class EditorPointer {
     this.redraw();
     switch (d.type) {
       case 'guide': {
-        if (!d.obj) return;
+        if (d.idx === null || !d.moved) return;
         const { sx, sy } = this.evPt(e);
         this.hint = '';
         if (d.axis === 'y' ? sy < RULER : sx < RULER) {
-          // zurück ins Lineal gezogen: verwerfen
-          this.doc.objs = this.doc.objs.filter((o) => o !== d.obj);
-          this.dropSnapshot();
-          this.setSel([]);
+          // zurück ins Lineal gezogen: eine neue verwerfen, eine vorhandene löschen
+          this.removeGuide(d.idx);
+          if (d.orig === null) this.dropSnapshot();
         }
         this.emit('doc');
         return;
@@ -681,7 +692,13 @@ export class EditorPointer {
     if (d.type === 'move' || d.type === 'scale' || d.type === 'rotate') {
       this.sel.forEach((o, i) => (o.m = d.orig[i]));
       if (d.type !== 'move' || d.moved) this.dropSnapshot();
-    } else if ((d.type === 'create' || d.type === 'guide') && d.obj) {
+    } else if (d.type === 'guide') {
+      if (d.idx !== null && d.moved) {
+        if (d.orig === null) this.removeGuide(d.idx);
+        else this.guideList()[d.idx].v = d.orig;
+        this.dropSnapshot();
+      }
+    } else if (d.type === 'create' && d.obj) {
       this.doc.objs = this.doc.objs.filter((o) => o !== d.obj);
       this.dropSnapshot();
       this.setSel([]);

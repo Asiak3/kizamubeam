@@ -275,6 +275,33 @@ export function buildObjectsPanel(ed: Editor) {
     out.push(row);
   };
 
+  /** Eigene Ebene „Hilfslinien“: gilt für alle Seiten, wird nie gelasert; Auge und Schloss wie bei Layern */
+  const renderGuides = (out: HTMLElement[]) => {
+    const n = ed.guideList().length;
+    const shown = ed.guidesShown();
+    const locked = !!ed.doc.guidesLocked;
+    out.push(
+      h(
+        'div',
+        {
+          class: `ot-row ot-layer ot-guides${shown ? '' : ' off'}`,
+          title: t('Hilfslinien aus dem Lineal ziehen. Sie gelten für alle Seiten und werden nie gelasert oder exportiert. Zurück ins Lineal ziehen löscht eine Hilfslinie.'),
+        },
+        h('span', { class: 'ot-chev' }),
+        h('span', { class: 'swatch ot-guide-swatch' }),
+        h('span', { class: 'ot-label' }, t('Hilfslinien')),
+        h('span', { class: 'muted ot-n' }, String(n)),
+        n ? toggleBtn('ot-act', false, 'delete', t('Alle Hilfslinien löschen (rückgängig machbar)'), () => ed.clearGuides()) : h('span', { class: 'ot-btn ot-spacer' }),
+        toggleBtn('ot-eye', shown, shown ? 'eye' : 'eyeoff', shown ? t('Hilfslinien ausblenden') : t('Hilfslinien einblenden'), () =>
+          ed.setGuideLayer({ hidden: shown }),
+        ),
+        toggleBtn('ot-lock', locked, locked ? 'lock' : 'unlock', locked ? t('Hilfslinien entsperren') : t('Hilfslinien sperren (nicht verschiebbar)'), () =>
+          ed.setGuideLayer({ locked: !locked }),
+        ),
+      ),
+    );
+  };
+
   const render = () => {
     setCount();
     if (!open() || renaming) return;
@@ -289,6 +316,7 @@ export function buildObjectsPanel(ed: Editor) {
       if (!secs.length) out.push(h('div', { class: 'empty', style: `padding-left:${8 + INDENT}px` }, t('Noch keine Objekte.')));
       for (const sec of secs) renderSection(sec, out);
     });
+    renderGuides(out);
     out.push(h('button', { class: 'ot-more', onclick: () => ed.addPage() }, t('+ Neue Seite')));
     const tree = h('div', { class: 'obj-tree' });
     tree.append(...out);
