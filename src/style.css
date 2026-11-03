@@ -3939,3 +3939,53 @@ input.bound {
 input.jig-count {
   width: 60px;
 }
+
+/* Skizzenmodus: Leiste oben über der Arbeitsfläche */
+.sketch-bar {
+  position: absolute;
+  z-index: 12;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  max-width: calc(100% - 16px);
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  font-size: 12px;
+}
+.sketch-bar[hidden] {
+  display: none;
+}
+.sketch-group {
+  display: flex;
+  gap: 2px;
+}
+.sketch-group .btn {
+  min-width: 28px;
+  padding: 3px 6px;
+  font-size: 14px;
+  line-height: 1;
+}
+.sketch-bar .btn.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.sketch-status {
+  min-width: 110px;
+  color: #2f6fe8;
+  font-variant-numeric: tabular-nums;
+}
+.sketch-status.full {
+  color: var(--text);
+  font-weight: 600;
+}
+.sketch-status.bad {
+  color: #d03a3a;
+  font-weight: 600;
+}

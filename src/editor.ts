@@ -38,6 +38,7 @@ import { EditorWarp } from './editor/warp';
 import { EditorNotes } from './editor/notes';
 import { EditorTabs, ProjectTab } from './editor/tabs';
 import { EditorRelations, RelPick } from './editor/relations';
+import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
 
@@ -78,6 +79,11 @@ export class Editor {
   measure: { a: Pt; b: Pt | null } | null = null;
   /** Kreis unter dem Mauszeiger im Werkzeug „Messen“ */
   measureCircle: { c: Pt; r: number } | null = null;
+
+  // Skizzenmodus (Skizzen mit Beziehungen und Bemaßungen)
+  sketchEdit: SketchSession | null = null;
+  /** Wert einer Bemaßung erfragen (ui.ts): Zahl oder Formel; null = abgebrochen */
+  onSketchValue: ((title: string, current: number, unit: string, expr?: string) => Promise<{ v: number; expr?: string } | null>) | null = null;
   snapCache: { ver: number; set: SnapSet } | null = null;
   snapVer = 0;
   currentLayer = 0;
@@ -435,6 +441,7 @@ export class Editor {
     this.relHover = null;
     this.measure = null;
     this.measureCircle = null;
+    if (t !== 'sketch') this.sketchEdit = null;
     this.clearSnap();
     this.hint = TOOL_HINTS[t];
     this.canvas.style.cursor = t === 'select' ? 'default' : t === 'text' ? 'text' : 'crosshair';
@@ -469,6 +476,7 @@ export interface Editor
     EditorImages,
     EditorTabs,
     EditorRelations,
+    EditorSketch,
     EditorRender {}
 
 const PARTS = [
@@ -496,6 +504,7 @@ const PARTS = [
   EditorImages,
   EditorTabs,
   EditorRelations,
+  EditorSketch,
   EditorRender,
 ];
 for (const part of PARTS) {

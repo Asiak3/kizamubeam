@@ -6,6 +6,8 @@ import { bezierPt, Box, boundsOf, drawText, localPath, segments, shapeSubs, subs
 import { SNAP_LABELS } from '../snap';
 import { shapeCenters, shownMark } from '../arcs';
 import { measureOf, RelElem } from '../relations';
+import { entOf, isDim, measureCon, pointPair, ptOf, SkCon } from '../sketch/model';
+import { CON_GLYPHS } from './sketch';
 import { dec, t } from '../i18n';
 import type { Editor } from '../editor';
 import { RULER, HANDLE_OFF, cachedWorldPath, SNAP_COLOR } from './shared';
@@ -544,6 +546,7 @@ export class EditorRender {
     this.renderCenters(ctx);
     if (this.tool === 'relate') this.renderRelations(ctx);
     if (this.tool === 'measure') this.renderMeasure(ctx);
+    if (this.sketchEdit) this.renderSketch(ctx);
     this.renderSnap(ctx);
     // Startknoten der Linie hervorheben (Schließen)
     if (this.draft && this.draft.nodes.length >= 2) {
@@ -628,6 +631,267 @@ export class EditorRender {
       }
     }
     ctx.stroke();
+    ctx.restore();
+  }
+
+  /**
+   * Skizzenmodus: übrige Arbeitsfläche abdunkeln, Elemente in Zustandsfarbe (blau = unterbestimmt, schwarz bzw. weiß =
+   * voll bestimmt, rot = Widerspruch), Hilfsgeometrie gestrichelt, Punkte, Beziehungssymbole und Bemaßungen.
+   */
+  renderSketch(this: Editor, ctx: CanvasRenderingContext2D) {
+    this.syncSketch();
+    const s = this.sketchEdit;
+    if (!s) return;
+    const sk = s.sk;
+    const T = this.colors;
+    const dpr = this.dpr;
+    ctx.save();
+    ctx.fillStyle = this.dark ? 'rgba(18,20,24,0.6)' : 'rgba(255,255,255,0.62)';
+    ctx.fillRect(RULER, RULER, this.w - RULER, this.h - RULER);
+    const full = s.status && s.status.ok && s.status.dof === 0;
+    const base = full ? (this.dark ? '#f2f2f2' : '#15181d') : '#1f6fe0';
+    const bad = new Set([...(s.status?.conflicting ?? []), ...(s.status?.redundant ?? [])]);
+    const SEL = '#ff6020',
+      DIM = '#d0451b';
+    const colorOf = (id: number) => (s.sel.has(id) ? SEL : s.hover?.id === id ? SNAP_COLOR : base);
+    // Elemente in Skizzenkoordinaten zeichnen
+    const { zoom: z, ox, oy } = this.view;
+    const m = s.m;
+    const k = this.skScale() || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.transform(z, 0, 0, z, ox, oy);
+    ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+    for (const e of sk.ents) {
+      ctx.beginPath();
+      if (e.t === 'line') {
+        const a = ptOf(sk, e.a),
+          b = ptOf(sk, e.b);
+        if (!a || !b) continue;
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      } else {
+        const c = ptOf(sk, e.c);
+        if (!c) continue;
+        if (e.t === 'circle') ctx.arc(c.x, c.y, e.r, 0, Math.PI * 2);
+        else ctx.arc(c.x, c.y, e.r, e.a0, e.a1);
+      }
+      ctx.strokeStyle = colorOf(e.id);
+      ctx.lineWidth = (s.sel.has(e.id) || s.hover?.id === e.id ? 2.5 : 1.6) / k;
+      ctx.setLineDash(e.aux ? [6 / k, 4 / k] : []);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const scr = (p: { x: number; y: number }) => this.skToScreen(p);
+    // Zeichnen im Entstehen
+    if (s.draft.length && s.tool !== 'dim') {
+      const cur = this.toScreen(this.cursor);
+      const d0 = scr(s.draft[0]);
+      ctx.strokeStyle = '#1f6fe0';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      if (s.tool === 'line') {
+        const last = scr(s.draft[s.draft.length - 1]);
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(cur.x, cur.y);
+      } else if (s.tool === 'rect') ctx.rect(d0.x, d0.y, cur.x - d0.x, cur.y - d0.y);
+      else if (s.tool === 'circle') ctx.arc(d0.x, d0.y, Math.hypot(cur.x - d0.x, cur.y - d0.y), 0, Math.PI * 2);
+      else if (s.tool === 'arc') {
+        const st = s.draft.length > 1 ? scr(s.draft[1]) : cur;
+        const r = Math.hypot(st.x - d0.x, st.y - d0.y);
+        ctx.moveTo(d0.x, d0.y);
+        ctx.lineTo(st.x, st.y);
+        if (s.draft.length > 1) {
+          const a0 = Math.atan2(st.y - d0.y, st.x - d0.x),
+            a1 = Math.atan2(cur.y - d0.y, cur.x - d0.x);
+          ctx.moveTo(st.x, st.y);
+          ctx.arc(d0.x, d0.y, r, a0, a1 <= a0 ? a1 + Math.PI * 2 : a1);
+        }
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Punkte
+    for (const p of sk.pts) {
+      const q = scr(p);
+      ctx.fillStyle = colorOf(p.id);
+      const r = s.sel.has(p.id) || s.hover?.id === p.id ? 4 : 2.5;
+      ctx.fillRect(q.x - r, q.y - r, r * 2, r * 2);
+    }
+    // Beschriftungen: Symbole der Beziehungen und Bemaßungen
+    s.labels = [];
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+    const box = (id: number, text: string, x: number, y: number, fg: string, bg: string) => {
+      const w = ctx.measureText(text).width + 8,
+        h = 16;
+      const bx = Math.round(x - w / 2),
+        by = Math.round(y - h / 2);
+      const sel = s.sel.has(id),
+        hov = s.hover?.id === id;
+      ctx.fillStyle = bad.has(id) ? '#d02020' : sel ? SEL : hov ? SNAP_COLOR : bg;
+      ctx.fillRect(bx, by, w, h);
+      ctx.fillStyle = bad.has(id) || sel || hov ? '#ffffff' : fg;
+      ctx.fillText(text, bx + 4, by + h / 2 + 0.5);
+      s.labels.push({ id, x: bx, y: by, w, h });
+    };
+    const glyphBg = this.dark ? 'rgba(40,44,52,0.9)' : 'rgba(235,240,250,0.95)';
+    const glyphFg = this.dark ? '#d8e2f0' : '#1f3a66';
+    const stack = new Map<string, number>();
+    const place = (key: string, x: number, y: number, dx: number, dy: number) => {
+      const n = stack.get(key) ?? 0;
+      stack.set(key, n + 1);
+      return { x: x + dx * (1 + n * 1.6), y: y + dy * (1 + n * 1.6) };
+    };
+    for (const c of sk.cons) {
+      if (isDim(c.t)) continue;
+      const g = CON_GLYPHS[c.t] ?? '?';
+      const first = c.r[0];
+      const e0 = entOf(sk, first);
+      if (c.t === 'coincident') {
+        const p = ptOf(sk, first);
+        if (!p) continue;
+        const q = scr(p);
+        ctx.fillStyle = bad.has(c.id) ? '#d02020' : base;
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        s.labels.push({ id: c.id, x: q.x - 5, y: q.y - 5, w: 10, h: 10 });
+        continue;
+      }
+      // Anker: Linienmitte (seitlich versetzt), Kreis oben rechts, Punkt daneben
+      const anchorOf = (id: number) => {
+        const e = entOf(sk, id);
+        if (e?.t === 'line') {
+          const a = scr(ptOf(sk, e.a)!),
+            b = scr(ptOf(sk, e.b)!);
+          const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          return { key: `e${id}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, dx: (-(b.y - a.y) / L) * 13, dy: ((b.x - a.x) / L) * 13 };
+        }
+        if (e) {
+          const c0 = scr(ptOf(sk, e.c)!);
+          const r = e.r * k;
+          return { key: `e${id}`, x: c0.x + r * 0.71, y: c0.y - r * 0.71, dx: 11, dy: -11 };
+        }
+        const p = ptOf(sk, id);
+        const q = p ? scr(p) : { x: 0, y: 0 };
+        return { key: `p${id}`, x: q.x, y: q.y, dx: 12, dy: -12 };
+      };
+      const refs = c.t === 'fixed' || c.t === 'horizontal' || c.t === 'vertical' ? [first] : c.t === 'midpoint' || c.t === 'pointOnLine' || c.t === 'pointOnCircle' ? [c.r[0]] : c.t === 'symmetric' ? [c.r[2]] : c.r;
+      if ((c.t === 'horizontal' || c.t === 'vertical') && !e0) refs.splice(0, 1, ...c.r);
+      for (const id of refs) {
+        const an = anchorOf(id);
+        const p = place(an.key, an.x, an.y, an.dx, an.dy);
+        box(c.id, g, p.x, p.y, glyphFg, glyphBg);
+      }
+    }
+    // Bemaßungen
+    const fmt = (c: SkCon) => {
+      const v = c.v ?? measureCon(sk, c) ?? 0;
+      const num = dec((Math.round(v * 100) / 100).toString());
+      const pre = c.t === 'radius' ? 'R' : c.t === 'diameter' ? 'Ø' : '';
+      const unit = c.t === 'angle' ? '°' : '';
+      return (c.expr ? `${c.expr} = ` : '') + pre + num + unit;
+    };
+    ctx.strokeStyle = DIM;
+    ctx.lineWidth = 1;
+    for (const c of sk.cons) {
+      if (!isDim(c.t)) continue;
+      const at = c.at ?? { x: 0, y: 0 };
+      let label: { x: number; y: number } | null = null;
+      if (c.t === 'radius' || c.t === 'diameter') {
+        const e = entOf(sk, c.r[0]);
+        if (!e || e.t === 'line') continue;
+        const C = ptOf(sk, e.c)!;
+        const dir = Math.hypot(at.x, at.y) > 1e-9 ? Math.atan2(at.y, at.x) : e.t === 'arc' ? (e.a0 + e.a1) / 2 : -Math.PI / 4;
+        const rim = { x: C.x + e.r * Math.cos(dir), y: C.y + e.r * Math.sin(dir) };
+        const from = c.t === 'diameter' ? { x: C.x - e.r * Math.cos(dir), y: C.y - e.r * Math.sin(dir) } : C;
+        const a = scr(from),
+          b = scr(rim);
+        const out = { x: b.x + Math.cos(dir) * 18, y: b.y + Math.sin(dir) * 18 };
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(out.x, out.y);
+        ctx.stroke();
+        label = { x: out.x + Math.cos(dir) * 14, y: out.y + Math.sin(dir) * 8 };
+      } else if (c.t === 'angle') {
+        const l1 = entOf(sk, c.r[0]),
+          l2 = entOf(sk, c.r[1]);
+        if (l1?.t !== 'line' || l2?.t !== 'line') continue;
+        const m1 = ptOf(sk, l1.a)!,
+          n1 = ptOf(sk, l1.b)!,
+          m2 = ptOf(sk, l2.a)!,
+          n2 = ptOf(sk, l2.b)!;
+        const mid = { x: (m1.x + n1.x + m2.x + n2.x) / 4 + at.x, y: (m1.y + n1.y + m2.y + n2.y) / 4 + at.y };
+        label = scr(mid);
+      } else {
+        // Abstände: Punkt–Punkt (auch Linienlänge) oder Punkt–Linie
+        let a: { x: number; y: number } | null = null,
+          b: { x: number; y: number } | null = null;
+        const l = c.r.length === 2 ? entOf(sk, c.r[1]) : undefined;
+        if (l?.t === 'line' && c.t === 'distance') {
+          const p = ptOf(sk, c.r[0])!,
+            la = ptOf(sk, l.a)!,
+            lb = ptOf(sk, l.b)!;
+          const dx = lb.x - la.x,
+            dy = lb.y - la.y,
+            l2 = dx * dx + dy * dy || 1;
+          const tt = ((p.x - la.x) * dx + (p.y - la.y) * dy) / l2;
+          a = p;
+          b = { x: la.x + dx * tt, y: la.y + dy * tt };
+        } else {
+          const pp = pointPair(sk, c.r);
+          if (!pp) continue;
+          [a, b] = pp;
+          if (c.t === 'hdistance') b = { x: b.x, y: a.y };
+          if (c.t === 'vdistance') b = { x: a.x, y: b.y };
+        }
+        // Maßlinie seitlich versetzt (um den Anteil von at senkrecht zur Strecke, sonst 5 mm)
+        const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const nx = -(b.y - a.y) / L,
+          ny = (b.x - a.x) / L;
+        const off = c.at ? at.x * nx + at.y * ny : 5;
+        const along = c.at ? at.x * ((b.x - a.x) / L) + at.y * ((b.y - a.y) / L) : 0;
+        const A = scr({ x: a.x + nx * off, y: a.y + ny * off }),
+          B = scr({ x: b.x + nx * off, y: b.y + ny * off });
+        const sa = scr(a),
+          sb = scr(b);
+        ctx.beginPath();
+        ctx.moveTo(sa.x, sa.y);
+        ctx.lineTo(A.x, A.y);
+        ctx.moveTo(sb.x, sb.y);
+        ctx.lineTo(B.x, B.y);
+        ctx.moveTo(A.x, A.y);
+        ctx.lineTo(B.x, B.y);
+        ctx.stroke();
+        const arrow = (P: { x: number; y: number }, Q: { x: number; y: number }) => {
+          const ang = Math.atan2(Q.y - P.y, Q.x - P.x);
+          ctx.beginPath();
+          ctx.moveTo(P.x, P.y);
+          ctx.lineTo(P.x + Math.cos(ang + 0.4) * 7, P.y + Math.sin(ang + 0.4) * 7);
+          ctx.moveTo(P.x, P.y);
+          ctx.lineTo(P.x + Math.cos(ang - 0.4) * 7, P.y + Math.sin(ang - 0.4) * 7);
+          ctx.stroke();
+        };
+        arrow(A, B);
+        arrow(B, A);
+        const mid = scr({ x: (a.x + b.x) / 2 + nx * off + ((b.x - a.x) / L) * along, y: (a.y + b.y) / 2 + ny * off + ((b.y - a.y) / L) * along });
+        label = mid;
+      }
+      if (label) box(c.id, fmt(c), label.x, label.y, '#ffffff', DIM);
+    }
+    // Bemaßungs-Werkzeug: gewählte Elemente
+    for (const h of s.dimPick) {
+      if (!h) continue;
+      const p = h.kind === 'pt' ? ptOf(sk, h.id) : undefined;
+      if (p) {
+        const q = scr(p);
+        ctx.strokeStyle = SEL;
+        ctx.strokeRect(q.x - 6, q.y - 6, 12, 12);
+      }
+    }
+    void T;
     ctx.restore();
   }
 

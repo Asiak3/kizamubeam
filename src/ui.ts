@@ -51,6 +51,8 @@ import { buildParamsPanel, openShowIfDialog } from './paramsPanel';
 import { buildNotesPanel } from './notesPanel';
 import { buildView3dPanel } from './view3d/panel';
 import { buildAppsPanel, openAppsPanel } from './appsPanel';
+import { installSketchPanel } from './sketchPanel';
+import { isSketchObj } from './editor/sketch';
 import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, windowList } from './dock';
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
 import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
@@ -160,7 +162,8 @@ export function buildUI(ed: Editor) {
   onMeshReady(() => ed.emit('doc'));
   ed.onGridArray = () => openGridArrayDialog(ed);
   ed.onBarcodeEdit = (o) => editBarcode(ed, o);
-  ed.onGenEdit = (o) => openGenDialog(ed, '', o);
+  ed.onGenEdit = (o) => (isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
+  installSketchPanel(ed);
   ed.onGenGuard = askGenConvert;
   ed.onJointDialog = () => openJointDialog(ed);
   ed.onRelDistance = (cur) => askDistance(cur);
@@ -791,7 +794,7 @@ function buildNumbar(ed: Editor) {
   const genIcon = h('span', { html: ICONS.gear, class: 'muted icon-inline' });
   const genProps = h('div', { class: 'field' },
     genIcon, genInfo,
-    h('button', { class: 'toggle', title: t('Parameter ändern, die Kontur wird neu berechnet (Doppelklick)'), onclick: () => ed.selGens()[0] && openGenDialog(ed, '', ed.selGens()[0]) }, t('Parameter …')),
+    h('button', { class: 'toggle', title: t('Parameter ändern, die Kontur wird neu berechnet (Doppelklick)'), onclick: () => ed.selGens()[0] && ed.onGenEdit?.(ed.selGens()[0]) }, t('Parameter …')),
     h('button', { class: 'toggle', title: t('In gewöhnliche Pfade umwandeln; die Parameter gehen verloren (Ctrl+Shift+C)'), onclick: () => ed.convertSelToPath() }, t('In Pfade umwandeln')),
   );
   const sepGen = sep();
@@ -970,6 +973,8 @@ function buildBars(ed: Editor) {
       id: 'lidhinge', cat: W, icon: 'lidhinge', label: t('Scharnier für Deckel: Oberkante der Rückwand und Hinterkante des Deckels anklicken; erzeugt Knöchel, Schlitze und Stiftlöcher'),
       run: () => ed.startHingeTool(), on: () => ed.tool === 'joint' && ed.jointHingeMode,
     },
+    { id: 'sketch', cat: W, icon: 'sketch', label: t('Neue Skizze: Linien, Kreise und Bögen mit Beziehungen und Bemaßungen'), run: () => void ed.newSketch(), on: () => ed.tool === 'sketch' },
+    { id: 'sketchconv', cat: W, icon: 'sketchconv', label: t('Gewählte Formen in eine Skizze umwandeln (Beziehungen und Maße setzen)'), run: () => void ed.convertSelToSketch(), enabled: sel1 },
     { id: 'qr', cat: W, icon: 'qr', label: t('QR-Code erstellen'), run: () => openQrDialog(ed) },
     { id: 'barcode', cat: W, icon: 'barcode', label: t('Strichcode erstellen (Code 128, EAN, UPC, Code 39, ITF)'), run: () => openBarcodeDialog(ed) },
     { id: 'jig', cat: W, icon: 'jig', label: t('Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken'), run: () => openGenDialog(ed, 'jig', undefined, ed.sel.length ? { shapes: encodeShapes(shapesFromSelection(ed)) } : undefined) },
@@ -1243,6 +1248,7 @@ function askDistance(current: number): Promise<number | null> {
     document.body.append(dlg);
     dlg.showModal();
     val.select();
+    setTimeout(() => val.select(), 0);
   });
 }
 

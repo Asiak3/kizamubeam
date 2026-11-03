@@ -32,6 +32,10 @@ import { tabNameFromPath } from './editor/tabs';
 import { Args, describe, findObj, flip, listedCircles, machineBox, pageList, r3, Tier, ToolDef, ToolError } from './agentutil';
 import { REL_MODES, RelElem, RelMode, relCount } from './relations';
 import { shapeCenters } from './arcs';
+import { addArc, addCircle, addCon, addLine, addPt, ConType, deleteIds, emptySketch, entOf, isDim, measureCon, parseSketch, ptOf, Sketch, sketchJson, sketchSubs } from './sketch/model';
+import { loadSolver, solveSketch } from './sketch/solver';
+import { conFromSel, isSketchObj } from './editor/sketch';
+import { evaluate, scopeOf } from './params';
 import { CheckIssue, fixLabel, loadCheckSettings } from './check';
 
 // ---------- Eingaben prüfen ----------
@@ -1134,6 +1138,152 @@ export const EDIT_TOOLS: ToolDef[] = [
       if (!ok) throw new ToolError(ed.hint.split('. ')[0] || 'Beziehung nicht anwendbar');
       const target = picks[picks.length - 1].top;
       return { object: describe(ed, target, IDENT, false) };
+    },
+  },
+  {
+    name: 'sketch',
+    title: 'Skizze mit Beziehungen',
+    description:
+      'Legt eine Skizze an oder ändert sie (wie Werkzeugkasten → Neue Skizze): Punkte, Linien, Kreise und Bögen mit Beziehungen und Bemaßungen; ein Löser hält alles ein. Ohne id entsteht eine neue Skizze mit Ursprung at (Maschinenkoordinaten, mm). Koordinaten in ops sind mm relativ zum Ursprung der Skizze, y nach oben. ops der Reihe nach: {op:"point", x, y, name?}; {op:"line", from, to, name?}; {op:"circle", center, r, name?}; {op:"arc", center, start, end, name?} (im Uhrzeigersinn von start nach end; end wird auf den Kreis gelegt); {op:"constrain", type, refs, value?, expr?}; {op:"aux", refs} (Hilfsgeometrie, wird nicht gelasert); {op:"delete", refs}. from/to/center/start/end: [x, y] (neuer Punkt) oder Verweis auf einen Punkt. Verweise: id aus der Antwort (Zahl), vergebener name (Text, gilt nur in diesem Aufruf) oder "name.a"/"name.b" (Endpunkte einer Linie), "name.c" (Mittelpunkt), "name.s"/"name.e" (Bogenanfang/-ende). type: coincident (2 Punkte, oder Punkt + Linie/Kreis = Punkt darauf), horizontal/vertical (Linien oder 2 Punkte), parallel, perpendicular, equal (Linien oder Kreise/Bögen), tangent (Linie/Kreis/Bogen + Kreis/Bogen), concentric, midpoint (Punkt + Linie), symmetric (2 Punkte + Linie), fixed (Punkte), distance (Linie = Länge; 2 Punkte; Punkt + Linie), hdistance/vdistance (2 Punkte), angle (2 Linien, Grad), radius/diameter (Kreis/Bogen). value fehlt = aktuelles Maß; expr = Formel mit Projekt-Parametern (bleibt verknüpft). Alles ist ein Undo-Schritt; widerspricht eine Beziehung, wird nichts geändert und conflicting nennt die Beziehungen. Antwort: Elemente mit ids und Koordinaten, dof (Freiheitsgrade, 0 = voll bestimmt). Ohne ops nur lesen.',
+    tier: Tier.Edit,
+    inputSchema: obj({
+      id: { type: 'integer' },
+      at: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+      ops: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            op: { type: 'string', enum: ['point', 'line', 'circle', 'arc', 'constrain', 'aux', 'delete'] },
+            name: { type: 'string' }, x: { type: 'number' }, y: { type: 'number' }, r: { type: 'number', exclusiveMinimum: 0 },
+            from: {}, to: {}, center: {}, start: {}, end: {},
+            type: { type: 'string' }, refs: { type: 'array' }, value: { type: 'number' }, expr: { type: 'string' },
+          },
+          required: ['op'],
+        },
+      },
+    }),
+    run: async (ed, a) => {
+      await loadSolver();
+      let o: Obj | undefined;
+      let created = false;
+      if (a.id !== undefined) {
+        o = findObj(ed.doc.objs, Number(a.id))?.[0];
+        if (!o || !isSketchObj(o)) throw new ToolError(`Objekt ${a.id} ist keine Skizze`);
+      }
+      const sk: Sketch = o ? parseSketch((o.shape as Extract<Shape, { kind: 'gen' }>).params.sketch) : emptySketch();
+      const names = new Map<string, number>();
+      const ops = Array.isArray(a.ops) ? (a.ops as Record<string, unknown>[]) : [];
+      const ref = (v: unknown, i: number): number => {
+        if (typeof v === 'number' && (ptOf(sk, v) || entOf(sk, v) || sk.cons.some((c) => c.id === v))) return v;
+        if (typeof v === 'string') {
+          if (names.has(v)) return names.get(v)!;
+          const m = /^(.*)\.([abcse])$/.exec(v);
+          const e = m && names.has(m[1]) ? entOf(sk, names.get(m[1])!) : undefined;
+          if (e && m) {
+            const k = m[2];
+            const id = e.t === 'line' ? (k === 'a' ? e.a : k === 'b' ? e.b : undefined) : e.t === 'circle' ? (k === 'c' ? e.c : undefined) : (k === 'c' ? e.c : k === 's' ? e.s : k === 'e' ? e.e : undefined);
+            if (id !== undefined) return id;
+          }
+        }
+        throw new ToolError(`ops[${i}]: unbekannter Verweis ${JSON.stringify(v)}`);
+      };
+      const pt = (v: unknown, i: number): number => {
+        if (Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === 'number' && isFinite(n))) return addPt(sk, v[0], -v[1]).id;
+        const id = ref(v, i);
+        if (!ptOf(sk, id)) throw new ToolError(`ops[${i}]: ${JSON.stringify(v)} ist kein Punkt`);
+        return id;
+      };
+      const label = (op: Record<string, unknown>, id: number) => {
+        if (typeof op.name === 'string' && op.name) names.set(op.name, id);
+      };
+      ops.forEach((op, i) => {
+        switch (op.op) {
+          case 'point':
+            label(op, addPt(sk, Number(op.x), -Number(op.y)).id);
+            break;
+          case 'line':
+            label(op, addLine(sk, pt(op.from, i), pt(op.to, i)).id);
+            break;
+          case 'circle': {
+            const r = Number(op.r);
+            if (!(r > 0)) throw new ToolError(`ops[${i}]: r > 0 angeben`);
+            label(op, addCircle(sk, pt(op.center, i), r).id);
+            break;
+          }
+          case 'arc': {
+            const c = pt(op.center, i), st = pt(op.start, i), en = pt(op.end, i);
+            const C = ptOf(sk, c)!, S = ptOf(sk, st)!, E = ptOf(sk, en)!;
+            const r = Math.hypot(S.x - C.x, S.y - C.y);
+            if (!(r > 0)) throw new ToolError(`ops[${i}]: Anfang liegt auf dem Mittelpunkt`);
+            const ang = Math.atan2(E.y - C.y, E.x - C.x);
+            E.x = C.x + r * Math.cos(ang);
+            E.y = C.y + r * Math.sin(ang);
+            label(op, addArc(sk, c, st, en).id);
+            break;
+          }
+          case 'constrain': {
+            const type = String(op.type) as ConType;
+            const refs = (Array.isArray(op.refs) ? op.refs : []).map((v) => ref(v, i));
+            if (isDim(type)) {
+              const probe = { id: 0, t: type, r: refs };
+              const cur = measureCon(sk, probe);
+              if (cur === null) throw new ToolError(`ops[${i}]: ${type} passt nicht zu refs`);
+              let v = op.value !== undefined ? Number(op.value) : cur;
+              const expr = typeof op.expr === 'string' && op.expr.trim() ? op.expr.trim() : undefined;
+              if (expr) {
+                const ev = evaluate(expr, scopeOf(ed.paramList()));
+                if (typeof ev !== 'number' || !isFinite(ev)) throw new ToolError(`ops[${i}]: expr ergibt keine Zahl`);
+                v = ev;
+              }
+              if (!isFinite(v) || (type !== 'angle' && !(v > 0) && type !== 'hdistance' && type !== 'vdistance')) throw new ToolError(`ops[${i}]: ungültiger Wert`);
+              addCon(sk, type, refs, { v, ...(expr ? { expr } : {}) });
+            } else {
+              const list = conFromSel(sk, refs, type);
+              if (!list) throw new ToolError(`ops[${i}]: ${type} passt nicht zu refs`);
+              for (const c of list) addCon(sk, c.t, c.r, c.t === 'fixed' ? { x: ptOf(sk, c.r[0])!.x, y: ptOf(sk, c.r[0])!.y } : {});
+            }
+            break;
+          }
+          case 'aux':
+            for (const v of Array.isArray(op.refs) ? op.refs : []) {
+              const e = entOf(sk, ref(v, i));
+              if (!e) throw new ToolError(`ops[${i}]: ${JSON.stringify(v)} ist kein Element`);
+              e.aux = !e.aux;
+            }
+            break;
+          case 'delete':
+            deleteIds(sk, (Array.isArray(op.refs) ? op.refs : []).map((v) => ref(v, i)));
+            break;
+          default:
+            throw new ToolError(`ops[${i}]: unbekannte op ${JSON.stringify(op.op)}`);
+        }
+      });
+      const r = solveSketch(sk);
+      if (!r.ok) throw new ToolError(`Widerspruch: Beziehungen ${r.conflicting.join(', ') || '?'} passen nicht zusammen; nichts geändert`);
+      if (ops.length) {
+        if (!o) {
+          const at = Array.isArray(a.at) ? W(ed, Number(a.at[0]), Number(a.at[1])) : { x: ed.doc.bed.w / 2, y: ed.doc.bed.h / 2 };
+          o = { id: newId(), m: translate(at.x, at.y), layer: ed.currentLayer, shape: { kind: 'gen', gen: 'sketch', v: 1, params: { sketch: '' }, subs: [] } };
+          ed.snapshot(t('Neue Skizze'));
+          ed.doc.objs.push(o);
+          created = true;
+        } else ed.snapshot(t('Skizze ändern'));
+        const shape = o.shape as Extract<Shape, { kind: 'gen' }>;
+        shape.params = { ...shape.params, sketch: sketchJson(sk) };
+        shape.subs = sketchSubs(sk);
+        ed.touch(shape);
+        ed.syncSketch();
+        ed.emit('doc');
+      } else if (!o) throw new ToolError('id oder ops angeben');
+      const Y = (y: number) => r3(-y);
+      return {
+        id: o.id, created, dof: r.dof, fully_defined: r.dof === 0, redundant: r.redundant,
+        names: Object.fromEntries(names),
+        points: sk.pts.map((p) => ({ id: p.id, x: r3(p.x), y: Y(p.y) })),
+        elements: sk.ents.map((e) => ({ ...e, ...('r' in e ? { r: r3(e.r) } : {}), ...(e.t === 'arc' ? { a0: undefined, a1: undefined } : {}) })),
+        constraints: sk.cons.map((c) => ({ id: c.id, type: c.t, refs: c.r, ...(c.v !== undefined ? { value: r3(c.v) } : {}), ...(c.expr ? { expr: c.expr } : {}) })),
+      };
     },
   },
   {

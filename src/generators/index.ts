@@ -14,6 +14,7 @@ import { DISCSPHERE } from './discsphere';
 import { STACK } from './stack';
 import { RIBS } from './ribs';
 import { JIG } from './jig';
+import { SKETCH } from '../sketch/generator';
 import type { Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet } from './types';
 import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
@@ -21,7 +22,7 @@ export type { GenPart, Generator, Issue, Params, ParamSpec } from './types';
 
 export const GENERATORS: Generator[] = [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, DRAWER, INSERT, SHELF, DISCSPHERE, STACK, RIBS, JIG];
 
-export const getGenerator = (id: string): Generator | undefined => GENERATORS.find((g) => g.id === id);
+export const getGenerator = (id: string): Generator | undefined => (id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
 
 /** Gilt das Feld bei diesen Parametern (showIf)? */
 export const fieldActive = (s: ParamSpec, p: Params) => !s.showIf || s.showIf(p);
