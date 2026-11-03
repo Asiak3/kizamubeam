@@ -37,10 +37,10 @@ jobs:
             args: --target universal-apple-darwin
           - platform: windows-latest
             args: ''
-          # RPM lehnt Vorabversionen ab; steht auch in src-tauri/tauri.linux.conf.json,
-          # hier zusätzlich, damit ältere Tags mit diesem Workflow gebaut werden können.
+          # Linux: AppImage und .deb, bei stabilen Versionen zusätzlich .rpm (RPM lehnt Vorabversionen
+          # wie 1.2.0-beta ab). Die Auswahl trifft der Schritt „Version und Update-Signatur“.
           - platform: ubuntu-22.04
-            args: --bundles deb,appimage
+            args: ''
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -79,6 +79,7 @@ jobs:
         run: |
           v=$(node -p "require('./src-tauri/tauri.conf.json').version")
           echo "prerelease=$([[ $v == *-* ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "linux_bundles=$([[ $v == *-* ]] && echo deb,appimage || echo deb,appimage,rpm)" >> "$GITHUB_OUTPUT"
           if [[ "$HAS_KEY" == "true" ]]; then
             # Die Tauri-CLI prüft die neue Signatur gegen den öffentlichen Schlüssel aus der Konfiguration.
             node -e "const f='src-tauri/tauri.conf.json',fs=require('fs'),c=JSON.parse(fs.readFileSync(f));c.bundle.createUpdaterArtifacts=true;c.plugins.updater.pubkey=process.env.PUBKEY.trim().replace(/%$/,'');fs.writeFileSync(f,JSON.stringify(c,null,2))"
@@ -103,4 +104,4 @@ jobs:
           releaseBody: 'Installer für macOS (Apple Silicon und Intel), Windows und Linux stehen unten unter „Assets“.'
           releaseDraft: false
           prerelease: ${{ steps.version.outputs.prerelease }}
-          args: ${{ matrix.args }}
+          args: ${{ matrix.platform == 'ubuntu-22.04' && format('--bundles {0}', steps.version.outputs.linux_bundles) || matrix.args }}

@@ -11,6 +11,7 @@ import { CON_GLYPHS } from './sketch';
 import { dec, t } from '../i18n';
 import type { Editor } from '../editor';
 import { RULER, HANDLE_OFF, cachedWorldPath, SNAP_COLOR } from './shared';
+import { GRID_MIN_PX, gridLevels, gridLines, LEVEL_ALPHA } from '../grid';
 
 function rectPath(w: number, h: number): Path2D {
   const p = new Path2D();
@@ -113,30 +114,35 @@ export class EditorRender {
       this.background(ctx);
       ctx.restore();
     }
-    const grid = (step: number, color: string) => {
-      if (step * z < 6) return;
-      ctx.beginPath();
-      const xa = Math.max(0, Math.floor(this.toWorld(0, 0).x / step) * step);
-      const xb = Math.min(bed.w, this.toWorld(W, 0).x);
-      for (let x = xa; x <= xb + 1e-9; x += step) {
-        const s = Math.round(x * z + ox) + 0.5;
-        ctx.moveTo(s, p0.y);
-        ctx.lineTo(s, p1.y);
+    const G = this.grid;
+    if (G.show) {
+      const levelColor = { fine: T.grid1, major: T.grid10, bold: T.grid100 };
+      ctx.save();
+      const xa = Math.max(0, this.toWorld(0, 0).x),
+        xb = Math.min(bed.w, this.toWorld(W, 0).x);
+      // y-Raster von unten (Maschinennull) gezählt: sichtbarer Bereich in Maschinen-y
+      const ya = Math.max(0, bed.h - this.toWorld(0, H).y),
+        yb = Math.min(bed.h, bed.h - this.toWorld(0, 0).y);
+      for (const { level, step } of gridLevels(G)) {
+        if (step * z < GRID_MIN_PX) continue;
+        ctx.beginPath();
+        for (const x of gridLines(step, xa, xb)) {
+          const s = Math.round(x * z + ox) + 0.5;
+          ctx.moveTo(s, p0.y);
+          ctx.lineTo(s, p1.y);
+        }
+        for (const y of gridLines(step, ya, yb)) {
+          const s = Math.round((bed.h - y) * z + oy) + 0.5;
+          ctx.moveTo(p0.x, s);
+          ctx.lineTo(p1.x, s);
+        }
+        ctx.strokeStyle = G.color || levelColor[level];
+        ctx.globalAlpha = (G.opacity / 100) * (G.color ? LEVEL_ALPHA[level] : 1);
+        ctx.lineWidth = 1;
+        ctx.stroke();
       }
-      // y-Raster von unten (Maschinennull) gezählt
-      for (let y = 0; y <= bed.h + 1e-9; y += step) {
-        const s = Math.round((bed.h - y) * z + oy) + 0.5;
-        if (s < 0 || s > H) continue;
-        ctx.moveTo(p0.x, s);
-        ctx.lineTo(p1.x, s);
-      }
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    };
-    grid(1, T.grid1);
-    grid(10, T.grid10);
-    grid(100, T.grid100);
+      ctx.restore();
+    }
     ctx.strokeStyle = T.border;
     ctx.lineWidth = 1.5;
     ctx.strokeRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
