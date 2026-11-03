@@ -41,6 +41,7 @@ import { EditorRelations, RelPick } from './editor/relations';
 import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
+import { DEFAULT_GRID, GridSettings } from './grid';
 
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
@@ -58,6 +59,8 @@ export class Editor {
   dark = false;
   snapGrid = false;
   gridStep = 1;
+  /** Hintergrundgitter (Ansicht → Gitter), je Nutzer gespeichert */
+  grid: GridSettings = { ...DEFAULT_GRID };
   /** An Objekten fangen (Knoten, Mittelpunkte, Zentren, Schnittpunkte, Linien) */
   snapObjects = true;
   /** Aktueller Fangpunkt zur Anzeige */
@@ -236,6 +239,7 @@ export class Editor {
     // Datum und Uhrzeit in variablem Text aktuell halten
     window.setInterval(() => this.refreshVarText(), 15000);
     this.loadSnapSettings();
+    this.loadGridSettings();
     this.loadBoolSettings();
     // Texte werden mit den Schriftkonturen gezeichnet; nach dem Laden einer Schrift neu zeichnen
     onFontLoaded(() => this.emit('sel'));

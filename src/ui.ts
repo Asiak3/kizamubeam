@@ -29,6 +29,7 @@ import { genLabel, getGenerator } from './generators';
 import { maybeOfferSetup, openSetupWizard } from './setupWizard';
 import { maybeCheckForUpdates, openUpdateDialog } from './updateDialog';
 import { openPacksDialog } from './packsDialog';
+import { openGridDialog } from './gridDialog';
 import { buildLaser, frameJob, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob } from './laser';
 import { openLayerDialog } from './layerdialog';
 import { openMaterialTestDialog } from './materialtest';
@@ -382,6 +383,10 @@ function buildMenu(ed: Editor) {
         [t('Immer|Mittelpunkte'), '', () => ed.setSnap({ centers: 'all' }), () => ed.centerMarks === 'all'],
       ] },
       'sep',
+      { sub: t('Gitter'), items: [
+        [t('Gitter anzeigen'), '', () => ed.setGrid({ show: !ed.grid.show }), () => ed.grid.show],
+        [t('Gitter einstellen …'), '', () => openGridDialog(ed)],
+      ] },
       { sub: t('Hilfslinien'), items: [
         [t('Hilfslinien anzeigen'), '', () => ed.setGuideLayer({ hidden: ed.guidesShown() }), () => ed.guidesShown()],
         [t('Hilfslinien sperren'), '', () => ed.setGuideLayer({ locked: !ed.doc.guidesLocked }), () => !!ed.doc.guidesLocked],
@@ -933,6 +938,8 @@ function buildBars(ed: Editor) {
     { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern (+)'), run: () => ed.zoomAt(1.25) },
     { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern (-)'), run: () => ed.zoomAt(0.8) },
     { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite (Ctrl+0)'), run: () => ed.zoomPage() },
+    { id: 'grid', cat: V, icon: 'grid', label: t('Gitter ein-/ausblenden'), run: () => ed.setGrid({ show: !ed.grid.show }), on: () => ed.grid.show },
+    { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
     { id: 'zoomsel', cat: V, icon: 'zoomsel', label: t('Auf Auswahl zoomen'), run: () => ed.zoomSelection(), enabled: sel1 },
     { id: 'view3d', cat: V, icon: 'view3d', label: t('3D-Ansicht: Baugruppen zusammengesteckt ansehen'), run: () => toggleWindow('view3d') },
     { id: 'wire', cat: V, short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt (Alt+W)'), run: () => ((ed.filled = !ed.filled), ed.emit('view')), on: () => ed.filled },
@@ -1937,6 +1944,7 @@ function buildStatus(ed: Editor) {
     }
     hint.textContent = ed.hint;
     snap.checked = ed.snapGrid;
+    if (document.activeElement !== step) step.value = dec(String(ed.gridStep));
     snapObj.checked = ed.snapObjects;
     filled.checked = ed.filled;
     zoom.textContent = `${Math.round(ed.view.zoom * 100) / 100} px/mm`;

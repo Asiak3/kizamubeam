@@ -1,7 +1,7 @@
 {
   "lang": "en",
   "locale": "en_US",
-  "version": "2.0.0-rc.1",
+  "version": "2.2.0",
   "meta": {
     "title": "KizamuBeam – Free laser engraving & cutting software",
     "description": "Free, open-source laser software for macOS, Windows and Linux. Design, engrave photos, generate boxes and gears, and send jobs straight to FluidNC, GRBL, grblHAL, Marlin and Smoothieware lasers.",
@@ -29,12 +29,12 @@
     "lang_short": "DE"
   },
   "hero": {
-    "badge": "New: version 2.0.0-rc.1",
+    "badge": "New: version 2.2.0 – the first stable release",
     "title": "Your laser. Your software. Free.",
     "subtitle": "KizamuBeam is open-source software to design, engrave and cut – made for diode lasers running FluidNC, GRBL and friends. Free on macOS, Windows and Linux.",
     "cta_primary": "Download for free",
     "cta_secondary": "View on GitHub",
-    "meta_line": "GPL-3.0 · macOS · Windows · Linux · Release Candidate",
+    "meta_line": "GPL-3.0 · macOS · Windows · Linux · Stable release",
     "name_note": "Kizamu (刻む) is Japanese for “to carve, to engrave, to cut finely”."
   },
   "why": {
@@ -62,7 +62,7 @@
         "Grid and circular arrays with live preview, multi-page projects and a history you can jump back through",
         "Import SVG, DXF, PDF, Illustrator (.ai), images and LightBurn projects (.lbrn2) – colors map straight to the matching layer",
         "Export as SVG, DXF, PDF and Illustrator (.ai) – curves stay curves, layers stay separate",
-        "Dockable windows, customizable toolbars, light and dark theme"
+        "Dockable windows, customizable toolbars, a fully adjustable grid, light and dark theme"
       ]
     },
     "image": {
@@ -171,7 +171,7 @@
     "win_title": "Windows",
     "win_detail": "Installer (.exe)",
     "linux_title": "Linux",
-    "linux_detail": "AppImage · .deb",
+    "linux_detail": "AppImage · .deb · .rpm",
     "button": "Download",
     "button_mac": "Download for macOS",
     "button_win": "Download for Windows",
@@ -180,8 +180,8 @@
     "source": "Prefer to build it yourself? See the README."
   },
   "beta": {
-    "title": "Honest heads-up: this is a release candidate",
-    "text": "All features have been tried out on real hardware. Until the stable 2.0 release we are still hunting bugs. Back up your projects and please report anything odd on GitHub.",
+    "title": "Stable – and still growing",
+    "text": "Version 2.2.0 is the first stable release: every feature has been tested on real hardware and is used every day. Want new features earlier? Switch to the Beta channel under Help → Check for Updates. Please report bugs and ideas on GitHub.",
     "unsigned_title": "Warning on first launch",
     "unsigned_text": "The installers aren’t code-signed yet, so macOS (Gatekeeper) and Windows (SmartScreen) show a warning the first time.",
     "unsigned_mac": "macOS: drag the app to the Applications folder and open it. In the dialog click “Done” (not “Move to Trash”), then System Settings → Privacy & Security → scroll down → “Open Anyway” → confirm with your password. Or in Terminal: xattr -cr /Applications/KizamuBeam.app",
@@ -195,9 +195,9 @@
       { "q": "Will it work with my laser?", "a": "If it runs FluidNC, GRBL, grblHAL, Marlin or Smoothieware, very likely – that covers most diode lasers. Galvo lasers and Ruida/DSP controllers are not supported." },
       { "q": "Why does my computer warn me when I install it?", "a": "The installers aren’t code-signed yet, which is common for young open-source projects. On macOS: System Settings → Privacy & Security → “Open Anyway”; on Windows: “More info” → “Run anyway”." },
       { "q": "Can I bring my existing material settings?", "a": "Yes. LightBurn material libraries (.clb) can be imported where fields have an equivalent. LightBurn projects (.lbrn2) open with their shapes, images and layer settings. Laserwerk projects and libraries open directly, and SVG, DXF, PDF and Illustrator (.ai) files import as usual." },
-      { "q": "Is the release candidate stable enough for real projects?", "a": "For most work, yes – it’s used on real hardware every day. Rare bugs are still possible (see the note above). Back up important projects and check new jobs with preview and frame." },
+      { "q": "Is KizamuBeam stable enough for real projects?", "a": "Yes – since version 2.2.0 there are stable releases, and KizamuBeam is used on real hardware every day. As with any laser software: check new jobs with preview and frame, and back up important projects." },
       { "q": "What’s the MCP server about?", "a": "It lets AI agents read and edit your designs. It’s off by default, local only and token-protected, and nothing reaches your machine without your confirmation in KizamuBeam." },
-      { "q": "How can I help?", "a": "Try the release candidate on your laser, report bugs and ideas on GitHub, translate the interface into your language, or send a pull request." }
+      { "q": "How can I help?", "a": "Try KizamuBeam on your laser, report bugs and ideas on GitHub, translate the interface into your language, or send a pull request." }
     ]
   },
   "footer": {

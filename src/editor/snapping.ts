@@ -3,6 +3,7 @@ import { Obj, Pt } from '../model';
 import { alignBox, alignPoint, buildSnapSet, findSnap, SnapHit, SnapSet } from '../snap';
 import type { Editor } from '../editor';
 import { Drag, SNAP_PX } from './shared';
+import { cleanGrid, GRID_KEY, GridSettings } from '../grid';
 
 const SNAP_KEY = 'kizamubeam.snap';
 
@@ -23,6 +24,24 @@ export class EditorSnapping {
       /* Speicher nicht verfügbar */
     }
     this.emit('view');
+  }
+  /** Hintergrundgitter ändern und merken */
+  setGrid(this: Editor, patch: Partial<GridSettings>) {
+    this.grid = cleanGrid({ ...this.grid, ...patch });
+    try {
+      localStorage.setItem(GRID_KEY, JSON.stringify(this.grid));
+    } catch {
+      /* Speicher nicht verfügbar */
+    }
+    this.emit('view');
+  }
+  loadGridSettings(this: Editor) {
+    try {
+      const raw = localStorage.getItem(GRID_KEY);
+      if (raw) this.grid = cleanGrid(JSON.parse(raw));
+    } catch {
+      /* Standardwerte */
+    }
   }
   loadSnapSettings(this: Editor) {
     try {
