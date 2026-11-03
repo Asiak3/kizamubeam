@@ -273,6 +273,8 @@ function buildMenu(ed: Editor) {
         'sep',
         [t('Formen trimmen'), 'Ctrl+K', () => ed.setTool('trim')],
         [t('Startpunkt setzen'), '', () => ed.setTool('start')],
+        'sep',
+        [t('Mittelpunkte markieren'), '', () => ed.markCentersSel()],
       ] },
       { sub: t('Array'), items: [
         [t('Rasterarray …'), 'Ctrl+Shift+A', () => openGridArrayDialog(ed)],
@@ -365,6 +367,11 @@ function buildMenu(ed: Editor) {
       [t('Verkleinern'), '-', () => ed.zoomAt(0.8)],
       'sep',
       [t('Drahtgitter / Gefüllt'), 'Alt+W', () => ((ed.filled = !ed.filled), ed.emit('view'))],
+      { sub: t('Mittelpunkte zeigen'), items: [
+        [t('Aus|Mittelpunkte'), '', () => ed.setSnap({ centers: 'off' }), () => ed.centerMarks === 'off'],
+        [t('Bei Auswahl und unter dem Mauszeiger'), '', () => ed.setSnap({ centers: 'auto' }), () => ed.centerMarks === 'auto'],
+        [t('Immer|Mittelpunkte'), '', () => ed.setSnap({ centers: 'all' }), () => ed.centerMarks === 'all'],
+      ] },
       'sep',
       { sub: t('Hilfslinien'), items: [
         [t('Hilfslinien anzeigen'), '', () => ed.setGuideLayer({ hidden: ed.guidesShown() }), () => ed.guidesShown()],

@@ -4,6 +4,7 @@ import { fitText, loadedFont, onFontLoaded, textLines, textToSubs, wrapParagraph
 import { bezierPt, segments } from './curves';
 import { shownText } from './vartext';
 import { barcodeExtent, barcodeOutline } from './barcode';
+import { forgetCenters } from './arcs';
 
 export { bezierPt, segments };
 
@@ -116,6 +117,7 @@ export function localPath(s: Shape): Path2D {
 }
 export function invalidate(s: Shape) {
   localCache.delete(s);
+  forgetCenters(s);
 }
 
 export function worldPath(s: Shape, m: Mat): Path2D {

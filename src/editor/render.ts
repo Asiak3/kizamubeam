@@ -4,6 +4,7 @@ import { displayCanvas } from '../images';
 import { EdgePick } from '../joints';
 import { bezierPt, Box, boundsOf, drawText, localPath, segments, shapeSubs, subsToPath2D, textOutline, worldPath } from '../geom';
 import { SNAP_LABELS } from '../snap';
+import { shapeCenters, shownMark } from '../arcs';
 import type { Editor } from '../editor';
 import { RULER, HANDLE_OFF, cachedWorldPath, SNAP_COLOR } from './shared';
 
@@ -62,6 +63,7 @@ export class EditorRender {
     const saved = {
       canvas: this.canvas, ctx: this.ctx, dpr: this.dpr, view: this.view, sel: this.sel,
       nodeHover: this.nodeHover, segHover: this.segHover, snapHit: this.snapHit, alignGuides: this.alignGuides, draft: this.draft,
+      centerMarks: this.centerMarks,
     };
     try {
       this.canvas = off;
@@ -72,6 +74,7 @@ export class EditorRender {
       this.nodeHover = this.segHover = this.snapHit = null;
       this.alignGuides = [];
       this.draft = null;
+      this.centerMarks = 'off';
       this.render();
       return off.toDataURL('image/png');
     } finally {
@@ -536,6 +539,7 @@ export class EditorRender {
         ctx.stroke();
       }
     }
+    this.renderCenters(ctx);
     this.renderSnap(ctx);
     // Startknoten der Linie hervorheben (Schließen)
     if (this.draft && this.draft.nodes.length >= 2) {
@@ -574,6 +578,52 @@ export class EditorRender {
         ctx.stroke();
       }
     }
+    ctx.restore();
+  }
+
+  /**
+   * Mittelpunktkreuze von Kreisen, Ellipsen, Vielecken und großen Bögen (auch Löchern in Pfaden).
+   * „auto“: gewählte Objekte, Objekt unter dem Mauszeiger und Mittelpunkte in der Nähe des Mauszeigers.
+   */
+  renderCenters(this: Editor, ctx: CanvasRenderingContext2D) {
+    const mode = this.centerMarks;
+    if (mode === 'off') return;
+    const focus = new Set<Obj>(this.sel);
+    if (this.centerHover) focus.add(this.centerHover);
+    const cur = this.toScreen(this.cursor);
+    const NEAR = 40;
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = SNAP_COLOR;
+    ctx.beginPath();
+    const seen: Pt[] = [];
+    for (const top of this.doc.objs) {
+      const inFocus = mode === 'all' || focus.has(top);
+      for (const [leaf, m] of visibleLeaves([top])) {
+        if (!this.layer(leaf.layer).show || leaf.shape.kind === 'text') continue;
+        for (const c of shapeCenters(leaf.shape, () => shapeSubs(leaf.shape))) {
+          if (!shownMark(c)) continue;
+          const q = this.toScreen(apply(m, c.x, c.y));
+          if (q.x < RULER || q.y < RULER || q.x > this.w || q.y > this.h) continue;
+          if (!inFocus && Math.hypot(q.x - cur.x, q.y - cur.y) > NEAR) continue;
+          // konzentrische Kreise nur einmal markieren
+          if (seen.some((p) => Math.abs(p.x - q.x) < 0.5 && Math.abs(p.y - q.y) < 0.5)) continue;
+          seen.push(q);
+          const x = Math.round(q.x) + 0.5,
+            y = Math.round(q.y) + 0.5;
+          ctx.moveTo(x - 7, y);
+          ctx.lineTo(x - 2, y);
+          ctx.moveTo(x + 2, y);
+          ctx.lineTo(x + 7, y);
+          ctx.moveTo(x, y - 7);
+          ctx.lineTo(x, y - 2);
+          ctx.moveTo(x, y + 2);
+          ctx.lineTo(x, y + 7);
+          ctx.rect(x - 0.5, y - 0.5, 1, 1);
+        }
+      }
+    }
+    ctx.stroke();
     ctx.restore();
   }
 
@@ -626,6 +676,13 @@ export class EditorRender {
         ctx.lineTo(x + 8, y);
         ctx.moveTo(x, y - 8);
         ctx.lineTo(x, y + 8);
+        break;
+      case 'quad':
+        // Viertelkreis mit Radien
+        ctx.moveTo(x - 5, y + 5);
+        ctx.lineTo(x - 5, y - 5);
+        ctx.arc(x - 5, y + 5, 10, -Math.PI / 2, 0);
+        ctx.closePath();
         break;
       case 'cross':
         ctx.moveTo(x - 5, y - 5);

@@ -3,13 +3,15 @@
 import { apply, inv, visibleLeaves, mul, Obj, Pt } from './model';
 import { bezierPt, Box, boundsOf, segments, shapeSubs, textOutline } from './geom';
 import { t } from './i18n';
+import { shapeCenters } from './arcs';
 
-export type SnapKind = 'node' | 'mid' | 'center' | 'cross' | 'line';
+export type SnapKind = 'node' | 'mid' | 'center' | 'quad' | 'cross' | 'line';
 
 export const SNAP_LABELS: Record<SnapKind, string> = {
   node: t('Knoten'),
   mid: t('Mittelpunkt'),
   center: t('Zentrum'),
+  quad: t('Quadrant'),
   cross: t('Schnittpunkt'),
   line: t('Linie'),
 };
@@ -30,7 +32,7 @@ export interface AlignGuide {
 export interface SnapPoint {
   x: number;
   y: number;
-  kind: 'node' | 'mid' | 'center';
+  kind: 'node' | 'mid' | 'center' | 'quad';
 }
 
 /** Gerade Stücke der Umrisse (Kurven angenähert) mit Begrenzung für die schnelle Vorauswahl */
@@ -105,6 +107,16 @@ export function buildSnapSet(objs: Obj[], visible: (leaf: Obj) => boolean, skip:
           }
         }
       }
+      // echte Mittelpunkte von Kreisen, Bögen (auch Löchern) und Vielecken, dazu Quadranten
+      if (s.kind !== 'text')
+        for (const c of shapeCenters(s, () => subs)) {
+          const q = apply(m, c.x, c.y);
+          set.addPoint(q.x, q.y, 'center');
+          for (const p of c.quads ?? []) {
+            const w = apply(m, p.x, p.y);
+            set.addPoint(w.x, w.y, 'quad');
+          }
+        }
       const lb = boundsOf([leaf], mul(m, inv(leaf.m)));
       if (lb) set.addPoint(lb.x + lb.w / 2, lb.y + lb.h / 2, 'center');
     }

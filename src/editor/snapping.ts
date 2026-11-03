@@ -12,12 +12,13 @@ type Mods = { altKey: boolean; ctrlKey: boolean; metaKey: boolean };
 
 export class EditorSnapping {
   /** Fang-Einstellungen ändern und merken */
-  setSnap(this: Editor, patch: { grid?: boolean; objects?: boolean; step?: number }) {
+  setSnap(this: Editor, patch: { grid?: boolean; objects?: boolean; step?: number; centers?: Editor['centerMarks'] }) {
+    if (patch.centers !== undefined) this.centerMarks = patch.centers;
     if (patch.grid !== undefined) this.snapGrid = patch.grid;
     if (patch.objects !== undefined) this.snapObjects = patch.objects;
     if (patch.step !== undefined && patch.step > 0) this.gridStep = patch.step;
     try {
-      localStorage.setItem(SNAP_KEY, JSON.stringify({ grid: this.snapGrid, objects: this.snapObjects, step: this.gridStep }));
+      localStorage.setItem(SNAP_KEY, JSON.stringify({ grid: this.snapGrid, objects: this.snapObjects, step: this.gridStep, centers: this.centerMarks }));
     } catch {
       /* Speicher nicht verfügbar */
     }
@@ -29,6 +30,7 @@ export class EditorSnapping {
       if (typeof st.grid === 'boolean') this.snapGrid = st.grid;
       if (typeof st.objects === 'boolean') this.snapObjects = st.objects;
       if (typeof st.step === 'number' && st.step > 0) this.gridStep = st.step;
+      if (st.centers === 'off' || st.centers === 'auto' || st.centers === 'all') this.centerMarks = st.centers;
     } catch {
       /* Standardwerte */
     }
