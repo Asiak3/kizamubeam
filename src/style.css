@@ -3999,3 +3999,22 @@ input.jig-count {
   color: #d03a3a;
   font-weight: 600;
 }
+
+/* Einstellungen übertragen (syncDialog.ts) */
+.sync-dialog { max-width: 620px; }
+.sync-dialog h4 { margin: 14px 0 4px; }
+.sync-sections { display: grid; gap: 4px; margin: 6px 0; }
+.sync-section { display: flex; gap: 8px; align-items: flex-start; }
+.sync-section input { margin-top: 3px; }
+.sync-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
+.sync-row input[type="text"] { flex: 1; min-width: 160px; }
+.sync-path { font-size: 12px; word-break: break-all; opacity: 0.8; }
+.sync-state { margin: 6px 0; display: grid; gap: 4px; }
+.sync-mode { display: grid; gap: 4px; margin: 8px 0; }
+.sync-folder { border-top: 1px solid var(--line); margin-top: 12px; }
+.sync-banner {
+  position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 50;
+  display: flex; gap: 8px; align-items: center; padding: 8px 12px; border-radius: 8px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  box-shadow: 0 4px 16px #0003;
+}

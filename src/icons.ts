@@ -117,6 +117,7 @@ export const ICONS: Record<string, string> = {
   setup: svg('<path d="M4 20 15 9"/><path d="M14 4v3M17.5 5.5l-2 2M20 9h-3M12 7.5 13.5 9"/><path d="M18 14v2M17 15h2M8 4v2M7 5h2"/>'),
   rotary: svg('<ellipse cx="12" cy="12" rx="4" ry="8"/><path d="M12 4h6M12 20h6"/><ellipse cx="18" cy="12" rx="1.2" ry="8"/><path d="M3 12h4"/>'),
   fonts: svg('<path d="M4 19L9 5h1.5l5 14M6 14h7.5"/><path d="M16.5 19v-5.5a2.5 2.5 0 015 0V19M16.5 16h5"/>'),
+  sync: svg('<path d="M19 8a8 8 0 00-14 1M5 16a8 8 0 0014-1"/><path d="M19 3v5h-5M5 21v-5h5"/>'),
   packs: svg('<path d="M9 4h4v2.5a1.5 1.5 0 003 0V4h4v6h-2.5a1.5 1.5 0 000 3H20v7h-6v-2.5a1.5 1.5 0 00-3 0V20H4v-6h2.5a1.5 1.5 0 000-3H4V4z"/>'),
   star: svg('<path d="M12 3.5l2.6 5.5 6 .7-4.5 4.1 1.2 5.9L12 16.8l-5.3 2.9 1.2-5.9-4.5-4.1 6-.7z"/>'),
   search: svg('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'),
