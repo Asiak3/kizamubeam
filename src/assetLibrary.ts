@@ -195,3 +195,12 @@ export async function openLibraryFolder() {
 
 /** Liste neu lesen (z. B. nachdem Dateien von Hand in den Ordner gelegt wurden) */
 export const reloadLibrary = changed;
+
+/** Browser: alle eigenen Dateien unverändert (für Einstellungen übertragen, syncData.ts) */
+export const rawLibraryFiles = (): Promise<[string, string][]> => idbAll();
+
+/** Browser: Dateien unverändert schreiben (Inhalt) oder löschen (null) */
+export async function writeRawLibraryFiles(files: Record<string, string | null>) {
+  for (const [f, v] of Object.entries(files)) await idbPut(f, v);
+  changed();
+}

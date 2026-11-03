@@ -6,6 +6,7 @@ mod machine;
 mod native;
 mod packs;
 mod stream;
+mod sync;
 mod templates;
 mod updater;
 mod ws;
@@ -214,6 +215,16 @@ pub fn run() {
             library::library_write,
             library::library_delete,
             library::library_open_folder,
+            sync::sync_pick_folder,
+            sync::sync_machine_name,
+            sync::sync_list,
+            sync::sync_read,
+            sync::sync_write,
+            sync::sync_open_folder,
+            sync::sync_dir_stat,
+            sync::sync_dir_read,
+            sync::sync_dir_write,
+            sync::sync_dir_delete,
             updater::update_supported,
             updater::update_check,
             updater::update_install

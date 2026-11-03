@@ -1,5 +1,6 @@
 // Oberfläche: Menü, Leisten, Panels, Palette, Statusleiste.
 import { Editor, Tool } from './editor';
+import { initSync, openSyncDialog } from './syncDialog';
 import type { CornerMode } from './corners';
 import { ICONS } from './icons';
 import { DITHER_MODES, DitherMode, ImageAdjust, ImageLayer, ImageShape, isCellMode, Layer, layerLabel, Obj, ObjBindKey, pageName, PALETTE, SubPath, TextShape, BarcodeShape, GenShape } from './model';
@@ -152,6 +153,7 @@ export function buildUI(ed: Editor) {
   buildLaser(ed);
   setTimeout(() => maybeOfferSetup(ed), 300);
   setTimeout(() => maybeCheckForUpdates(), 5000);
+  initSync(ed);
   initDock();
   buildMenu(ed);
   buildPalette(ed);
@@ -228,6 +230,7 @@ function buildMenu(ed: Editor) {
       'sep',
       [t('Schriften …'), '', () => openFontManager(ed)],
       [t('Erweiterungen …'), '', () => openPacksDialog()],
+      [t('Einstellungen übertragen …'), '', () => openSyncDialog(ed)],
       [t('KI-Agenten (MCP) …'), '', () => openAgentDialog(ed)],
     ]],
     [t('Bearbeiten'), [
@@ -1043,6 +1046,7 @@ function buildBars(ed: Editor) {
     { id: 'newtemplate', cat: F, icon: 'template', label: t('Neu aus Vorlage …'), run: () => openTemplateLibrary(ed) },
     { id: 'filltemplate', cat: F, icon: 'filltemplate', label: t('Vorlage ausfüllen …'), run: () => openFillDialog(ed) },
     { id: 'packs', cat: F, icon: 'packs', label: t('Erweiterungen …'), run: () => openPacksDialog() },
+    { id: 'sync', cat: F, icon: 'sync', label: t('Einstellungen übertragen …'), run: () => openSyncDialog(ed) },
     { id: 'fonts', cat: F, icon: 'fonts', short: t('Schriften'), label: t('Schriften: Google Fonts laden, eigene Schriften und Favoriten verwalten'), run: () => openFontManager(ed) },
     { id: 'apps', cat: W, icon: 'apps', label: t('Werkzeugkasten: alle Generatoren und Werkzeuge mit Suche'), run: () => toggleWindow('apps'), on: () => !isHidden('apps') },
     // Knopfgruppen: ein Knopf für die zuletzt benutzte Aktion, der Pfeil daneben zeigt die übrigen
