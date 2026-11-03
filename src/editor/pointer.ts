@@ -45,6 +45,11 @@ export class EditorPointer {
     }
     if (e.button === 2) {
       if (this.draft) this.finishLine();
+      if (this.sketchEdit && this.sketchEdit.draft.length) {
+        this.sketchEdit.draft = [];
+        this.sketchEdit.draftIds = [];
+        this.redraw();
+      }
       return;
     }
     if (e.button !== 0) return;
@@ -53,6 +58,10 @@ export class EditorPointer {
     if ((sy < RULER) !== (sx < RULER) && !this.drag) {
       if (this.draft) this.finishLine();
       this.drag = { type: 'guide', axis: sy < RULER ? 'y' : 'x', idx: null, orig: null, moved: false, snapSet: this.hoverSnapSet() };
+      return;
+    }
+    if (this.tool === 'sketch') {
+      this.sketchDown(sx, sy, e);
       return;
     }
     switch (this.tool) {
@@ -270,6 +279,10 @@ export class EditorPointer {
     this.cursor = wp;
     const d = this.drag;
     this.emit('view');
+    if (!d && this.tool === 'sketch') {
+      this.sketchMove(sx, sy, e);
+      return;
+    }
     if (!d) {
       const hadSnap = !!this.snapHit || this.alignGuides.length > 0;
       this.clearSnap();
@@ -516,6 +529,7 @@ export class EditorPointer {
   }
 
   onUp(this: Editor, e: PointerEvent) {
+    if (this.tool === 'sketch') this.sketchUp();
     const d = this.drag;
     this.drag = null;
     if (!d) return;
@@ -628,6 +642,10 @@ export class EditorPointer {
   onDouble(this: Editor, e: MouseEvent) {
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
+    if (this.tool === 'sketch') {
+      this.sketchDouble(sx, sy);
+      return;
+    }
     if (this.tool === 'line' && this.draft) {
       // Doppelklick erzeugt zwei Knoten an derselben Stelle; den zweiten verwerfen
       const ns = this.draft.nodes;

@@ -121,6 +121,8 @@ export const ICONS: Record<string, string> = {
   search: svg('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'),
   chevup: svg('<path d="M6 15l6-6 6 6"/>'),
   chevdown: svg('<path d="M6 9l6 6 6-6"/>'),
+  sketch: svg('<path d="M4 18L11 6h7"/><circle cx="4" cy="18" r="1.6"/><circle cx="11" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><path d="M14 17.5a3.5 3.5 0 107 0 3.5 3.5 0 00-7 0" stroke-width="1.2"/><path d="M6.5 8.5l2 1.2" stroke-width="1.2"/>'),
+  sketchconv: svg('<path d="M3 17h7V7"/><path d="M14 17h7V7"/><circle cx="14" cy="17" r="1.5"/><circle cx="21" cy="17" r="1.5"/><circle cx="21" cy="7" r="1.5"/><path d="M11.5 12h1.5" stroke-width="1.2"/>'),
   measure: svg('<path d="M3 15.5L15.5 3l5.5 5.5L8.5 21z"/><path d="M7 11.5l2 2M9.5 9l1.5 1.5M12 6.5l2 2M14.5 4l1.5 1.5"/>'),
   relconc: svg('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 10.5v3M10.5 12h3"/>'),
   relequal: svg('<circle cx="7" cy="12" r="4"/><circle cx="17" cy="12" r="4"/><path d="M10 20.5h4M10 22h4" stroke-width="1.2"/>'),

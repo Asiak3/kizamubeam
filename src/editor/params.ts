@@ -10,6 +10,7 @@ import {
 import { t } from '../i18n';
 import type { Editor } from '../editor';
 import { normalizeTemplate, TemplateInfo } from '../templates';
+import { renameSketchParam, sketchUsesParam } from './sketch';
 
 export class EditorParams {
   /** Parameter des Projekts (leer, wenn es keine gibt) */
@@ -112,6 +113,7 @@ export class EditorParams {
       if (s.kind === 'text') s.text = renameInTemplate(s.text, from, to);
       else if (s.kind === 'barcode') s.data = renameInTemplate(s.data, from, to);
       else if (s.kind === 'gen' && s.bind) for (const k of Object.keys(s.bind)) s.bind[k] = renameInExpr(s.bind[k], from, to);
+      renameSketchParam(o, from, to);
     }
   }
   /** Wo wird der Parameter benutzt? (Objekte auf allen Seiten) */
@@ -127,7 +129,7 @@ export class EditorParams {
         s.kind === 'text' ? usesName(s.text, p.name, true)
         : s.kind === 'barcode' ? usesName(s.data, p.name, true)
         : s.kind === 'gen' && s.bind ? Object.values(s.bind).some((src) => usesName(src, p.name, false))
-        : false;
+        : sketchUsesParam(o, p.name);
       if (used) out.push(o);
     }
     return out;
@@ -144,6 +146,11 @@ export class EditorParams {
     for (const [o] of [...leaves(allObjs(this.doc))]) {
       const s = o.shape;
       if ((s.kind === 'text' && hasPlaceholders(s.text)) || (s.kind === 'barcode' && hasPlaceholders(s.data))) this.touch(s);
+      if (s.kind === 'gen' && s.gen === 'sketch') {
+        const issues = this.refreshSketchParams(o, scope);
+        if (issues.length) problems.push({ obj: o, issues });
+        continue;
+      }
       if (s.kind !== 'gen' || !s.bind) continue;
       if (s.asm) {
         if (doneAsm.has(s.asm)) continue;

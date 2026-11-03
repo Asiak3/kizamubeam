@@ -6,7 +6,7 @@
 import en from './locales/en.json';
 import { t } from './i18n';
 
-export type AppGroup = 'mech' | 'box' | 'model3d' | 'join' | 'arrange' | 'text' | 'image' | 'laser';
+export type AppGroup = 'mech' | 'box' | 'model3d' | 'join' | 'arrange' | 'text' | 'image' | 'laser' | 'cad';
 
 export interface AppGroupInfo {
   id: AppGroup;
@@ -37,6 +37,7 @@ export const appGroups = (): AppGroupInfo[] => [
   { id: 'mech', label: t('Mechanik'), chip: t('Mechanik'), icon: 'gear' },
   { id: 'box', label: t('Boxen und Möbel'), chip: t('Boxen'), icon: 'box' },
   { id: 'model3d', label: t('3D-Steckmodelle'), chip: t('3D'), icon: 'discsphere' },
+  { id: 'cad', label: t('Skizzen mit Beziehungen'), chip: t('Skizze'), icon: 'sketch' },
   { id: 'join', label: t('Verbindungen und Biegen'), chip: t('Verbindungen'), icon: 'joint' },
   { id: 'arrange', label: t('Vervielfältigen und Anordnen'), chip: t('Anordnen'), icon: 'gridArray' },
   { id: 'text', label: t('Text und Daten'), chip: t('Text'), icon: 'qr' },
@@ -63,6 +64,8 @@ const rows = (t: (s: string) => string): AppInfo[] => [
   { id: 'ribs', group: 'model3d', name: t('Rippenmodell'), desc: t('3D-Modell (STL, OBJ) als Rippen, die mit Schlitzen auf einem Rückgrat stecken.'), keys: t('3D STL OBJ Rippen Spanten Rückgrat Steckmodell Tier Figur Waffel|Suchwörter'), since: '1.16.0' },
   { id: 'discsphere', group: 'model3d', name: t('Scheibenkugel'), desc: t('Kugel oder Lampe aus Kreisscheiben, die sich über schräge Schlitze gegenseitig halten.'), keys: t('Lampe Kugel Scheiben Steckmodell Lampenschirm Polyeder Papier Karton|Suchwörter'), since: '1.10.0' },
   { id: 'lidhinge', group: 'box', name: t('Deckelscharnier'), desc: t('Scharnier zwischen Rückwand und Deckel einer Box: Knöchel, Schlitze und Stiftlöcher.'), keys: t('Scharnier Deckel Klappe Box Gelenk|Suchwörter') },
+  { id: 'sketch', group: 'cad', name: t('Neue Skizze'), desc: t('Linien, Kreise und Bögen mit Beziehungen und Bemaßungen zeichnen; Maße bleiben änderbar, auch über Projekt-Parameter.'), keys: t('Skizze CAD Bemaßung Beziehung Constraint parametrisch tangential parallel senkrecht Maß Solver|Suchwörter'), since: '2.1.0' },
+  { id: 'sketchconv', group: 'cad', name: t('In Skizze umwandeln'), desc: t('Gewählte Formen in eine Skizze umwandeln, damit Beziehungen und Maße darauf gesetzt werden können.'), keys: t('Skizze umwandeln CAD Bemaßung Beziehung parametrisch|Suchwörter'), since: '2.1.0' },
   { id: 'tool:joint', group: 'join', name: t('Verbindungen'), desc: t('Fingerzinken, Zapfen, Überblattung, Schnapp-, Haken-, Keil- oder T-Slot-Verbindung auf gerade Kanten.'), keys: t('Zinken Zapfen Schlitz Überblattung T-Slot Keil Holzverbindung|Suchwörter') },
   { id: 'hinge', group: 'join', name: t('Biegeschnitte'), desc: t('Schnittmuster, mit dem sich eine Platte biegen lässt (Living Hinge).'), keys: t('Living Hinge Biegen flexibel Muster Gelenk|Suchwörter') },
   { id: 'slots', group: 'join', name: t('Schlitze anpassen'), desc: t('Schlitze und Aussparungen auf die tatsächliche Materialdicke bringen, auch in importierten Dateien.'), keys: t('Schlitze Materialdicke Passung Nut Aussparung|Suchwörter'), since: '1.5.0' },
