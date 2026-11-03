@@ -5,6 +5,8 @@ import { EdgePick } from '../joints';
 import { bezierPt, Box, boundsOf, drawText, localPath, segments, shapeSubs, subsToPath2D, textOutline, worldPath } from '../geom';
 import { SNAP_LABELS } from '../snap';
 import { shapeCenters, shownMark } from '../arcs';
+import { measureOf, RelElem } from '../relations';
+import { dec, t } from '../i18n';
 import type { Editor } from '../editor';
 import { RULER, HANDLE_OFF, cachedWorldPath, SNAP_COLOR } from './shared';
 
@@ -540,6 +542,8 @@ export class EditorRender {
       }
     }
     this.renderCenters(ctx);
+    if (this.tool === 'relate') this.renderRelations(ctx);
+    if (this.tool === 'measure') this.renderMeasure(ctx);
     this.renderSnap(ctx);
     // Startknoten der Linie hervorheben (Schließen)
     if (this.draft && this.draft.nodes.length >= 2) {
@@ -624,6 +628,92 @@ export class EditorRender {
       }
     }
     ctx.stroke();
+    ctx.restore();
+  }
+
+  /** Gewählte Elemente (orange) und Element unter dem Mauszeiger im Werkzeug „Beziehung“ */
+  renderRelations(this: Editor, ctx: CanvasRenderingContext2D) {
+    const draw = (e: RelElem, color: string) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      if (e.kind === 'circle') {
+        const c = this.toScreen(e.c);
+        if (e.r > 0) ctx.arc(c.x, c.y, e.r * this.view.zoom, 0, Math.PI * 2);
+        ctx.moveTo(c.x - 6, c.y);
+        ctx.lineTo(c.x + 6, c.y);
+        ctx.moveTo(c.x, c.y - 6);
+        ctx.lineTo(c.x, c.y + 6);
+      } else if (e.kind === 'edge') {
+        const a = this.toScreen(e.a),
+          b = this.toScreen(e.b);
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      } else {
+        const p = this.toScreen(e.p);
+        ctx.rect(p.x - 5, p.y - 5, 10, 10);
+      }
+      ctx.stroke();
+    };
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const p of this.relPicks) draw(p.elem, '#ff6020');
+    if (this.relHover) draw(this.relHover.elem, SNAP_COLOR);
+    ctx.restore();
+  }
+
+  /** Messlinie mit Länge, Δx, Δy und Winkel; über einem Kreis Radius und Durchmesser */
+  renderMeasure(this: Editor, ctx: CanvasRenderingContext2D) {
+    const T = this.colors;
+    const label = (text: string, x: number, y: number) => {
+      ctx.font = '12px system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      const w = ctx.measureText(text).width + 10;
+      ctx.fillStyle = T.label;
+      ctx.fillRect(x, y - 10, w, 20);
+      ctx.fillStyle = T.labelText;
+      ctx.fillText(text, x + 5, y);
+    };
+    const mm = (v: number) => dec(v.toFixed(2));
+    ctx.save();
+    const m = this.measure;
+    if (m) {
+      const b = m.b ?? this.cursor;
+      const p = this.toScreen(m.a),
+        q = this.toScreen(b);
+      ctx.strokeStyle = '#ff6020';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 3]);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(q.x, q.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      for (const s of [p, q]) {
+        ctx.beginPath();
+        ctx.moveTo(s.x - 5, s.y - 5);
+        ctx.lineTo(s.x + 5, s.y + 5);
+        ctx.moveTo(s.x + 5, s.y - 5);
+        ctx.lineTo(s.x - 5, s.y + 5);
+        ctx.stroke();
+      }
+      const r = measureOf(m.a, b);
+      label(
+        t('{len} mm · Δx {dx} · Δy {dy} · {angle}°', { len: mm(r.len), dx: mm(r.dx), dy: mm(r.dy), angle: dec(r.angle.toFixed(1)) }),
+        (p.x + q.x) / 2 + 10, (p.y + q.y) / 2 - 22,
+      );
+    }
+    const c = this.measureCircle;
+    if (c) {
+      const s = this.toScreen(c.c);
+      ctx.strokeStyle = SNAP_COLOR;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, c.r * this.view.zoom, 0, Math.PI * 2);
+      ctx.stroke();
+      const cur = this.toScreen(this.cursor);
+      label(t('Ø {d} mm · r {r} mm', { d: mm(c.r * 2), r: mm(c.r) }), cur.x + 14, cur.y - 22);
+    }
     ctx.restore();
   }
 

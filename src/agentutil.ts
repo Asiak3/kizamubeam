@@ -138,7 +138,7 @@ export function describe(ed: Editor, o: Obj, parent: Mat, detail: boolean): Reco
   if (s.kind === 'path' || s.kind === 'gen' || s.kind === 'rect') {
     const k = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
     const fm = mul(flip(ed), m);
-    const cs = shapeCenters(s, () => shapeSubs(s)).filter((c) => c.kind === 'circle' || (c.sweep ?? 0) >= Math.PI / 2 + 0.01);
+    const cs = listedCircles(s);
     if (cs.length)
       out.circles = cs.slice(0, 50).map((c) => {
         const p = apply(fm, c.x, c.y);
@@ -151,6 +151,11 @@ export function describe(ed: Editor, o: Obj, parent: Mat, detail: boolean): Reco
     if (subs) out.svgPath = subsToD(subs, mul(flip(ed), m));
   }
   return out;
+}
+
+/** Kreise und Bögen eines Pfads, wie get_document sie unter circles meldet (Bögen über 90°) */
+export function listedCircles(s: Obj['shape']) {
+  return shapeCenters(s, () => shapeSubs(s)).filter((c) => c.kind === 'circle' || (c.sweep ?? 0) >= Math.PI / 2 + 0.01);
 }
 
 export function findObj(objs: Obj[], id: number, parent: Mat = IDENT): [Obj, Mat] | null {

@@ -52,6 +52,7 @@ import { buildNotesPanel } from './notesPanel';
 import { buildView3dPanel } from './view3d/panel';
 import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, windowList } from './dock';
+import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
 import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
 import { dec, LangPref, langPref, LANGUAGES, setLangPref, t, tn } from './i18n';
 import { version as APP_VERSION } from '../package.json';
@@ -162,6 +163,7 @@ export function buildUI(ed: Editor) {
   ed.onGenEdit = (o) => openGenDialog(ed, '', o);
   ed.onGenGuard = askGenConvert;
   ed.onJointDialog = () => openJointDialog(ed);
+  ed.onRelDistance = (cur) => askDistance(cur);
   installDropAndPaste(ed, $('#stage'));
   buildTabBar(ed);
   window.addEventListener('keydown', (e) => {
@@ -251,6 +253,7 @@ function buildMenu(ed: Editor) {
       [t('Ellipse'), 'Ctrl+E', () => ed.setTool('ellipse')],
       [t('Polygon'), '', () => ed.setTool('polygon')],
       [t('Text'), 'Ctrl+T', () => ed.setTool('text')],
+      [t('Messen'), '', () => ed.setTool('measure')],
       'sep',
       { sub: t('Boolesche Operationen'), items: [
         [t('Vereinen'), 'Alt++', () => ed.booleanSel('union')],
@@ -317,6 +320,9 @@ function buildMenu(ed: Editor) {
         'sep',
         [t('Horizontal verteilen'), '', () => ed.distribute(true)],
         [t('Vertikal verteilen'), '', () => ed.distribute(false)],
+      ] },
+      { sub: t('Beziehungen'), items: [
+        ...REL_MODES.map((m): MenuItem => [REL_LABELS[m], '', () => ed.startRelation(m), () => ed.tool === 'relate' && ed.relMode === m]),
       ] },
       'sep',
       [t('Verschachteln …'), '', () => openNestDialog(ed)],
@@ -954,6 +960,11 @@ function buildBars(ed: Editor) {
     tool('text', 'text', t('Text (Ctrl+T)')),
     tool('trim', 'trim', t('Formen trimmen (Ctrl+K): Abschnitte bis zum nächsten Schnittpunkt anklicken und entfernen')),
     tool('start', 'startpoint', t('Startpunkt setzen: Knoten anklicken, an dem der Schnitt beginnt (Shift: Richtung umkehren)')),
+    tool('measure', 'measure', t('Messen: Abstand, Winkel, Radius und Durchmesser')),
+    ...REL_MODES.map((m): Action => ({
+      id: `rel:${m}`, cat: A, icon: REL_ICONS[m], label: `${REL_LABELS[m]}: ${REL_HINTS[m]}`, short: REL_LABELS[m],
+      run: () => ed.startRelation(m), on: () => ed.tool === 'relate' && ed.relMode === m,
+    })),
     tool('joint', 'joint', t('Verbindung: Fingerzinken, Zapfen, Überblattung, Schnapp-, Haken-, Keil- oder T-Slot-Verbindung auf gerade Kanten anwenden')),
     {
       id: 'lidhinge', cat: W, icon: 'lidhinge', label: t('Scharnier für Deckel: Oberkante der Rückwand und Hinterkante des Deckels anklicken; erzeugt Knöchel, Schlitze und Stiftlöcher'),
@@ -1029,6 +1040,7 @@ function buildBars(ed: Editor) {
     { id: 'grp:bool', cat: M, label: t('Boolesche Operationen (Gruppe)'), items: ['union', 'subtract', 'intersect', 'boolopts'], run: () => {} },
     { id: 'grp:gen', cat: W, label: t('Generatoren (Gruppe)'), items: ['gear', 'rack', 'pulley', 'cam', 'gearpair', 'box', 'drawer', 'insert', 'shelf', 'discsphere', 'stack', 'ribs'], run: () => {} },
     { id: 'grp:array', cat: M, label: t('Arrays (Gruppe)'), items: ['gridarray', 'circarray'], run: () => {} },
+    { id: 'grp:relate', cat: A, label: t('Beziehungen (Gruppe)'), items: REL_MODES.map((m) => `rel:${m}`), run: () => {} },
     { id: 'grp:path', cat: M, label: t('Pfad-Werkzeuge (Gruppe)'), items: ['tool:trim', 'tool:start', 'closepath', 'join', 'breakapart', 'reverse', 'corners'], run: () => {} },
   ];
   initToolbars(
@@ -1041,7 +1053,7 @@ function buildBars(ed: Editor) {
       ],
       tools: [
         'tool:select', 'tool:node', SEP, 'tool:line', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
-        'grp:bool', 'offset', 'warp', 'grp:path', 'grp:array', 'nest',
+        'grp:bool', 'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure',
       ],
     },
     // Gespeicherte Leisten von vor den Knopfgruppen: die alten Standardfolgen durch die Gruppe ersetzen
@@ -1187,6 +1199,51 @@ function openCloseDialog(ed: Editor) {
   document.body.append(dlg);
   dlg.showModal();
   update();
+}
+
+// ---------- Beziehung „Abstand“ ----------
+
+const REL_ICONS: Record<RelMode, string> = {
+  concentric: 'relconc', equal: 'relequal', parallel: 'relpar', perpendicular: 'relperp',
+  horizontal: 'relhor', vertical: 'relvert', tangent: 'reltan', distance: 'reldist',
+};
+
+/** Abstand für die Beziehung erfragen; null = abgebrochen */
+function askDistance(current: number): Promise<number | null> {
+  return new Promise((resolve) => {
+    let result: number | null = null;
+    const val = h('input', { type: 'text', id: 'rel-dist', value: dec(String(Math.round(current * 1000) / 1000)), style: 'width: 96px' }) as HTMLInputElement;
+    const ok = () => {
+      const v = evalExpr(val.value);
+      if (v === null || !(v >= 0)) {
+        val.focus();
+        return;
+      }
+      result = v;
+      dlg.close();
+    };
+    val.onkeydown = (e) => {
+      if (e.key === 'Enter') ok();
+    };
+    const dlg = h(
+      'dialog',
+      { class: 'offset-dialog' },
+      h('h3', {}, t('Abstand')),
+      h('div', { class: 'form' }, h('label', { for: 'rel-dist' }, t('Abstand (mm)')), val),
+      h('div', { class: 'note' }, t('Aktuell: {v} mm. Das zweite Objekt wird verschoben.', { v: dec(current.toFixed(3)) })),
+      h('div', { class: 'dialog-buttons' },
+        h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen')),
+        h('button', { class: 'btn primary', onclick: ok }, t('Übernehmen'))),
+    );
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      resolve(result);
+    });
+    dlg.addEventListener('keydown', (e) => e.stopPropagation());
+    document.body.append(dlg);
+    dlg.showModal();
+    val.select();
+  });
 }
 
 // ---------- Ecken runden oder fasen ----------

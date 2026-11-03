@@ -121,4 +121,13 @@ export const ICONS: Record<string, string> = {
   search: svg('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'),
   chevup: svg('<path d="M6 15l6-6 6 6"/>'),
   chevdown: svg('<path d="M6 9l6 6 6-6"/>'),
+  measure: svg('<path d="M3 15.5L15.5 3l5.5 5.5L8.5 21z"/><path d="M7 11.5l2 2M9.5 9l1.5 1.5M12 6.5l2 2M14.5 4l1.5 1.5"/>'),
+  relconc: svg('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 10.5v3M10.5 12h3"/>'),
+  relequal: svg('<circle cx="7" cy="12" r="4"/><circle cx="17" cy="12" r="4"/><path d="M10 20.5h4M10 22h4" stroke-width="1.2"/>'),
+  relpar: svg('<path d="M4 17L14 4M10 20L20 7"/>'),
+  relperp: svg('<path d="M4 20h16M10 20V4"/><path d="M10 16h4v4" stroke-width="1.2"/>'),
+  relhor: svg('<path d="M3 12h18"/><path d="M6 8v8M18 8v8" stroke-width="1.2"/>'),
+  relvert: svg('<path d="M12 3v18"/><path d="M8 6h8M8 18h8" stroke-width="1.2"/>'),
+  reltan: svg('<circle cx="12" cy="10" r="6"/><path d="M3 16h18"/>'),
+  reldist: svg('<path d="M4 4v16M20 4v16M7 12h10M7 12l2.5-2.5M7 12l2.5 2.5M17 12l-2.5-2.5M17 12l-2.5 2.5"/>'),
 };

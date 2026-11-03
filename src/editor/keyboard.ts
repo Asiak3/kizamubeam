@@ -65,6 +65,8 @@ export class EditorKeyboard {
       return run(() => {
         if (this.drag) return this.cancelDrag();
         if (this.tool === 'joint' && this.jointPicks.length) return this.clearJointPicks();
+        if (this.tool === 'relate' && this.relPicks.length) return this.clearRelPicks();
+        if (this.tool === 'measure' && this.measure) return ((this.measure = null), this.redraw());
         if (nodeMode && this.selectedNodes().length) return this.clearNodeSel();
         if (this.draft) this.finishLine();
         else if (this.tool !== 'select') this.setTool('select');
