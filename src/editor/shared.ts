@@ -14,13 +14,13 @@ export const CANVAS_THEMES = {
     outside: '#c9ccd2', bed: '#ffffff', grid1: '#f2f2f2', grid10: '#e0e0e0', grid100: '#c4c4c4', border: '#30343a',
     sel: '#3070ff', handleFill: '#ffffff', nodeLine: '#8090a0',
     ruler: '#eceef1', rulerLine: '#a8adb5', rulerText: '#4a5058', rulerCorner: '#d6d9de',
-    label: 'rgba(30,40,60,0.85)', labelText: '#ffffff',
+    label: 'rgba(30,40,60,0.85)', labelText: '#ffffff', guide: '#00a3d9',
   },
   dark: {
     outside: '#15171b', bed: '#24272d', grid1: '#2a2e34', grid10: '#343940', grid100: '#4a5059', border: '#8a929c',
     sel: '#5b93f5', handleFill: '#24272d', nodeLine: '#7d8894',
     ruler: '#24282e', rulerLine: '#3a4049', rulerText: '#a3abb5', rulerCorner: '#2e333a',
-    label: 'rgba(230,235,245,0.92)', labelText: '#1b1e23',
+    label: 'rgba(230,235,245,0.92)', labelText: '#1b1e23', guide: '#3cc0ee',
   },
 };
 export const HANDLE_OFF = 9; // Abstand der Griffe vom Auswahlrahmen in px
@@ -40,8 +40,11 @@ export type Drag =
   | { type: 'linenode'; node: Node }
   /** Textwerkzeug: Klicken setzt einen Text, Ziehen einen Textrahmen */
   | { type: 'textframe'; start: Pt; end: Pt }
-  /** Hilfslinie aus dem Lineal ziehen: 'y' = waagrecht (oberes Lineal), 'x' = senkrecht (linkes Lineal) */
-  | { type: 'guide'; axis: 'x' | 'y'; obj: Obj | null; snapSet: SnapSet }
+  /**
+   * Hilfslinie aus dem Lineal ziehen oder verschieben: 'y' = waagrecht (oberes Lineal), 'x' = senkrecht (linkes Lineal).
+   * idx: Index in doc.guides (null, solange eine neue noch im Lineal ist); orig: alte Lage einer verschobenen Linie
+   */
+  | { type: 'guide'; axis: 'x' | 'y'; idx: number | null; orig: number | null; moved: boolean; snapSet: SnapSet }
   | {
       type: 'node'; obj: Obj; sub: number; idx: number; which: 'p' | 'cin' | 'cout'; start: Pt; orig: Node; moved: boolean;
       /** Gezogener Punkt in Weltkoordinaten zu Beginn und Fangpunkte ohne die bewegten Knoten */

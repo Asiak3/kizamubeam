@@ -33,6 +33,7 @@
     "test:library": "node scripts/run-ts.mjs scripts/library-test.ts",
     "test:fluidnc": "node scripts/run-ts.mjs scripts/fluidnc-test.ts",
     "test:notes": "node scripts/run-ts.mjs scripts/notes-test.ts",
+    "test:guides": "node scripts/run-ts.mjs scripts/guides-test.ts",
     "test:fonts": "node scripts/run-ts.mjs scripts/fonts-test.ts",
     "test:testphoto": "node scripts/run-ts.mjs scripts/testphoto-test.ts",
     "test:workpieces": "node scripts/run-ts.mjs scripts/workpieces-test.ts",

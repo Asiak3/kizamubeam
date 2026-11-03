@@ -404,6 +404,14 @@ select:focus {
 .ot-layer .swatch {
   flex: 0 0 auto;
 }
+.ot-guide-swatch {
+  min-width: 18px;
+  background: repeating-linear-gradient(90deg, #00a3d9 0 4px, transparent 4px 7px) center / 100% 2px no-repeat;
+  border: 1px solid var(--line);
+}
+.ot-guides {
+  margin-top: 4px;
+}
 .ot-row.sel {
   background: var(--accent-soft);
 }

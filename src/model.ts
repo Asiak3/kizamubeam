@@ -579,10 +579,51 @@ export interface Doc {
   seriesTable?: SeriesTable;
   /** Projekt-Notizen (Fenster „Notizen“): Material, Aufbau und Bearbeitung als freier Text */
   notes?: ProjectNotes;
+  /** Hilfslinien aus dem Lineal: eigene Ebene, keine Objekte, werden nie gelasert oder exportiert (alle Seiten) */
+  guides?: Guide[];
+  /** Ebene „Hilfslinien“ ausgeblendet bzw. gesperrt (nicht verschiebbar) */
+  guidesHidden?: boolean;
+  guidesLocked?: boolean;
   /** Nur in Projektdateien: Bilddaten (Asset-ID → data:-URL) */
   assets?: Record<string, string>;
   /** Nur in Projektdateien: 3D-Modelle der Generatoren (Kennung → Daten, siehe model3d/store.ts) */
   meshes?: Record<string, string>;
+}
+
+/** Hilfslinie über das ganze Bett: 'y' = waagrecht auf Höhe v, 'x' = senkrecht bei v (Weltkoordinaten in mm) */
+export interface Guide {
+  axis: 'x' | 'y';
+  v: number;
+}
+
+/** Hilfslinien aus einer Datei prüfen; fehlerhafte Einträge fallen weg */
+export function cleanGuides(raw: unknown): Guide[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Guide[] = [];
+  for (const g of raw) {
+    const r = g as Record<string, unknown>;
+    if (!r || (r.axis !== 'x' && r.axis !== 'y') || typeof r.v !== 'number' || !Number.isFinite(r.v)) continue;
+    out.push({ axis: r.axis, v: r.v });
+  }
+  return out;
+}
+
+/**
+ * Bis Version 2.0.0-rc.1 waren Hilfslinien gewöhnliche Linien auf dem Werkzeug-Layer T1 (über das ganze Bett,
+ * nur verschoben, ohne Namen). Solche Linien werden zu echten Hilfslinien.
+ */
+export function legacyGuide(o: Obj, bed: { w: number; h: number }): Guide | null {
+  const s = o.shape;
+  if (o.layer !== 30 || o.name || o.hidden || o.locked || s.kind !== 'path' || s.subs.length !== 1) return null;
+  const sp = s.subs[0];
+  if (sp.closed || sp.nodes.length !== 2) return null;
+  const [a, b] = sp.nodes;
+  if (a.cin || a.cout || b.cin || b.cout || a.x !== 0 || a.y !== 0) return null;
+  const m = o.m;
+  if (m[0] !== 1 || m[1] !== 0 || m[2] !== 0 || m[3] !== 1) return null;
+  if (b.y === 0 && b.x === bed.w && m[4] === 0) return { axis: 'y', v: m[5] };
+  if (b.x === 0 && b.y === bed.h && m[5] === 0) return { axis: 'x', v: m[4] };
+  return null;
 }
 
 /** Abschnitte der Projekt-Notizen; leere Abschnitte werden nicht gespeichert */
@@ -627,6 +668,20 @@ export function loadDoc(raw: unknown): Doc {
   const notes = cleanNotes(d.notes);
   if (notes) d.notes = notes;
   else delete d.notes;
+  const guides = cleanGuides(d.guides);
+  const bed = d.bed as { w: number; h: number };
+  for (const p of pages) {
+    const keep = p.objs.filter((o) => {
+      const g = legacyGuide(o, bed);
+      if (g && !guides.some((x) => x.axis === g.axis && x.v === g.v)) guides.push(g);
+      return !g;
+    });
+    if (keep.length !== p.objs.length) p.objs = keep;
+  }
+  if (guides.length) d.guides = guides;
+  else delete d.guides;
+  if (d.guidesHidden !== true) delete d.guidesHidden;
+  if (d.guidesLocked !== true) delete d.guidesLocked;
   Object.defineProperty(d, 'objs', {
     enumerable: false,
     configurable: true,
