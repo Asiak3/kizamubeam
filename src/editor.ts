@@ -60,6 +60,10 @@ export class Editor {
   snapHit: SnapHit | null = null;
   /** Ausrichtungshilfen (Alt) zur Anzeige */
   alignGuides: AlignGuide[] = [];
+  /** Mittelpunktkreuze: aus, bei Auswahl/unter dem Mauszeiger, immer */
+  centerMarks: 'off' | 'auto' | 'all' = 'auto';
+  /** Objekt unter dem Mauszeiger, dessen Mittelpunkte gezeigt werden */
+  centerHover: Obj | null = null;
   snapCache: { ver: number; set: SnapSet } | null = null;
   snapVer = 0;
   currentLayer = 0;

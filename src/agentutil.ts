@@ -5,7 +5,8 @@ import { hasPlaceholders } from './params';
 import { barcodeData } from './barcode';
 import type { Editor } from './editor';
 import { boundsOf, Box, shapeSubs, subsToD, textOutline } from './geom';
-import { CutSettings, IDENT, isOff, layerLabel, Mat, mul, Obj } from './model';
+import { apply, CutSettings, IDENT, isOff, layerLabel, Mat, mul, Obj } from './model';
+import { shapeCenters } from './arcs';
 import { library } from './materials';
 import { genLabel } from './generators';
 
@@ -132,6 +133,17 @@ export function describe(ed: Editor, o: Obj, parent: Mat, detail: boolean): Reco
     case 'group':
       out.children = s.children.map((c) => describe(ed, c, m, detail));
       break;
+  }
+  // Kreise und Bögen (auch Löcher in Pfaden) mit Mittelpunkt in Maschinenkoordinaten
+  if (s.kind === 'path' || s.kind === 'gen' || s.kind === 'rect') {
+    const k = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
+    const fm = mul(flip(ed), m);
+    const cs = shapeCenters(s, () => shapeSubs(s)).filter((c) => c.kind === 'circle' || (c.sweep ?? 0) >= Math.PI / 2 + 0.01);
+    if (cs.length)
+      out.circles = cs.slice(0, 50).map((c) => {
+        const p = apply(fm, c.x, c.y);
+        return { center: { x: r3(p.x), y: r3(p.y) }, radius: r3((c.r ?? 0) * k), ...(c.kind === 'arc' ? { arcDegrees: r3(((c.sweep ?? 0) * 180) / Math.PI) } : {}) };
+      });
   }
   if (detail && s.kind !== 'group' && s.kind !== 'image') {
     const subs = s.kind === 'text' ? textOutline(s)?.subs ?? null : shapeSubs(s);

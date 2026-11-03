@@ -46,7 +46,8 @@
     "test:focus": "node scripts/run-ts.mjs scripts/focustest-test.ts",
     "test:vecformats": "node scripts/run-ts.mjs scripts/vecformats-test.ts",
     "test:printcut": "node scripts/run-ts.mjs scripts/printcut-test.ts",
-    "test:jig": "node scripts/run-ts.mjs scripts/jig-test.ts"
+    "test:jig": "node scripts/run-ts.mjs scripts/jig-test.ts",
+    "test:arcs": "node scripts/run-ts.mjs scripts/arcs-test.ts"
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {

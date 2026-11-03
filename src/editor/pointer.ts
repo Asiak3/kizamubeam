@@ -260,6 +260,8 @@ export class EditorPointer {
     if (!d) {
       const hadSnap = !!this.snapHit || this.alignGuides.length > 0;
       this.clearSnap();
+      // Mittelpunkte des Objekts unter dem Mauszeiger zeigen
+      this.centerHover = this.centerMarks === 'auto' && sy >= RULER && sx >= RULER ? this.hitTest(wp) : null;
       if ((sy < RULER) !== (sx < RULER)) {
         this.canvas.style.cursor = sy < RULER ? 'row-resize' : 'col-resize';
         return;

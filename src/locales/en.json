@@ -3479,5 +3479,14 @@
   "Stecken": "Slotting",
   "Dichter an Details bis": "Denser at details, down to",
   "Wo sich der Umriss schnell ändert (Nase, Ohren, runde Enden), rücken die Rippen bis auf diesen Abstand zusammen; an glatten Stellen bleibt der Rippenabstand. 0 = überall gleich.": "Where the outline changes quickly (nose, ears, round ends), the ribs move closer together, down to this spacing; on smooth stretches the rib spacing stays. 0 = the same everywhere.",
-  "Der kleinste Abstand muss mindestens 0,5 mm größer als die Materialdicke sein.": "The smallest spacing must be at least 0.5 mm larger than the material thickness."
+  "Der kleinste Abstand muss mindestens 0,5 mm größer als die Materialdicke sein.": "The smallest spacing must be at least 0.5 mm larger than the material thickness.",
+  "Keine Kreise, Ellipsen, Vielecke oder Bögen in der Auswahl.": "No circles, ellipses, polygons or arcs in the selection.",
+  "Mittelpunkte markieren": "Mark centers",
+  "{n} Mittelpunkt markiert.": "{n} center marked.",
+  "{n} Mittelpunkte markiert.": "{n} centers marked.",
+  "Quadrant": "Quadrant",
+  "Mittelpunkte zeigen": "Show centers",
+  "Aus|Mittelpunkte": "Off",
+  "Bei Auswahl und unter dem Mauszeiger": "Selected and under the pointer",
+  "Immer|Mittelpunkte": "Always"
 }

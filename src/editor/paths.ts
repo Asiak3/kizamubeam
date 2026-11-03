@@ -10,6 +10,7 @@ import {
   reverseSub, setStart, trimSpan, trimSub,
 } from '../pathtools';
 import { cornerSub, CornerMode, isCorner } from '../corners';
+import { shapeCenters, shownMark } from '../arcs';
 import type { Editor } from '../editor';
 import { SNAP_COLOR, TOOL_HINTS } from './shared';
 
@@ -546,5 +547,40 @@ export class EditorPaths {
       });
     }
     ctx.restore();
+  }
+
+  /**
+   * Mittelpunkte markieren: ein kleines Kreuz je Kreis, Ellipse, Vieleck und großem Bogen der Auswahl
+   * (z. B. zum Ankörnen oder Bohren). Die Kreuze kommen als ein Pfad auf den aktuellen Layer.
+   */
+  markCentersSel(this: Editor): number {
+    const subs: SubPath[] = [];
+    const seen: Pt[] = [];
+    for (const [l, m] of visibleLeaves(this.sel)) {
+      if (l.shape.kind === 'text' || isOff(l)) continue;
+      const k = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
+      for (const c of shapeCenters(l.shape, () => shapeSubs(l.shape))) {
+        if (!shownMark(c)) continue;
+        const q = apply(m, c.x, c.y);
+        if (seen.some((p) => Math.hypot(p.x - q.x, p.y - q.y) < 0.01)) continue;
+        seen.push(q);
+        const r = Math.min(c.r ?? 5, c.ry ?? Infinity) * k;
+        const a = Math.max(0.5, Math.min(3, r * 0.4));
+        subs.push({ closed: false, nodes: [{ x: q.x - a, y: q.y }, { x: q.x + a, y: q.y }] });
+        subs.push({ closed: false, nodes: [{ x: q.x, y: q.y - a }, { x: q.x, y: q.y + a }] });
+      }
+    }
+    if (!subs.length) {
+      this.hint = t('Keine Kreise, Ellipsen, Vielecke oder Bögen in der Auswahl.');
+      this.emit('tool');
+      return 0;
+    }
+    this.snapshot(t('Mittelpunkte markieren'));
+    const o: Obj = { id: newId(), m: IDENT, layer: this.currentLayer, shape: { kind: 'path', subs } };
+    this.doc.objs.push(o);
+    this.setSel([o]);
+    this.hint = tn('{n} Mittelpunkt markiert.', '{n} Mittelpunkte markiert.', subs.length / 2);
+    this.emit('doc');
+    return subs.length / 2;
   }
 }
