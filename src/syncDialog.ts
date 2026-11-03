@@ -202,7 +202,7 @@ export async function openSyncDialog(ed: Editor) {
   const dlg = h('dialog', { class: 'sync-dialog' },
     h('h3', {}, t('Einstellungen übertragen')),
     h('h4', {}, t('Als Datei')),
-    h('p', { class: 'note' }, t('Exportiere die gewählten Bereiche in eine Datei (.kzs) und lies sie auf einem anderen Rechner wieder ein.')),
+    h('p', { class: 'note' }, t('Exportiere die gewählten Bereiche in eine Datei (.kzs), als Sicherung oder um sie auf einem anderen Rechner wieder einzulesen.')),
     exp.list,
     h('div', { class: 'sync-row' }, h('button', { class: 'btn', onclick: doExport }, t('Exportieren …')), h('button', { class: 'btn', onclick: doImport }, t('Importieren …'))),
     syncBox,

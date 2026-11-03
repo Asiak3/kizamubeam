@@ -68,7 +68,7 @@ A material library stores proven settings. Material tests, focus tests and a fit
 Templates with parameters, variable text and serial numbers from CSV, QR codes and barcodes, multi-page projects, jigs for batches of blanks, **Print and Cut** with registration marks and a camera to place designs right on the workpiece.
 
 ### Make it yours
-Dockable windows and customizable toolbars, light and dark theme, German and English. A Toolbox gathers all generators and special tools in one place. Extensions add device presets, templates, materials and motifs. Settings, devices and libraries can be transferred as a file or synced between computers through your own folder (iCloud, Dropbox, Nextcloud). AI agents such as Claude Code or Codex can work with your project through the built-in MCP server, with the access level you choose.
+Dockable windows and customizable toolbars, light and dark theme, German and English. A Toolbox gathers all generators and special tools in one place. Extensions add device presets, templates, materials and motifs. Settings, devices and libraries can be backed up or transferred as a file, or synced between computers through your own folder (iCloud, Dropbox, Nextcloud). AI agents such as Claude Code or Codex can work with your project through the built-in MCP server, with the access level you choose.
 
 **→ [The complete feature list](docs/features.md)**
 

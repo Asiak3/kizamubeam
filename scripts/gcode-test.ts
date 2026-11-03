@@ -1,7 +1,7 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode } from '../src/gcode';
+import { buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
 
@@ -494,6 +494,12 @@ await test('Sub-Layer: erst füllen, dann ausschneiden; ausgeschaltete Sub-Layer
   for (let i = 1; i < mv.n; i++) if (mv.f[i] === 300 && mv.s[i] > 0) cut += Math.hypot(mv.x[i] - mv.x[i - 1], mv.y[i] - mv.y[i - 1]);
   assert.ok(Math.abs(cut - 40) < 1e-6);
   assert.equal(mv.f[mv.n - 1], 300);
+});
+
+await test('Laser zur Klickposition: absolutes Verfahren je Firmware', () => {
+  assert.deepEqual(jogToLines(newDevice({ fw: 'fluidnc' }), 12.5, 30, 3000), ['$J=G90 G21 X12.5 Y30 F3000']);
+  assert.deepEqual(jogToLines(newDevice({ fw: 'grbl' }), 1, null, 1500), ['$J=G90 G21 X1 F1500']);
+  assert.deepEqual(jogToLines(newDevice({ fw: 'marlin' }), 5, 6, 3000), ['G90', 'G0 X5 Y6 F3000']);
 });
 
 if (failed) {

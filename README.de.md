@@ -68,7 +68,7 @@ Eine Material-Bibliothek speichert bewährte Einstellungen. Materialtest, Fokust
 Vorlagen mit Parametern, variabler Text und Seriennummern aus CSV, QR-Codes und Strichcodes, mehrseitige Projekte, Jigs für ganze Ladungen von Rohlingen, **Print and Cut** mit Passermarken und eine Kamera, um Motive direkt auf dem Werkstück zu platzieren.
 
 ### Nach deinem Geschmack
-Andockbare Fenster und anpassbare Werkzeugleisten, helles und dunkles Design, Deutsch und Englisch. Der Werkzeugkasten sammelt alle Generatoren und Spezialwerkzeuge an einem Ort. Erweiterungen bringen Gerätevorlagen, Vorlagen, Materialien und Motive mit. Einstellungen, Geräte und Bibliotheken lassen sich als Datei übertragen oder über einen eigenen Ordner (iCloud, Dropbox, Nextcloud) zwischen Rechnern synchronisieren. KI-Agenten wie Claude Code oder Codex können über den eingebauten MCP-Server mit deinem Projekt arbeiten, mit der Berechtigungsstufe, die du wählst.
+Andockbare Fenster und anpassbare Werkzeugleisten, helles und dunkles Design, Deutsch und Englisch. Der Werkzeugkasten sammelt alle Generatoren und Spezialwerkzeuge an einem Ort. Erweiterungen bringen Gerätevorlagen, Vorlagen, Materialien und Motive mit. Einstellungen, Geräte und Bibliotheken lassen sich als Datei sichern und übertragen oder über einen eigenen Ordner (iCloud, Dropbox, Nextcloud) zwischen Rechnern synchronisieren. KI-Agenten wie Claude Code oder Codex können über den eingebauten MCP-Server mit deinem Projekt arbeiten, mit der Berechtigungsstufe, die du wählst.
 
 **→ [Die vollständige Funktionsliste](docs/features.de.md)**
 

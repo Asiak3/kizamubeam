@@ -117,11 +117,15 @@ export function materialTab(ed: Editor): HTMLElement {
   const doExport = () => saveText('materialien.kzm', t('KizamuBeam-Materialbibliothek'), 'kzm', 'application/json', library.serialize());
 
   const render = () => {
+    // Bildlaufstand merken: Neuaufbau setzte sonst die Liste (und das Fenster) an den Anfang zurück.
+    const oldList = root.querySelector<HTMLElement>('.mat-list');
+    const listScroll = oldList?.scrollTop ?? 0;
+    const outer: [HTMLElement, number][] = [];
+    for (let p = root.parentElement; p; p = p.parentElement) if (p.scrollTop) outer.push([p, p.scrollTop]);
     const i = target();
     const L = ed.layer(i);
     const cur = library.get(L.material);
-    const sel = library.get(selected ?? undefined) ?? null;
-    if (!sel) selected = null;
+    if (!library.get(selected ?? undefined)) selected = null;
     const status = h('div', { class: 'mat-status' },
       h('span', { class: 'swatch', style: `background:${PALETTE[i]}` }, layerLabel(i)),
       cur
@@ -162,20 +166,23 @@ export function materialTab(ed: Editor): HTMLElement {
               e.fit ? h('span', { class: 'mat-fit', title: fitSummary(e.fit) }, t('Passung')) : null),
             h('span', { class: 'muted' }, settingsSummary(e.settings)),
           );
-          row.addEventListener('click', () => ((selected = e.id), render()));
+          row.addEventListener('click', () => {
+            if (selected === e.id) return;
+            selected = e.id;
+            for (const r of list.querySelectorAll('.mat-entry.sel')) r.classList.remove('sel');
+            row.classList.add('sel');
+            buttons.replaceChildren(...entryButtons());
+          });
           row.addEventListener('dblclick', () => assign(e));
           list.append(row);
         }
       }
     };
-    renderList();
     const btn = (label: string, title: string, f: () => void, enabled = true) =>
       h('button', { class: 'btn', title, disabled: !enabled, onclick: f }, label);
-    root.replaceChildren(
-      status,
-      search,
-      list,
-      h('div', { class: 'mat-buttons' },
+    const entryButtons = () => {
+      const sel = library.get(selected ?? undefined) ?? null;
+      return [
         btn(t('Übernehmen'), t('Einstellungen des gewählten Eintrags auf Layer {layer} übertragen (Doppelklick)', { layer: layerLabel(i) }), () => sel && assign(sel), !!sel),
         btn(t('Aus Layer aktualisieren'), t('Eintrag mit den Einstellungen von Layer {layer} überschreiben', { layer: layerLabel(i) }), () => sel && updateFromLayer(sel), !!sel),
         btn(t('Bearbeiten …'), t('Material, Dicke, Titel und Beschreibung ändern'), () => sel && openEntryDialog(sel, (d) => library.update(sel.id, d)), !!sel),
@@ -185,7 +192,15 @@ export function materialTab(ed: Editor): HTMLElement {
           selected = library.add({ ...rest, title: rest.title ? t('{name} (Kopie)', { name: rest.title }) : t('(Kopie)') }).id;
         }, !!sel),
         btn(t('Löschen'), t('Eintrag aus der Bibliothek entfernen'), () => sel && confirm(t('„{entry}“ löschen?', { entry: entryLabel(sel) })) && library.remove(sel.id), !!sel),
-      ),
+      ];
+    };
+    const buttons = h('div', { class: 'mat-buttons' }, ...entryButtons());
+    renderList();
+    root.replaceChildren(
+      status,
+      search,
+      list,
+      buttons,
       h('div', { class: 'mat-buttons' },
         btn(t('Neu aus Layer …'), t('Einstellungen von Layer {layer} als neuen Eintrag speichern', { layer: layerLabel(i) }), createFromLayer),
         btn(t('Importieren …'), t('Einträge aus einer .kzm-, .lwm- oder LightBurn-.clb-Datei hinzufügen'), doImport),
@@ -195,6 +210,8 @@ export function materialTab(ed: Editor): HTMLElement {
         btn(t('Passung kalibrieren …'), t('Schnittfuge und Steckspiel für ein Material ermitteln'), () => openCalibrateDialog(ed)),
       ),
     );
+    list.scrollTop = listScroll;
+    for (const [p, top] of outer) p.scrollTop = top;
   };
 
   library.on(render);

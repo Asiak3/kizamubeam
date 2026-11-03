@@ -12,6 +12,11 @@ export class EditorKeyboard {
       f();
     };
     // Skizzenmodus: eigene Tasten (Werkzeuge, Beziehungen, Esc/Enter); Ctrl+Z usw. laufen normal weiter
+    if (this.pickHandler && e.key === 'Escape') {
+      e.preventDefault();
+      this.endPick();
+      return;
+    }
     if (this.tool === 'sketch' && !e.repeat && e.code !== 'Space' && this.sketchKey(e)) {
       e.preventDefault();
       return;

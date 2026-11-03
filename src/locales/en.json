@@ -3659,7 +3659,7 @@
   "Synchronisieren über einen Ordner gibt es nur in der Desktop-App. Im Browser kannst du die Einstellungen als Datei übertragen.": "Syncing through a folder is only available in the desktop app. In the browser you can transfer settings as a file.",
   "Einstellungen übertragen": "Transfer Settings",
   "Als Datei": "As a file",
-  "Exportiere die gewählten Bereiche in eine Datei (.kzs) und lies sie auf einem anderen Rechner wieder ein.": "Export the chosen areas to a file (.kzs) and import it on another computer.",
+  "Exportiere die gewählten Bereiche in eine Datei (.kzs), als Sicherung oder um sie auf einem anderen Rechner wieder einzulesen.": "Export the chosen areas to a file (.kzs), as a backup or to import it on another computer.",
   "Ordner enthält schon Einstellungen": "Folder already contains settings",
   "Hier liegen schon Einstellungen von: {list}.": "This folder already has settings from: {list}.",
   "Was soll gelten, wenn es einen Eintrag auf beiden Seiten gibt? Einträge, die nur auf einer Seite vorkommen, kommen in jedem Fall dazu.": "Which should win when an entry exists on both sides? Entries that exist on only one side are always added.",
@@ -3677,5 +3677,11 @@
   "Neue Einstellungen von „{name}“.": "New settings from “{name}”.",
   "Neue Einstellungen von einem anderen Rechner.": "New settings from another computer.",
   "Später": "Later",
-  "Einstellungen übertragen …": "Transfer Settings …"
+  "Einstellungen übertragen …": "Transfer Settings …",
+  "Während eines Jobs nicht möglich.": "Not possible while a job is running.",
+  "Die Position liegt außerhalb des Arbeitsbereichs.": "The position is outside the work area.",
+  "Danach fährt jeder Klick auf die Arbeitsfläche den Laser dorthin (Esc beendet)": "Afterwards, every click on the workspace moves the laser there (Esc ends)",
+  "Klick auf die Arbeitsfläche fährt den Laser dorthin. Esc beendet.": "Click on the workspace to move the laser there. Esc ends.",
+  "Mit Drehachse fährt der Klick nur in X.": "With a rotary axis, the click only moves in X.",
+  "Laser zur Klickposition": "Move laser to click"
 }

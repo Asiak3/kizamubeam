@@ -4018,3 +4018,7 @@ input.jig-count {
   background: var(--panel); color: var(--text); border: 1px solid var(--line);
   box-shadow: 0 4px 16px #0003;
 }
+.move-buttons .btn.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}

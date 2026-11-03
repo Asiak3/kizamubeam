@@ -5,7 +5,7 @@ import { ICONS } from './icons';
 import { saveText } from './files';
 import { native } from './native';
 import {
-  anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, formatDuration, frameGCode, Job, jogLines, loadDevices, Moves, newDevice,
+  anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, formatDuration, frameGCode, Job, jogLines, jogToLines, loadDevices, Moves, newDevice,
   prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, sameMoves, saveDevices, StartFrom, startHere,
 } from './gcode';
 import { isTauri, machine, PortInfo } from './machine';
@@ -633,6 +633,24 @@ function moveTab(ed: Editor): HTMLElement {
     const a = anchorOf(box, device.jobOrigin);
     machine.send(`G0 X${a.x.toFixed(3)} Y${a.y.toFixed(3)}`);
   };
+  // Laser zur Klickposition: solange aktiv, fährt jeder Klick auf die Arbeitsfläche den Laser dorthin (Esc beendet)
+  const goTo = (p: { x: number; y: number }) => {
+    if (!machine.connected) return notify(t('Nicht verbunden.'), true);
+    if (machine.running) return notify(t('Während eines Jobs nicht möglich.'), true);
+    const bed = ed.doc.bed;
+    if (p.x < 0 || p.y < 0 || p.x > bed.w || p.y > bed.h) return notify(t('Die Position liegt außerhalb des Arbeitsbereichs.'), true);
+    // Werkstückkoordinaten wie die Laserkopf-Anzeige (y nach oben); mit Drehachse nur X
+    for (const l of jogToLines(device, p.x, rotaryOn(device) ? null : bed.h - p.y, st.speed)) machine.send(l);
+  };
+  const clickB = h('button', {
+    class: 'btn', title: t('Danach fährt jeder Klick auf die Arbeitsfläche den Laser dorthin (Esc beendet)'),
+    onclick: () => {
+      if (ed.pickHandler === goTo) return ed.endPick();
+      ed.startPick(goTo, () => clickB.classList.remove('on'), t('Klick auf die Arbeitsfläche fährt den Laser dorthin. Esc beendet.'));
+      clickB.classList.add('on');
+      if (rotaryOn(device)) notify(t('Mit Drehachse fährt der Klick nur in X.'));
+    },
+  }, t('Laser zur Klickposition')) as HTMLButtonElement;
   const setO = h('button', { class: 'btn', title: t('Werkstück-Nullpunkt an die aktuelle Position legen'), onclick: () => machine.send(fw().setOrigin) }, t('Ursprung hier setzen')) as HTMLButtonElement;
   const clearO = h('button', { class: 'btn', title: t('Werkstück-Nullpunkt auf den Maschinen-Nullpunkt zurücksetzen'), onclick: () => fw().clearOrigin && machine.send(fw().clearOrigin!) }, t('Ursprung löschen')) as HTMLButtonElement;
   const unlock = h('button', { class: 'btn', title: t('Alarm aufheben'), onclick: () => fw().unlock && machine.send(fw().unlock!) }, t('Entsperren')) as HTMLButtonElement;
@@ -648,6 +666,7 @@ function moveTab(ed: Editor): HTMLElement {
       setO,
       clearO,
       h('button', { class: 'btn', title: t('Laser zum Job-Ursprung der Auswahl fahren (absolute Koordinaten)'), onclick: toSelection }, t('Laser zur Auswahl')),
+      clickB,
       unlock,
     ),
   );

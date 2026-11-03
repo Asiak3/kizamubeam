@@ -409,6 +409,14 @@ export function jogLines(d: Device, dx: number, dy: number, f: number): string[]
   return fw.jog(dx, dy * k, l > 0 ? (f * Math.hypot(dx, dy * k)) / l : f, d.rotary.axis);
 }
 
+/** Absolut an eine Werkstückposition fahren (Laser zur Klickposition). y = null lässt Y stehen (z. B. mit Drehachse).
+ *  GRBL-Familie über $J (Soft-Limits, Abbruch mit Jog-Cancel), sonst G0 in G90. */
+export function jogToLines(d: Device, x: number, y: number | null, f: number): string[] {
+  const fw = FIRMWARES[d.fw];
+  const axes = `X${num(x)}${y === null ? '' : ` Y${num(y)}`}`;
+  return fw.jog === grblJog ? [`$J=G90 G21 ${axes} F${Math.round(f)}`] : ['G90', `G0 ${axes} F${Math.round(f)}`];
+}
+
 /** Testdrehung: das Objekt einmal ganz herumdrehen (bei Walzen hängt das vom Objektdurchmesser ab) */
 export function rotaryTestLines(d: Device, speed = 1500): string[] {
   return jogLines(d, 0, Math.PI * d.rotary.objectDiam, speed);
