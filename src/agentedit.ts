@@ -29,7 +29,9 @@ import { ASSET_CATEGORIES, AssetCategory, parseTags } from './assetFormat';
 import { defaultTemplate, guessColumns, tableRows, listTemplates, readTemplate, templateFields, templateFileName, templateJson, writeTemplate } from './templates';
 import { DEFAULT_NEST_SETTINGS, NestSettings } from './editor/nest';
 import { tabNameFromPath } from './editor/tabs';
-import { Args, describe, findObj, flip, machineBox, pageList, r3, Tier, ToolDef, ToolError } from './agentutil';
+import { Args, describe, findObj, flip, listedCircles, machineBox, pageList, r3, Tier, ToolDef, ToolError } from './agentutil';
+import { REL_MODES, RelElem, RelMode, relCount } from './relations';
+import { shapeCenters } from './arcs';
 import { CheckIssue, fixLabel, loadCheckSettings } from './check';
 
 // ---------- Eingaben prüfen ----------
@@ -1071,6 +1073,67 @@ export const EDIT_TOOLS: ToolDef[] = [
         ed.distribute(oneOf(a, 'distribute', ['horizontal', 'vertical'] as const) === 'horizontal');
       }
       return { objects: describeAll(ed, objs) };
+    },
+  },
+  {
+    name: 'apply_relation',
+    title: 'Beziehung anwenden',
+    description:
+      'Wendet eine Beziehung einmal an (wie Anordnen → Beziehungen): Das erste Element ist die Referenz und bleibt stehen, das Objekt des zweiten wird verschoben, gedreht oder skaliert. mode: concentric (zwei Kreise: Mittelpunkte übereinander), equal (zwei Kreise: gleicher Radius, oder zwei Kanten: gleiche Länge; skaliert gleichmäßig), parallel / perpendicular (zwei gerade Kanten; dreht um die Mitte der zweiten Kante), horizontal / vertical (eine Kante; dreht ihr Objekt), tangent (Kreis + Kante oder zwei Kreise: verschiebt bis zur Berührung), distance (verschiebt auf den Abstand distance: parallele Kanten senkrecht, Kante–Punkt/Kreis senkrecht zur Kante, sonst Punkt zu Punkt). Elemente: {id, circle: n} = n-ter Eintrag von circles aus get_object (bei Ellipse/Vieleck/Kreis-Form 0 = ihre Mitte); {id, edge: {subpath, segment}} = gerades Segment (Zählung ab 0 wie im SVG-Pfad); {id, point: [x, y]} = Punkt in Maschinenkoordinaten (nur distance). Nur Objekte der obersten Ebene; ein Undo-Schritt.',
+    tier: Tier.Edit,
+    inputSchema: obj({
+      mode: { type: 'string', enum: REL_MODES },
+      elements: {
+        type: 'array', minItems: 1, maxItems: 2,
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'integer' }, circle: { type: 'integer', minimum: 0 },
+            edge: { type: 'object', properties: { subpath: { type: 'integer', minimum: 0 }, segment: { type: 'integer', minimum: 0 } }, required: ['subpath', 'segment'] },
+            point: { type: 'array', items: { type: 'number' }, minItems: 2, maxItems: 2 },
+          },
+          required: ['id'],
+        },
+      },
+      distance: { type: 'number', minimum: 0 },
+    }, ['mode', 'elements']),
+    run: async (ed, a) => {
+      const mode = oneOf(a, 'mode', REL_MODES) as RelMode;
+      const els = a.elements;
+      if (!Array.isArray(els) || els.length !== relCount(mode)) throw new ToolError(`${mode} braucht ${relCount(mode)} Element(e)`);
+      const picks = els.map((e, i) => {
+        const el = e as Record<string, unknown>;
+        const o = ed.doc.objs.find((x) => x.id === Number(el.id));
+        if (!o) throw new ToolError(`Element ${i}: kein Objekt der obersten Ebene mit id ${el.id}`);
+        const s = o.shape;
+        const m = o.m;
+        let elem: RelElem;
+        const k = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) || 1;
+        if (el.circle !== undefined) {
+          const n = Number(el.circle);
+          const list = s.kind === 'ellipse' || s.kind === 'polygon' ? shapeCenters(s, () => []) : listedCircles(s);
+          const c = list[n];
+          if (!c) throw new ToolError(`Element ${i}: Objekt ${o.id} hat keinen Kreis ${n}`);
+          const r = (c.kind === 'ellipse' ? Math.min(c.r ?? 0, c.ry ?? 0) : c.kind === 'polygon' ? 0 : c.r ?? 0) * k;
+          elem = { kind: 'circle', c: apply(m, c.x, c.y), r };
+        } else if (el.edge !== undefined) {
+          const ed2 = el.edge as { subpath: number; segment: number };
+          const sg = segments(shapeSubs(s)[Number(ed2.subpath)] ?? { nodes: [], closed: false })[Number(ed2.segment)];
+          if (!sg) throw new ToolError(`Element ${i}: Objekt ${o.id} hat kein Segment ${ed2.subpath}/${ed2.segment}`);
+          if (sg.curve) throw new ToolError(`Element ${i}: Segment ${ed2.subpath}/${ed2.segment} ist gekrümmt`);
+          elem = { kind: 'edge', a: apply(m, sg.a.x, sg.a.y), b: apply(m, sg.b.x, sg.b.y) };
+        } else if (Array.isArray(el.point)) {
+          elem = { kind: 'point', p: W(ed, Number(el.point[0]), Number(el.point[1])) };
+        } else throw new ToolError(`Element ${i}: circle, edge oder point angeben`);
+        return { top: o, elem };
+      });
+      if (mode === 'distance' && a.distance === undefined) throw new ToolError('distance angeben');
+      ed.relMode = mode;
+      ed.relPicks = picks;
+      const ok = await ed.applyRelation(mode === 'distance' ? num(a, 'distance', { min: 0 }) : undefined);
+      if (!ok) throw new ToolError(ed.hint.split('. ')[0] || 'Beziehung nicht anwendbar');
+      const target = picks[picks.length - 1].top;
+      return { object: describe(ed, target, IDENT, false) };
     },
   },
   {

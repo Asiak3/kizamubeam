@@ -37,6 +37,8 @@ import { EditorLibrary } from './editor/library';
 import { EditorWarp } from './editor/warp';
 import { EditorNotes } from './editor/notes';
 import { EditorTabs, ProjectTab } from './editor/tabs';
+import { EditorRelations, RelPick } from './editor/relations';
+import type { RelMode } from './relations';
 import { t } from './i18n';
 
 export type { Tool } from './editor/shared';
@@ -65,6 +67,17 @@ export class Editor {
   centerMarks: 'off' | 'auto' | 'all' = 'auto';
   /** Objekt unter dem Mauszeiger, dessen Mittelpunkte gezeigt werden */
   centerHover: Obj | null = null;
+
+  // Beziehungen (einmal angewendet) und Messen
+  relMode: RelMode = 'concentric';
+  relPicks: RelPick[] = [];
+  relHover: RelPick | null = null;
+  /** Abstand für die Beziehung „Abstand“ erfragen (ui.ts); null = abgebrochen */
+  onRelDistance: ((current: number) => Promise<number | null>) | null = null;
+  /** Messung: Anfang und (wenn fertig) Ende in Welt-mm */
+  measure: { a: Pt; b: Pt | null } | null = null;
+  /** Kreis unter dem Mauszeiger im Werkzeug „Messen“ */
+  measureCircle: { c: Pt; r: number } | null = null;
   snapCache: { ver: number; set: SnapSet } | null = null;
   snapVer = 0;
   currentLayer = 0;
@@ -118,7 +131,7 @@ export class Editor {
   // Fangen an Raster, Objekten und Hilfslinien
   /** Ist der Werkzeug-Modus einer, bei dem der Mauszeiger schon ohne Ziehen fängt? */
   get drawTool() {
-    return this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text';
+    return this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
   }
 
   // Pfad-Werkzeuge: Schließen, Verbinden, Zerlegen, Startpunkt, Trimmen
@@ -418,6 +431,10 @@ export class Editor {
     this.jointHingeMode = false;
     this.trimHover = null;
     this.startHover = null;
+    this.relPicks = [];
+    this.relHover = null;
+    this.measure = null;
+    this.measureCircle = null;
     this.clearSnap();
     this.hint = TOOL_HINTS[t];
     this.canvas.style.cursor = t === 'select' ? 'default' : t === 'text' ? 'text' : 'crosshair';
@@ -451,6 +468,7 @@ export interface Editor
     EditorNotes,
     EditorImages,
     EditorTabs,
+    EditorRelations,
     EditorRender {}
 
 const PARTS = [
@@ -477,6 +495,7 @@ const PARTS = [
   EditorNotes,
   EditorImages,
   EditorTabs,
+  EditorRelations,
   EditorRender,
 ];
 for (const part of PARTS) {

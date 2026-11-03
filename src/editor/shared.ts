@@ -4,7 +4,7 @@ import { Box, worldPath } from '../geom';
 import { SnapSet } from '../snap';
 import { t } from '../i18n';
 
-export type Tool = 'select' | 'node' | 'line' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start';
+export type Tool = 'select' | 'node' | 'line' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure';
 
 export const RULER = 22; // px
 
@@ -100,5 +100,7 @@ export const TOOL_HINTS: Record<Tool, string> = {
   joint: t('Verbindung: erste gerade Kante anklicken (Zinken, Zapfen oder Schlitze). Esc hebt die Wahl auf.'),
   trim: t('Trimmen: Abschnitt bis zu den nächsten Schnittpunkten anklicken (rot) zum Entfernen. Shift: Stück auf aktuellem Layer behalten, Ctrl: nicht verbinden.'),
   start: t('Startpunkt: Knoten anklicken, dort beginnt der Schnitt. Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).'),
+  relate: t('Beziehung: zuerst das Element anklicken, das stehen bleibt, dann das Element des Objekts, das sich anpasst.'),
+  measure: t('Messen: Anfang und Ende anklicken (mit Fang). Über einem Kreis erscheinen Radius und Durchmesser. Esc löscht die Messung.'),
 };
 

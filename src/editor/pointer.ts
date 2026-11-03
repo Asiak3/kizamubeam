@@ -163,6 +163,12 @@ export class EditorPointer {
         this.setSel(o ? [o] : []);
         return;
       }
+      case 'relate':
+        this.relClick();
+        return;
+      case 'measure':
+        this.measureClick(this.snapPt(wp, e, { toggle: true }));
+        return;
       case 'joint': {
         const h = this.jointHover;
         if (!h) return;
@@ -275,7 +281,8 @@ export class EditorPointer {
       }
       if (this.drawTool) {
         // Fangpunkt schon vor dem Klicken zeigen; die Linie im Entstehen folgt ihm
-        this.cursor = this.snapPt(wp, e, { extra: this.draft?.nodes, toggle: this.tool === 'line' || this.tool === 'text' });
+        this.cursor = this.snapPt(wp, e, { extra: this.draft?.nodes, toggle: this.tool === 'line' || this.tool === 'text' || this.tool === 'measure' });
+        if (this.tool === 'measure') this.updateMeasureHover(sx, sy);
         this.canvas.style.cursor = this.space ? 'grab' : this.tool === 'text' ? 'text' : 'crosshair';
         return;
       }
@@ -299,6 +306,7 @@ export class EditorPointer {
                   : 'default';
       } else if (this.tool === 'node') this.updateNodeHover(sx, sy);
       else if (this.tool === 'joint') this.updateJointHover(sx, sy);
+      else if (this.tool === 'relate') this.updateRelHover(sx, sy);
       else if (this.tool === 'trim') this.updateTrimHover(sx, sy);
       else if (this.tool === 'start') this.updateStartHover(sx, sy);
       return;
