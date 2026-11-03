@@ -148,6 +148,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         // Kamera für das Kamerabild auf der Arbeitsfläche ohne zusätzliche Rückfrage der Webansicht freigeben;
         // die Freigabe des Betriebssystems (macOS: Datenschutz › Kamera) bleibt davon unberührt.
         .on_permission_request(|_, kind| match kind {

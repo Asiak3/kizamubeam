@@ -53,6 +53,11 @@ export class EditorPointer {
       return;
     }
     if (e.button !== 0) return;
+    // Punktabfrage (z. B. Laser zur Klickposition): Klick geht nur an sie, nicht ans Werkzeug
+    if (this.pickHandler && (sx >= RULER || sy >= RULER)) {
+      this.pickHandler(wp);
+      return;
+    }
     const ctrl = e.ctrlKey || e.metaKey;
     // Aus dem Lineal ziehen: Hilfslinie (oben waagrecht, links senkrecht)
     if ((sy < RULER) !== (sx < RULER) && !this.drag) {
@@ -279,6 +284,10 @@ export class EditorPointer {
     this.cursor = wp;
     const d = this.drag;
     this.emit('view');
+    if (!d && this.pickHandler) {
+      this.canvas.style.cursor = 'crosshair';
+      return;
+    }
     if (!d && this.tool === 'sketch') {
       this.sketchMove(sx, sy, e);
       return;

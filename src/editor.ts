@@ -180,6 +180,10 @@ export class Editor {
   arrayCenter: Pt | null = null;
   /** Position des Laserkopfs (Werkstückkoordinaten, y nach oben), solange verbunden */
   laserPos: Pt | null = null;
+  /** Punkt auf der Arbeitsfläche abfragen (z. B. „Laser zur Klickposition“): Linksklick ruft ihn mit Weltpunkt auf */
+  pickHandler: ((p: Pt) => void) | null = null;
+  /** Wird beim Beenden der Abfrage aufgerufen (Esc, Werkzeugwechsel, endPick) */
+  pickEnd: (() => void) | null = null;
 
   // Knotenbearbeitung
   /** Anzahl ausgewählter Knoten für die Oberfläche */
@@ -294,22 +298,59 @@ export class Editor {
 
   private resize() {
     const r = this.canvas.getBoundingClientRect();
+    const oldW = this.w,
+      oldH = this.h;
+    // Zeigte die Ansicht gerade den ganzen Arbeitsbereich (Start oder „Seite einpassen“), wird neu eingepasst,
+    // sonst bleibt die Mitte der Ansicht in der Mitte (z. B. beim Maximieren des Fensters)
+    const wasFitted = this.sized && this.fitView !== null && this.sameView(this.fitView);
     this.dpr = window.devicePixelRatio || 1;
     this.canvas.width = Math.round(r.width * this.dpr);
     this.canvas.height = Math.round(r.height * this.dpr);
     if (!this.sized) {
+      if (r.width < 1 || r.height < 1) return;
       this.sized = true;
       this.zoomPage();
+    } else if (wasFitted) {
+      this.zoomPage();
+    } else if (oldW > 0 && oldH > 0) {
+      this.view.ox += (this.w - oldW) / 2;
+      this.view.oy += (this.h - oldH) / 2;
+      this.emit('view');
     }
     this.dirty = true;
   }
   private sized = false;
+  /** Ansicht nach dem letzten Einpassen des Arbeitsbereichs (null = seitdem gezoomt oder verschoben) */
+  private fitView: { zoom: number; ox: number; oy: number } | null = null;
+  private sameView(v: { zoom: number; ox: number; oy: number }) {
+    return Math.abs(v.zoom - this.view.zoom) < 1e-9 && Math.abs(v.ox - this.view.ox) < 1e-6 && Math.abs(v.oy - this.view.oy) < 1e-6;
+  }
   get w() {
     return this.canvas.width / this.dpr;
   }
   get h() {
     return this.canvas.height / this.dpr;
   }
+  /** Punktabfrage starten; jeder Linksklick ruft onPick, bis endPick() (oder Esc) sie beendet */
+  startPick(onPick: (p: Pt) => void, onEnd?: () => void, hint?: string) {
+    this.endPick();
+    this.pickHandler = onPick;
+    this.pickEnd = onEnd ?? null;
+    if (hint) this.hint = hint;
+    this.canvas.style.cursor = 'crosshair';
+    this.emit('tool');
+  }
+
+  endPick() {
+    if (!this.pickHandler) return;
+    const end = this.pickEnd;
+    this.pickHandler = this.pickEnd = null;
+    this.hint = TOOL_HINTS[this.tool];
+    this.canvas.style.cursor = this.tool === 'select' ? 'default' : this.tool === 'text' ? 'text' : 'crosshair';
+    this.emit('tool');
+    end?.();
+  }
+
   toWorld(sx: number, sy: number): Pt {
     return { x: (sx - this.view.ox) / this.view.zoom, y: (sy - this.view.oy) / this.view.zoom };
   }
@@ -328,6 +369,7 @@ export class Editor {
   }
   zoomPage() {
     this.zoomBox({ x: 0, y: 0, w: this.doc.bed.w, h: this.doc.bed.h });
+    this.fitView = { ...this.view };
   }
   zoomSelection() {
     const b = this.selBounds();
@@ -437,6 +479,7 @@ export class Editor {
     this.tool = t;
     this.nodeHover = this.segHover = null;
     this.jointPicks = [];
+    this.endPick();
     this.jointHover = null;
     this.jointHingeMode = false;
     this.trimHover = null;

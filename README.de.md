@@ -32,7 +32,7 @@ KizamuBeam ist Open Source (GPL-3.0), kostenlos und braucht weder Konto noch Liz
 | **Windows** (64 Bit) | `KizamuBeam_…_x64-setup.exe` |
 | **Linux** (64 Bit) | `KizamuBeam_…_amd64.AppImage`, `.deb` oder `.rpm` |
 
-Die aktuelle Version gibt es auf der [Release-Seite](https://github.com/negurvulkan/kizamubeam/releases) und auf der [Website](https://negurvulkan.github.io/kizamubeam/#download). Aktuelle Version: **2.3.0** (stabil). Einmal installiert, hält sich KizamuBeam selbst aktuell (Hilfe → Nach Updates suchen).
+Die aktuelle Version gibt es auf der [Release-Seite](https://github.com/negurvulkan/kizamubeam/releases) und auf der [Website](https://negurvulkan.github.io/kizamubeam/#download). Aktuelle Version: **2.4.0** (stabil). Einmal installiert, hält sich KizamuBeam selbst aktuell (Hilfe → Nach Updates suchen).
 
 > **Erster Start unter macOS:** Meldet macOS, dass die App nicht überprüft werden kann, unter Systemeinstellungen → Datenschutz & Sicherheit auf „Dennoch öffnen“ klicken.
 
@@ -68,7 +68,7 @@ Eine Material-Bibliothek speichert bewährte Einstellungen. Materialtest, Fokust
 Vorlagen mit Parametern, variabler Text und Seriennummern aus CSV, QR-Codes und Strichcodes, mehrseitige Projekte, Jigs für ganze Ladungen von Rohlingen, **Print and Cut** mit Passermarken und eine Kamera, um Motive direkt auf dem Werkstück zu platzieren.
 
 ### Nach deinem Geschmack
-Andockbare Fenster und anpassbare Werkzeugleisten, helles und dunkles Design, Deutsch und Englisch. Der Werkzeugkasten sammelt alle Generatoren und Spezialwerkzeuge an einem Ort. Erweiterungen bringen Gerätevorlagen, Vorlagen, Materialien und Motive mit. Einstellungen, Geräte und Bibliotheken lassen sich als Datei übertragen oder über einen eigenen Ordner (iCloud, Dropbox, Nextcloud) zwischen Rechnern synchronisieren. KI-Agenten wie Claude Code oder Codex können über den eingebauten MCP-Server mit deinem Projekt arbeiten, mit der Berechtigungsstufe, die du wählst.
+Andockbare Fenster und anpassbare Werkzeugleisten, helles und dunkles Design, Deutsch und Englisch. Der Werkzeugkasten sammelt alle Generatoren und Spezialwerkzeuge an einem Ort. Erweiterungen bringen Gerätevorlagen, Vorlagen, Materialien und Motive mit. Einstellungen, Geräte und Bibliotheken lassen sich als Datei sichern und übertragen oder über einen eigenen Ordner (iCloud, Dropbox, Nextcloud) zwischen Rechnern synchronisieren. KI-Agenten wie Claude Code oder Codex können über den eingebauten MCP-Server mit deinem Projekt arbeiten, mit der Berechtigungsstufe, die du wählst.
 
 **→ [Die vollständige Funktionsliste](docs/features.de.md)**
 

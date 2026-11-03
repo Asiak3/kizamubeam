@@ -32,7 +32,7 @@ It is open source (GPL-3.0), free of charge, and needs no account or license key
 | **Windows** (64-bit) | `KizamuBeam_…_x64-setup.exe` |
 | **Linux** (64-bit) | `KizamuBeam_…_amd64.AppImage`, `.deb` or `.rpm` |
 
-Get the latest version from the [releases page](https://github.com/negurvulkan/kizamubeam/releases) or the [website](https://negurvulkan.github.io/kizamubeam/en/#download). Current version: **2.3.0** (stable). Once installed, KizamuBeam keeps itself up to date (Help → Check for Updates).
+Get the latest version from the [releases page](https://github.com/negurvulkan/kizamubeam/releases) or the [website](https://negurvulkan.github.io/kizamubeam/en/#download). Current version: **2.4.0** (stable). Once installed, KizamuBeam keeps itself up to date (Help → Check for Updates).
 
 > **First start on macOS:** if macOS says the app cannot be checked, open System Settings → Privacy & Security and click “Open Anyway”.
 
@@ -68,7 +68,7 @@ A material library stores proven settings. Material tests, focus tests and a fit
 Templates with parameters, variable text and serial numbers from CSV, QR codes and barcodes, multi-page projects, jigs for batches of blanks, **Print and Cut** with registration marks and a camera to place designs right on the workpiece.
 
 ### Make it yours
-Dockable windows and customizable toolbars, light and dark theme, German and English. A Toolbox gathers all generators and special tools in one place. Extensions add device presets, templates, materials and motifs. Settings, devices and libraries can be transferred as a file or synced between computers through your own folder (iCloud, Dropbox, Nextcloud). AI agents such as Claude Code or Codex can work with your project through the built-in MCP server, with the access level you choose.
+Dockable windows and customizable toolbars, light and dark theme, German and English. A Toolbox gathers all generators and special tools in one place. Extensions add device presets, templates, materials and motifs. Settings, devices and libraries can be backed up or transferred as a file, or synced between computers through your own folder (iCloud, Dropbox, Nextcloud). AI agents such as Claude Code or Codex can work with your project through the built-in MCP server, with the access level you choose.
 
 **→ [The complete feature list](docs/features.md)**
 
