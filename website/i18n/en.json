@@ -1,7 +1,7 @@
 {
   "lang": "en",
   "locale": "en_US",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "meta": {
     "title": "KizamuBeam – Free laser engraving & cutting software",
     "description": "Free, open-source laser software for macOS, Windows and Linux. Design, engrave photos, generate boxes and gears, and send jobs straight to FluidNC, GRBL, grblHAL, Marlin and Smoothieware lasers.",
@@ -29,7 +29,7 @@
     "lang_short": "DE"
   },
   "hero": {
-    "badge": "New: version 2.2.0 – the first stable release",
+    "badge": "New: version 2.3.0 – sync settings through a folder",
     "title": "Your laser. Your software. Free.",
     "subtitle": "KizamuBeam is open-source software to design, engrave and cut – made for diode lasers running FluidNC, GRBL and friends. Free on macOS, Windows and Linux.",
     "cta_primary": "Download for free",
