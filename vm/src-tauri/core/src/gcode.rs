@@ -1,8 +1,8 @@
-//! G-Code-Zeilen zerlegen und nach den Regeln von GRBL 1.1 prüfen (modale Gruppen, doppelte Wörter,
-//! nicht unterstützte Befehle). Die Fehlernummern sind die von GRBL, damit Programme dieselben
-//! Meldungen bekommen wie von einer echten Steuerung.
+//! Split G-code lines and check them by the rules of GRBL 1.1 (modal groups, repeated words,
+//! unsupported commands). The error numbers are GRBL's, so programs get the same
+//! messages as from a real controller.
 
-/// GRBL-Fehlernummern (Auswahl)
+/// GRBL error numbers (selection)
 pub mod err {
     pub const EXPECTED_COMMAND_LETTER: u8 = 1;
     pub const BAD_NUMBER_FORMAT: u8 = 2;
@@ -36,7 +36,7 @@ pub struct Word {
     pub value: f64,
 }
 
-/// Kommentare ( … ) und ; entfernen, Leerzeichen streichen, Großbuchstaben.
+/// Remove comments ( … ) and ;, strip spaces, upper case.
 pub fn clean(line: &str) -> String {
     let mut out = String::with_capacity(line.len());
     let mut paren = false;
@@ -54,7 +54,7 @@ pub fn clean(line: &str) -> String {
     out
 }
 
-/// Zeile (ohne Kommentare) in Wörter zerlegen
+/// Split a line (without comments) into words
 pub fn words(line: &str) -> Result<Vec<Word>, u8> {
     let b = line.as_bytes();
     let mut i = 0;
@@ -94,7 +94,7 @@ pub enum Motion {
     Linear,
     ArcCw,
     ArcCcw,
-    /// G80: keine Bewegung
+    /// G80: no motion
     None,
 }
 
@@ -116,9 +116,9 @@ pub enum NonModal {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spindle {
     Off,
-    /// M3: konstante Leistung
+    /// M3: constant power
     Cw,
-    /// M4: im Laser-Modus Leistung passend zur Geschwindigkeit
+    /// M4: in laser mode, power follows the speed
     Ccw,
 }
 
@@ -128,15 +128,15 @@ pub enum ProgramFlow {
     End,
 }
 
-/// Eine geprüfte Zeile
+/// A checked line
 #[derive(Clone, Debug, Default)]
 pub struct Block {
     pub motion: Option<Motion>,
     pub non_modal: Option<NonModal>,
     pub g53: bool,
-    /// Some(true) = G90 absolut, Some(false) = G91 relativ
+    /// Some(true) = G90 absolute, Some(false) = G91 relative
     pub absolute: Option<bool>,
-    /// Some(true) = G20 Zoll
+    /// Some(true) = G20 inches
     pub inches: Option<bool>,
     /// G54 … G59 → 0 … 5
     pub wcs: Option<usize>,
@@ -146,7 +146,7 @@ pub struct Block {
     pub flood: Option<bool>,
     pub coolant_off: bool,
     pub flow: Option<ProgramFlow>,
-    /// M62–M65: (Nummer, an, synchron)
+    /// M62–M65: (number, on, synchronized)
     pub output: Option<(u32, bool, bool)>,
     pub axes: [Option<f64>; 3],
     pub ijk: [Option<f64>; 3],
@@ -159,7 +159,7 @@ pub struct Block {
 }
 
 fn int_code(v: f64) -> Result<(u32, u32), u8> {
-    // Ganzzahl und eine Nachkommastelle (G28.1, G92.1, G38.2)
+    // integer and one decimal (G28.1, G92.1, G38.2)
     let x = (v * 10.0).round();
     if (v * 10.0 - x).abs() > 1e-6 {
         return Err(err::COMMAND_VALUE_NOT_INTEGER);
@@ -177,8 +177,8 @@ impl Block {
     }
 }
 
-/// Wörter einer Zeile nach den modalen Gruppen ordnen und prüfen. A/B/C (Drehachse) gelten als nicht
-/// unterstützt wie bei einer Maschine mit drei Achsen.
+/// Sort a line's words into modal groups and check them. A/B/C (rotary) count as
+/// unsupported, as on a three-axis machine.
 pub fn parse_block(words: &[Word]) -> Result<Block, u8> {
     let mut b = Block::default();
     let mut groups: u32 = 0;
@@ -277,7 +277,7 @@ pub fn parse_block(words: &[Word]) -> Result<Block, u8> {
                             _ => Spindle::Off,
                         });
                     }
-                    // M7 und M8 dürfen zusammen stehen
+                    // M7 and M8 may appear together
                     7 => b.mist = Some(true),
                     8 => b.flood = Some(true),
                     9 => {
@@ -341,7 +341,7 @@ pub fn parse_block(words: &[Word]) -> Result<Block, u8> {
             }
         }
     }
-    // M62–M65 brauchen P (Nummer des Ausgangs)
+    // M62–M65 need P (output number)
     if let Some((_, on, sync)) = b.output {
         let p = b.p.ok_or(err::VALUE_WORD_MISSING)?;
         if p < 0.0 || p.fract() != 0.0 {
@@ -352,7 +352,7 @@ pub fn parse_block(words: &[Word]) -> Result<Block, u8> {
     if b.inverse_time {
         return Err(err::UNSUPPORTED_COMMAND);
     }
-    // Achsen bei G10/G28/G30/G92 gehören dem nicht-modalen Befehl; zugleich G0–G3 → Konflikt
+    // axes with G10/G28/G30/G92 belong to the non-modal command; together with G0–G3 → conflict
     if matches!(
         b.non_modal,
         Some(NonModal::SetOffset | NonModal::GoPredef(_) | NonModal::SetG92)
@@ -366,8 +366,8 @@ pub fn parse_block(words: &[Word]) -> Result<Block, u8> {
     Ok(b)
 }
 
-/// Bogen in kurze Geraden zerlegen wie GRBL (mc_arc): Sehnenfehler höchstens `tol`.
-/// Gibt die Zwischenpunkte und den Endpunkt in der XY-Ebene zurück (Z linear mitgeführt).
+/// Split an arc into short lines like GRBL (mc_arc): chord error at most `tol`.
+/// Returns the intermediate points and the end point in the XY plane (Z interpolated linearly).
 pub fn arc_points(
     start: [f64; 3],
     end: [f64; 3],
@@ -410,7 +410,7 @@ pub fn arc_points(
     out
 }
 
-/// Mittelpunkt aus R-Form (GRBL: negatives R = großer Bogen)
+/// Center from the R form (GRBL: negative R = large arc)
 pub fn center_from_radius(
     start: [f64; 3],
     end: [f64; 3],
@@ -425,7 +425,7 @@ pub fn center_from_radius(
     }
     let mut h = 4.0 * r * r - d2;
     if h < 0.0 {
-        // GRBL lässt kleine Rundungsfehler zu
+        // GRBL tolerates small rounding errors
         if h < -0.5e-3 * 4.0 * r * r {
             return Err(err::ARC_RADIUS_ERROR);
         }
@@ -506,9 +506,9 @@ mod tests {
         for p in &pts {
             assert!((p[0].hypot(p[1]) - 10.0).abs() < 1e-9);
         }
-        // Viertelkreis r=10: Länge 15,7 mm, Sehnen ≈ 0,4 mm
+        // quarter circle r=10: length 15.7 mm, chords ≈ 0.4 mm
         assert!(pts.len() > 30 && pts.len() < 50, "{}", pts.len());
-        // Vollkreis, wenn Start = Ende
+        // full circle when start = end
         let full = arc_points([10.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 0.0], true, 0.002);
         assert!(full.len() > 120);
     }

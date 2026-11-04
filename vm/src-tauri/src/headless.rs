@@ -1,5 +1,5 @@
-//! Ohne Fenster: `kizamubeam-vm --headless [Optionen]` startet nur die Server und schreibt den Verkehr
-//! auf die Standardausgabe. Für automatische Tests (CI) und Rechner ohne Bildschirm.
+//! Without a window: `kizamubeam-vm --headless [options]` starts only the servers and prints the traffic
+//! to standard output. For automated tests (CI) and computers without a screen.
 
 use kizamubeam_vm_core::{Config, Event, Flavor, Runner};
 use std::time::Duration;

@@ -1,6 +1,6 @@
-//! Laufzeit der virtuellen Maschine: ein Takt-Thread lässt die Steuerung in Echtzeit laufen, dazu ein
-//! Telnet-Server (rohes TCP wie FluidNC Port 23) und ein WebSocket-Server (wie FluidNC Port 81). Jede
-//! Verbindung bekommt eine eigene Nummer; Antworten gehen an den Absender, Alarme und Begrüßung an alle.
+//! Runtime of the virtual machine: a tick thread runs the controller in real time, plus a
+//! Telnet server (raw TCP like FluidNC port 23) and a WebSocket server (like FluidNC port 81). Each
+//! connection gets its own number; replies go to the sender, alarms and the welcome to everyone.
 
 use crate::config::Config;
 use crate::machine::{ClientId, Event, Machine, Segment, Snapshot, LOCAL};
@@ -16,14 +16,14 @@ use std::time::{Duration, Instant};
 use tungstenite::handshake::server::{Request, Response};
 use tungstenite::{Message, WebSocket};
 
-/// Takt der Simulation
+/// Simulation tick
 const TICK: Duration = Duration::from_millis(2);
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientInfo {
     pub id: ClientId,
-    /// "telnet" oder "ws"
+    /// "telnet" or "ws"
     pub kind: &'static str,
     pub addr: String,
 }
@@ -31,7 +31,7 @@ pub struct ClientInfo {
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerInfo {
-    /// Adresse oder Fehlermeldung (z. B. Port belegt); None = ausgeschaltet
+    /// address or error message (e.g. port in use); None = off
     pub telnet: Option<Result<String, String>>,
     pub ws: Option<Result<String, String>>,
 }
@@ -50,7 +50,7 @@ impl Drop for Listener {
     }
 }
 
-/// Verbindung: Angaben, Ausgang für Antworten, Merker zum Trennen
+/// Connection: info, channel for replies, flag to disconnect
 type ClientSlot = (ClientInfo, Sender<String>, Arc<AtomicBool>);
 
 struct Shared {
@@ -58,7 +58,7 @@ struct Shared {
     clients: Mutex<HashMap<ClientId, ClientSlot>>,
     next_id: AtomicU32,
     stop: AtomicBool,
-    /// Ereignisse und Strecken für die Oberfläche (oder die Ausgabe ohne Oberfläche)
+    /// events and segments for the UI (or the headless output)
     events: Mutex<Vec<Event>>,
     segments: Mutex<Vec<Segment>>,
 }
@@ -92,7 +92,7 @@ impl Runner {
         r
     }
 
-    /// Server mit den aktuellen Ports (neu) starten; bestehende Verbindungen werden getrennt
+    /// (Re)start the servers on the current ports; existing connections are closed
     pub fn restart_servers(&mut self) {
         self.listeners.clear();
         for (_, _, closed) in self.shared.clients.lock().unwrap().values() {
@@ -142,7 +142,7 @@ impl Runner {
         self.shared.machine.lock().unwrap().cfg.clone()
     }
 
-    /// Neue Einstellungen; bei geänderten Ports werden die Server neu gestartet
+    /// New settings; changed ports restart the servers
     pub fn set_config(&mut self, cfg: Config) {
         let old = self.config();
         self.shared.machine.lock().unwrap().set_config(cfg);
@@ -189,7 +189,7 @@ impl Runner {
         std::mem::take(&mut *self.shared.segments.lock().unwrap())
     }
 
-    /// Zeile aus der eigenen Konsole
+    /// Line from the own console
     pub fn send_local(&self, bytes: &[u8]) {
         self.shared.machine.lock().unwrap().input(LOCAL, bytes);
         flush(&self.shared);
@@ -215,7 +215,7 @@ impl Drop for Runner {
     }
 }
 
-/// Ausgaben der Steuerung an die Verbindungen verteilen, Ereignisse sammeln
+/// Distribute controller output to the connections, collect events
 fn flush(s: &Shared) {
     let (out, events, segs) = {
         let mut m = s.machine.lock().unwrap();
@@ -252,7 +252,7 @@ fn tick_loop(s: Arc<Shared>) {
     while !s.stop.load(Ordering::SeqCst) {
         thread::sleep(TICK);
         let now = Instant::now();
-        // nach einem Hänger (Rechner im Ruhezustand) nicht minutenlang aufholen
+        // after a stall (computer asleep) do not catch up for minutes
         let dt = now.duration_since(last).as_secs_f64().min(0.1);
         last = now;
         s.machine.lock().unwrap().tick(dt);
@@ -310,7 +310,7 @@ fn unregister(s: &Shared, id: ClientId) {
     s.machine.lock().unwrap().disconnect(id);
 }
 
-/// Telnet-Steuerzeichen (IAC …) entfernen, die manche Programme beim Verbinden schicken
+/// Remove Telnet control sequences (IAC …) some programs send when connecting
 fn strip_telnet(buf: &[u8], state: &mut u8) -> Vec<u8> {
     let mut out = Vec::with_capacity(buf.len());
     for &b in buf {
@@ -362,7 +362,7 @@ fn serve_telnet(mut stream: TcpStream, addr: SocketAddr, s: Arc<Shared>, stop: A
 fn serve_ws(stream: TcpStream, addr: SocketAddr, s: Arc<Shared>, stop: Arc<AtomicBool>) {
     let _ = stream.set_nodelay(true);
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
-    // Die Weboberfläche von FluidNC und KizamuBeam melden sich mit dem Unterprotokoll „arduino“
+    // FluidNC's web UI and KizamuBeam announce the subprotocol "arduino"
     let cb = |req: &Request, mut resp: Response| {
         if let Some(p) = req.headers().get("Sec-WebSocket-Protocol") {
             if p.to_str()
@@ -405,7 +405,7 @@ fn serve_ws(stream: TcpStream, addr: SocketAddr, s: Arc<Shared>, stop: Arc<Atomi
         }
         let mut sent = false;
         while let Ok(line) = rx.try_recv() {
-            // Ausgabe der Steuerung schickt FluidNC als Binärnachricht
+            // FluidNC sends controller output as binary messages
             if ws
                 .write(Message::binary(format!("{line}\r\n").into_bytes()))
                 .is_err()

@@ -1,5 +1,5 @@
-// Fenster der KizamuBeam Virtual Machine: Bett mit Spuren, Zustand, Verbindungen, Hinweise und Konsole.
-// Die Daten holt das Fenster etwa 30-mal je Sekunde von der Steuerung (api.poll).
+// Window of the KizamuBeam Virtual Machine: bed with traces, state, connections, notices and console.
+// The window fetches data from the controller about 30 times per second (api.poll).
 
 import './style.css';
 import { api, hasNative, type ClientInfo, type Config, type ServerInfo, type Snapshot, type VmEvent } from './api';
@@ -46,7 +46,7 @@ async function start() {
   let cfg = await api.config();
   let info = await api.serverInfo();
 
-  // ---------- Kopfleiste ----------
+  // ---------- header ----------
   const badge = h('span', { class: 'badge' }, '…');
   const chips = h('div', { class: 'chips' });
   const header = h('header', { class: 'top' },
@@ -59,7 +59,7 @@ async function start() {
     h('button', { class: 'btn', title: t('Maschine aus- und wieder einschalten: Der Kopf bleibt stehen, die Position beginnt dort bei 0'), onclick: () => api.powerCycle() }, t('Aus/Ein')),
     h('button', { class: 'btn primary', onclick: () => openSettings() }, t('Einstellungen')));
 
-  // ---------- Bett ----------
+  // ---------- bed ----------
   const stage = h('section', { class: 'stage' });
   const rapidBox = h('input', { type: 'checkbox', checked: true, onchange: () => ((view.showRapids = rapidBox.checked), view.invalidate()) });
   const overlay = h('div', { class: 'overlay' },
@@ -69,7 +69,7 @@ async function start() {
   const view = new BedView(stage);
   view.setBed(cfg.bedW, cfg.bedH);
 
-  // ---------- Seitenleiste ----------
+  // ---------- sidebar ----------
   const status = h('dl', { class: 'status' });
   const clientsBox = h('div', { class: 'clients' });
   const hint = h('p', { class: 'hint' }, t('Aus KizamuBeam: Laser → Geräte → Neues Gerät → Vorlage „KizamuBeam Virtual Machine“. Andere Programme: als GRBL- bzw. FluidNC-Gerät über das Netzwerk (Telnet) mit dieser Adresse.'));
@@ -108,7 +108,7 @@ async function start() {
 
   app.append(header, h('main', { class: 'main' }, stage, side));
 
-  // ---------- Anzeige ----------
+  // ---------- rendering ----------
   const renderChips = () => {
     chips.replaceChildren();
     const chip = (label: string, r: ServerInfo['telnet'], prefix = '') => {
@@ -187,7 +187,7 @@ async function start() {
     }
   };
 
-  // ---------- Abfrage ----------
+  // ---------- polling ----------
   let busy = false;
   let lastPoll = 0;
   const frame = async (ts: number) => {
@@ -214,7 +214,7 @@ async function start() {
   };
   requestAnimationFrame(frame);
 
-  // ---------- Einstellungen ----------
+  // ---------- settings ----------
   async function openSettings() {
     const c: Config = { ...cfg };
     const lan = await api.lanAddresses().catch(() => [] as string[]);

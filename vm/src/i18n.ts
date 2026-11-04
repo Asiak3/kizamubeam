@@ -1,5 +1,5 @@
-// Übersetzungen der Virtual Machine: Schlüssel sind die deutschen Texte, Englisch steht hier.
-// Sprache nach dem System; Platzhalter {name} werden ersetzt.
+// Translations of the Virtual Machine: keys are the German texts, English is listed here.
+// Language follows the system; placeholders {name} are replaced.
 
 const EN: Record<string, string> = {
   'Nur in der Desktop-App': 'Desktop app only',

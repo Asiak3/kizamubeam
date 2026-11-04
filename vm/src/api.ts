@@ -1,5 +1,5 @@
-// Verbindung zur Steuerung in Rust (src-tauri/src/lib.rs). Außerhalb der Desktop-App gibt es keine
-// Maschine; dann zeigt das Fenster nur einen Hinweis.
+// Bridge to the controller in Rust (src-tauri/src/lib.rs). Outside the desktop app there is no
+// machine; the window then only shows a notice.
 
 export type Flavor = 'grbl' | 'fluidnc';
 
@@ -66,7 +66,7 @@ export interface ClientInfo {
 export interface Poll {
   snapshot: Snapshot;
   events: VmEvent[];
-  /** je Strecke 7 Zahlen: x0, y0, x1, y1, Leistung, Dauer, Eilgang */
+  /** 7 numbers per segment: x0, y0, x1, y1, power, duration, rapid */
   segments: number[];
   clients: ClientInfo[];
 }

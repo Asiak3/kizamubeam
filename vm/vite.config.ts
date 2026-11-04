@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 
-// Fenster der KizamuBeam Virtual Machine; eigener Port neben KizamuBeam (1420), siehe src-tauri/tauri.conf.json
+// Window of the KizamuBeam Virtual Machine; own port next to KizamuBeam (1420), see src-tauri/tauri.conf.json
 export default defineConfig({
   clearScreen: false,
   server: { port: 1421, strictPort: true },

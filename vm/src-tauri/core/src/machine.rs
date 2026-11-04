@@ -1,11 +1,11 @@
-//! Die Steuerung der virtuellen Maschine: Zeilen- und Zeichenpuffer je Verbindung, Echtzeitbefehle,
-//! G-Code- und $-Befehle wie GRBL 1.1 bzw. FluidNC, ein Bewegungsplaner mit Beschleunigung und
-//! Junction Deviation und die Ausführung in Echtzeit. `tick(dt)` lässt die Zeit laufen; was die Maschine
-//! dabei sendet, holt man mit `take_out`, die gefahrenen Strecken mit `take_segments`.
+//! The controller of the virtual machine: line and character buffers per connection, real-time commands,
+//! G-code and $ commands like GRBL 1.1 or FluidNC, a motion planner with acceleration and
+//! junction deviation, and execution in real time. `tick(dt)` advances time; what the machine
+//! sends is fetched with `take_out`, the travelled segments with `take_segments`.
 //!
-//! Koordinaten: Maschinenkoordinaten 0 … Fahrweg, Ursprung an der Referenzposition (vorne links), Y nach
-//! hinten. Daneben gibt es die physische Kopfposition: Sie weicht ab, solange nicht referenziert wurde
-//! (MPos 0 liegt dann dort, wo der Kopf beim Einschalten stand) oder wenn der Kopf gegen den Rahmen fuhr.
+//! Coordinates: machine coordinates 0 … travel, origin at the homing position (front left), Y towards
+//! the back. Separately there is the physical head position: it differs until the machine is homed
+//! (MPos 0 is then where the head stood at power-on) or after the head ran into the frame.
 
 use crate::config::{Config, Flavor};
 use crate::gcode::{self, err, Block, Motion, NonModal, ProgramFlow, Spindle};
@@ -13,27 +13,27 @@ use serde::Serialize;
 use std::collections::{BTreeMap, VecDeque};
 
 pub type ClientId = u32;
-/// Konsole im Fenster der virtuellen Maschine selbst
+/// Console in the virtual machine's own window
 pub const LOCAL: ClientId = 0;
 
 pub const FLUIDNC_VERSION: &str = "3.7.12";
 const GRBL_LINE_MAX: usize = 80;
 const FLUID_LINE_MAX: usize = 255;
-/// Wie viele Strecken/Ereignisse höchstens auf Abholung warten
+/// How many segments/events may wait to be fetched
 const SEGMENT_CAP: usize = 400_000;
 const EVENT_CAP: usize = 20_000;
-/// Sonderwert: Ziel außerhalb des Fahrwegs bei weichen Grenzen → ALARM:2
+/// Special value: target outside the travel with soft limits → ALARM:2
 const SOFT_LIMIT_ALARM: u8 = 255;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Out {
-    /// None = an alle Verbindungen
+    /// None = to all connections
     pub to: Option<ClientId>,
     pub text: String,
 }
 
-/// Eine gefahrene Strecke der physischen Kopfposition (mm), mit Laserleistung 0 … 1 und Dauer in s.
-/// Länge 0 = der Laser stand still (z. B. G4 mit eingeschaltetem Laser ohne Laser-Modus).
+/// A segment travelled by the physical head (mm), with laser power 0 … 1 and duration in s.
+/// Length 0 = the laser stood still (e.g. G4 with the laser on outside laser mode).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
 pub struct Segment {
     pub x0: f32,
@@ -48,7 +48,7 @@ pub struct Segment {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Event {
-    /// Verkehr für die Konsole: dir = "in" (empfangen), "out" (gesendet), "rt" (Echtzeitbefehl)
+    /// Console traffic: dir = "in" (received), "out" (sent), "rt" (real-time command)
     #[serde(rename_all = "camelCase")]
     Console {
         client: ClientId,
@@ -56,7 +56,7 @@ pub enum Event {
         text: String,
         status: bool,
     },
-    /// Auffälligkeiten, die eine echte Maschine nicht meldet, die man beim Testen aber wissen will
+    /// Anomalies a real machine does not report but a tester wants to know about
     #[serde(rename_all = "camelCase")]
     Warning {
         code: &'static str,
@@ -67,7 +67,7 @@ pub enum Event {
     Alarm {
         code: u8,
     },
-    /// Einstellungen wurden über die Steuerung geändert ($130=…), bitte speichern
+    /// Settings were changed through the controller ($130=…), please save
     ConfigChanged,
 }
 
@@ -78,13 +78,13 @@ pub struct Snapshot {
     pub mpos: [f64; 3],
     pub wpos: [f64; 3],
     pub wco: [f64; 3],
-    /// Physische Kopfposition
+    /// Physical head position
     pub head: [f64; 2],
-    /// Momentane Geschwindigkeit in mm/min
+    /// Current speed in mm/min
     pub feed: f64,
-    /// Aktiver S-Wert
+    /// Active S value
     pub s: f64,
-    /// M3, M4 oder M5
+    /// M3, M4 or M5
     pub spindle: String,
     pub laser_on: bool,
     pub power: f64,
@@ -96,7 +96,7 @@ pub struct Snapshot {
     pub planner_size: usize,
     pub homed: bool,
     pub alarm: Option<u8>,
-    /// Laufzeit des aktuellen bzw. letzten Auftrags in s
+    /// Run time of the current or last job in s
     pub job_time: f64,
     pub running: bool,
 }
@@ -139,12 +139,12 @@ struct Move {
     unit: [f64; 3],
     len: f64,
     done: f64,
-    /// programmierter Vorschub in mm/s (Eilgang: 0)
+    /// programmed feed in mm/s (rapid: 0)
     feed: f64,
     rapid: bool,
     jog: bool,
     homing: bool,
-    /// größte Eintrittsgeschwindigkeit aus der Geometrie (Junction Deviation), mm/s
+    /// max. entry speed from the geometry (junction deviation), mm/s
     junction: f64,
 }
 
@@ -152,11 +152,11 @@ struct Move {
 enum Item {
     Move(Move),
     Dwell(f64),
-    /// Zustand von Laser, Kühlmittel und Ausgängen umschalten; stop = Bewegung hält dafür an
+    /// switch laser, coolant and output state; stop = motion stops for it
     Apply(Applied, bool),
-    /// M0/M1: anhalten wie Feed-Hold
+    /// M0/M1: stop like a feed hold
     Pause,
-    /// Ende der Referenzfahrt
+    /// end of homing
     Homed,
 }
 
@@ -196,12 +196,12 @@ impl Default for Modal {
 struct Client {
     lines: VecDeque<String>,
     partial: Vec<u8>,
-    /// Bytes im Empfangspuffer (empfangen, noch nicht verarbeitet)
+    /// bytes in the receive buffer (received, not processed yet)
     rx_used: usize,
     overflow_warned: bool,
-    /// ok erst senden, wenn die Maschine stillsteht (Referenzfahrt)
+    /// send ok only once the machine stands still (homing)
     wait_idle: bool,
-    /// Zähler für WCO/Ov im Statusbericht
+    /// counters for WCO/Ov in the status report
     wco_count: u32,
     ov_count: u32,
     last_wco: [f64; 3],
@@ -210,7 +210,7 @@ struct Client {
 
 enum Reply {
     Ok(Vec<String>),
-    /// ok erst nach dem Stillstand
+    /// ok only after standstill
     Deferred,
     Err(u8),
 }
@@ -224,14 +224,14 @@ pub struct Machine {
     g5x: [[f64; 3]; 6],
     g92: [f64; 3],
     predef: [[f64; 3]; 2],
-    /// Ausgeführte Position (Maschinenkoordinaten)
+    /// executed position (machine coordinates)
     pos: [f64; 3],
-    /// Position am Ende des Geplanten
+    /// position at the end of what is planned
     plan_pos: [f64; 3],
-    /// physisch = pos + off
+    /// physical = pos + off
     off: [f64; 3],
     queue: VecDeque<Item>,
-    /// Ergebnis einer Zeile, das noch nicht in den Planer passte (Bögen)
+    /// result of a line that did not fit into the planner yet (arcs)
     pending: VecDeque<Item>,
     pending_client: Option<ClientId>,
     /// mm/s
@@ -270,7 +270,7 @@ fn vec3(v: [f64; 3]) -> String {
     format!("{},{},{}", f3(v[0]), f3(v[1]), f3(v[2]))
 }
 
-/// Echtzeitbefehle (werden sofort ausgewertet, auch mitten in einer Zeile)
+/// Real-time commands (handled at once, even in the middle of a line)
 pub fn is_realtime(b: u8) -> bool {
     matches!(
         b,
@@ -323,7 +323,7 @@ impl Machine {
         self.cfg.homing && self.cfg.must_home && !self.homed
     }
 
-    // ---------- Verbindungen ----------
+    // ---------- connections ----------
 
     pub fn connect(&mut self, id: ClientId) {
         self.clients.insert(id, Client::default());
@@ -366,7 +366,7 @@ impl Machine {
         });
     }
 
-    /// Empfangene Bytes einer Verbindung: Echtzeitbefehle sofort, der Rest in den Zeilenpuffer
+    /// Bytes received on a connection: real-time commands at once, the rest into the line buffer
     pub fn input(&mut self, id: ClientId, bytes: &[u8]) {
         if !self.clients.contains_key(&id) {
             self.connect(id);
@@ -381,7 +381,7 @@ impl Machine {
             match b {
                 b'\n' => {
                     let raw = std::mem::take(&mut c.partial);
-                    // Nicht-ASCII (Umlaute in Kommentaren) verwirft GRBL; hier ebenso
+                    // GRBL drops non-ASCII (umlauts in comments); so do we
                     let line: String = raw
                         .iter()
                         .filter(|b| b.is_ascii())
@@ -487,7 +487,7 @@ impl Machine {
         });
     }
 
-    // ---------- Zustand ----------
+    // ---------- state ----------
 
     fn wco(&self) -> [f64; 3] {
         add(self.g5x[self.modal.wcs], self.g92)
@@ -634,7 +634,7 @@ impl Machine {
         self.time
     }
 
-    /// Einstellungen von außen ändern (Fenster); Fahrweg und Grenzen gelten sofort
+    /// Change settings from outside (window); travel and limits apply at once
     pub fn set_config(&mut self, mut cfg: Config) {
         cfg.sanitize();
         self.cfg = cfg;
@@ -646,7 +646,7 @@ impl Machine {
         }
     }
 
-    /// Strg-X: anhalten, Puffer leeren, Grundzustand. Während einer Bewegung: ALARM:3.
+    /// Ctrl-X: stop, clear buffers, default state. During motion: ALARM:3.
     pub fn soft_reset(&mut self) {
         let moving = self.speed > 0.0
             || matches!(
@@ -701,7 +701,7 @@ impl Machine {
         }
     }
 
-    /// Aus- und wieder einschalten: Der Kopf bleibt stehen, wo er ist; MPos beginnt dort bei 0.
+    /// Power cycle: the head stays where it is; MPos starts at 0 there.
     pub fn power_cycle(&mut self) {
         let head = self.head();
         self.state = State::Idle;
@@ -748,10 +748,10 @@ impl Machine {
         }
     }
 
-    // ---------- Zeilen verarbeiten ----------
+    // ---------- processing lines ----------
 
     fn process_lines(&mut self) {
-        // Reihum je Verbindung eine Zeile, solange der Planer Platz hat
+        // one line per connection in turn, while the planner has room
         loop {
             if !self.pending.is_empty() {
                 return;
@@ -899,7 +899,7 @@ impl Machine {
         }))
     }
 
-    /// Eine geprüfte Zeile in Planer-Einträge umsetzen. Ändert den modalen Zustand nur bei Erfolg.
+    /// Turn a checked line into planner entries. Changes the modal state only on success.
     fn plan_block(&mut self, b: &Block) -> Result<Vec<Item>, u8> {
         let mut m = self.modal.clone();
         let mut g5x = self.g5x;
@@ -956,7 +956,7 @@ impl Machine {
         let coolant_changed = old.flood != m.flood || old.mist != m.mist;
         let outputs_changed = old.outputs != m.outputs && immediate_outputs.is_none();
         if spindle_changed || coolant_changed || outputs_changed {
-            // Im Laser-Modus fährt die Maschine bei neuen S-Werten durch, sonst hält sie an
+            // in laser mode the machine keeps moving on new S values, otherwise it stops
             let stop = coolant_changed || outputs_changed || !self.cfg.laser_mode;
             items.push(Item::Apply(new_state, stop));
         }
@@ -974,7 +974,7 @@ impl Machine {
             m.absolute = a;
         }
         let wco = add(g5x[m.wcs], g92);
-        // Zielpunkt einer Bewegung aus den Achswörtern
+        // target of a move from the axis words
         let target = |base: [f64; 3], wco: [f64; 3], absolute: bool| -> [f64; 3] {
             let mut t = base;
             for i in 0..3 {
@@ -1138,7 +1138,7 @@ impl Machine {
             }
             None => {}
         }
-        // Übernehmen
+        // commit
         self.modal = m;
         self.g5x = g5x;
         self.g92 = g92;
@@ -1181,7 +1181,7 @@ impl Machine {
         }
     }
 
-    /// Größte Geschwindigkeit, mit der eine neue Bewegung an die letzte im Planer anschließen kann
+    /// Max. speed at which a new move can follow the last one in the planner
     fn junction_with_tail(&self, mv: &Move) -> f64 {
         let mut prev = None;
         for it in self.queue.iter().rev() {
@@ -1219,8 +1219,8 @@ impl Machine {
         }
     }
 
-    /// Höchste Geschwindigkeit an der aktuellen Stelle, um an allen folgenden Übergängen rechtzeitig
-    /// langsam genug zu sein (am Ende des Planers: Stillstand)
+    /// Max. speed at the current point that still allows slowing down in time for all following
+    /// junctions (at the end of the planner: standstill)
     fn brake_limit(&self) -> f64 {
         let a = self.cfg.accel;
         let Some(Item::Move(first)) = self.queue.front() else {
@@ -1232,7 +1232,7 @@ impl Machine {
         let top = self.cfg.max_rate / 60.0 * 2.0;
         let mut i = 1;
         loop {
-            // nächsten Eintrag suchen, durchlässige Umschaltungen überspringen
+            // find the next entry, skipping pass-through state changes
             let mut next = None;
             while let Some(it) = self.queue.get(i) {
                 i += 1;
@@ -1282,7 +1282,7 @@ impl Machine {
         base
     }
 
-    /// Laserleistung im Stillstand (nur ohne Laser-Modus brennt der Laser auch ohne Bewegung)
+    /// Laser power at standstill (only outside laser mode does the laser burn without motion)
     fn idle_power(&self) -> f64 {
         if self.cfg.laser_mode || self.active.spindle == Spindle::Off || self.active.s <= 0.0 {
             0.0
@@ -1302,7 +1302,7 @@ impl Machine {
             dur: dur as f32,
             rapid,
         };
-        // gerade weiterlaufende Strecke mit gleicher Leistung zusammenfassen
+        // merge a straight continuation with the same power
         if let Some(l) = self.segments.last_mut() {
             if l.rapid == rapid && (l.power - s.power).abs() < 1e-4 && l.x1 == s.x0 && l.y1 == s.y0
             {
@@ -1330,7 +1330,7 @@ impl Machine {
         self.segments.push(s);
     }
 
-    /// Neue Position ausführen: physische Lage mitführen, Rahmen und Endschalter prüfen
+    /// Execute a new position: track the physical head, check frame and limit switches
     fn set_pos(&mut self, p: [f64; 3]) -> bool {
         self.pos = p;
         let raw = add(p, self.off);
@@ -1343,7 +1343,7 @@ impl Machine {
                 self.alarm(1);
                 return false;
             }
-            // Ohne Endschalter fährt der Kopf gegen den Rahmen, die Motoren verlieren Schritte
+            // without limit switches the head runs into the frame and the motors lose steps
             self.off = sub(h, p);
             if !self.crashed {
                 self.crashed = true;
@@ -1355,9 +1355,9 @@ impl Machine {
         true
     }
 
-    // ---------- Zeit ----------
+    // ---------- time ----------
 
-    /// Zeit um `dt` Sekunden weiterlaufen lassen
+    /// Advance time by `dt` seconds
     pub fn tick(&mut self, dt: f64) {
         let mut left = dt.max(0.0);
         self.process_lines();
@@ -1528,7 +1528,7 @@ impl Machine {
         }
     }
 
-    // ---------- $-Befehle ----------
+    // ---------- $ commands ----------
 
     fn system(&mut self, id: ClientId, line: &str) -> Reply {
         let fluid = self.cfg.flavor == Flavor::Fluidnc;
@@ -1689,7 +1689,7 @@ impl Machine {
                 return self.fluid_setting(path);
             }
         }
-        // $n=Wert
+        // $n=value
         if let Some((k, v)) = line[1..].split_once('=') {
             if let Ok(n) = k.parse::<u32>() {
                 if busy {
@@ -1730,7 +1730,7 @@ impl Machine {
         if !matches!(self.state, State::Idle | State::Alarm(_)) || !self.queue.is_empty() {
             return Reply::Err(err::IDLE_ERROR);
         }
-        // Referenzfahrt fährt physisch zum Anschlag; die Position bis dahin zählt nicht
+        // homing physically drives to the stop; the position until then does not count
         let head = self.head();
         self.pos = head;
         self.off = [0.0, 0.0, 0.0];
@@ -1880,7 +1880,7 @@ impl Machine {
         Ok(())
     }
 
-    /// FluidNC: $/Pfad lesen bzw. $/Pfad=Wert setzen
+    /// FluidNC: read $/path or set $/path=value
     fn fluid_setting(&mut self, path: &str) -> Reply {
         let (key, val) = match path.split_once('=') {
             Some((k, v)) => (k.trim().to_ascii_lowercase(), Some(v.trim().to_string())),
@@ -1951,7 +1951,7 @@ impl Machine {
         Reply::Ok(vec![])
     }
 
-    /// FluidNC $CD: Konfiguration als YAML (so, wie KizamuBeam sie auswertet)
+    /// FluidNC $CD: configuration as YAML (as KizamuBeam parses it)
     fn config_yaml(&self) -> Vec<String> {
         let c = &self.cfg;
         let b = |v: bool| if v { "true" } else { "false" };
@@ -2060,7 +2060,7 @@ mod tests {
     #[test]
     fn line_takes_realistic_time() {
         let mut m = machine();
-        // 100 mm bei 3000 mm/min = 2 s, dazu Beschleunigen und Bremsen (1500 mm/s²): +0,033 s
+        // 100 mm at 3000 mm/min = 2 s, plus accelerating and braking (1500 mm/s²): +0.033 s
         send(&mut m, "G1 X100 F3000\n");
         let t = run_until_idle(&mut m, 10.0);
         assert!((t - 2.033).abs() < 0.03, "{t}");
@@ -2096,7 +2096,7 @@ mod tests {
             .filter(|s| s.power > 0.0)
             .map(|s| s.power)
             .fold(1.0, f32::min);
-        assert!(lowest < 0.5, "beim Anfahren weniger Leistung: {lowest}");
+        assert!(lowest < 0.5, "less power while accelerating: {lowest}");
         assert!(segs.iter().any(|s| s.power > 0.99));
     }
 
@@ -2124,7 +2124,7 @@ mod tests {
         send(&mut m, &prog);
         m.tick(0.001);
         let oks = texts(&mut m).iter().filter(|t| *t == "ok").count();
-        assert_eq!(oks, 16, "nur so viele ok wie Plätze im Planer");
+        assert_eq!(oks, 16, "only as many ok as planner slots");
         run_until_idle(&mut m, 60.0);
         assert_eq!(texts(&mut m).iter().filter(|t| *t == "ok").count(), 24);
     }
@@ -2154,7 +2154,7 @@ mod tests {
         send(&mut m, "?");
         assert!(texts(&mut m).last().unwrap().starts_with("<Hold:0"));
         m.tick(0.5);
-        assert_eq!(m.snapshot().mpos[0], x, "steht im Halt");
+        assert_eq!(m.snapshot().mpos[0], x, "stands still in hold");
         send(&mut m, "~");
         run_until_idle(&mut m, 5.0);
         assert!((m.snapshot().mpos[0] - 100.0).abs() < 1e-6);
@@ -2193,12 +2193,12 @@ mod tests {
         run_until_idle(&mut m, 5.0);
         m.power_cycle();
         texts(&mut m);
-        // nach dem Einschalten: MPos 0 dort, wo der Kopf steht
+        // after power-on: MPos 0 where the head stands
         assert_eq!(m.snapshot().mpos, [0.0; 3]);
         assert_eq!(m.snapshot().head, [30.0, 20.0]);
         send(&mut m, "$H\n");
         m.tick(0.1);
-        assert!(texts(&mut m).is_empty(), "ok erst nach der Referenzfahrt");
+        assert!(texts(&mut m).is_empty(), "ok only after homing");
         run_until_idle(&mut m, 10.0);
         assert_eq!(texts(&mut m), vec!["ok"]);
         assert_eq!(m.snapshot().head, [0.0, 0.0]);
@@ -2217,7 +2217,7 @@ mod tests {
                 ..
             }
         )));
-        // die Steuerung glaubt X=10, der Kopf steht aber bei 30
+        // the controller believes X=10, but the head is at 30
         assert!((m.snapshot().head[0] - 30.0).abs() < 1e-6);
     }
 
@@ -2300,7 +2300,7 @@ mod tests {
         m.input(C, &[0x91, 0x91]);
         send(&mut m, "G1 X100 F3000\n");
         let t = run_until_idle(&mut m, 10.0);
-        assert!(t < 1.8, "120 % Vorschub: {t}");
+        assert!(t < 1.8, "120 % feed: {t}");
         send(&mut m, "??");
         let o = texts(&mut m);
         assert!(o.iter().any(|l| l.contains("Ov:120,100,100")), "{o:?}");

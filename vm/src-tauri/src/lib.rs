@@ -1,6 +1,6 @@
-//! KizamuBeam Virtual Machine: Fenster zur virtuellen Lasermaschine. Die Steuerung selbst steckt in
-//! `kizamubeam-vm-core`; hier werden die Einstellungen gespeichert und der Oberfläche Zustand,
-//! Konsole und gefahrene Strecken übergeben.
+//! KizamuBeam Virtual Machine: window for the virtual laser machine. The controller itself lives in
+//! `kizamubeam-vm-core`; this file stores the settings and hands state, console traffic and
+//! travelled segments to the UI.
 
 use kizamubeam_vm_core::{net::ClientInfo, net::ServerInfo, Config, Event, Runner, Snapshot};
 use serde::Serialize;
@@ -10,7 +10,7 @@ use tauri::State;
 
 pub struct Vm(pub Mutex<Runner>);
 
-/// Gespeicherte Einstellungen (eigener Ordner, unabhängig von KizamuBeam)
+/// Saved settings (own folder, independent of KizamuBeam)
 pub fn config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("org.kizamubeam.vm").join("config.json"))
 }
@@ -37,7 +37,7 @@ pub fn save_config(c: &Config) -> Result<(), String> {
 struct Poll {
     snapshot: Snapshot,
     events: Vec<Event>,
-    /// je Strecke 7 Zahlen: x0, y0, x1, y1, Leistung 0…1, Dauer s, Eilgang 0/1
+    /// 7 numbers per segment: x0, y0, x1, y1, power 0…1, duration s, rapid 0/1
     segments: Vec<f32>,
     clients: Vec<ClientInfo>,
 }
@@ -81,7 +81,7 @@ fn vm_restart_servers(vm: State<'_, Vm>) -> ServerInfo {
     r.info()
 }
 
-/// Zeile aus der Konsole des Fensters
+/// Line from the window's console
 #[tauri::command]
 fn vm_send(vm: State<'_, Vm>, line: String) {
     vm.0.lock().unwrap().send_local(format!("{}\n", line.trim_end()).as_bytes());
@@ -99,7 +99,7 @@ fn vm_power_cycle(vm: State<'_, Vm>) {
 
 #[tauri::command]
 fn vm_lan_addresses() -> Vec<String> {
-    // Eigene Adresse im Netz: UDP-Socket „verbinden“ (sendet nichts) und lokale Adresse ablesen
+    // own network address: "connect" a UDP socket (sends nothing) and read its local address
     let mut out = Vec::new();
     if let Ok(s) = std::net::UdpSocket::bind("0.0.0.0:0") {
         if s.connect("192.0.2.1:9").is_ok() {

@@ -1,8 +1,8 @@
-//! Kern der KizamuBeam Virtual Machine: eine virtuelle Lasermaschine, die sich wie eine Steuerung mit
-//! GRBL 1.1 oder FluidNC verhält. Sie nimmt G-Code über Telnet oder WebSocket an, antwortet mit ok/error,
-//! Statusberichten und Alarmen, plant Bewegungen mit Beschleunigung in Echtzeit und meldet, wo der Laser
-//! mit welcher Leistung gefahren ist. Ohne Oberfläche, damit derselbe Kern im Programm, kopflos und in
-//! Tests läuft.
+//! Core of the KizamuBeam Virtual Machine: a virtual laser machine that behaves like a controller running
+//! GRBL 1.1 or FluidNC. It accepts G-code over Telnet or WebSocket, answers with ok/error,
+//! status reports and alarms, plans moves with acceleration in real time and reports where the laser
+//! travelled with which power. Without UI, so the same core runs in the program, headless and in
+//! tests.
 
 pub mod config;
 pub mod gcode;

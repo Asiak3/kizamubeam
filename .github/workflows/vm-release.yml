@@ -1,11 +1,11 @@
-# Baut die KizamuBeam Virtual Machine (Ordner vm/) für macOS, Windows und Linux und hängt die Installer an
-# ihren Release. Die VM hat eigene Tags, die mit „vm-“ beginnen, z. B. vm-v0.1.0; die Version muss zu
-# vm/src-tauri/tauri.conf.json passen. Releases von KizamuBeam selbst (v…) baut release.yml.
+# Builds the KizamuBeam Virtual Machine (folder vm/) for macOS, Windows and Linux and attaches the installers
+# to its release. The VM has its own tags starting with "vm-", e.g. vm-v0.1.0; the version must match
+# vm/src-tauri/tauri.conf.json. Releases of KizamuBeam itself (v…) are built by release.yml.
 #
-# Release anlegen: GitHub → Releases → Draft a new release → Tag vm-v0.1.0 anlegen → Titel z. B.
-# „KizamuBeam Virtual Machine 0.1.0“ → „Set as a pre-release“ anhaken (sonst gilt er auf GitHub als
-# neuester Release) → Publish release. Für einen schon veröffentlichten Release: Actions →
-# Virtual Machine Release → Run workflow mit dem Tag.
+# Creating a release: GitHub → Releases → Draft a new release → create tag vm-v0.1.0 → title e.g.
+# "KizamuBeam Virtual Machine 0.1.0" → tick "Set as a pre-release" (otherwise GitHub treats it as the
+# latest release) → Publish release. For a release that is already published: Actions →
+# Virtual Machine Release → Run workflow with the tag.
 name: Virtual Machine Release
 
 on:
@@ -87,13 +87,13 @@ jobs:
         with:
           workspaces: vm/src-tauri -> target
 
-      # Oberfläche und Tauri-CLI kommen aus den Paketen im Hauptordner
+      # The UI and the Tauri CLI come from the packages in the root folder
       - run: npm ci
 
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS: ohne Apple-Zertifikat ad hoc signieren (wie bei KizamuBeam)
+          # macOS: sign ad hoc without an Apple certificate (as for KizamuBeam)
           APPLE_SIGNING_IDENTITY: '-'
         with:
           projectPath: vm
@@ -102,6 +102,6 @@ jobs:
           releaseName: KizamuBeam Virtual Machine ${{ env.TAG }}
           releaseBody: 'Virtuelle Lasermaschine (GRBL/FluidNC) zum Testen ohne Hardware. Installer für macOS, Windows und Linux stehen unten unter „Assets“.'
           releaseDraft: false
-          # nie als „neuester Release“ führen: die Seite und Download-Links von KizamuBeam zeigen auf dessen Releases
+          # never mark as "latest release": the KizamuBeam website and download links point to its releases
           prerelease: true
           args: ${{ matrix.args }}

@@ -1,5 +1,5 @@
-//! Einstellungen der virtuellen Maschine. Sie werden als JSON gespeichert und lassen sich auch über die
-//! Steuerung ändern ($130=…, $/axes/x/max_travel_mm=…), so wie bei einer echten Maschine.
+//! Settings of the virtual machine. They are stored as JSON and can also be changed through the
+//! controller ($130=…, $/axes/x/max_travel_mm=…), as on a real machine.
 
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 pub enum Flavor {
     /// GRBL 1.1h
     Grbl,
-    /// FluidNC 3.x (GRBL-kompatibel, dazu $/Pfad, $CD, [ESP800])
+    /// FluidNC 3.x (GRBL compatible, plus $/path, $CD, [ESP800])
     Fluidnc,
 }
 
@@ -16,42 +16,42 @@ pub enum Flavor {
 #[serde(rename_all = "camelCase", default)]
 pub struct Config {
     pub flavor: Flavor,
-    /// Fahrweg in mm (GRBL $130/$131, FluidNC axes/x/max_travel_mm)
+    /// Travel in mm (GRBL $130/$131, FluidNC axes/x/max_travel_mm)
     pub bed_w: f64,
     pub bed_h: f64,
-    /// Höchstgeschwindigkeit in mm/min ($110/$111)
+    /// Max. speed in mm/min ($110/$111)
     pub max_rate: f64,
-    /// Beschleunigung in mm/s² ($120/$121)
+    /// Acceleration in mm/s² ($120/$121)
     pub accel: f64,
-    /// Junction Deviation in mm ($11)
+    /// Junction deviation in mm ($11)
     pub junction_dev: f64,
-    /// Toleranz beim Zerlegen von Bögen in mm ($12)
+    /// Tolerance for splitting arcs in mm ($12)
     pub arc_tolerance: f64,
-    /// S-Wert für 100 % ($30)
+    /// S value for 100 % ($30)
     pub s_max: f64,
-    /// Laser-Modus ($32): Laser nur während G1/G2/G3 an, M4 passt die Leistung der Geschwindigkeit an
+    /// Laser mode ($32): laser on only during G1/G2/G3, M4 adapts power to speed
     pub laser_mode: bool,
-    /// Referenzfahrt möglich ($22), also Endschalter vorhanden
+    /// Homing possible ($22), i.e. limit switches present
     pub homing: bool,
-    /// Nach dem Einschalten gesperrt bis zur Referenzfahrt (FluidNC start/must_home)
+    /// Locked after power-on until homed (FluidNC start/must_home)
     pub must_home: bool,
-    /// Geschwindigkeit der Referenzfahrt in mm/min ($25)
+    /// Homing speed in mm/min ($25)
     pub homing_rate: f64,
-    /// Weiche Grenzen ($20): Ziele außerhalb des Fahrwegs lösen ALARM:2 aus (nur mit Referenzfahrt)
+    /// Soft limits ($20): targets outside the travel trigger ALARM:2 (only with homing)
     pub soft_limits: bool,
-    /// Harte Grenzen ($21): Endschalter während der Fahrt lösen ALARM:1 aus
+    /// Hard limits ($21): limit switches during motion trigger ALARM:1
     pub hard_limits: bool,
-    /// Empfangspuffer in Bytes; überschreitet ein Programm ihn, gibt es eine Warnung
+    /// Receive buffer in bytes; a program exceeding it gets a warning
     pub rx_buffer: usize,
-    /// Plätze im Bewegungsplaner
+    /// Slots in the motion planner
     pub planner_blocks: usize,
-    /// $10: Bit 0 = MPos statt WPos, Bit 1 = Pufferstand (Bf)
+    /// $10: bit 0 = MPos instead of WPos, bit 1 = buffer state (Bf)
     pub status_mask: u32,
     pub telnet_enabled: bool,
     pub telnet_port: u16,
     pub ws_enabled: bool,
     pub ws_port: u16,
-    /// Auch von anderen Rechnern im Netz erreichbar (sonst nur 127.0.0.1)
+    /// Reachable from other computers on the network too (otherwise only 127.0.0.1)
     pub lan: bool,
 }
 
@@ -85,7 +85,7 @@ impl Default for Config {
 }
 
 impl Config {
-    /// Werte in sinnvolle Grenzen bringen (aus Datei oder Oberfläche)
+    /// Clamp values to sensible ranges (from file or UI)
     pub fn sanitize(&mut self) {
         let clamp =
             |v: f64, lo: f64, hi: f64, def: f64| if v.is_finite() { v.clamp(lo, hi) } else { def };

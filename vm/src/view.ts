@@ -1,6 +1,6 @@
-// Draufsicht auf das Bett: Brennspuren und Eilgänge werden in Bitmaps in Bett-Auflösung gesammelt
-// (unabhängig davon, wie viele Strecken ein Auftrag hat), darüber Raster, Nullpunkte und der Kopf.
-// Maschinenkoordinaten: Ursprung vorne links, Y nach hinten (auf dem Bildschirm nach oben).
+// Top view of the bed: burn marks and rapids are collected in bitmaps at bed resolution
+// (independent of how many segments a job has), with grid, origins and the head on top.
+// Machine coordinates: origin front left, Y towards the back (up on screen).
 
 import type { Snapshot } from './api';
 import { t } from './i18n';
@@ -12,13 +12,13 @@ export class BedView {
   private ctx: CanvasRenderingContext2D;
   private bedW = 400;
   private bedH = 400;
-  /** Pixel je mm der Spur-Bitmaps */
+  /** pixels per mm of the trace bitmaps */
   private res = 8;
   private burn = document.createElement('canvas');
   private rapid = document.createElement('canvas');
   private bctx!: CanvasRenderingContext2D;
   private rctx!: CanvasRenderingContext2D;
-  /** Ansicht: Bildschirm-Pixel je mm und Verschiebung */
+  /** view: screen pixels per mm and offset */
   private scale = 1;
   private ox = 0;
   private oy = 0;
@@ -26,8 +26,8 @@ export class BedView {
   private snap: Snapshot | null = null;
   showRapids = true;
   private dirty = true;
-  /** Verkleinerte Fassungen der Spur-Bitmaps (je Stufe halbe Größe), damit dünne Linien beim
-   *  Herauszoomen nicht verschwinden; neu gebaut, wenn neue Strecken dazukamen */
+  /** Downscaled copies of the trace bitmaps (half size per level) so thin lines do not
+   *  vanish when zoomed out; rebuilt when new segments arrived */
   private pyramid: { burn: HTMLCanvasElement; rapid: HTMLCanvasElement }[] = [];
   private pyramidAt = 0;
   private pyramidStale = true;
@@ -54,7 +54,7 @@ export class BedView {
     this.fit();
   }
 
-  /** Spuren löschen */
+  /** clear traces */
   resetLayers() {
     this.res = Math.max(1, Math.min(10, MAX_PX / Math.max(this.bedW, this.bedH)));
     for (const c of [this.burn, this.rapid]) {
@@ -70,7 +70,7 @@ export class BedView {
     this.dirty = true;
   }
 
-  /** Bitmaps für die Stufe k (0 = volle Auflösung); Stufen entstehen durch fortgesetztes Halbieren */
+  /** Bitmaps for level k (0 = full resolution); levels are made by repeated halving */
   private level(k: number) {
     if (k <= 0) return { burn: this.burn, rapid: this.rapid };
     const now = performance.now();
@@ -96,14 +96,14 @@ export class BedView {
     return this.pyramid[k - 1];
   }
 
-  /** Neue Strecken (je 7 Zahlen) in die Bitmaps zeichnen */
+  /** Draw new segments (7 numbers each) into the bitmaps */
   addSegments(s: number[]) {
     if (!s.length) return;
     const r = this.res;
     const H = this.bedH;
     const b = this.bctx;
     const q = this.rctx;
-    // Laserfleck etwa 0,15 mm, mindestens 1,5 Pixel, damit Schnittlinien auch verkleinert sichtbar bleiben
+    // laser spot about 0.15 mm, at least 2 px so cut lines stay visible when zoomed out
     b.lineWidth = Math.max(2, 0.15 * r);
     q.lineWidth = 1.5;
     q.strokeStyle = 'rgba(40, 110, 220, 0.35)';
@@ -113,7 +113,7 @@ export class BedView {
       const ax = x0 * r, ay = (H - y0) * r, bx = x1 * r, by = (H - y1) * r;
       if (p > 0) {
         if (x0 === x1 && y0 === y1) {
-          // Stillstand mit Laser: Punkt, umso dunkler, je länger
+          // standing still with the laser on: a dot, darker the longer it lasts
           b.fillStyle = `rgba(45, 25, 10, ${Math.min(1, 0.3 + dur * p * 2)})`;
           b.beginPath();
           b.arc(ax, ay, Math.max(1, 0.2 * r), 0, Math.PI * 2);
@@ -165,7 +165,7 @@ export class BedView {
     this.dirty = true;
   }
 
-  /** mm → Bildschirm */
+  /** mm → screen */
   private sx(x: number) {
     return this.ox + x * this.scale;
   }
@@ -216,10 +216,10 @@ export class BedView {
     g.fillStyle = v('--stage');
     g.fillRect(0, 0, this.canvas.width, this.canvas.height);
     const x0 = this.sx(0), y0 = this.sy(this.bedH), w = this.bedW * this.scale, h = this.bedH * this.scale;
-    // Bett
+    // bed
     g.fillStyle = v('--bed');
     g.fillRect(x0, y0, w, h);
-    // Raster 10 mm, kräftiger alle 50 mm
+    // grid every 10 mm, stronger every 50 mm
     for (const [step, color] of [[10, v('--grid')], [50, v('--grid-major')]] as const) {
       if (step * this.scale < 6) continue;
       g.strokeStyle = color;
@@ -237,7 +237,7 @@ export class BedView {
       }
       g.stroke();
     }
-    // passende Stufe: Bitmap höchstens doppelt so fein wie der Bildschirm
+    // matching level: bitmap at most twice as fine as the screen
     const k = this.scale < this.res ? Math.max(0, Math.floor(Math.log2(this.res / this.scale))) : 0;
     const lv = this.level(k);
     g.imageSmoothingEnabled = this.scale < this.res;
@@ -246,22 +246,22 @@ export class BedView {
     g.strokeStyle = v('--bed-edge');
     g.lineWidth = 1.5 * dpr;
     g.strokeRect(x0, y0, w, h);
-    // Beschriftung
+    // label
     g.fillStyle = v('--muted');
     g.font = `${11 * dpr}px system-ui, sans-serif`;
     g.textBaseline = 'top';
     g.fillText(`${t('Bett')} ${this.bedW} × ${this.bedH} mm`, x0, y0 + h + 6 * dpr);
-    // Maschinen-Nullpunkt
+    // machine origin
     this.cross(this.sx(0), this.sy(0), 9 * dpr, v('--muted'), 1.5 * dpr);
     const s = this.snap;
     if (!s) return;
-    // Werkstück-Nullpunkt, wenn verschoben
+    // work origin, if offset
     if (Math.abs(s.wco[0]) > 1e-6 || Math.abs(s.wco[1]) > 1e-6) {
-      // WCO ist in Maschinenkoordinaten; die Kopfabweichung (physisch − MPos) gilt auch hier
+      // WCO is in machine coordinates; the head deviation (physical − MPos) applies here too
       const dx = s.head[0] - s.mpos[0], dy = s.head[1] - s.mpos[1];
       this.cross(this.sx(s.wco[0] + dx), this.sy(s.wco[1] + dy), 8 * dpr, v('--accent'), 1.5 * dpr);
     }
-    // Kopf
+    // head
     const hx = this.sx(s.head[0]), hy = this.sy(s.head[1]);
     if (s.laserOn) {
       const r = 14 * dpr;

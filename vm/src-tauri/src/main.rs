@@ -1,4 +1,4 @@
-// Unter Windows kein zusätzliches Konsolenfenster
+// No extra console window on Windows
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod headless;
