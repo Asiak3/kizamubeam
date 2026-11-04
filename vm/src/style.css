@@ -19,8 +19,9 @@
   color-scheme: light;
 }
 
+/* dark colours: from the system unless the window is set to light, or chosen directly */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #17191c;
     --panel: #202328;
     --text: #e6e6e6;
@@ -37,6 +38,24 @@
     --hot: #ff6b4a;
     color-scheme: dark;
   }
+}
+
+:root[data-theme='dark'] {
+  --bg: #17191c;
+  --panel: #202328;
+  --text: #e6e6e6;
+  --muted: #9aa0a8;
+  --line: #34383e;
+  --accent: #4c8dff;
+  --stage: #121417;
+  --bed: #e9e2d2;
+  --bed-edge: #b9ad94;
+  --head: #ff4d4f;
+  --bad: #ff6b6b;
+  --warn: #e3b341;
+  --ok: #3fb950;
+  --hot: #ff6b4a;
+  color-scheme: dark;
 }
 
 * {
@@ -197,12 +216,59 @@ canvas.bed {
 
 .side {
   width: 360px;
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 8px;
   overflow: auto;
-  border-left: 1px solid var(--line);
+}
+
+.main.side-left {
+  flex-direction: row-reverse;
+}
+.main.side-hidden .side,
+.main.side-hidden .splitter {
+  display: none;
+}
+
+/* drag handle between bed and sidebar */
+.splitter {
+  flex: none;
+  width: 5px;
+  margin: 0 -2px;
+  z-index: 2;
+  cursor: col-resize;
+  position: relative;
+}
+.splitter::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  background: var(--line);
+}
+.splitter:hover::after,
+.splitter.drag::after {
+  inset: 0 1px;
+  background: var(--accent);
+}
+
+.btn.icon {
+  padding: 4px 7px;
+  line-height: 1;
+  min-width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn.icon .pane {
+  opacity: 0;
+}
+.btn.icon.on .pane {
+  opacity: 0.35;
+}
+.btn.icon.flip svg {
+  transform: scaleX(-1);
 }
 
 .card {
@@ -214,10 +280,40 @@ canvas.bed {
 
 .card h3 {
   margin: 4px 0 6px;
+  user-select: none;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--muted);
+}
+
+.card h3.fold {
+  cursor: pointer;
+}
+.card h3.fold::before {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin: 0 6px 1px 0;
+  border: 4px solid transparent;
+  border-top-color: currentColor;
+  border-bottom-width: 0;
+  vertical-align: middle;
+}
+.card.folded h3.fold::before {
+  transform: rotate(-90deg);
+}
+.card.folded > :not(:first-child),
+.card.folded > .row:first-child > :not(h3) {
+  display: none;
+}
+.card.folded h3 {
+  margin-bottom: 4px;
+}
+.console.folded {
+  flex: none;
+  min-height: 0;
 }
 
 .status {
@@ -405,8 +501,14 @@ dialog .buttons {
   .main {
     flex-direction: column;
   }
+  .main.side-left {
+    flex-direction: column;
+  }
+  .splitter {
+    display: none;
+  }
   .side {
-    width: auto;
+    width: auto !important;
     border-left: none;
     border-top: 1px solid var(--line);
     max-height: 50vh;

@@ -1,5 +1,9 @@
 // Translations of the Virtual Machine: keys are the German texts, English is listed here.
-// Language follows the system; placeholders {name} are replaced.
+// The language choice (system, German, English) is shared with the app's i18n module, so material names from
+// the app follow it too; a change reloads the window. Placeholders {name} are replaced.
+
+import { lang } from '../../src/i18n';
+export { LANGUAGES, langPref, setLangPref, type LangPref } from '../../src/i18n';
 
 const EN: Record<string, string> = {
   'Nur in der Desktop-App': 'Desktop app only',
@@ -112,10 +116,24 @@ const EN: Record<string, string> = {
   'Laserleistung (W, optisch)': 'Laser power (W, optical)',
   'Material ziehen verschiebt es, mit Umschalt drehen, mit Alt ohne Raster. Ansicht: linke Maustaste dreht, rechte verschiebt, Rad zoomt.': 'Drag material to move it, with Shift to rotate, with Alt without snapping. View: left mouse button orbits, right pans, wheel zooms.',
   'Material ziehen verschiebt es, mit Umschalt drehen, mit Alt ohne Raster.': 'Drag material to move it, with Shift to rotate, with Alt without snapping.',
+  Seitenleiste: 'Sidebar',
+  'Seitenleiste ein-/ausblenden ({key})': 'Show/hide the sidebar ({key})',
+  'Breite ziehen, Doppelklick setzt sie zurück': 'Drag to resize, double-click resets the width',
+  Rechts: 'Right',
+  Links: 'Left',
+  'Einklappen/Ausklappen': 'Collapse/expand',
+  Design: 'Theme',
+  'Design: wie das System': 'Theme: same as the system',
+  'Design: hell': 'Theme: light',
+  'Design: dunkel': 'Theme: dark',
+  Sprache: 'Language',
+  'Wie das System': 'Same as the system',
+  Maschine: 'Machine',
+  Hell: 'Light',
+  Dunkel: 'Dark',
+  Ansicht: 'View',
+  'Strg+B': 'Ctrl+B',
 };
-
-const lang = (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';
-document.documentElement.lang = lang;
 
 export function t(de: string, vars?: Record<string, string | number>): string {
   let s = lang === 'en' ? (EN[de] ?? de) : de;
