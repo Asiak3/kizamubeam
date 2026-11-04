@@ -5,13 +5,14 @@ import './style.css';
 import { api, hasNative, type ClientInfo, type Config, type ServerInfo, type Snapshot, type VmEvent } from './api';
 import { BurnMap, burnSegments, toBed, type Piece } from './burn';
 import type { Analysis } from './parts';
-import { t } from './i18n';
+import { LANGUAGES, langPref, setLangPref, t, type LangPref } from './i18n';
+import { getTheme, loadSide, onThemeChange, saveSide, setTheme, SIDE_DEFAULT, SIDE_MIN, type Theme } from './ui';
 import { BedView } from './view';
 import type { Bed3D, BodyState } from './view3d';
 import { LOOK_GROUPS, LOOKS, lookName, resolveLook } from '../../src/view3d/looks';
 import { t as tApp } from '../../src/i18n';
 
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 const PIECES_KEY = 'kizamubeam-vm.pieces';
 const VIEW_KEY = 'kizamubeam-vm.view';
 
@@ -82,6 +83,21 @@ function fmt(n: number, d = 3) {
   return s === `-${(0).toFixed(d)}` ? (0).toFixed(d) : s;
 }
 
+const THEME_ICON: Record<Theme, string> = { system: '◐', light: '☀', dark: '☾' };
+const THEME_TITLE: Record<Theme, () => string> = { system: () => t('Design: wie das System'), light: () => t('Design: hell'), dark: () => t('Design: dunkel') };
+const nextTheme: Record<Theme, Theme> = { system: 'light', light: 'dark', dark: 'system' };
+
+/** Window with a panel on the right (stroke icon, follows the text colour) */
+function sideIcon() {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = '<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor"/><path d="M10 3v10" stroke="currentColor"/><path class="pane" d="M10.5 3h3v10h-3z" fill="currentColor" opacity=".35"/>';
+  return svg;
+}
+
 function time(s: number) {
   const m = Math.floor(s / 60);
   const r = Math.floor(s % 60);
@@ -95,6 +111,16 @@ async function start() {
   // ---------- header ----------
   const badge = h('span', { class: 'badge' }, '…');
   const chips = h('div', { class: 'chips' });
+  const mac = /Mac|iPhone|iPad/.test(navigator.platform);
+  const sideBtn = h('button', { class: 'btn icon', title: t('Seitenleiste ein-/ausblenden ({key})', { key: mac ? '⌘B' : t('Strg+B') }), 'aria-label': t('Seitenleiste'), onclick: () => toggleSide() }, sideIcon());
+  const themeBtn = h('button', { class: 'btn icon', onclick: () => setTheme(nextTheme[getTheme()]) });
+  const showTheme = () => {
+    const th = getTheme();
+    themeBtn.textContent = THEME_ICON[th];
+    themeBtn.title = THEME_TITLE[th]();
+    themeBtn.setAttribute('aria-label', themeBtn.title);
+  };
+  showTheme();
   const header = h('header', { class: 'top' },
     h('div', { class: 'title' }, h('strong', {}, 'KizamuBeam Virtual Machine'), h('span', { class: 'muted' }, t('Version {v}', { v: VERSION }))),
     badge,
@@ -103,7 +129,9 @@ async function start() {
     h('button', { class: 'btn', title: t('Gefahrene Wege und Brennspuren auf dem Bett entfernen'), onclick: () => view.resetLayers() }, t('Spuren löschen')),
     h('button', { class: 'btn', title: t('Steuerung zurücksetzen (Strg-X): hält an und leert alle Puffer'), onclick: () => api.realtime(0x18) }, t('Zurücksetzen')),
     h('button', { class: 'btn', title: t('Maschine aus- und wieder einschalten: Der Kopf bleibt stehen, die Position beginnt dort bei 0'), onclick: () => api.powerCycle() }, t('Aus/Ein')),
-    h('button', { class: 'btn primary', onclick: () => openSettings() }, t('Einstellungen')));
+    h('button', { class: 'btn primary', onclick: () => openSettings() }, t('Einstellungen')),
+    themeBtn,
+    sideBtn);
 
   // ---------- bed ----------
   const stage = h('section', { class: 'stage' });
@@ -277,21 +305,89 @@ async function start() {
   const pieceForm = h('div', { class: 'piece-form' });
   const partsBox = h('div', { class: 'parts' });
   const side = h('aside', { class: 'side' },
-    h('section', { class: 'card' }, status),
-    h('section', { class: 'card' },
+    h('section', { class: 'card', 'data-id': 'state' }, h('h3', {}, t('Maschine')), status),
+    h('section', { class: 'card', 'data-id': 'material' },
       h('div', { class: 'row' }, h('h3', {}, t('Material')), h('button', { class: 'btn small', onclick: () => addPiece() }, t('Material einlegen'))),
       pieceList,
       pieceForm,
       partsBox),
-    h('section', { class: 'card' }, h('h3', {}, t('Hier verbinden')), hint, h('h3', {}, t('Verbindungen')), clientsBox),
-    h('section', { class: 'card notices-card' }, h('h3', {}, t('Hinweise')), notices),
-    h('section', { class: 'card console' },
+    h('section', { class: 'card', 'data-id': 'connect' }, h('h3', {}, t('Hier verbinden')), hint, h('h3', {}, t('Verbindungen')), clientsBox),
+    h('section', { class: 'card notices-card', 'data-id': 'notices' }, h('h3', {}, t('Hinweise')), notices),
+    h('section', { class: 'card console', 'data-id': 'console' },
       h('div', { class: 'row' }, h('h3', {}, t('Konsole')), h('label', { class: 'small' }, showStatus, ' ', t('Statusabfragen zeigen'))),
       log,
       h('div', { class: 'row quick' }, quick('?', () => api.realtime(0x3f)), quick('!', () => api.realtime(0x21)), quick('~', () => api.realtime(0x7e)), quick('$H', () => api.send('$H')), quick('$X', () => api.send('$X')), quick('$$', () => api.send('$$'))),
       h('div', { class: 'row' }, input, h('button', { class: 'btn', onclick: sendLine }, t('Senden')))));
 
-  app.append(header, h('main', { class: 'main' }, stage, side));
+  // ---------- sidebar layout: width, side, hidden, folded cards ----------
+  const layout = loadSide();
+  const splitter = h('div', { class: 'splitter', title: t('Breite ziehen, Doppelklick setzt sie zurück') });
+  const main = h('main', { class: 'main' }, stage, splitter, side);
+  const maxSide = () => Math.max(SIDE_MIN, main.clientWidth * 0.6);
+  const applyLayout = () => {
+    side.style.width = `${Math.min(layout.width, maxSide())}px`;
+    main.classList.toggle('side-left', layout.left);
+    main.classList.toggle('side-hidden', layout.hidden);
+    sideBtn.classList.toggle('on', !layout.hidden);
+    sideBtn.classList.toggle('flip', layout.left);
+    for (const c of side.querySelectorAll<HTMLElement>('.card[data-id]')) c.classList.toggle('folded', layout.folded.includes(c.dataset.id!));
+  };
+  function toggleSide() {
+    layout.hidden = !layout.hidden;
+    saveSide(layout);
+    applyLayout();
+  }
+  splitter.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    splitter.setPointerCapture(e.pointerId);
+    splitter.classList.add('drag');
+    const r = main.getBoundingClientRect();
+    const move = (ev: PointerEvent) => {
+      const w = layout.left ? ev.clientX - r.left : r.right - ev.clientX;
+      layout.width = Math.round(Math.max(SIDE_MIN, Math.min(maxSide(), w)));
+      applyLayout();
+    };
+    const up = () => {
+      splitter.classList.remove('drag');
+      splitter.removeEventListener('pointermove', move);
+      saveSide(layout);
+    };
+    splitter.addEventListener('pointermove', move);
+    splitter.addEventListener('pointerup', up, { once: true });
+    splitter.addEventListener('pointercancel', up, { once: true });
+  });
+  splitter.addEventListener('dblclick', () => {
+    layout.width = SIDE_DEFAULT;
+    saveSide(layout);
+    applyLayout();
+  });
+  // a click on a card's heading folds it
+  for (const c of side.querySelectorAll<HTMLElement>('.card[data-id]')) {
+    const h3 = c.querySelector('h3')!;
+    h3.classList.add('fold');
+    h3.title = t('Einklappen/Ausklappen');
+    h3.addEventListener('click', () => {
+      const id = c.dataset.id!;
+      layout.folded = layout.folded.includes(id) ? layout.folded.filter((f) => f !== id) : [...layout.folded, id];
+      saveSide(layout);
+      applyLayout();
+    });
+  }
+  window.addEventListener('resize', applyLayout);
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b') {
+      e.preventDefault();
+      toggleSide();
+    }
+  });
+  onThemeChange(() => {
+    showTheme();
+    view.invalidate();
+  });
+
+  app.append(header, main);
+  applyLayout();
 
   function addPiece() {
     const n = pieces.length;
@@ -619,8 +715,22 @@ async function start() {
     const mpos = h('input', { type: 'checkbox', checked: (c.statusMask & 1) === 1 });
     const bf = h('input', { type: 'checkbox', checked: (c.statusMask & 2) === 2 });
     const note = h('p', { class: 'note' });
+    const themeSel = h('select', {},
+      h('option', { value: 'system' }, t('Wie das System')),
+      h('option', { value: 'light' }, t('Hell')),
+      h('option', { value: 'dark' }, t('Dunkel')));
+    themeSel.value = getTheme();
+    const langSel = h('select', {}, h('option', { value: 'system' }, t('Wie das System')), ...LANGUAGES.map(([code, name]) => h('option', { value: code }, name)));
+    langSel.value = langPref();
+    const sideSel = h('select', {}, h('option', { value: 'right' }, t('Rechts')), h('option', { value: 'left' }, t('Links')));
+    sideSel.value = layout.left ? 'left' : 'right';
     const dlg = h('dialog', { class: 'settings' },
       h('h2', {}, t('Einstellungen')),
+      h('h3', {}, t('Ansicht')),
+      h('div', { class: 'grid' },
+        h('label', {}, t('Design')), themeSel,
+        h('label', {}, t('Sprache')), langSel,
+        h('label', {}, t('Seitenleiste')), sideSel),
       h('h3', {}, t('Steuerung')),
       h('div', { class: 'grid' },
         h('label', {}, t('Firmware')), flavor,
@@ -657,12 +767,18 @@ async function start() {
               if (!Number.isInteger(p) || p < 1 || p > 65535) return void (note.textContent = t('Port {p} ist ungültig.', { p }));
             }
             if (c.telnetEnabled && c.wsEnabled && c.telnetPort === c.wsPort) return void (note.textContent = t('Telnet und WebSocket brauchen verschiedene Ports.'));
+            setTheme(themeSel.value as Theme);
+            layout.left = sideSel.value === 'left';
+            saveSide(layout);
+            applyLayout();
             info = await api.setConfig(c);
             cfg = await api.config();
             view.setBed(cfg.bedW, cfg.bedH);
             bed3d?.setBed(cfg.bedW, cfg.bedH);
             renderChips();
             dlg.close();
+            // the texts are set once at start; a new language reloads the window
+            if (setLangPref(langSel.value as LangPref)) location.reload();
           },
         }, t('Speichern'))));
     dlg.addEventListener('close', () => dlg.remove());

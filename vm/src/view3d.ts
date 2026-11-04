@@ -8,6 +8,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { Snapshot } from './api';
 import { contains, type BurnMap, type Piece } from './burn';
 import { signature, type Analysis, type Body } from './parts';
+import { onThemeChange } from './ui';
 import { lookTexture, resolveLook, shadeHex, type LookPreset } from '../../src/view3d/looks';
 
 const FRAME = 22;
@@ -195,7 +196,7 @@ export class Bed3D {
     this.scene.add(this.machine, this.piecesGroup, this.head, this.beam, this.glow, this.gantry);
 
     new ResizeObserver(() => this.fitSize()).observe(host);
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => this.applyTheme());
+    onThemeChange(() => this.applyTheme());
     this.applyTheme();
     this.fitSize();
   }
