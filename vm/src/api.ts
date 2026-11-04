@@ -1,0 +1,97 @@
+// Verbindung zur Steuerung in Rust (src-tauri/src/lib.rs). Außerhalb der Desktop-App gibt es keine
+// Maschine; dann zeigt das Fenster nur einen Hinweis.
+
+export type Flavor = 'grbl' | 'fluidnc';
+
+export interface Config {
+  flavor: Flavor;
+  bedW: number;
+  bedH: number;
+  maxRate: number;
+  accel: number;
+  junctionDev: number;
+  arcTolerance: number;
+  sMax: number;
+  laserMode: boolean;
+  homing: boolean;
+  mustHome: boolean;
+  homingRate: number;
+  softLimits: boolean;
+  hardLimits: boolean;
+  rxBuffer: number;
+  plannerBlocks: number;
+  statusMask: number;
+  telnetEnabled: boolean;
+  telnetPort: number;
+  wsEnabled: boolean;
+  wsPort: number;
+  lan: boolean;
+}
+
+export interface Snapshot {
+  state: string;
+  mpos: [number, number, number];
+  wpos: [number, number, number];
+  wco: [number, number, number];
+  head: [number, number];
+  feed: number;
+  s: number;
+  spindle: 'M3' | 'M4' | 'M5';
+  laserOn: boolean;
+  power: number;
+  ovr: [number, number, number];
+  flood: boolean;
+  mist: boolean;
+  outputs: number;
+  plannerUsed: number;
+  plannerSize: number;
+  homed: boolean;
+  alarm: number | null;
+  jobTime: number;
+  running: boolean;
+}
+
+export type VmEvent =
+  | { type: 'console'; client: number; dir: 'in' | 'out' | 'rt'; text: string; status: boolean }
+  | { type: 'warning'; code: 'rxOverflow' | 'frameHit'; client: number | null; x: number; y: number }
+  | { type: 'alarm'; code: number }
+  | { type: 'configChanged' };
+
+export interface ClientInfo {
+  id: number;
+  kind: 'telnet' | 'ws';
+  addr: string;
+}
+
+export interface Poll {
+  snapshot: Snapshot;
+  events: VmEvent[];
+  /** je Strecke 7 Zahlen: x0, y0, x1, y1, Leistung, Dauer, Eilgang */
+  segments: number[];
+  clients: ClientInfo[];
+}
+
+type Res = { Ok: string } | { Err: string } | null;
+export interface ServerInfo {
+  telnet: Res;
+  ws: Res;
+}
+
+export const hasNative = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke<T>(cmd, args);
+}
+
+export const api = {
+  poll: () => invoke<Poll>('vm_poll'),
+  config: () => invoke<Config>('vm_config'),
+  setConfig: (config: Config) => invoke<ServerInfo>('vm_set_config', { config }),
+  serverInfo: () => invoke<ServerInfo>('vm_server_info'),
+  restartServers: () => invoke<ServerInfo>('vm_restart_servers'),
+  send: (line: string) => invoke<void>('vm_send', { line }),
+  realtime: (byte: number) => invoke<void>('vm_realtime', { byte }),
+  powerCycle: () => invoke<void>('vm_power_cycle'),
+  lanAddresses: () => invoke<string[]>('vm_lan_addresses'),
+};

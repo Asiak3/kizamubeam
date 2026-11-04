@@ -1,6 +1,7 @@
 # Baut die Installer für macOS, Windows und Linux, sobald ein Release veröffentlicht wird
 # (GitHub → Releases → Draft a new release → neuen Tag anlegen → Publish release), und hängt sie an diesen Release.
 # Für einen schon veröffentlichten Release: Actions → Release → Run workflow mit dem Tag.
+# Releases der Virtual Machine (Tags vm-v…) baut .github/workflows/vm-release.yml, nicht dieser Workflow.
 #
 # Updates: Ist das Secret TAURI_SIGNING_PRIVATE_KEY (und ggf. TAURI_SIGNING_PRIVATE_KEY_PASSWORD) hinterlegt und die
 # Variable TAURI_UPDATER_PUBKEY gesetzt, werden die Pakete signiert, eine latest.json angehängt und der öffentliche
@@ -29,6 +30,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ !startsWith(github.event.release.tag_name || inputs.tag, 'vm-') }}
     strategy:
       fail-fast: false
       matrix:

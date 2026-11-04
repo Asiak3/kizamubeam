@@ -1,0 +1,13 @@
+[package]
+name = "kizamubeam-vm-core"
+version = "0.1.0"
+description = "Kern der KizamuBeam Virtual Machine ohne Oberfläche: GRBL/FluidNC-Steuerung, Bewegungsplaner, Netzwerk-Server"
+authors = ["Hanjo Winter"]
+license = "GPL-3.0-or-later"
+edition = "2021"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# WebSocket-Server wie FluidNC (Port 81), ohne TLS
+tungstenite = { version = "0.27", default-features = false, features = ["handshake"] }

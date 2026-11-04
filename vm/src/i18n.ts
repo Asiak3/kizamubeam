@@ -1,0 +1,90 @@
+// Übersetzungen der Virtual Machine: Schlüssel sind die deutschen Texte, Englisch steht hier.
+// Sprache nach dem System; Platzhalter {name} werden ersetzt.
+
+const EN: Record<string, string> = {
+  'Nur in der Desktop-App': 'Desktop app only',
+  'Die virtuelle Maschine läuft nur in der Desktop-App „KizamuBeam Virtual Machine“.': 'The virtual machine only runs in the desktop app “KizamuBeam Virtual Machine”.',
+  Einstellungen: 'Settings',
+  'Spuren löschen': 'Clear traces',
+  'Gefahrene Wege und Brennspuren auf dem Bett entfernen': 'Remove travel paths and burn marks from the bed',
+  Zurücksetzen: 'Reset',
+  'Steuerung zurücksetzen (Strg-X): hält an und leert alle Puffer': 'Reset the controller (Ctrl-X): stops and clears all buffers',
+  'Aus/Ein': 'Power cycle',
+  'Maschine aus- und wieder einschalten: Der Kopf bleibt stehen, die Position beginnt dort bei 0': 'Switch the machine off and on: the head stays where it is and its position starts at 0 there',
+  Zustand: 'State',
+  'Maschine (MPos)': 'Machine (MPos)',
+  'Werkstück (WPos)': 'Work (WPos)',
+  'Kopf tatsächlich': 'Actual head',
+  Vorschub: 'Feed',
+  Laser: 'Laser',
+  Overrides: 'Overrides',
+  Planer: 'Planner',
+  'Air Assist': 'Air assist',
+  Ausgänge: 'Outputs',
+  Referenziert: 'Homed',
+  Laufzeit: 'Run time',
+  ja: 'yes',
+  nein: 'no',
+  aus: 'off',
+  Verbindungen: 'Connections',
+  'Noch keine Verbindung.': 'No connection yet.',
+  Konsole: 'Console',
+  'Statusabfragen zeigen': 'Show status queries',
+  'Befehl senden, z. B. $$ oder G0 X10': 'Send a command, e.g. $$ or G0 X10',
+  Senden: 'Send',
+  Hinweise: 'Notices',
+  'Eilgänge zeigen': 'Show rapids',
+  'Ansicht einpassen (Doppelklick)': 'Fit view (double-click)',
+  'Hier verbinden': 'Connect here',
+  'Aus KizamuBeam: Laser → Geräte → Neues Gerät → Vorlage „KizamuBeam Virtual Machine“. Andere Programme: als GRBL- bzw. FluidNC-Gerät über das Netzwerk (Telnet) mit dieser Adresse.':
+    'From KizamuBeam: Laser → Devices → New device → template “KizamuBeam Virtual Machine”. Other programs: as a GRBL or FluidNC device over the network (Telnet) at this address.',
+  Telnet: 'Telnet',
+  WebSocket: 'WebSocket',
+  ausgeschaltet: 'off',
+  'Verbindung #{c} hat mehr gesendet, als in den Empfangspuffer ({n} Bytes) passt. Eine echte Steuerung würde Zeichen verlieren.':
+    'Connection #{c} sent more than fits into the receive buffer ({n} bytes). A real controller would lose characters.',
+  'Der Kopf ist bei X {x} / Y {y} gegen den Rahmen gefahren. Eine echte Maschine verliert dabei Schritte; die gemeldete Position stimmt danach nicht mehr.':
+    'The head ran into the frame at X {x} / Y {y}. A real machine loses steps there; the reported position is wrong afterwards.',
+  'ALARM:1 – Endschalter während der Fahrt ausgelöst': 'ALARM:1 – limit switch triggered during motion',
+  'ALARM:2 – Ziel außerhalb des Fahrwegs (weiche Grenzen)': 'ALARM:2 – target outside the travel (soft limits)',
+  'ALARM:3 – während der Bewegung zurückgesetzt, Position evtl. verloren': 'ALARM:3 – reset during motion, position may be lost',
+  'ALARM:{n}': 'ALARM:{n}',
+  Steuerung: 'Controller',
+  Firmware: 'Firmware',
+  'Fahrweg (mm)': 'Travel (mm)',
+  'Höchstgeschwindigkeit (mm/min)': 'Max. speed (mm/min)',
+  'Beschleunigung (mm/s²)': 'Acceleration (mm/s²)',
+  'Junction Deviation (mm)': 'Junction deviation (mm)',
+  'S-Wert für 100 %': 'S value for 100 %',
+  'Laser-Modus ($32): Laser nur bei G1/G2/G3 an, M4 passt die Leistung an': 'Laser mode ($32): laser only on during G1/G2/G3, M4 adapts the power',
+  'Endschalter vorhanden (Referenzfahrt $H)': 'Limit switches present (homing $H)',
+  'Nach dem Einschalten erst referenzieren (must_home)': 'Require homing after power-on (must_home)',
+  'Weiche Grenzen ($20)': 'Soft limits ($20)',
+  'Harte Grenzen ($21)': 'Hard limits ($21)',
+  'Empfangspuffer (Bytes)': 'Receive buffer (bytes)',
+  'Plätze im Planer': 'Planner blocks',
+  'Status mit Maschinenkoordinaten (MPos)': 'Status with machine coordinates (MPos)',
+  'Pufferstand im Status (Bf)': 'Buffer state in status (Bf)',
+  Netzwerk: 'Network',
+  'Telnet-Port': 'Telnet port',
+  'WebSocket-Port': 'WebSocket port',
+  'Auch aus dem Netzwerk erreichbar (sonst nur von diesem Rechner)': 'Reachable from the network (otherwise only from this computer)',
+  'Adresse im Netzwerk: {ip}': 'Network address: {ip}',
+  'Ports unter 1024 brauchen auf macOS und Linux Administratorrechte.': 'Ports below 1024 need administrator rights on macOS and Linux.',
+  Abbrechen: 'Cancel',
+  Speichern: 'Save',
+  'Port {p} ist ungültig.': 'Port {p} is invalid.',
+  'Telnet und WebSocket brauchen verschiedene Ports.': 'Telnet and WebSocket need different ports.',
+  'Gespeichert.': 'Saved.',
+  'Version {v}': 'Version {v}',
+  Bett: 'Bed',
+};
+
+const lang = (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';
+document.documentElement.lang = lang;
+
+export function t(de: string, vars?: Record<string, string | number>): string {
+  let s = lang === 'en' ? (EN[de] ?? de) : de;
+  if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
+  return s;
+}

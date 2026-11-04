@@ -8,6 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "vm": "cd vm && tauri dev",
+    "vm:build": "cd vm && tauri build",
+    "vm:headless": "cd vm/src-tauri && cargo run -- --headless",
     "i18n:check": "node scripts/i18n-check.mjs",
     "build:library": "node scripts/run-ts.mjs scripts/build-library.ts",
     "test:core": "node scripts/core-fixtures.mjs && cd src-tauri && cargo test -p kizamubeam-core",
@@ -52,7 +55,8 @@
     "test:sync": "node scripts/run-ts.mjs scripts/sync-test.ts",
     "test:relations": "node scripts/run-ts.mjs scripts/relations-test.ts",
     "test:sketch": "node scripts/run-ts.mjs scripts/sketch-test.ts",
-    "test:grid": "node scripts/run-ts.mjs scripts/grid-test.ts"
+    "test:grid": "node scripts/run-ts.mjs scripts/grid-test.ts",
+    "test:vm": "cd vm/src-tauri && cargo test -p kizamubeam-vm-core"
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {

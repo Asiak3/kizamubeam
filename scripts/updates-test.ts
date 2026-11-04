@@ -53,6 +53,13 @@ test('Adresse zeigt auf die latest.json des Releases', () => {
   assert.equal(pickRelease(list, 'beta', '1.2.0-beta')?.manifest, 'https://github.com/negurvulkan/kizamubeam/releases/download/v1.3.0-beta/latest.json');
 });
 
+test('Releases der Virtual Machine (vm-v…) sind keine App-Updates', () => {
+  const withVm = [rel('vm-v0.2.0', false), rel('vm-v0.3.0-beta', true), ...list];
+  assert.equal(pickRelease(withVm, 'stable', '1.2.0-beta')?.version, '1.2.1');
+  assert.equal(pickRelease(withVm, 'beta', '1.2.0-beta')?.version, '1.3.0-beta');
+  assert.equal(pickRelease([rel('vm-v9.0.0', false)], 'stable', '1.0.0'), null);
+});
+
 if (failed) {
   console.log(`${failed} fehlgeschlagen`);
   process.exit(1);
