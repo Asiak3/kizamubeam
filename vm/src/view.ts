@@ -104,7 +104,7 @@ export class BedView {
     const b = this.bctx;
     const q = this.rctx;
     // Laserfleck etwa 0,15 mm, mindestens 1,5 Pixel, damit Schnittlinien auch verkleinert sichtbar bleiben
-    b.lineWidth = Math.max(1.5, 0.15 * r);
+    b.lineWidth = Math.max(2, 0.15 * r);
     q.lineWidth = 1.5;
     q.strokeStyle = 'rgba(40, 110, 220, 0.35)';
     q.beginPath();
