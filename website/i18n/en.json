@@ -22,6 +22,7 @@
   "nav": {
     "features": "Features",
     "hardware": "Hardware",
+    "vm": "Virtual Machine",
     "download": "Download",
     "faq": "FAQ",
     "github": "GitHub",
@@ -147,7 +148,8 @@
     "gen": "Drawer generator in the 3D view: finger-jointed parts pulled apart, no collisions",
     "prod": "Nesting dialog over the selected parts of a box on the workspace",
     "gearpair": "Create Gear Pair dialog with input fields and a preview of both gears",
-    "check": "Check panel on the right with one error and several warnings, each with a fix button"
+    "check": "Check panel on the right with one error and several warnings, each with a fix button",
+    "vm": "KizamuBeam Virtual Machine in the 3D view: cut-out parts lie next to the plywood sheet, machine state and material on the right"
   },
   "hw": {
     "eyebrow": "Hardware",
@@ -179,6 +181,27 @@
     "button_linux": "Download for Linux",
     "all_releases": "All releases on GitHub",
     "source": "Prefer to build it yourself? See the README."
+  },
+  "vm": {
+    "eyebrow": "Test without a laser",
+    "title": "KizamuBeam Virtual Machine",
+    "lead": "A separate, free program that behaves like a laser running FluidNC. Send your job to it and watch it engrave and cut in real time – no material used and no risk to your machine.",
+    "b": [
+      "Emulates a FluidNC controller over Telnet (port 2323) and WebSocket (port 8181) – KizamuBeam connects through the “KizamuBeam Virtual Machine” device preset, other programs as a GRBL or FluidNC network device",
+      "Moves with real acceleration and a motion planner: run time, framing, homing and error messages just like on the machine",
+      "3D view of the bed with the laser module, plus a 2D top view",
+      "Place material: plywood, acrylic, cardboard and more – lines burn in according to power and speed",
+      "Take cut-out parts out, flip them over and inspect them from every side; parts that are still attached are flagged",
+      "Virtual camera above the bed or on the head – usable in KizamuBeam as a network camera, including calibration"
+    ],
+    "dl_title": "Download the Virtual Machine",
+    "dl_lead": "Preview release for macOS, Windows and Linux. Installs independently of KizamuBeam.",
+    "dl_lead_tpl": "Preview release {version} for macOS, Windows and Linux. Installs independently of KizamuBeam.",
+    "button_mac": "Download the Virtual Machine for macOS",
+    "button_win": "Download the Virtual Machine for Windows",
+    "button_linux": "Download the Virtual Machine for Linux",
+    "all_releases": "All Virtual Machine releases on GitHub",
+    "note": "Unsigned like KizamuBeam itself: on macOS choose “Open Anyway”, on Windows “More info → Run anyway”."
   },
   "beta": {
     "title": "Stable – and still growing",

@@ -10,6 +10,8 @@ const root = dirname(fileURLToPath(import.meta.url));
 const SITE = 'https://negurvulkan.github.io/kizamubeam/';
 const REPO = 'https://github.com/negurvulkan/kizamubeam';
 const RELEASES = `${REPO}/releases`;
+// The Virtual Machine has its own vm-v* tags; this lists only those releases.
+const VM_RELEASES = `${RELEASES}?q=vm-v&expanded=true`;
 const LICENSE = `${REPO}/blob/main/LICENSE`;
 
 const template = readFileSync(join(root, 'template.html'), 'utf8');
@@ -98,6 +100,7 @@ for (const p of pages) {
   const t = withVersion(raw, raw.version);
   const alt = load(p.altLang);
   t.dl.lead_tpl = raw.dl.lead;
+  t.vm.dl_lead_tpl = raw.vm.dl_lead_tpl;
   const jsonld = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -124,6 +127,7 @@ for (const p of pages) {
     lang_upper: p.lang.toUpperCase(),
     repo: REPO,
     releases: RELEASES,
+    vm_releases: VM_RELEASES,
     license_url: LICENSE,
     // "Dein Laser. Deine Software. Frei." -> one line per sentence, last one glows.
     hero_title_html: t.hero.title
