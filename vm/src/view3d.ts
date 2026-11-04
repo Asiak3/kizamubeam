@@ -7,6 +7,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { Snapshot } from './api';
 import { contains, type BurnMap, type Piece } from './burn';
+import { signature, type Analysis, type Body } from './parts';
 import { lookTexture, resolveLook, shadeHex, type LookPreset } from '../../src/view3d/looks';
 
 const FRAME = 22;
@@ -44,13 +45,33 @@ interface PieceObj {
   pickables: THREE.Object3D[];
   uploaded: number;
   key: string;
+  /** plate meshes (shown while nothing is cut out) */
+  plate: THREE.Object3D[];
+  /** cut-out parts and leftover as separate bodies, plus markers for parts that still hang */
+  bodies: THREE.Group;
+  bodyObjs: Map<string, THREE.Group>;
+  sig: string;
+  look: LookPreset;
 }
 
+/** What the viewer has done with a body: lifted out of the machine, turned over */
+export interface BodyState {
+  out?: boolean;
+  flip?: boolean;
+}
+
+/** how far a taken-out body hovers above the bed (mm) */
+const LIFT = 40;
+
 /** Face material of a workpiece: look texture plus burn map (mark colour, darker with depth, holes where cut through) */
-function faceMaterial(p: LookPreset, w: number, h: number, burnTex: THREE.DataTexture) {
+function faceMaterial(p: LookPreset, w: number, h: number, burnTex: THREE.DataTexture, bodyUv = false) {
   const map = p.tex === 'plain' ? null : lookMap(p).clone();
   if (map) {
-    map.repeat.set(w / p.tile, h / p.tile);
+    // plate: uv 0…1 over the piece; bodies (extruded outlines): uv in mm around the piece centre
+    if (bodyUv) {
+      map.repeat.set(1 / p.tile, 1 / p.tile);
+      map.offset.set(w / 2 / p.tile, h / 2 / p.tile);
+    } else map.repeat.set(w / p.tile, h / p.tile);
     map.needsUpdate = true;
   }
   const mat = new THREE.MeshStandardMaterial({
@@ -67,25 +88,32 @@ function faceMaterial(p: LookPreset, w: number, h: number, burnTex: THREE.DataTe
     burnAlpha: { value: p.engrave.alpha },
     burnDeep: { value: p.engrave.style === 'burn' ? 0.45 : 0.15 },
     edgeColor: { value: new THREE.Color(p.edge ?? shadeHex(p.color, 0.45)) },
+    pieceSize: { value: new THREE.Vector2(w, h) },
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
-    shader.vertexShader = 'varying vec2 vBurnUv;\n' + shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vBurnUv = uv;');
+    shader.vertexShader =
+      'uniform vec2 pieceSize;\nvarying vec2 vBurnUv;\nvarying float vBurnTop;\n' +
+      shader.vertexShader
+        .replace('#include <uv_vertex>', bodyUv ? '#include <uv_vertex>\n  vBurnUv = position.xy / pieceSize + 0.5;' : '#include <uv_vertex>\n  vBurnUv = uv;')
+        // engravings are only on the upper side; from below only the cuts show
+        .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vBurnTop = objectNormal.z > 0.0 ? 1.0 : 0.0;');
     shader.fragmentShader =
-      'uniform sampler2D burnMap;\nuniform vec3 burnColor;\nuniform vec3 edgeColor;\nuniform float burnAlpha;\nuniform float burnDeep;\nvarying vec2 vBurnUv;\n' +
+      'uniform sampler2D burnMap;\nuniform vec3 burnColor;\nuniform vec3 edgeColor;\nuniform float burnAlpha;\nuniform float burnDeep;\nvarying vec2 vBurnUv;\nvarying float vBurnTop;\n' +
       shader.fragmentShader.replace(
         '#include <map_fragment>',
         `#include <map_fragment>
   vec2 burn = texture2D(burnMap, vBurnUv).rg;
   if (burn.g > 0.998) discard;
-  diffuseColor.rgb = mix(diffuseColor.rgb, burnColor, burn.r * burnAlpha);
-  diffuseColor.rgb *= 1.0 - burnDeep * burn.g;
+  float mark = burn.r * burnAlpha * vBurnTop;
+  diffuseColor.rgb = mix(diffuseColor.rgb, burnColor, mark);
+  diffuseColor.rgb *= 1.0 - burnDeep * burn.g * vBurnTop;
   // seen from afar a thin cut is averaged with the surface around it: show it as a dark cut edge
   diffuseColor.rgb = mix(diffuseColor.rgb, edgeColor, smoothstep(0.15, 0.9, burn.g) * 0.85);
-  diffuseColor.a = mix(diffuseColor.a, 1.0, burn.r * burnAlpha);`,
+  diffuseColor.a = mix(diffuseColor.a, 1.0, mark);`,
       );
   };
-  mat.customProgramCacheKey = () => 'vm-burn';
+  mat.customProgramCacheKey = () => (bodyUv ? 'vm-burn-body' : 'vm-burn');
   return mat;
 }
 
@@ -116,6 +144,8 @@ export class Bed3D {
   onSelect: (id: string | null) => void = () => {};
   /** a piece is being dragged; done = pointer released */
   onMove: (id: string, x: number, y: number, rot: number, done: boolean) => void = () => {};
+  /** a cut-out body was double-clicked */
+  onBody: (pieceId: string, key: string) => void = () => {};
 
   constructor(private host: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -335,14 +365,110 @@ export class Bed3D {
     outline.position.z = t / 2;
     group.add(box, top, bottom, outline);
     for (const m of [top, bottom, box]) m.userData.pieceId = piece.id;
+    const bodies = new THREE.Group();
+    group.add(bodies);
     this.piecesGroup.add(group);
-    return { piece, map, group, burnTex, outline, pickables: [top, box], uploaded: 0, key };
+    return { piece, map, group, burnTex, outline, pickables: [top, box], uploaded: 0, key, plate: [top, bottom, box], bodies, bodyObjs: new Map(), sig: '', look };
   }
 
   private dropPiece(o: PieceObj) {
     this.piecesGroup.remove(o.group);
     disposeTree(o.group);
     o.burnTex.dispose();
+  }
+
+  /**
+   * Show the result of the cut-out analysis of a piece: as soon as anything is cut out, the plate is replaced by
+   * the leftover and the parts as separate bodies with cut edges. Bodies are rebuilt only when the analysis changed.
+   */
+  setBodies(pieceId: string, a: Analysis | null, states: Map<string, BodyState>) {
+    const o = this.objs.find((q) => q.piece.id === pieceId);
+    if (!o) return;
+    const split = !!a && a.bodies.length > 1;
+    const sig = a ? signature(a) : '';
+    if (sig !== o.sig) {
+      o.sig = sig;
+      disposeTree(o.bodies);
+      o.bodies.clear();
+      o.bodyObjs.clear();
+      o.pickables = o.pickables.filter((m) => !m.userData.bodyKey);
+      if (a) {
+        const { w, h, t } = o.piece;
+        if (split) {
+          const cap = faceMaterial(o.look, w, h, o.burnTex, true);
+          const edge = new THREE.MeshStandardMaterial({ color: new THREE.Color(o.look.edge ?? shadeHex(o.look.color, 0.5)), roughness: 0.9, metalness: o.look.metal * 0.5, transparent: o.look.clear > 0, opacity: o.look.clear > 0 ? 0.7 : 1 });
+          for (const b of a.bodies) {
+            const { pivot, mesh } = this.bodyGroup(b, w, h, t, cap, edge);
+            mesh.userData = { pieceId, bodyKey: b.key };
+            o.pickables.push(mesh);
+            o.bodies.add(pivot);
+            o.bodyObjs.set(b.key, pivot);
+          }
+        }
+        // parts that still hang: orange outline just above the surface
+        for (const hg of a.hanging) {
+          // the marker moves with the leftover it hangs in
+          const rest = a.bodies.find((b) => b.kind === 'rest' && hg.cx >= b.x0 && hg.cx <= b.x1 && hg.cy >= b.y0 && hg.cy <= b.y1);
+          const holder = (rest && o.bodyObjs.get(rest.key)) || o.bodies;
+          const home = (holder.userData.home as THREE.Vector2 | undefined) ?? new THREE.Vector2();
+          const pts = [];
+          for (let i = 0; i < hg.loop.length; i += 2) pts.push(new THREE.Vector3(hg.loop[i] - w / 2 - home.x, hg.loop[i + 1] - h / 2 - home.y, t + 0.3));
+          const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xff8c1a }));
+          line.userData.hanging = true;
+          holder.add(line);
+        }
+      }
+    }
+    for (const m of o.plate) m.visible = !split;
+    const t = o.piece.t;
+    for (const [key, g] of o.bodyObjs) {
+      const st = states.get(key) ?? {};
+      // a part is lifted above its hole; the leftover is set down next to the piece, so the parts stay visible
+      const home = g.userData.home as THREE.Vector2;
+      const aside = st.out && key.startsWith('rest');
+      g.position.set(home.x + (aside ? o.piece.w + 20 : 0), home.y, (st.out ? (aside ? 20 : LIFT + t) : 0) + (st.flip ? t : 0));
+      g.rotation.x = st.flip ? Math.PI : 0;
+    }
+    this.needsRender = true;
+  }
+
+  /** A body as its own group, pivot at its centre, so it can be lifted and turned over in place */
+  private bodyGroup(b: Body, w: number, h: number, t: number, cap: THREE.Material, edge: THREE.Material) {
+    const cx = (b.x0 + b.x1) / 2 - w / 2,
+      cy = (b.y0 + b.y1) / 2 - h / 2;
+    const toVec = (l: number[]) => {
+      const v: THREE.Vector2[] = [];
+      for (let i = 0; i < l.length; i += 2) v.push(new THREE.Vector2(l[i] - w / 2, l[i + 1] - h / 2));
+      return v;
+    };
+    const shape = new THREE.Shape(toVec(b.loops[0]));
+    for (const hole of b.loops.slice(1)) shape.holes.push(new THREE.Path(toVec(hole)));
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 });
+    // the caps sample the burn map by vertex position (piece coordinates), so the geometry stays where it is;
+    // the pivot sits at the body's centre, so lifting and turning over happen in place
+    const mesh = new THREE.Mesh(geo, [cap, edge]);
+    mesh.position.set(-cx, -cy, 0);
+    const pivot = new THREE.Group();
+    pivot.position.set(cx, cy, 0);
+    pivot.userData.home = new THREE.Vector2(cx, cy);
+    pivot.add(mesh);
+    return { pivot, mesh };
+  }
+
+  /** Camera onto one body (e.g. a taken-out part) */
+  focusBody(pieceId: string, key: string) {
+    const o = this.objs.find((q) => q.piece.id === pieceId);
+    const g = o?.bodyObjs.get(key);
+    if (!g) return;
+    g.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(g);
+    const c = box.getCenter(new THREE.Vector3());
+    const size = Math.max(10, box.getSize(new THREE.Vector3()).length());
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+    this.controls.target.copy(c);
+    this.camera.position.copy(c).addScaledVector(dir, size * 2.2);
+    this.controls.update();
+    this.needsRender = true;
   }
 
   update(s: Snapshot) {
@@ -398,7 +524,7 @@ export class Bed3D {
 
   // ---------- moving pieces with the mouse ----------
 
-  private ray(e: PointerEvent) {
+  private ray(e: MouseEvent) {
     const r = this.canvas.getBoundingClientRect();
     const v = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     this.raycaster.setFromCamera(v, this.camera);
@@ -406,7 +532,7 @@ export class Bed3D {
   }
 
   /** Point on the horizontal plane at height z under the pointer */
-  private onPlane(e: PointerEvent, z: number) {
+  private onPlane(e: MouseEvent, z: number) {
     const p = new THREE.Vector3();
     return this.ray(e).ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -z), p) ? p : null;
   }
@@ -418,7 +544,7 @@ export class Bed3D {
     c.addEventListener('pointerdown', (e) => {
       down = { x: e.clientX, y: e.clientY };
       if (e.button !== 0) return;
-      const hits = this.ray(e).intersectObjects(this.objs.flatMap((o) => o.pickables), false);
+      const hits = this.ray(e).intersectObjects(this.objs.flatMap((o) => o.pickables.filter((m) => m.visible)), false);
       const id = hits[0]?.object.userData.pieceId as string | undefined;
       const o = id ? this.objs.find((q) => q.piece.id === id) : undefined;
       if (!o) return;
@@ -464,7 +590,13 @@ export class Bed3D {
     };
     c.addEventListener('pointerup', end);
     c.addEventListener('pointercancel', end);
-    c.addEventListener('dblclick', () => this.fit());
+    // double-click on a cut-out body takes it out or puts it back, elsewhere it fits the view
+    c.addEventListener('dblclick', (e) => {
+      const hit = this.ray(e).intersectObjects(this.objs.flatMap((o) => o.pickables.filter((m) => m.visible)), false)[0];
+      const key = hit?.object.userData.bodyKey as string | undefined;
+      if (key) this.onBody(hit!.object.userData.pieceId, key);
+      else this.fit();
+    });
   }
 }
 
@@ -483,7 +615,7 @@ function glowTexture() {
 
 function disposeTree(o: THREE.Object3D) {
   o.traverse((n) => {
-    if (n instanceof THREE.Mesh || n instanceof THREE.LineSegments) {
+    if (n instanceof THREE.Mesh || n instanceof THREE.Line) {
       n.geometry.dispose();
       for (const m of (Array.isArray(n.material) ? n.material : [n.material]) as THREE.MeshStandardMaterial[]) {
         // look textures are shared (cache); clones only share the image, so disposing the clone is fine

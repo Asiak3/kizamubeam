@@ -3,14 +3,15 @@
 
 import './style.css';
 import { api, hasNative, type ClientInfo, type Config, type ServerInfo, type Snapshot, type VmEvent } from './api';
-import { BurnMap, burnSegments, type Piece } from './burn';
+import { BurnMap, burnSegments, toBed, type Piece } from './burn';
+import type { Analysis } from './parts';
 import { t } from './i18n';
 import { BedView } from './view';
-import type { Bed3D } from './view3d';
+import type { Bed3D, BodyState } from './view3d';
 import { LOOK_GROUPS, LOOKS, lookName, resolveLook } from '../../src/view3d/looks';
 import { t as tApp } from '../../src/i18n';
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 const PIECES_KEY = 'kizamubeam-vm.pieces';
 const VIEW_KEY = 'kizamubeam-vm.view';
 
@@ -127,14 +128,75 @@ async function start() {
     if (!m || m.w !== p.w || m.h !== p.h) {
       m = new BurnMap(p.w, p.h, p.look, p.t);
       maps.set(p.id, m);
+      analyses.delete(p.id);
+      bodyStates.delete(p.id);
+      analyzed.delete(p.id);
     }
     return m;
+  };
+
+  // ---------- cut-out parts (analysis in a worker) ----------
+  const analyses = new Map<string, Analysis>();
+  /** burn map version each analysis was made from */
+  const analyzed = new Map<string, number>();
+  const bodyStates = new Map<string, Map<string, BodyState>>();
+  const statesOf = (id: string) => {
+    let m = bodyStates.get(id);
+    if (!m) bodyStates.set(id, (m = new Map()));
+    return m;
+  };
+  const worker = new Worker(new URL('./parts.worker.ts', import.meta.url), { type: 'module' });
+  let analysing = false;
+  let lastAnalysis = 0;
+  /** after a job ended: report parts that still hang once the analysis is up to date */
+  let reportHanging = false;
+  const analyseNext = (now: number) => {
+    if (analysing || now - lastAnalysis < 1200) return;
+    const p = pieces.find((q) => maps.has(q.id) && analyzed.get(q.id) !== maps.get(q.id)!.version);
+    if (!p) {
+      if (reportHanging) {
+        reportHanging = false;
+        for (const q of pieces) {
+          const n = analyses.get(q.id)?.hanging.length ?? 0;
+          if (n) notice(t('{name}: {n} Teil(e) hängen noch fest, der Schnitt geht nicht überall ganz durch.', { name: pieceLabel(q), n }), 'warn');
+        }
+      }
+      return;
+    }
+    const m = maps.get(p.id)!;
+    analysing = true;
+    lastAnalysis = now;
+    const tex = m.tex.slice();
+    worker.postMessage({ id: p.id, version: m.version, map: { nx: m.nx, ny: m.ny, res: m.res, tex } }, [tex.buffer]);
+  };
+  worker.onmessage = (e: MessageEvent<{ id: string; version: number; analysis: Analysis }>) => {
+    analysing = false;
+    const { id, version, analysis } = e.data;
+    if (!pieces.some((p) => p.id === id)) return;
+    analyses.set(id, analysis);
+    analyzed.set(id, version);
+    const st = statesOf(id);
+    for (const k of [...st.keys()]) if (!analysis.bodies.some((b) => b.key === k)) st.delete(k);
+    bed3d?.setBodies(id, analysis, st);
+    renderPieces(false);
+    if (id === selected) renderParts();
+  };
+  worker.onerror = (e) => {
+    analysing = false;
+    console.error(e);
+  };
+  const setBodyState = (pieceId: string, key: string, patch: BodyState) => {
+    const st = statesOf(pieceId);
+    st.set(key, { ...st.get(key), ...patch });
+    bed3d?.setBodies(pieceId, analyses.get(pieceId) ?? null, st);
+    if (pieceId === selected) renderParts();
   };
   const savePieces = () => store.set(PIECES_KEY, JSON.stringify(pieces));
   const pushPieces = () => {
     for (const id of [...maps.keys()]) if (!pieces.some((p) => p.id === id)) maps.delete(id);
     view.setPieces(pieces, selected);
     bed3d?.setPieces(pieces.map((piece) => ({ piece, map: mapOf(piece) })), selected);
+    for (const p of pieces) bed3d?.setBodies(p.id, analyses.get(p.id) ?? null, statesOf(p.id));
   };
   const onMove = (id: string, x: number, y: number, rot: number, done: boolean) => {
     pieces = pieces.map((p) => (p.id === id ? { ...p, x, y, rot } : p));
@@ -171,6 +233,7 @@ async function start() {
       bed3d.setBed(cfg.bedW, cfg.bedH);
       bed3d.onMove = onMove;
       bed3d.onSelect = onSelect;
+      bed3d.onBody = (pieceId, key) => setBodyState(pieceId, key, { out: !statesOf(pieceId).get(key)?.out });
       loading3d = false;
       pushPieces();
     }
@@ -212,12 +275,14 @@ async function start() {
   const quick = (label: string, fn: () => void) => h('button', { class: 'btn small', onclick: fn }, label);
   const pieceList = h('div', { class: 'pieces' });
   const pieceForm = h('div', { class: 'piece-form' });
+  const partsBox = h('div', { class: 'parts' });
   const side = h('aside', { class: 'side' },
     h('section', { class: 'card' }, status),
     h('section', { class: 'card' },
       h('div', { class: 'row' }, h('h3', {}, t('Material')), h('button', { class: 'btn small', onclick: () => addPiece() }, t('Material einlegen'))),
       pieceList,
-      pieceForm),
+      pieceForm,
+      partsBox),
     h('section', { class: 'card' }, h('h3', {}, t('Hier verbinden')), hint, h('h3', {}, t('Verbindungen')), clientsBox),
     h('section', { class: 'card notices-card' }, h('h3', {}, t('Hinweise')), notices),
     h('section', { class: 'card console' },
@@ -255,7 +320,13 @@ async function start() {
   const pieceLabel = (p: Piece) => `${lookName(resolveLook({ id: p.look }))} · ${fmt(p.w, 0)} × ${fmt(p.h, 0)} × ${fmt(p.t, 1)} mm`;
   let lastList = '';
   function renderPieces(force = true) {
-    const key = JSON.stringify([pieces.map((p) => [p.id, pieceLabel(p), (maps.get(p.id)?.through ?? 0) > 0]), selected]);
+    const cutState = (p: Piece) => {
+      const a = analyses.get(p.id);
+      const parts = a?.bodies.filter((b) => b.kind === 'part').length ?? 0;
+      const hang = a?.hanging.length ?? 0;
+      return [parts, hang, (maps.get(p.id)?.through ?? 0) > 0] as const;
+    };
+    const key = JSON.stringify([pieces.map((p) => [p.id, pieceLabel(p), cutState(p)]), selected]);
     if (!force && key === lastList) return;
     lastList = key;
     pieceList.replaceChildren(
@@ -264,10 +335,64 @@ async function start() {
             h('div', { class: `piece${p.id === selected ? ' on' : ''}`, onclick: () => onSelect(p.id === selected ? null : p.id) },
               h('span', { class: 'swatch', style: `background:${resolveLook({ id: p.look, color: p.color }).color}` }),
               h('span', {}, pieceLabel(p)),
-              (maps.get(p.id)?.through ?? 0) > 0 ? h('span', { class: 'cut small' }, t('durchgeschnitten')) : null))
+              (() => {
+                const [parts, hang, through] = cutState(p);
+                const txt = [parts ? t('{n} ausgeschnitten', { n: parts }) : through ? t('durchgeschnitten') : '', hang ? t('{n} hängt fest', { n: hang }) : ''].filter(Boolean).join(' · ');
+                return txt ? h('span', { class: `cut small${hang ? ' hang' : ''}` }, txt) : null;
+              })()))
         : [h('p', { class: 'muted small' }, t('Noch kein Material eingelegt. Gelaserte Linien brennen sich dann in Echtzeit ein.'))]),
     );
     renderPieceForm();
+    renderParts();
+  }
+
+  /** Cut-out parts of the selected piece: take out, turn over, look at */
+  let partsKey = '';
+  function renderParts() {
+    const p = pieces.find((q) => q.id === selected);
+    const a = p ? analyses.get(p.id) : undefined;
+    const st = p ? statesOf(p.id) : new Map<string, BodyState>();
+    const key = JSON.stringify([p?.id, a ? a.bodies.map((b) => b.key) : null, a?.hanging.map((x) => [x.cx, x.cy]), [...st]]);
+    if (key === partsKey) return;
+    partsKey = key;
+    if (!p || !a || (a.bodies.length <= 1 && !a.hanging.length)) {
+      partsBox.replaceChildren(p ? h('p', { class: 'muted small' }, t('Noch nichts ausgeschnitten. Ausgeschnittene Teile lassen sich hier herausnehmen und ansehen.')) : '');
+      return;
+    }
+    const look = async (k: string) => {
+      if (mode !== '3d') await setMode('3d');
+      bed3d?.focusBody(p.id, k);
+    };
+    const rows: (HTMLElement | null)[] = [];
+    const split = a.bodies.length > 1;
+    const parts = a.bodies.filter((b) => b.kind === 'part').sort((x, y) => y.area - x.area);
+    const rests = a.bodies.filter((b) => b.kind === 'rest').sort((x, y) => y.area - x.area);
+    const MAX = 40;
+    const row = (label: string, b: (typeof a.bodies)[number]) => {
+      const s = st.get(b.key) ?? {};
+      return h('div', { class: 'part' },
+        h('span', { class: 'name' }, label, h('span', { class: 'muted small' }, ` ${fmt(b.x1 - b.x0, 0)} × ${fmt(b.y1 - b.y0, 0)} mm`)),
+        h('button', { class: `btn small${s.out ? ' on' : ''}`, onclick: () => setBodyState(p.id, b.key, { out: !s.out }) }, s.out ? t('Zurücklegen') : t('Herausnehmen')),
+        h('button', { class: `btn small${s.flip ? ' on' : ''}`, title: t('Rückseite zeigen'), onclick: () => setBodyState(p.id, b.key, { flip: !s.flip }) }, t('Umdrehen')),
+        h('button', { class: 'btn small', onclick: () => look(b.key) }, t('Ansehen')));
+    };
+    if (split) {
+      rests.forEach((b, i) => rows.push(row(rests.length > 1 ? `${t('Restmaterial')} ${i + 1}` : t('Restmaterial'), b)));
+      parts.slice(0, MAX).forEach((b, i) => rows.push(row(`${t('Teil')} ${i + 1}`, b)));
+      if (parts.length > MAX) rows.push(h('p', { class: 'muted small' }, t('und {n} weitere kleine Teile', { n: parts.length - MAX })));
+    }
+    for (const hg of a.hanging) {
+      const [x, y] = toBed(p, hg.cx, hg.cy);
+      rows.push(h('p', { class: 'hang small' }, t('Teil bei X {x} / Y {y} hängt noch fest: der Schnitt geht nicht überall ganz durch (orange markiert).', { x: fmt(x, 0), y: fmt(y, 0) })));
+    }
+    const allOut = parts.length > 1 && parts.every((b) => st.get(b.key)?.out);
+    partsBox.replaceChildren(
+      h('div', { class: 'row' }, h('h3', {}, t('Ausgeschnitten')),
+        parts.length > 1
+          ? h('button', { class: 'btn small', onclick: () => parts.forEach((b) => setBodyState(p.id, b.key, { out: !allOut })) }, allOut ? t('Alle zurücklegen') : t('Alle Teile herausnehmen'))
+          : null),
+      ...rows.filter((r): r is HTMLElement => !!r),
+      split ? h('p', { class: 'muted small' }, t('Doppelklick auf ein Teil in der 3D-Ansicht nimmt es heraus oder legt es zurück.')) : '');
   }
 
   let formFor = '';
@@ -331,7 +456,7 @@ async function start() {
         ...num(t('Drehung (°)'), 'rot', -360, 1)),
       h('p', { class: 'muted small' }, t('Lage = vordere linke Ecke vor dem Drehen; gedreht wird um die Mitte. Eine neue Größe beginnt mit unbearbeitetem Material.')),
       h('div', { class: 'row quick' },
-        h('button', { class: 'btn small', onclick: () => (maps.get(p.id)?.clear(), renderPieces(), bed3d?.invalidate()) }, t('Abbrand entfernen')),
+        h('button', { class: 'btn small', onclick: () => (maps.get(p.id)?.clear(), bodyStates.delete(p.id), renderPieces(), bed3d?.invalidate()) }, t('Abbrand entfernen')),
         h('button', {
           class: 'btn small',
           onclick: () => {
@@ -342,7 +467,7 @@ async function start() {
             renderPieces();
             setMode(mode);
           },
-        }, t('Herausnehmen'))));
+        }, t('Material entfernen'))));
   }
   renderPieces();
   pushPieces();
@@ -430,6 +555,7 @@ async function start() {
 
   // ---------- polling ----------
   let busy = false;
+  let lastState = '';
   let lastPoll = 0;
   const frame = async (ts: number) => {
     requestAnimationFrame(frame);
@@ -453,6 +579,12 @@ async function start() {
       view.addSegments(p.segments);
       view.update(p.snapshot);
       bed3d?.update(p.snapshot);
+      if (p.snapshot.state === 'Idle' && lastState !== 'Idle' && lastState !== '') {
+        reportHanging = true;
+        lastAnalysis = 0;
+      }
+      lastState = p.snapshot.state;
+      analyseNext(ts);
       renderStatus(p.snapshot);
       renderClients(p.clients);
     } catch (err) {
