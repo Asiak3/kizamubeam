@@ -150,21 +150,20 @@ let opened = null, confirmations = 0, consent = true;
 globalThis.confirm = () => { confirmations++; return consent; };
 const translate = (text, vars = {}) => text.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 globalThis.__cameraUiMocks = {
-  CameraStream, cameraError: (error) => String(error), machine, device, isTauri: () => true,
-  onDeviceChange: subscribe(deviceListeners), runBlocker: () => null,
+  CameraStream, cameraError: (error) => String(error), machine, device,
+  onDeviceChange: subscribe(deviceListeners),
   openText: async () => opened,
   saveText: async (...args) => { saved.push(args); return true; },
   defaultLayer: deny('defaultLayer'), loadDoc: deny('loadDoc'), translate: deny('model.translate'),
   buildJob: deny('buildJob'), estimate: deny('estimate'), writeGCode: deny('writeGCode'),
-  FIRMWARES: { grbl: { jog: deny('firmware.jog'), home: 'TEST_ONLY_HOME' } },
-  jogLines: deny('jogLines'), rotaryOn: () => false,
+  FIRMWARES: { grbl: { jog: deny('firmware.jog') } },
   dec: (text) => text, t: translate, tn: (one, many, n) => translate(n === 1 ? one : many, { n }),
   openWorkpieceDialog: deny('openWorkpieceDialog'),
 };
 const mocks = {
-  './laser': ['device', 'onDeviceChange', 'runBlocker'], './machine': ['machine', 'isTauri'],
+  './laser': ['device', 'onDeviceChange'], './machine': ['machine'],
   './files': ['openText', 'saveText'], './model': ['defaultLayer', 'loadDoc', 'translate'],
-  './gcode': ['buildJob', 'estimate', 'writeGCode', 'FIRMWARES', 'jogLines', 'rotaryOn'],
+  './gcode': ['buildJob', 'estimate', 'writeGCode', 'FIRMWARES'],
   './i18n': ['dec', 't', 'tn'], './workpieceDialog': ['openWorkpieceDialog'],
 };
 // Synthetic connection data only; no URL is ever opened by this test.
@@ -325,14 +324,12 @@ const machineCount = machineListeners.size, deviceCount = deviceListeners.size;
 await button(tab, 'Kalibrieren …').click();
 const dialog = all(document.body, 'dialog')[0];
 assert.ok(dialog?.open, 'Actual calibration click must construct and open the dialog');
-const controls = all(dialog, '.calibration-machine-controls')[0];
-assert.ok(controls, 'Calibration dialog contains real machine controls');
+assert.equal(all(dialog, '.calibration-machine-controls').length, 0, 'New machine panel is excluded from the camera PR');
+for (const label of ['Connect', 'Home…', 'Z+', '←', '→', '↑', '↓'])
+  assert.equal(all(dialog, 'button').some((el) => el.textContent === label), false,
+    `Fixed-camera wizard must not include ${label} machine controls`);
 assert.equal(all(dialog, '.camera-image-controls').length, 1);
 assert.ok(dialog.textContent.includes('Unavailable (not reported by camera)'));
-for (const label of ['↑', 'Home…', 'Z+']) {
-  assert.equal(button(controls, label).disabled, true, `Disconnected ${label} is blocked`);
-  await button(controls, label).emit('click'); // Also exercise callback-side guards.
-}
 assert.equal(button(dialog, 'Markierungen lasern').disabled, true);
 await button(dialog, 'Markierungen lasern').emit('click');
 assert.equal(all(dialog, 'input').some((input) => input.getAttribute('aria-label') === 'Grid intensity'), false,
@@ -351,8 +348,6 @@ assert.ok(observers.filter((o) => o.active).length === 1, 'Only tab lifecycle ob
 const beforeCloseInput = storage.get('kizamubeam.camera');
 await change(dialogBrightness, 2, 'input');
 assert.equal(storage.get('kizamubeam.camera'), beforeCloseInput, 'Disposed image callbacks cannot persist');
-await button(controls, 'Connect').emit('click');
-await button(controls, '↑').emit('click');
 // Upstream network cameras also work inside the adjusted calibration wizard.
 stream.networkView = networkCanvas;
 stream.stream = null;

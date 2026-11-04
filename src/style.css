@@ -1222,8 +1222,6 @@ table.devices .actions {
   .camera-adjustment-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .camera-tab input[type="range"], .cal-left input[type="range"] { min-width: 0; width: 100%; }
-.calibration-machine-controls { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.calibration-machine-controls h3 { font-size: 14px; }
 .camera-image-controls fieldset { min-width: 0; border: 1px solid var(--line); padding: 8px; margin: 6px 0; }
 .camera-image-controls label { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(65px, 1.4fr) auto; gap: 5px; align-items: center; margin: 6px 0; }
 .camera-image-controls input[type="number"], .camera-image-controls select { width: 100%; min-width: 0; }
