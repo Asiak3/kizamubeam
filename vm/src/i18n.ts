@@ -78,6 +78,23 @@ const EN: Record<string, string> = {
   'Gespeichert.': 'Saved.',
   'Version {v}': 'Version {v}',
   Bett: 'Bed',
+  'Material': 'Material',
+  'Material einlegen': 'Place material',
+  'durchgeschnitten': 'cut through',
+  'Noch kein Material eingelegt. Gelaserte Linien brennen sich dann in Echtzeit ein.': 'No material placed yet. Once placed, lasered lines burn into it in real time.',
+  'Aussehen': 'Look',
+  'Breite (mm)': 'Width (mm)',
+  'Tiefe (mm)': 'Depth (mm)',
+  'Dicke (mm)': 'Thickness (mm)',
+  'Lage X (mm)': 'Position X (mm)',
+  'Lage Y (mm)': 'Position Y (mm)',
+  'Drehung (°)': 'Rotation (°)',
+  'Lage = vordere linke Ecke vor dem Drehen; gedreht wird um die Mitte. Eine neue Größe beginnt mit unbearbeitetem Material.': 'Position = front left corner before rotating; rotation is about the centre. A new size starts with unprocessed material.',
+  'Abbrand entfernen': 'Remove burns',
+  'Herausnehmen': 'Take out',
+  'Laserleistung (W, optisch)': 'Laser power (W, optical)',
+  'Material ziehen verschiebt es, mit Umschalt drehen, mit Alt ohne Raster. Ansicht: linke Maustaste dreht, rechte verschiebt, Rad zoomt.': 'Drag material to move it, with Shift to rotate, with Alt without snapping. View: left mouse button orbits, right pans, wheel zooms.',
+  'Material ziehen verschiebt es, mit Umschalt drehen, mit Alt ohne Raster.': 'Drag material to move it, with Shift to rotate, with Alt without snapping.',
 };
 
 const lang = (navigator.language || 'de').toLowerCase().startsWith('de') ? 'de' : 'en';
