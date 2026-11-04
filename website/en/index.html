@@ -51,6 +51,7 @@
       <ul>
         <li><a href="#features">Features</a></li>
         <li><a href="#hardware">Hardware</a></li>
+        <li class="nav-wide"><a href="#vm">Virtual Machine</a></li>
         <li><a href="#download">Download</a></li>
         <li><a href="#faq">FAQ</a></li>
       </ul>
@@ -304,7 +305,37 @@
   </div>
 </section>
 
-<section id="faq" class="section section-alt" aria-labelledby="faq-title">
+<section id="vm" class="section section-alt" aria-labelledby="vm-title">
+  <div class="container">
+    <article class="spotlight vm-spotlight">
+      <div class="spotlight-copy">
+        <p class="eyebrow">Test without a laser</p>
+        <h2 id="vm-title">KizamuBeam Virtual Machine</h2>
+        <p class="section-lead">A separate, free program that behaves like a laser running FluidNC. Send your job to it and watch it engrave and cut in real time – no material used and no risk to your machine.</p>
+        <ul class="ticks"><li>Emulates a FluidNC controller over Telnet (port 2323) and WebSocket (port 8181) – KizamuBeam connects through the “KizamuBeam Virtual Machine” device preset, other programs as a GRBL or FluidNC network device</li><li>Moves with real acceleration and a motion planner: run time, framing, homing and error messages just like on the machine</li><li>3D view of the bed with the laser module, plus a 2D top view</li><li>Place material: plywood, acrylic, cardboard and more – lines burn in according to power and speed</li><li>Take cut-out parts out, flip them over and inspect them from every side; parts that are still attached are flagged</li><li>Virtual camera above the bed or on the head – usable in KizamuBeam as a network camera, including calibration</li></ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="../assets/vm-parts.webp" alt="KizamuBeam Virtual Machine in the 3D view: cut-out parts lie next to the plywood sheet, machine state and material on the right" width="1200" height="800" loading="lazy" decoding="async">
+      </figure>
+    </article>
+
+    <div class="card vm-dl">
+      <div class="vm-dl-copy">
+        <h3>Download the Virtual Machine</h3>
+        <p class="vm-dl-lead" data-vm-lead data-template="Preview release {version} for macOS, Windows and Linux. Installs independently of KizamuBeam.">Preview release for macOS, Windows and Linux. Installs independently of KizamuBeam.</p>
+      </div>
+      <div class="vm-dl-buttons">
+        <a class="btn btn-secondary" href="https://github.com/negurvulkan/kizamubeam/releases?q=vm-v&amp;expanded=true" data-vm-dl="mac" aria-label="Download the Virtual Machine for macOS"><svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true" focusable="false"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1ZM13.9 5c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3-1.5Z"/></svg><span>macOS</span></a>
+        <a class="btn btn-secondary" href="https://github.com/negurvulkan/kizamubeam/releases?q=vm-v&amp;expanded=true" data-vm-dl="win" aria-label="Download the Virtual Machine for Windows"><svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true" focusable="false"><path d="M3 5.2 10.4 4v7.3H3Zm8.4-1.3L21 2.5v8.8h-9.6ZM3 12.7h7.4V20L3 18.8Zm8.4 0H21v8.8l-9.6-1.4Z"/></svg><span>Windows</span></a>
+        <a class="btn btn-secondary" href="https://github.com/negurvulkan/kizamubeam/releases?q=vm-v&amp;expanded=true" data-vm-dl="linux" aria-label="Download the Virtual Machine for Linux"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></svg><span>Linux</span></a>
+      </div>
+      <p class="vm-dl-foot"><a href="https://github.com/negurvulkan/kizamubeam/releases?q=vm-v&amp;expanded=true">All Virtual Machine releases on GitHub</a> <span aria-hidden="true">·</span> Unsigned like KizamuBeam itself: on macOS choose “Open Anyway”, on Windows “More info → Run anyway”.</p>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="section" aria-labelledby="faq-title">
   <div class="container narrow">
     <header class="section-head center">
       <h2 id="faq-title">Frequently asked questions</h2>

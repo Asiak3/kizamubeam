@@ -22,6 +22,7 @@
   "nav": {
     "features": "Funktionen",
     "hardware": "Hardware",
+    "vm": "Virtuelle Maschine",
     "download": "Download",
     "faq": "FAQ",
     "github": "GitHub",
@@ -147,7 +148,8 @@
     "gen": "Schubladen-Generator in der 3D-Ansicht: Teile mit Fingerzinken auseinandergezogen, keine Überschneidungen",
     "prod": "Dialog „Verschachteln“ über ausgewählten Teilen einer Box auf der Arbeitsfläche",
     "gearpair": "Dialog „Zahnradpaar erstellen“ mit Eingabefeldern und Vorschau der beiden Zahnräder",
-    "check": "Prüfung-Panel rechts mit einem Fehler und mehreren Warnungen samt Schaltflächen zum Beheben"
+    "check": "Prüfung-Panel rechts mit einem Fehler und mehreren Warnungen samt Schaltflächen zum Beheben",
+    "vm": "KizamuBeam Virtual Machine in der 3D-Ansicht: ausgeschnittene Teile liegen neben der Sperrholzplatte, rechts Zustand und Material"
   },
   "hw": {
     "eyebrow": "Hardware",
@@ -179,6 +181,27 @@
     "button_linux": "Für Linux herunterladen",
     "all_releases": "Alle Versionen und Prüfsummen auf GitHub",
     "source": "Lieber selbst bauen? Anleitung im README."
+  },
+  "vm": {
+    "eyebrow": "Ohne Laser testen",
+    "title": "KizamuBeam Virtual Machine",
+    "lead": "Ein eigenes, kostenloses Programm, das sich wie ein Laser mit FluidNC verhält. Schick deinen Auftrag hin und sieh in Echtzeit zu, wie er graviert und schneidet – ohne Material zu verbrauchen und ohne Risiko für deine Maschine.",
+    "b": [
+      "Emuliert einen FluidNC-Controller per Telnet (Port 2323) und WebSocket (Port 8181) – KizamuBeam verbindet sich über die Gerätevorlage „KizamuBeam Virtual Machine“, andere Programme als GRBL- oder FluidNC-Netzwerkgerät",
+      "Fährt mit echter Beschleunigung und Planer: Laufzeit, Rahmen, Referenzfahrt und Fehlermeldungen wie an der Maschine",
+      "3D-Ansicht des Bettes mit Lasermodul, Draufsicht in 2D",
+      "Material einlegen: Sperrholz, Acryl, Pappe und mehr – Linien brennen sich je nach Leistung und Tempo ein",
+      "Ausgeschnittene Teile herausnehmen, umdrehen und von allen Seiten ansehen; was noch festhängt, wird angezeigt",
+      "Virtuelle Kamera über dem Bett oder am Kopf – in KizamuBeam als Netzwerk-Kamera nutzbar, auch zum Kalibrieren"
+    ],
+    "dl_title": "Virtual Machine herunterladen",
+    "dl_lead": "Vorabversion für macOS, Windows und Linux. Unabhängig von KizamuBeam installierbar.",
+    "dl_lead_tpl": "Vorabversion {version} für macOS, Windows und Linux. Unabhängig von KizamuBeam installierbar.",
+    "button_mac": "Virtual Machine für macOS herunterladen",
+    "button_win": "Virtual Machine für Windows herunterladen",
+    "button_linux": "Virtual Machine für Linux herunterladen",
+    "all_releases": "Alle Versionen der Virtual Machine auf GitHub",
+    "note": "Nicht signiert wie KizamuBeam selbst: Unter macOS „Dennoch öffnen“, unter Windows „Weitere Informationen → Trotzdem ausführen“."
   },
   "beta": {
     "title": "Stabil – und weiter in Arbeit",

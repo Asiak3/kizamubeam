@@ -51,6 +51,7 @@
       <ul>
         <li><a href="#features">{{nav.features}}</a></li>
         <li><a href="#hardware">{{nav.hardware}}</a></li>
+        <li class="nav-wide"><a href="#vm">{{nav.vm}}</a></li>
         <li><a href="#download">{{nav.download}}</a></li>
         <li><a href="#faq">{{nav.faq}}</a></li>
       </ul>
@@ -286,7 +287,37 @@
   </div>
 </section>
 
-<section id="faq" class="section section-alt" aria-labelledby="faq-title">
+<section id="vm" class="section section-alt" aria-labelledby="vm-title">
+  <div class="container">
+    <article class="spotlight vm-spotlight">
+      <div class="spotlight-copy">
+        <p class="eyebrow">{{vm.eyebrow}}</p>
+        <h2 id="vm-title">{{vm.title}}</h2>
+        <p class="section-lead">{{vm.lead}}</p>
+        <ul class="ticks">{{#each vm.b}}<li>{{.}}</li>{{/each}}</ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="{{base}}assets/vm-parts.webp" alt="{{alt.vm}}" width="1200" height="800" loading="lazy" decoding="async">
+      </figure>
+    </article>
+
+    <div class="card vm-dl">
+      <div class="vm-dl-copy">
+        <h3>{{vm.dl_title}}</h3>
+        <p class="vm-dl-lead" data-vm-lead data-template="{{vm.dl_lead_tpl}}">{{vm.dl_lead}}</p>
+      </div>
+      <div class="vm-dl-buttons">
+        <a class="btn btn-secondary" href="{{vm_releases}}" data-vm-dl="mac" aria-label="{{vm.button_mac}}">{{svg:apple}}<span>{{dl.mac_title}}</span></a>
+        <a class="btn btn-secondary" href="{{vm_releases}}" data-vm-dl="win" aria-label="{{vm.button_win}}">{{svg:windows}}<span>{{dl.win_title}}</span></a>
+        <a class="btn btn-secondary" href="{{vm_releases}}" data-vm-dl="linux" aria-label="{{vm.button_linux}}">{{svg:terminal}}<span>{{dl.linux_title}}</span></a>
+      </div>
+      <p class="vm-dl-foot"><a href="{{vm_releases}}">{{vm.all_releases}}</a> <span aria-hidden="true">·</span> {{vm.note}}</p>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="section" aria-labelledby="faq-title">
   <div class="container narrow">
     <header class="section-head center">
       <h2 id="faq-title">{{faq.title}}</h2>

@@ -158,6 +158,8 @@ main:focus { outline: none; }
   color: var(--text-muted); font-weight: 500; font-size: .975rem; text-decoration: none;
 }
 .main-nav a:hover { color: var(--text); background: var(--surface-2); }
+.main-nav a { white-space: nowrap; }
+@media (max-width: 1099px) { .main-nav .nav-wide { display: none; } }
 .header-actions { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
 .lang-switch {
   display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 12px;
@@ -404,6 +406,23 @@ main:focus { outline: none; }
   margin-top: var(--s-5); font-size: var(--fs-small); color: var(--text-muted);
 }
 .safety .icon { width: 20px; height: 20px; color: var(--accent-text); }
+
+/* ---------- Virtual Machine ---------- */
+.vm-spotlight { margin-top: 0; }
+.vm-spotlight .eyebrow + h2 { font-size: var(--fs-h2); }
+.vm-spotlight .shot { box-shadow: var(--shadow); }
+.vm-dl { margin-top: var(--s-7); padding: var(--s-6) var(--s-5); display: grid; gap: var(--s-5); align-items: center; }
+.vm-dl h3 { font-size: var(--fs-h3); }
+.vm-dl-lead { margin-top: var(--s-2); color: var(--text-muted); }
+.vm-dl-buttons { display: grid; gap: var(--s-3); }
+.vm-dl-buttons .btn { justify-content: center; }
+.vm-dl-buttons .icon { width: 20px; height: 20px; }
+.vm-dl-foot { font-size: var(--fs-small); color: var(--text-muted); }
+@media (min-width: 560px) { .vm-dl-buttons { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 960px) {
+  .vm-dl { grid-template-columns: 5fr 7fr; column-gap: var(--s-7); padding: var(--s-6) var(--s-7); }
+  .vm-dl-foot { grid-column: 1 / -1; }
+}
 
 /* ---------- FAQ ---------- */
 .faq-list { display: grid; gap: var(--s-3); }

@@ -4,8 +4,9 @@ Static product page for KizamuBeam, served by GitHub Pages at
 <https://negurvulkan.github.io/kizamubeam/>. Plain HTML, one stylesheet, one small
 script. No framework, no build tools, no third-party requests (no CDNs, fonts or
 analytics). The only external call is an optional GitHub API request in `main.js`
-that points the download buttons at the newest release's files; if it fails, the
-buttons keep linking to the Releases page.
+that points the download buttons at the newest release's files (KizamuBeam itself and,
+separately, the newest `vm-v*` release of the Virtual Machine); if it fails, the
+buttons keep linking to the Releases page (for the VM: filtered to `vm-v`).
 
 ## Layout
 
