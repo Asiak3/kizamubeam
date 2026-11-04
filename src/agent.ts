@@ -267,6 +267,20 @@ const READ_TOOLS: ToolDef[] = [
     },
   },
   {
+    // AI-generated integration by GPT 6.1 Sol (OpenAI) via OpenCode.
+    name: 'get_stream_diagnostics',
+    title: 'Read stream diagnostics',
+    description:
+      'Read a bounded, metadata-only stream snapshot: session ID, transport configuration, sent/acknowledged/in-flight counts, last status and ages, pending write offsets, error kind, write duration, and recent events. Contains no G-code, project content, or secrets. Desktop only; does not connect, poll, or send commands to the controller.',
+    tier: Tier.Read,
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    run: async () => {
+      if (!isTauri()) throw new ToolError('Stream diagnostics are only supported in the desktop app; no controller commands were sent.');
+      const { invoke } = await import('@tauri-apps/api/core');
+      return json(await invoke('machine_stream_diagnostics'));
+    },
+  },
+  {
     name: 'machine_status',
     title: 'Maschinenstatus',
     description: 'Ob ein Laser verbunden ist, sein Zustand (Idle, Run, Hold, Alarm …), Position, ob gerade ein Job läuft und wie die letzte Anfrage eines Agenten (Job, Rahmen, Referenzfahrt) entschieden wurde. Nur lesend.',
