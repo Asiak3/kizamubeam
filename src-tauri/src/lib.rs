@@ -4,6 +4,7 @@ mod fonts;
 mod library;
 mod machine;
 mod native;
+mod netcam;
 mod packs;
 mod stream;
 mod sync;
@@ -157,6 +158,7 @@ pub fn run() {
         })
         .manage(machine::Machine::default())
         .manage(agent::Agent::default())
+        .manage(netcam::NetCams::default())
         .manage(updater::Pending::default())
         .manage(std::sync::Arc::new(native::Native::default()))
         .setup(|app| {
@@ -165,6 +167,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            netcam::netcam_open,
+            netcam::netcam_frame,
+            netcam::netcam_close,
             save_text_file,
             open_text_file,
             pick_file,

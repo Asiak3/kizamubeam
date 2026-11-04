@@ -12,6 +12,7 @@ const HELP: &str = "KizamuBeam Virtual Machine
 Optionen für --headless (sonst gelten die gespeicherten Einstellungen):
   --telnet-port N   Telnet-Port (Standard 2323, 0 = aus)
   --ws-port N       WebSocket-Port (Standard 8181, 0 = aus)
+  --camera-port N   Kamera-Port (Standard 8282, 0 = aus; ohne Fenster gibt es kein Bild)
   --lan             auch aus dem Netzwerk erreichbar (sonst nur 127.0.0.1)
   --grbl            als GRBL 1.1 statt FluidNC melden
   --bed BxH         Fahrweg in mm, z. B. 400x400
@@ -50,6 +51,11 @@ pub fn run(args: &[String]) -> i32 {
                 Some(p) => (cfg.ws_enabled, cfg.ws_port) = (true, p),
                 None => return 2,
             },
+            "--camera-port" => match num("--camera-port") {
+                Some(0) => cfg.camera_enabled = false,
+                Some(p) => (cfg.camera_enabled, cfg.camera_port) = (true, p),
+                None => return 2,
+            },
             "--bed" => {
                 let Some((w, h)) = it.next().and_then(|v| v.split_once(['x', 'X'])) else {
                     eprintln!("--bed: z. B. 400x400");
@@ -73,7 +79,7 @@ pub fn run(args: &[String]) -> i32 {
     let runner = Runner::start(cfg);
     let info = runner.info();
     let mut ok = false;
-    for (name, r) in [("Telnet", info.telnet), ("WebSocket", info.ws)] {
+    for (name, r) in [("Telnet", info.telnet), ("WebSocket", info.ws), ("Kamera", info.camera)] {
         match r {
             Some(Ok(a)) => {
                 ok = true;

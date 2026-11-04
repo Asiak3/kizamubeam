@@ -17,6 +17,61 @@ const HEAD_Z = 45;
 /** how often a changed burn map is sent to the graphics card at most (ms) */
 const UPLOAD_MS = 100;
 
+/** layer of helpers that only the window shows, not the virtual camera (paths, selection, markers) */
+const OVERLAY = 1;
+
+/** Settings of the virtual camera */
+export interface CameraView {
+  mount: 'fixed' | 'head';
+  width: number;
+  height: number;
+  /** barrel distortion: shift at the image corner in % of the half diagonal */
+  lens: number;
+}
+
+const CAM_BACKGROUND = new THREE.Color(0x2e3033);
+
+/** Head camera: offset from the laser spot (mm) and height above the bed */
+const HEAD_CAM = { dx: 0, dy: -50, z: HEAD_Z + 30, fov: 60 };
+
+/** Lens pass: samples the rendered image with barrel distortion, then tone mapping and sRGB like the screen */
+const LENS_SHADER = {
+  vertex: `varying vec2 vUv;
+void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragment: `uniform sampler2D tImage;
+uniform vec2 halfSize;
+uniform float k;
+uniform float m;
+varying vec2 vUv;
+// same as three.js NeutralToneMapping and the sRGB transfer, under own names (the chunks may already be in the prefix)
+vec3 neutralTM(vec3 color) {
+  const float StartCompression = 0.8 - 0.04;
+  const float Desaturation = 0.15;
+  float x = min(color.r, min(color.g, color.b));
+  float offset = x < 0.08 ? x - 6.25 * x * x : 0.04;
+  color -= offset;
+  float peak = max(color.r, max(color.g, color.b));
+  if (peak < StartCompression) return color;
+  float d = 1. - StartCompression;
+  float newPeak = 1. - d * d / (peak + d - StartCompression);
+  color *= newPeak / peak;
+  float g = 1. - 1. / (Desaturation * (peak - newPeak) + 1.);
+  return mix(color, vec3(newPeak), g);
+}
+vec3 toSRGB(vec3 c) {
+  return mix(pow(c, vec3(0.41666)) * 1.055 - vec3(0.055), c * 12.92, vec3(lessThanEqual(c, vec3(0.0031308))));
+}
+void main() {
+  // d: output point (unit = half the longer side), u = d * (1 + k |d|²): the ideal point that lands there
+  vec2 d = (vUv - 0.5) * 2.0 * halfSize;
+  vec2 u = d * (1.0 + k * dot(d, d));
+  vec2 st = u / (halfSize * m) * 0.5 + 0.5;
+  if (st.x < 0.0 || st.y < 0.0 || st.x > 1.0 || st.y > 1.0) { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+  vec3 c = texture2D(tImage, st).rgb;
+  gl_FragColor = vec4(toSRGB(clamp(neutralTM(c), 0.0, 1.0)), 1.0);
+}`,
+};
+
 const cssVar = (n: string, d: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || d;
 
 const texCache = new Map<string, THREE.DataTexture>();
@@ -138,6 +193,7 @@ export class Bed3D {
   private bedH = 0;
   private snap: Snapshot | null = null;
   private needsRender = true;
+  private cam: { view: THREE.PerspectiveCamera; rt: THREE.WebGLRenderTarget; out: THREE.WebGLRenderTarget; quad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>; scene: THREE.Scene; ortho: THREE.OrthographicCamera; pixels: Uint8Array; canvas: HTMLCanvasElement } | null = null;
   private raycaster = new THREE.Raycaster();
   private selected: string | null = null;
   active = false;
@@ -164,6 +220,7 @@ export class Bed3D {
     sun.position.set(-0.6, -1.2, 2);
     this.scene.add(sun);
     this.camera.up.set(0, 0, 1);
+    this.camera.layers.enable(OVERLAY);
     // registered before OrbitControls, so a drag on a piece can switch the orbit off first
     this.bindPointer();
     this.controls = new OrbitControls(this.camera, this.canvas);
@@ -294,6 +351,7 @@ export class Bed3D {
     if (!this.traces) {
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(this.bedW || 1, this.bedH || 1), new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
       mesh.position.set(this.bedW / 2, this.bedH / 2, 0.05);
+      mesh.layers.set(OVERLAY);
       this.traces = { mesh, tex: null as unknown as THREE.CanvasTexture };
       this.scene.add(mesh);
     }
@@ -364,6 +422,7 @@ export class Bed3D {
     box.position.z = t / 2;
     const outline = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w + 1, h + 1, t + 0.4)), new THREE.LineBasicMaterial({ color: new THREE.Color(cssVar('--accent', '#1f6feb')) }));
     outline.position.z = t / 2;
+    outline.layers.set(OVERLAY);
     group.add(box, top, bottom, outline);
     for (const m of [top, bottom, box]) m.userData.pieceId = piece.id;
     const bodies = new THREE.Group();
@@ -416,6 +475,7 @@ export class Bed3D {
           for (let i = 0; i < hg.loop.length; i += 2) pts.push(new THREE.Vector3(hg.loop[i] - w / 2 - home.x, hg.loop[i + 1] - h / 2 - home.y, t + 0.3));
           const line = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xff8c1a }));
           line.userData.hanging = true;
+          line.layers.set(OVERLAY);
           holder.add(line);
         }
       }
@@ -492,6 +552,14 @@ export class Bed3D {
   draw() {
     if (!this.active) return;
     if (this.controls.update()) this.needsRender = true;
+    this.prepare();
+    if (!this.needsRender) return;
+    this.needsRender = false;
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  /** Bring the scene up to date: changed burn maps to the graphics card, head and beam to the current state */
+  private prepare() {
     const now = performance.now();
     for (const o of this.objs) {
       if (o.map.dirty && now - o.uploaded > UPLOAD_MS) {
@@ -501,8 +569,6 @@ export class Bed3D {
         this.needsRender = true;
       }
     }
-    if (!this.needsRender) return;
-    this.needsRender = false;
     const s = this.snap;
     const hx = s ? s.head[0] : 0,
       hy = s ? s.head[1] : 0;
@@ -520,7 +586,103 @@ export class Bed3D {
       this.glow.scale.set(k, k, 1);
       (this.beam.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.6 * s!.power;
     }
-    this.renderer.render(this.scene, this.camera);
+  }
+
+  // ---------- virtual camera ----------
+
+  /**
+   * One image of the virtual camera as a canvas: fixed above the bed (slightly behind the centre, so the
+   * bed appears in perspective as with a camera in the lid) or on the laser head. Paths, selection and
+   * markers of the window are not in it. Works also while the 3D view is hidden.
+   */
+  cameraImage(v: CameraView): HTMLCanvasElement {
+    this.prepare();
+    const w = Math.round(v.width),
+      h = Math.round(v.height);
+    // the lens pulls the corners in, so the scene is rendered a bit wider than the image
+    const L = Math.max(w, h);
+    const half = new THREE.Vector2(w / L, h / L);
+    const k = v.lens / 100 / half.lengthSq();
+    const m = 1 + v.lens / 100;
+    let c = this.cam;
+    if (!c || c.rt.width !== w || c.rt.height !== h) {
+      c?.rt.dispose();
+      c?.out.dispose();
+      const rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 });
+      const out = new THREE.WebGLRenderTarget(w, h);
+      const quad = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.ShaderMaterial({
+          uniforms: { tImage: { value: rt.texture }, halfSize: { value: half }, k: { value: k }, m: { value: m } },
+          vertexShader: LENS_SHADER.vertex,
+          fragmentShader: LENS_SHADER.fragment,
+          depthTest: false,
+        }),
+      );
+      const scene = new THREE.Scene();
+      quad.frustumCulled = false;
+      scene.add(quad);
+      const canvas = c?.canvas ?? document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      c = this.cam = { view: c?.view ?? new THREE.PerspectiveCamera(), rt, out, quad, scene, ortho: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1), pixels: new Uint8Array(w * h * 4), canvas };
+      c.view.layers.set(0);
+    }
+    const u = c.quad.material.uniforms;
+    u.halfSize.value = half;
+    u.k.value = k;
+    u.m.value = m;
+
+    const cam = c.view;
+    cam.aspect = w / h;
+    cam.up.set(0, 1, 0);
+    // vertical opening widened by m for the lens
+    const widen = (fov: number) => (2 * Math.atan(Math.tan((fov * Math.PI) / 360) * m) * 180) / Math.PI;
+    if (v.mount === 'head') {
+      const s = this.snap;
+      const hx = (s ? s.head[0] : 0) + HEAD_CAM.dx,
+        hy = (s ? s.head[1] : 0) + HEAD_CAM.dy;
+      cam.fov = widen(HEAD_CAM.fov);
+      cam.position.set(hx, hy, HEAD_CAM.z);
+      cam.lookAt(hx, hy, 0);
+      cam.near = 1;
+      cam.far = 500;
+    } else {
+      const W = this.bedW || 400,
+        H = this.bedH || 400;
+      const fov = 60;
+      const t = Math.tan((fov * Math.PI) / 360);
+      // high enough that the whole bed plus a margin fits
+      const z = Math.max(H / 2 / t, W / 2 / (t * cam.aspect)) * 1.2 + HEAD_Z;
+      cam.fov = widen(fov);
+      cam.position.set(W / 2, H / 2 + H * 0.06, z);
+      cam.lookAt(W / 2, H / 2, 0);
+      cam.near = 10;
+      cam.far = z * 4;
+    }
+    cam.updateProjectionMatrix();
+
+    const r = this.renderer;
+    const prevTarget = r.getRenderTarget();
+    // the camera sees the machine's surroundings, not the window's background colour
+    const bg = this.scene.background;
+    this.scene.background = CAM_BACKGROUND;
+    r.setRenderTarget(c.rt);
+    r.render(this.scene, cam);
+    this.scene.background = bg;
+    r.setRenderTarget(c.out);
+    r.render(c.scene, c.ortho);
+    r.readRenderTargetPixels(c.out, 0, 0, w, h, c.pixels);
+    r.setRenderTarget(prevTarget);
+
+    // WebGL rows start at the bottom
+    const g = c.canvas.getContext('2d')!;
+    const img = g.createImageData(w, h);
+    const row = w * 4;
+    for (let y = 0; y < h; y++) img.data.set(c.pixels.subarray((h - 1 - y) * row, (h - y) * row), y * row);
+    g.putImageData(img, 0, 0);
+    this.needsRender = true;
+    return c.canvas;
   }
 
   // ---------- moving pieces with the mouse ----------

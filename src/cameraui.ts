@@ -13,7 +13,7 @@ import { device, onDeviceChange } from './laser';
 import {
   bedToPixel, buildRemap, buildRemapRect, calibFits, calibrate, CameraCalib, cameraError, CameraMount, CameraSettings,
   CameraStream, coverRect, DEFAULT_CAMERA, footprint, headMarkRect, headShift, markPositionsIn, MarkSettings,
-  Rect, Remap, warp,
+  NETCAM_EXAMPLES, Rect, Remap, warp,
 } from './camera';
 import { dec, t, tn } from './i18n';
 import { openWorkpieceDialog } from './workpieceDialog';
@@ -149,7 +149,7 @@ class CamUnit {
 
   async connect(ed: Editor) {
     const s = this.s;
-    await this.stream.start(s.cam, s.width, s.height);
+    await this.stream.start(s.cam, s.width, s.height, s.url ?? '');
     // Gewählte Kamera merken (deviceId kann nach der ersten Freigabe erst feststehen)
     s.cam = this.stream.deviceId || s.cam;
     s.label = this.stream.label || s.label;
@@ -441,6 +441,19 @@ export function cameraTab(ed: Editor): HTMLElement {
   ) as HTMLSelectElement;
   const camSel = h('select', { title: t('Kamera') }) as HTMLSelectElement;
   const resSel = h('select', { title: t('Gewünschte Auflösung (die Kamera nimmt die nächstmögliche)') }) as HTMLSelectElement;
+  /** option value of the network camera in the camera list */
+  const NET = '__net__';
+  const urlList = h('datalist', { id: 'netcam-urls' }, ...NETCAM_EXAMPLES.map((u) => h('option', { value: u })));
+  const urlIn = h('input', {
+    type: 'url',
+    list: 'netcam-urls',
+    style: 'grid-column: 1 / -1',
+    spellcheck: false,
+    placeholder: NETCAM_EXAMPLES[0],
+    title: t('MJPEG-Stream oder Einzelbild über http://, z. B. ESP32-CAM (Port 81, /stream) oder die KizamuBeam Virtual Machine (Port 8282, /stream)'),
+  }) as HTMLInputElement;
+  const urlLbl = h('label', {}, t('Adresse'));
+  const resLbl = h('label', {}, t('Auflösung'));
   const connBtn = h('button', { class: 'btn' }, t('Verbinden')) as HTMLButtonElement;
   const dot = h('span', { class: 'dot' });
   const stTxt = h('span', {});
@@ -475,8 +488,9 @@ export function cameraTab(ed: Editor): HTMLElement {
     camSel.textContent = '';
     if (!list.length) camSel.append(h('option', { value: s.cam }, s.label || t('Standardkamera')));
     list.forEach((d, i) =>
-      camSel.append(h('option', { value: d.deviceId, selected: d.deviceId === s.cam || (!!s.label && d.label === s.label) }, d.label || t('Kamera {i}', { i: i + 1 }))),
+      camSel.append(h('option', { value: d.deviceId, selected: !s.url && (d.deviceId === s.cam || (!!s.label && d.label === s.label)) }, d.label || t('Kamera {i}', { i: i + 1 }))),
     );
+    camSel.append(h('option', { value: NET, selected: !!s.url }, t('Netzwerk-Kamera (Adresse)')));
   };
   RESOLUTIONS.forEach(([w, hh]) => resSel.append(h('option', { value: `${w}x${hh}` }, `${w} × ${hh}`)));
 
@@ -494,13 +508,18 @@ export function cameraTab(ed: Editor): HTMLElement {
     if (document.activeElement !== nameIn) nameIn.value = s.name;
     mountSel.value = s.mount;
     resSel.value = `${s.width}x${s.height}`;
+    // network camera: address instead of resolution (the camera sends its own size)
+    const net = !!s.url;
+    urlLbl.hidden = urlIn.hidden = !net;
+    resLbl.hidden = resSel.hidden = net;
+    if (document.activeElement !== urlIn) urlIn.value = s.url ?? '';
     show.checked = s.show;
     live.checked = s.live;
     opacity.value = String(s.opacity);
     connBtn.textContent = cam.open ? t('Trennen') : t('Verbinden');
     dot.className = `dot ${cam.open ? 'ok' : ''}`;
     stTxt.textContent = cam.open ? t('Verbunden, {width} × {height}', { width: cam.width, height: cam.height }) : t('Nicht verbunden');
-    if (preview.firstChild !== cam.video) preview.replaceChildren(cam.video);
+    if (preview.firstChild !== cam.view) preview.replaceChildren(cam.view);
     preview.hidden = !cam.open;
     const c = s.calib;
     if (!c) calTxt.textContent = t('Nicht kalibriert. Ohne Kalibrierung erscheint das Bild nicht auf der Arbeitsfläche.');
@@ -586,8 +605,20 @@ export function cameraTab(ed: Editor): HTMLElement {
   });
   camSel.addEventListener('change', async () => {
     const s = cfg();
-    s.cam = camSel.value;
-    s.label = camSel.selectedOptions[0]?.textContent ?? '';
+    if (camSel.value === NET) {
+      s.url = s.url || urlIn.value.trim() || NETCAM_EXAMPLES[0];
+    } else {
+      s.url = '';
+      s.cam = camSel.value;
+      s.label = camSel.selectedOptions[0]?.textContent ?? '';
+    }
+    save();
+    refresh();
+    if (cur().stream.open) await reconnect();
+  });
+  urlIn.addEventListener('change', async () => {
+    const s = cfg();
+    s.url = urlIn.value.trim() || NETCAM_EXAMPLES[0];
     save();
     if (cur().stream.open) await reconnect();
   });
@@ -678,8 +709,10 @@ export function cameraTab(ed: Editor): HTMLElement {
       h('label', {}, t('Name')), nameIn,
       h('label', {}, t('Montage')), mountSel,
       h('label', {}, t('Kamera')), h('div', { class: 'conn-row' }, camSel, h('button', { class: 'ib small', title: t('Kameras neu suchen'), html: ICONS.refresh, onclick: () => loadCams() })),
-      h('label', {}, t('Auflösung')), resSel,
+      urlLbl, urlIn,
+      resLbl, resSel,
     ),
+    urlList,
     h('div', { class: 'conn-row' }, connBtn, calBtn),
     preview,
     calTxt,

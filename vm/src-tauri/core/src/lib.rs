@@ -4,11 +4,12 @@
 //! travelled with which power. Without UI, so the same core runs in the program, headless and in
 //! tests.
 
+pub mod camera;
 pub mod config;
 pub mod gcode;
 pub mod machine;
 pub mod net;
 
-pub use config::{Config, Flavor};
+pub use config::{CameraMount, Config, Flavor};
 pub use machine::{ClientId, Event, Machine, Out, Segment, Snapshot};
 pub use net::Runner;

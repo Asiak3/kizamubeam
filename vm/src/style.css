@@ -641,3 +641,14 @@ canvas.bed3d {
 .parts .hang {
   margin: 4px 0;
 }
+
+.cam .status dd {
+  text-align: left;
+}
+.cam .status {
+  grid-template-columns: auto 1fr;
+}
+.sel {
+  user-select: text;
+  word-break: break-all;
+}
