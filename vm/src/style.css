@@ -508,3 +508,34 @@ canvas.bed3d {
   padding: 1px 2px;
   height: 28px;
 }
+
+.parts {
+  margin-top: 8px;
+}
+.parts:empty {
+  display: none;
+}
+.parts .part {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 0;
+}
+.parts .part .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.btn.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.piece .cut.hang,
+.parts .hang {
+  color: var(--warn);
+}
+.parts .hang {
+  margin: 4px 0;
+}

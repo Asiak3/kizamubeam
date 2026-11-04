@@ -101,6 +101,8 @@ export class BurnMap {
   readonly tex: Uint8Array;
   /** set when tex changed; the view clears it after uploading */
   dirty = true;
+  /** counts changes (for the cut-out analysis) */
+  version = 0;
   private params: BurnParams;
   private thick: number;
   /** a coarse grid spreads a line over a wider pixel than the spot; this undoes the thinning for marks and cuts */
@@ -130,6 +132,7 @@ export class BurnMap {
     this.thick = thick;
     for (let i = 0; i < this.energy.length; i++) this.shade(i);
     this.dirty = true;
+    this.version++;
   }
 
   clear() {
@@ -137,6 +140,7 @@ export class BurnMap {
     this.tex.fill(0);
     this.through = 0;
     this.dirty = true;
+    this.version++;
   }
 
   /** Mark strength 0…1 for an energy density */
@@ -206,6 +210,7 @@ export class BurnMap {
       this.add(ax + (bx - ax) * f, ay + (by - ay) * f, e);
     }
     this.dirty = true;
+    this.version++;
   }
 
   /** Total stored energy in J (for tests) */
