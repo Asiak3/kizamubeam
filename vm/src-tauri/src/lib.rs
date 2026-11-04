@@ -40,6 +40,9 @@ struct Poll {
     /// 7 numbers per segment: x0, y0, x1, y1, power 0…1, duration s, rapid 0/1
     segments: Vec<f32>,
     clients: Vec<ClientInfo>,
+    /// someone watches the camera: the window should render images
+    camera_wanted: bool,
+    camera_viewers: usize,
 }
 
 #[tauri::command]
@@ -53,7 +56,26 @@ fn vm_poll(vm: State<'_, Vm>) -> Poll {
     for s in r.take_segments() {
         segments.extend_from_slice(&[s.x0, s.y0, s.x1, s.y1, s.power, s.dur, if s.rapid { 1.0 } else { 0.0 }]);
     }
-    Poll { snapshot: r.snapshot(), events, segments, clients: r.clients() }
+    let cam = r.camera();
+    Poll {
+        snapshot: r.snapshot(),
+        events,
+        segments,
+        clients: r.clients(),
+        camera_wanted: cam.wanted(),
+        camera_viewers: cam.viewers(),
+    }
+}
+
+/// Camera image from the window (JPEG as raw body)
+#[tauri::command]
+fn vm_camera_frame(vm: State<'_, Vm>, request: tauri::ipc::Request<'_>) -> Result<(), String> {
+    let tauri::ipc::InvokeBody::Raw(jpeg) = request.body() else {
+        return Err("JPEG erwartet".into());
+    };
+    let cam = vm.0.lock().unwrap().camera();
+    cam.push(jpeg.clone());
+    Ok(())
 }
 
 #[tauri::command]
@@ -119,6 +141,7 @@ pub fn run() {
         .manage(Vm(Mutex::new(runner)))
         .invoke_handler(tauri::generate_handler![
             vm_poll,
+            vm_camera_frame,
             vm_config,
             vm_set_config,
             vm_server_info,

@@ -12,7 +12,7 @@ import type { Bed3D, BodyState } from './view3d';
 import { LOOK_GROUPS, LOOKS, lookName, resolveLook } from '../../src/view3d/looks';
 import { t as tApp } from '../../src/i18n';
 
-const VERSION = '0.3.1';
+const VERSION = '0.4.0';
 const PIECES_KEY = 'kizamubeam-vm.pieces';
 const VIEW_KEY = 'kizamubeam-vm.view';
 
@@ -244,6 +244,21 @@ async function start() {
   let mode: '2d' | '3d' = store.get(VIEW_KEY) === '3d' ? '3d' : '2d';
   let bed3d: Bed3D | null = null;
   let loading3d = false;
+  /** The 3D scene, also needed by the camera while the 2D view is shown */
+  async function load3d() {
+    if (bed3d || loading3d) return;
+    loading3d = true;
+    const { Bed3D } = await import('./view3d');
+    bed3d = new Bed3D(stage);
+    bed3d.canvas.style.display = mode === '3d' ? '' : 'none';
+    bed3d.setBed(cfg.bedW, cfg.bedH);
+    bed3d.onMove = onMove;
+    bed3d.onSelect = onSelect;
+    bed3d.onBody = (pieceId, key) => setBodyState(pieceId, key, { out: !statesOf(pieceId).get(key)?.out });
+    loading3d = false;
+    pushPieces();
+  }
+
   async function setMode(m: '2d' | '3d') {
     mode = m;
     store.set(VIEW_KEY, m);
@@ -254,17 +269,7 @@ async function start() {
         ? t('Material ziehen verschiebt es, mit Umschalt drehen, mit Alt ohne Raster. Ansicht: linke Maustaste dreht, rechte verschiebt, Rad zoomt.')
         : t('Material ziehen verschiebt es, mit Umschalt drehen, mit Alt ohne Raster.')
       : '';
-    if (m === '3d' && !bed3d && !loading3d) {
-      loading3d = true;
-      const { Bed3D } = await import('./view3d');
-      bed3d = new Bed3D(stage);
-      bed3d.setBed(cfg.bedW, cfg.bedH);
-      bed3d.onMove = onMove;
-      bed3d.onSelect = onSelect;
-      bed3d.onBody = (pieceId, key) => setBodyState(pieceId, key, { out: !statesOf(pieceId).get(key)?.out });
-      loading3d = false;
-      pushPieces();
-    }
+    if (m === '3d') await load3d();
     view.canvas.style.display = m === '2d' ? '' : 'none';
     if (bed3d) {
       bed3d.canvas.style.display = m === '3d' ? '' : 'none';
@@ -304,6 +309,7 @@ async function start() {
   const pieceList = h('div', { class: 'pieces' });
   const pieceForm = h('div', { class: 'piece-form' });
   const partsBox = h('div', { class: 'parts' });
+  const camBox = h('div', { class: 'cam' });
   const side = h('aside', { class: 'side' },
     h('section', { class: 'card', 'data-id': 'state' }, h('h3', {}, t('Maschine')), status),
     h('section', { class: 'card', 'data-id': 'material' },
@@ -312,6 +318,7 @@ async function start() {
       pieceForm,
       partsBox),
     h('section', { class: 'card', 'data-id': 'connect' }, h('h3', {}, t('Hier verbinden')), hint, h('h3', {}, t('Verbindungen')), clientsBox),
+    h('section', { class: 'card', 'data-id': 'camera' }, h('h3', {}, t('Kamera')), camBox),
     h('section', { class: 'card notices-card', 'data-id': 'notices' }, h('h3', {}, t('Hinweise')), notices),
     h('section', { class: 'card console', 'data-id': 'console' },
       h('div', { class: 'row' }, h('h3', {}, t('Konsole')), h('label', { class: 'small' }, showStatus, ' ', t('Statusabfragen zeigen'))),
@@ -577,8 +584,34 @@ async function start() {
       if ('Err' in r) return h('span', { class: 'chip err', title: r.Err }, `${label}: ${r.Err}`);
       return h('span', { class: 'chip ok', title: r.Ok }, `${label}: ${prefix}${r.Ok}`);
     };
-    chips.append(chip(t('Telnet'), info.telnet), chip(t('WebSocket'), info.ws, 'ws://'));
+    chips.append(chip(t('Telnet'), info.telnet), chip(t('WebSocket'), info.ws, 'ws://'), chip(t('Kamera'), info.camera, 'http://'));
+    renderCamera(-1);
   };
+
+  /** Camera card: addresses to copy and who watches; viewers -1 = keep the count */
+  let camViewers = 0;
+  let lastCam = '';
+  function renderCamera(viewers: number) {
+    if (viewers >= 0) camViewers = viewers;
+    const r = info.camera;
+    const key = JSON.stringify([r, camViewers, cfg.cameraMount, cfg.cameraWidth, cfg.cameraHeight]);
+    if (key === lastCam) return;
+    lastCam = key;
+    if (!r) return void camBox.replaceChildren(h('p', { class: 'muted' }, t('Die Kamera ist ausgeschaltet (Einstellungen → Kamera).')));
+    if ('Err' in r) return void camBox.replaceChildren(h('p', { class: 'bad' }, r.Err));
+    const base = `http://${r.Ok}`;
+    const url = (label: string, u: string) => [h('dt', {}, label), h('dd', { class: 'mono sel' }, u)];
+    camBox.replaceChildren(
+      h('dl', { class: 'status' },
+        ...url(t('Stream (MJPEG)'), `${base}/stream`),
+        ...url(t('Einzelbild'), `${base}/capture`),
+        h('dt', {}, t('Montage')), h('dd', {}, cfg.cameraMount === 'head' ? t('am Laserkopf') : t('fest über dem Bett')),
+        h('dt', {}, t('Bild')), h('dd', { class: 'mono' }, `${cfg.cameraWidth} × ${cfg.cameraHeight}`),
+        h('dt', {}, t('Zuschauer')), h('dd', { class: 'mono' }, String(camViewers))),
+      h('p', { class: 'hint' }, t('In KizamuBeam: Fenster „Kamera“ → Kamera „Netzwerk-Kamera“ mit der Stream-Adresse. Die Kamera sieht, was gelasert wurde, aber keine Fahrwege.')),
+    );
+  }
+
   renderChips();
 
   const row = (k: string, v: string, cls = '') => [h('dt', {}, k), h('dd', { class: cls }, v)];
@@ -649,6 +682,31 @@ async function start() {
     }
   };
 
+  // ---------- virtual camera ----------
+  let camBusy = false;
+  let camAt = 0;
+  /** Render one camera image and hand it to the HTTP server (at most cameraFps per second) */
+  const sendCameraFrame = (ts: number) => {
+    if (camBusy || ts - camAt < 1000 / cfg.cameraFps) return;
+    camAt = ts;
+    if (!bed3d) return void load3d();
+    camBusy = true;
+    const canvas = bed3d.cameraImage({ mount: cfg.cameraMount, width: cfg.cameraWidth, height: cfg.cameraHeight, lens: cfg.cameraLens });
+    canvas.toBlob(
+      async (b) => {
+        try {
+          if (b) await api.cameraFrame(new Uint8Array(await b.arrayBuffer()));
+        } catch (e) {
+          console.error(e);
+        } finally {
+          camBusy = false;
+        }
+      },
+      'image/jpeg',
+      0.85,
+    );
+  };
+
   // ---------- polling ----------
   let busy = false;
   let lastState = '';
@@ -683,6 +741,8 @@ async function start() {
       analyseNext(ts);
       renderStatus(p.snapshot);
       renderClients(p.clients);
+      renderCamera(p.cameraViewers);
+      if (cfg.cameraEnabled && p.cameraWanted) sendCameraFrame(ts);
     } catch (err) {
       console.error(err);
     } finally {
@@ -715,6 +775,20 @@ async function start() {
     const mpos = h('input', { type: 'checkbox', checked: (c.statusMask & 1) === 1 });
     const bf = h('input', { type: 'checkbox', checked: (c.statusMask & 2) === 2 });
     const note = h('p', { class: 'note' });
+    const mountSel = h('select', { onchange: () => (c.cameraMount = mountSel.value as Config['cameraMount']) },
+      h('option', { value: 'fixed' }, t('fest über dem Bett')),
+      h('option', { value: 'head' }, t('am Laserkopf')));
+    mountSel.value = c.cameraMount;
+    const RES = [[640, 480], [1280, 720], [1600, 1200], [1920, 1080]];
+    const resSel = h('select', {
+      onchange: () => {
+        const [w, hh] = resSel.value.split('x').map(Number);
+        c.cameraWidth = w;
+        c.cameraHeight = hh;
+      },
+    }, ...RES.map(([w, hh]) => h('option', { value: `${w}x${hh}` }, `${w} × ${hh}`)));
+    if (!RES.some(([w, hh]) => w === c.cameraWidth && hh === c.cameraHeight)) resSel.append(h('option', { value: `${c.cameraWidth}x${c.cameraHeight}` }, `${c.cameraWidth} × ${c.cameraHeight}`));
+    resSel.value = `${c.cameraWidth}x${c.cameraHeight}`;
     const themeSel = h('select', {},
       h('option', { value: 'system' }, t('Wie das System')),
       h('option', { value: 'light' }, t('Hell')),
@@ -754,6 +828,13 @@ async function start() {
         check(t('Telnet-Port'), 'telnetEnabled'), h('input', { type: 'number', min: 1, max: 65535, value: String(c.telnetPort), onchange: (e: Event) => (c.telnetPort = Number((e.target as HTMLInputElement).value)) }),
         check(t('WebSocket-Port'), 'wsEnabled'), h('input', { type: 'number', min: 1, max: 65535, value: String(c.wsPort), onchange: (e: Event) => (c.wsPort = Number((e.target as HTMLInputElement).value)) })),
       check(t('Auch aus dem Netzwerk erreichbar (sonst nur von diesem Rechner)'), 'lan'),
+      h('h3', {}, t('Kamera')),
+      h('div', { class: 'grid' },
+        check(t('Kamera-Port'), 'cameraEnabled'), h('input', { type: 'number', min: 1, max: 65535, value: String(c.cameraPort), onchange: (e: Event) => (c.cameraPort = Number((e.target as HTMLInputElement).value)) }),
+        h('label', {}, t('Montage')), mountSel,
+        h('label', {}, t('Bildgröße (Pixel)')), resSel,
+        ...num(t('Bilder pro Sekunde'), 'cameraFps', 1, 1),
+        ...num(t('Linsenverzeichnung (%)'), 'cameraLens', 0.5, 0)),
       lan.length ? h('p', { class: 'muted small' }, t('Adresse im Netzwerk: {ip}', { ip: lan.join(', ') })) : null,
       h('p', { class: 'muted small' }, t('Ports unter 1024 brauchen auf macOS und Linux Administratorrechte.')),
       note,
@@ -763,10 +844,11 @@ async function start() {
           class: 'btn primary',
           onclick: async () => {
             c.statusMask = (mpos.checked ? 1 : 0) | (bf.checked ? 2 : 0);
-            for (const p of [c.telnetPort, c.wsPort]) {
+            for (const p of [c.telnetPort, c.wsPort, c.cameraPort]) {
               if (!Number.isInteger(p) || p < 1 || p > 65535) return void (note.textContent = t('Port {p} ist ungültig.', { p }));
             }
-            if (c.telnetEnabled && c.wsEnabled && c.telnetPort === c.wsPort) return void (note.textContent = t('Telnet und WebSocket brauchen verschiedene Ports.'));
+            const used = [c.telnetEnabled && c.telnetPort, c.wsEnabled && c.wsPort, c.cameraEnabled && c.cameraPort].filter((p) => p !== false);
+            if (new Set(used).size < used.length) return void (note.textContent = t('Telnet, WebSocket und Kamera brauchen verschiedene Ports.'));
             setTheme(themeSel.value as Theme);
             layout.left = sideSel.value === 'left';
             saveSide(layout);

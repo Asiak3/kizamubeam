@@ -28,6 +28,15 @@ export interface Config {
   lan: boolean;
   /** optical laser power at 100 % in W (for burning the virtual material) */
   laserWatts: number;
+  /** virtual camera: HTTP server with MJPEG stream and single images */
+  cameraEnabled: boolean;
+  cameraPort: number;
+  cameraMount: 'fixed' | 'head';
+  cameraWidth: number;
+  cameraHeight: number;
+  cameraFps: number;
+  /** barrel distortion: shift at the image corner in % of the half diagonal */
+  cameraLens: number;
 }
 
 export interface Snapshot {
@@ -71,17 +80,21 @@ export interface Poll {
   /** 7 numbers per segment: x0, y0, x1, y1, power, duration, rapid */
   segments: number[];
   clients: ClientInfo[];
+  /** someone watches the camera, so images should be rendered */
+  cameraWanted: boolean;
+  cameraViewers: number;
 }
 
 type Res = { Ok: string } | { Err: string } | null;
 export interface ServerInfo {
   telnet: Res;
   ws: Res;
+  camera: Res;
 }
 
 export const hasNative = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+async function invoke<T>(cmd: string, args?: Record<string, unknown> | Uint8Array): Promise<T> {
   const { invoke } = await import('@tauri-apps/api/core');
   return invoke<T>(cmd, args);
 }
@@ -96,4 +109,6 @@ export const api = {
   realtime: (byte: number) => invoke<void>('vm_realtime', { byte }),
   powerCycle: () => invoke<void>('vm_power_cycle'),
   lanAddresses: () => invoke<string[]>('vm_lan_addresses'),
+  /** camera image as JPEG (sent as raw body) */
+  cameraFrame: (jpeg: Uint8Array) => invoke<void>('vm_camera_frame', jpeg),
 };

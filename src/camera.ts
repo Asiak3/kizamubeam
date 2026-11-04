@@ -12,6 +12,7 @@
 
 import type { Pt } from './model';
 import { t } from './i18n';
+import { hasNative, native } from './native';
 
 export interface CameraCalib {
   /** Bildgröße bei der Kalibrierung in Pixeln */
@@ -65,6 +66,8 @@ export interface CameraSettings {
   /** Gewählte Kamera (MediaDeviceInfo.deviceId) und ihr Name zum Wiederfinden */
   cam: string;
   label: string;
+  /** Network camera: MJPEG stream or single-image address (http://…); empty = USB camera */
+  url?: string;
   /** Gewünschte Auflösung */
   width: number;
   height: number;
@@ -461,10 +464,17 @@ export function cameraError(e: unknown): string {
   return t('Kamera-Fehler: {message}', { message: (e as Error)?.message ?? String(e) });
 }
 
+/** Default addresses of common network cameras, offered in the camera dialog */
+export const NETCAM_EXAMPLES = ['http://127.0.0.1:8282/stream', 'http://192.168.4.1:81/stream'];
+
 export class CameraStream {
   stream: MediaStream | null = null;
   readonly video = document.createElement('video');
   private grabCanvas = document.createElement('canvas');
+  // Network camera (read in Rust, src-tauri/src/netcam.rs): latest decoded image and its number
+  /** Preview of a network camera (the USB camera shows its video element) */
+  private netView = document.createElement('canvas');
+  private net: { id: number; url: string; image: ImageBitmap | null; seq: number; error: string; frames: number; timer: number } | null = null;
 
   constructor() {
     this.video.muted = true;
@@ -472,13 +482,59 @@ export class CameraStream {
   }
 
   get open() {
-    return !!this.stream;
+    return !!this.stream || !!this.net;
+  }
+  /** Element showing the live image */
+  get view(): HTMLVideoElement | HTMLCanvasElement {
+    return this.net ? this.netView : this.video;
   }
   get width() {
-    return this.video.videoWidth;
+    return this.net ? (this.net.image?.width ?? 0) : this.video.videoWidth;
   }
   get height() {
-    return this.video.videoHeight;
+    return this.net ? (this.net.image?.height ?? 0) : this.video.videoHeight;
+  }
+
+  /** Open a network camera and wait for its first image */
+  private async startNet(url: string) {
+    if (!hasNative()) throw new Error(t('Netzwerk-Kameras gehen nur in der Desktop-App.'));
+    const id = await native<number>('netcam_open', { url });
+    const n: NonNullable<CameraStream['net']> = { id, url, image: null, seq: 0, error: '', frames: 0, timer: 0 };
+    this.net = n;
+    const pull = async () => {
+      if (this.net !== n) return;
+      try {
+        const buf = await native<ArrayBuffer>('netcam_frame', { id, since: n.seq });
+        n.error = '';
+        if (buf.byteLength > 8) {
+          const seq = Number(new DataView(buf).getBigUint64(0, true));
+          const img = await createImageBitmap(new Blob([buf.slice(8)], { type: 'image/jpeg' }));
+          if (this.net !== n) return img.close();
+          n.image?.close();
+          n.image = img;
+          const v = this.netView;
+          if (v.isConnected) {
+            if (v.width !== img.width || v.height !== img.height) ((v.width = img.width), (v.height = img.height));
+            v.getContext('2d')!.drawImage(img, 0, 0);
+          }
+          n.seq = seq;
+          n.frames++;
+        }
+      } catch (e) {
+        n.error = String((e as Error)?.message ?? e);
+      }
+      if (this.net === n) n.timer = window.setTimeout(pull, 40);
+    };
+    pull();
+    for (let i = 0; i < 200 && !n.image; i++) {
+      if (n.error && i > 20) break;
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    if (!n.image) {
+      const err = n.error || t('Keine Antwort');
+      this.stop();
+      throw new Error(t('Netzwerk-Kamera {url}: {error}', { url, error: err }));
+    }
   }
 
   /** Angeschlossene Kameras; Namen gibt es erst nach der ersten Freigabe */
@@ -487,8 +543,10 @@ export class CameraStream {
     return (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
   }
 
-  async start(cam: string, width: number, height: number) {
+  /** USB camera (cam = deviceId) or, with url, a network camera */
+  async start(cam: string, width: number, height: number, url = '') {
     this.stop();
+    if (url) return this.startNet(url);
     if (!navigator.mediaDevices?.getUserMedia) throw new Error(t('Kein Kamerazugriff in dieser Umgebung'));
     const video: MediaTrackConstraints = { width: { ideal: width }, height: { ideal: height } };
     if (cam) video.deviceId = { exact: cam };
@@ -512,10 +570,17 @@ export class CameraStream {
     return this.stream?.getVideoTracks()[0]?.getSettings().deviceId ?? '';
   }
   get label(): string {
-    return this.stream?.getVideoTracks()[0]?.label ?? '';
+    return this.net?.url ?? this.stream?.getVideoTracks()[0]?.label ?? '';
   }
 
   stop() {
+    const n = this.net;
+    if (n) {
+      this.net = null;
+      clearTimeout(n.timer);
+      n.image?.close();
+      native('netcam_close', { id: n.id }).catch(() => {});
+    }
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.video.srcObject = null;
@@ -523,6 +588,12 @@ export class CameraStream {
 
   /** Warten, bis n neue Bilder angekommen sind (nach einer Kopfbewegung liegen noch alte im Puffer) */
   async freshFrames(n = 3) {
+    const net = this.net;
+    if (net) {
+      const want = net.frames + n;
+      for (let i = 0; i < 100 && this.net === net && net.frames < want; i++) await new Promise((r) => setTimeout(r, 30));
+      return;
+    }
     const v = this.video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number };
     for (let i = 0; i < n; i++)
       await new Promise<void>((res) => {
@@ -535,10 +606,10 @@ export class CameraStream {
   grab(): HTMLCanvasElement | null {
     const w = this.width,
       h = this.height;
-    if (!this.stream || !w || !h) return null;
+    if (!this.open || !w || !h) return null;
     const c = this.grabCanvas;
     if (c.width !== w || c.height !== h) ((c.width = w), (c.height = h));
-    c.getContext('2d', { willReadFrequently: true })!.drawImage(this.video, 0, 0, w, h);
+    c.getContext('2d', { willReadFrequently: true })!.drawImage(this.net ? this.net.image! : this.video, 0, 0, w, h);
     return c;
   }
 }

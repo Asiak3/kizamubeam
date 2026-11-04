@@ -1,6 +1,6 @@
 [package]
 name = "kizamubeam-vm-core"
-version = "0.3.1"
+version = "0.4.0"
 description = "Kern der KizamuBeam Virtual Machine ohne Oberfläche: GRBL/FluidNC-Steuerung, Bewegungsplaner, Netzwerk-Server"
 authors = ["Hanjo Winter"]
 license = "GPL-3.0-or-later"

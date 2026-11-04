@@ -34,7 +34,7 @@
 <link rel="stylesheet" href="styles.css">
 <script>(function(){try{var s=localStorage.getItem('kb-lang');if(s)return;if(/bot|crawl|spider|slurp|preview/i.test(navigator.userAgent))return;var l=((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase();if(l&&l.indexOf('de')!==0){location.replace('en/'+location.hash);}}catch(e){}})();</script>
 <script src="main.js" defer></script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"KizamuBeam","description":"Kostenlose Open-Source-Lasersoftware für macOS, Windows und Linux. Entwerfen, Bilder gravieren, Boxen und Zahnräder erzeugen und direkt an FluidNC-, GRBL-, grblHAL-, Marlin- und Smoothieware-Laser senden.","applicationCategory":"DesignApplication","operatingSystem":"macOS, Windows, Linux","softwareVersion":"2.4.0","license":"https://github.com/negurvulkan/kizamubeam/blob/main/LICENSE","url":"https://negurvulkan.github.io/kizamubeam/","downloadUrl":"https://github.com/negurvulkan/kizamubeam/releases","image":"https://negurvulkan.github.io/kizamubeam/assets/og-image.png","inLanguage":"de","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"KizamuBeam","description":"Kostenlose Open-Source-Lasersoftware für macOS, Windows und Linux. Entwerfen, Bilder gravieren, Boxen und Zahnräder erzeugen und direkt an FluidNC-, GRBL-, grblHAL-, Marlin- und Smoothieware-Laser senden.","applicationCategory":"DesignApplication","operatingSystem":"macOS, Windows, Linux","softwareVersion":"2.5.0","license":"https://github.com/negurvulkan/kizamubeam/blob/main/LICENSE","url":"https://negurvulkan.github.io/kizamubeam/","downloadUrl":"https://github.com/negurvulkan/kizamubeam/releases","image":"https://negurvulkan.github.io/kizamubeam/assets/og-image.png","inLanguage":"de","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}}</script>
 </head>
 <body>
 <a class="skip-link" href="#main">Zum Inhalt springen</a>
@@ -71,7 +71,7 @@
   <div class="hero-grid" aria-hidden="true"></div>
   <div class="container hero-inner">
     <div class="hero-copy">
-      <p class="chip"><span class="chip-dot" aria-hidden="true"></span>Neu: Version 2.4.0 – Laser per Klick fahren, Fenster merkt sich Größe und Lage</p>
+      <p class="chip"><span class="chip-dot" aria-hidden="true"></span>Neu: Version 2.5.0 – Netzwerk-Kameras wie ESP32-CAM und eine virtuelle Lasermaschine zum Testen ohne Hardware</p>
       <h1 id="hero-title"><span class="h1-line">Dein Laser.</span> <span class="h1-line">Deine Software.</span> <span class="h1-line h1-accent">Frei.</span></h1>
       <p class="hero-sub">KizamuBeam ist Open-Source-Lasersoftware zum Entwerfen, Gravieren und Schneiden – für Diodenlaser mit FluidNC, GRBL &amp; Co. Kostenlos für macOS, Windows und Linux.</p>
       <hr class="beam beam-hero">
@@ -146,7 +146,7 @@
         <span class="card-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></span>
         <h3>Bilder &amp; Gravur</h3>
         <p class="card-lead">Fotos, Logos und Grafiken so aufs Material bringen, wie du sie dir vorstellst.</p>
-        <ul class="ticks"><li>Zehn Bildmodi, u. a. Floyd-Steinberg, Jarvis, Stucki, Halbton, Zeitungsraster, Skizze und Graustufen</li><li>Helligkeit, Kontrast, Gamma, Schärfen und Entrauschen mit Vorher-nachher-Vergleich und 1:1-Ansicht</li><li>Arbeitsfläche zeigt das gerasterte Ergebnis in Laser-Auflösung</li><li>Bilder zuschneiden, maskieren und lokal freistellen, Vektorisieren (Trace) zu sauberen Bézierpfaden</li><li>Füllgravur mit Scanwinkel, Kreuzschraffur, Overscan und bidirektional oder konturfolgend in Ringen</li><li>Kamera-Overlay: USB- oder Kopfkamera kalibrieren, Material direkt auf der Arbeitsfläche sehen und ein Design automatisch auf alle erkannten Werkstücke legen</li></ul>
+        <ul class="ticks"><li>Zehn Bildmodi, u. a. Floyd-Steinberg, Jarvis, Stucki, Halbton, Zeitungsraster, Skizze und Graustufen</li><li>Helligkeit, Kontrast, Gamma, Schärfen und Entrauschen mit Vorher-nachher-Vergleich und 1:1-Ansicht</li><li>Arbeitsfläche zeigt das gerasterte Ergebnis in Laser-Auflösung</li><li>Bilder zuschneiden, maskieren und lokal freistellen, Vektorisieren (Trace) zu sauberen Bézierpfaden</li><li>Füllgravur mit Scanwinkel, Kreuzschraffur, Overscan und bidirektional oder konturfolgend in Ringen</li><li>Kamera-Overlay: USB-, Netzwerk- (z. B. ESP32-CAM) oder Kopfkamera kalibrieren, Material direkt auf der Arbeitsfläche sehen und ein Design automatisch auf alle erkannten Werkstücke legen</li></ul>
       </article>
       <article class="card feature-card">
         <span class="card-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 3h6v5l-2 3h-2L9 8Z"/><path d="M12 11v6"/><path d="M4 21h16"/><path d="m8 17 4 2 4-2"/></svg></span>
@@ -253,7 +253,7 @@
     <header class="section-head center">
       <p class="eyebrow">Download</p>
       <h2 id="dl-title">KizamuBeam herunterladen</h2>
-      <p class="section-lead" data-dl-lead data-template="Aktuelle Version: {version}. Kostenlos, ohne Anmeldung.">Aktuelle Version: 2.4.0. Kostenlos, ohne Anmeldung.</p>
+      <p class="section-lead" data-dl-lead data-template="Aktuelle Version: {version}. Kostenlos, ohne Anmeldung.">Aktuelle Version: 2.5.0. Kostenlos, ohne Anmeldung.</p>
       <hr class="beam beam-center">
     </header>
     <div class="dl-grid">

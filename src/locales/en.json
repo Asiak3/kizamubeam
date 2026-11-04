@@ -3683,5 +3683,10 @@
   "Danach fährt jeder Klick auf die Arbeitsfläche den Laser dorthin (Esc beendet)": "Afterwards, every click on the workspace moves the laser there (Esc ends)",
   "Klick auf die Arbeitsfläche fährt den Laser dorthin. Esc beendet.": "Click on the workspace to move the laser there. Esc ends.",
   "Mit Drehachse fährt der Klick nur in X.": "With a rotary axis, the click only moves in X.",
-  "Laser zur Klickposition": "Move laser to click"
+  "Laser zur Klickposition": "Move laser to click",
+  "Netzwerk-Kameras gehen nur in der Desktop-App.": "Network cameras only work in the desktop app.",
+  "Keine Antwort": "No response",
+  "Netzwerk-Kamera {url}: {error}": "Network camera {url}: {error}",
+  "MJPEG-Stream oder Einzelbild über http://, z. B. ESP32-CAM (Port 81, /stream) oder die KizamuBeam Virtual Machine (Port 8282, /stream)": "MJPEG stream or single image over http://, e.g. ESP32-CAM (port 81, /stream) or the KizamuBeam Virtual Machine (port 8282, /stream)",
+  "Netzwerk-Kamera (Adresse)": "Network camera (address)"
 }

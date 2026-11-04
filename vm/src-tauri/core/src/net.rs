@@ -2,6 +2,7 @@
 //! Telnet server (raw TCP like FluidNC port 23) and a WebSocket server (like FluidNC port 81). Each
 //! connection gets its own number; replies go to the sender, alarms and the welcome to everyone.
 
+use crate::camera::{self, FrameStore};
 use crate::config::Config;
 use crate::machine::{ClientId, Event, Machine, Segment, Snapshot, LOCAL};
 use serde::Serialize;
@@ -34,6 +35,7 @@ pub struct ServerInfo {
     /// address or error message (e.g. port in use); None = off
     pub telnet: Option<Result<String, String>>,
     pub ws: Option<Result<String, String>>,
+    pub camera: Option<Result<String, String>>,
 }
 
 struct Listener {
@@ -68,6 +70,7 @@ pub struct Runner {
     tick: Option<thread::JoinHandle<()>>,
     listeners: Vec<Listener>,
     info: ServerInfo,
+    camera: Arc<FrameStore>,
 }
 
 impl Runner {
@@ -87,6 +90,7 @@ impl Runner {
             tick: Some(tick),
             listeners: Vec::new(),
             info: ServerInfo::default(),
+            camera: Arc::new(FrameStore::default()),
         };
         r.restart_servers();
         r
@@ -131,7 +135,27 @@ impl Runner {
                 info.telnet = Some(res);
             }
         }
+        if cfg.camera_enabled {
+            let stop = Arc::new(AtomicBool::new(false));
+            info.camera = Some(
+                match camera::start(host, cfg.camera_port, self.camera.clone(), stop.clone()) {
+                    Ok((addr, handle)) => {
+                        self.listeners.push(Listener {
+                            stop,
+                            handle: Some(handle),
+                        });
+                        Ok(addr)
+                    }
+                    Err(e) => Err(e),
+                },
+            );
+        }
         self.info = info;
+    }
+
+    /// Latest camera image and who wants images
+    pub fn camera(&self) -> Arc<FrameStore> {
+        self.camera.clone()
     }
 
     pub fn info(&self) -> ServerInfo {
@@ -153,12 +177,16 @@ impl Runner {
             old.ws_enabled,
             old.ws_port,
             old.lan,
+            old.camera_enabled,
+            old.camera_port,
         ) != (
             new.telnet_enabled,
             new.telnet_port,
             new.ws_enabled,
             new.ws_port,
             new.lan,
+            new.camera_enabled,
+            new.camera_port,
         ) {
             self.restart_servers();
         }

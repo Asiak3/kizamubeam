@@ -12,6 +12,16 @@ pub enum Flavor {
     Fluidnc,
 }
 
+/// Where the virtual camera sits
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CameraMount {
+    /// fixed above the bed, sees all of it
+    Fixed,
+    /// on the laser head, moves along and sees a small field below it
+    Head,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Config {
@@ -55,6 +65,17 @@ pub struct Config {
     pub lan: bool,
     /// Optical laser power at 100 % in W; only used to burn the virtual material
     pub laser_watts: f64,
+    /// Virtual camera: HTTP server with MJPEG stream and single images (rendered by the window)
+    pub camera_enabled: bool,
+    pub camera_port: u16,
+    pub camera_mount: CameraMount,
+    /// Image size in pixels
+    pub camera_width: u32,
+    pub camera_height: u32,
+    /// Images per second while someone watches
+    pub camera_fps: f64,
+    /// Barrel distortion of the lens: shift at the image corner in % of the half diagonal (0 = none)
+    pub camera_lens: f64,
 }
 
 impl Default for Config {
@@ -83,6 +104,13 @@ impl Default for Config {
             ws_port: 8181,
             lan: false,
             laser_watts: 10.0,
+            camera_enabled: true,
+            camera_port: 8282,
+            camera_mount: CameraMount::Fixed,
+            camera_width: 1280,
+            camera_height: 720,
+            camera_fps: 10.0,
+            camera_lens: 4.0,
         }
     }
 }
@@ -104,6 +132,10 @@ impl Config {
         self.rx_buffer = self.rx_buffer.clamp(64, 65_536);
         self.planner_blocks = self.planner_blocks.clamp(4, 256);
         self.laser_watts = clamp(self.laser_watts, 0.1, 500.0, d.laser_watts);
+        self.camera_width = self.camera_width.clamp(160, 3840);
+        self.camera_height = self.camera_height.clamp(120, 2160);
+        self.camera_fps = clamp(self.camera_fps, 1.0, 30.0, d.camera_fps);
+        self.camera_lens = clamp(self.camera_lens, 0.0, 20.0, d.camera_lens);
         if !self.homing {
             self.soft_limits = false;
             self.must_home = false;
