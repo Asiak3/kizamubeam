@@ -26,6 +26,8 @@ export interface Config {
   wsEnabled: boolean;
   wsPort: number;
   lan: boolean;
+  /** optical laser power at 100 % in W (for burning the virtual material) */
+  laserWatts: number;
 }
 
 export interface Snapshot {

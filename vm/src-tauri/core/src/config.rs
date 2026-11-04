@@ -53,6 +53,8 @@ pub struct Config {
     pub ws_port: u16,
     /// Reachable from other computers on the network too (otherwise only 127.0.0.1)
     pub lan: bool,
+    /// Optical laser power at 100 % in W; only used to burn the virtual material
+    pub laser_watts: f64,
 }
 
 impl Default for Config {
@@ -80,6 +82,7 @@ impl Default for Config {
             ws_enabled: true,
             ws_port: 8181,
             lan: false,
+            laser_watts: 10.0,
         }
     }
 }
@@ -100,6 +103,7 @@ impl Config {
         self.homing_rate = clamp(self.homing_rate, 60.0, 600_000.0, d.homing_rate);
         self.rx_buffer = self.rx_buffer.clamp(64, 65_536);
         self.planner_blocks = self.planner_blocks.clamp(4, 256);
+        self.laser_watts = clamp(self.laser_watts, 0.1, 500.0, d.laser_watts);
         if !self.homing {
             self.soft_limits = false;
             self.must_home = false;

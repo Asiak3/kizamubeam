@@ -3,10 +3,55 @@
 
 import './style.css';
 import { api, hasNative, type ClientInfo, type Config, type ServerInfo, type Snapshot, type VmEvent } from './api';
+import { BurnMap, burnSegments, type Piece } from './burn';
 import { t } from './i18n';
 import { BedView } from './view';
+import type { Bed3D } from './view3d';
+import { LOOK_GROUPS, LOOKS, lookName, resolveLook } from '../../src/view3d/looks';
+import { t as tApp } from '../../src/i18n';
 
-const VERSION = '0.1.0';
+const VERSION = '0.2.0';
+const PIECES_KEY = 'kizamubeam-vm.pieces';
+const VIEW_KEY = 'kizamubeam-vm.view';
+
+const store = {
+  get(k: string) {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set(k: string, v: string) {
+    try {
+      localStorage.setItem(k, v);
+    } catch {
+      /* storage not available */
+    }
+  },
+};
+
+function loadPieces(): Piece[] {
+  try {
+    const v = JSON.parse(store.get(PIECES_KEY) ?? '[]') as Piece[];
+    const num = (n: unknown, d: number) => (typeof n === 'number' && Number.isFinite(n) ? n : d);
+    return Array.isArray(v)
+      ? v.filter((p) => p && typeof p.id === 'string').map((p) => ({
+          id: p.id,
+          look: LOOKS.some((l) => l.id === p.look) ? p.look : 'birch',
+          color: typeof p.color === 'string' && /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : undefined,
+          x: num(p.x, 0),
+          y: num(p.y, 0),
+          w: Math.max(1, num(p.w, 100)),
+          h: Math.max(1, num(p.h, 100)),
+          t: Math.max(0.1, num(p.t, 3)),
+          rot: num(p.rot, 0),
+        }))
+      : [];
+  } catch {
+    return [];
+  }
+}
 const CONSOLE_MAX = 3000;
 
 type Attrs = Record<string, unknown>;
@@ -61,13 +106,82 @@ async function start() {
 
   // ---------- bed ----------
   const stage = h('section', { class: 'stage' });
-  const rapidBox = h('input', { type: 'checkbox', checked: true, onchange: () => ((view.showRapids = rapidBox.checked), view.invalidate()) });
+  const rapidBox = h('input', { type: 'checkbox', checked: true, onchange: () => ((view.showRapids = rapidBox.checked), view.version++, view.invalidate()) });
+  const b2d = h('button', { class: 'seg', onclick: () => setMode('2d') }, '2D');
+  const b3d = h('button', { class: 'seg', onclick: () => setMode('3d') }, '3D');
   const overlay = h('div', { class: 'overlay' },
+    h('div', { class: 'segs' }, b2d, b3d),
     h('label', {}, rapidBox, ' ', t('Eilgänge zeigen')),
-    h('button', { class: 'btn small', onclick: () => view.fit() }, t('Ansicht einpassen (Doppelklick)')));
-  stage.append(overlay);
+    h('button', { class: 'btn small', onclick: () => (mode === '3d' ? bed3d?.fit() : view.fit()) }, t('Ansicht einpassen (Doppelklick)')));
+  const help = h('div', { class: 'help muted small' });
+  stage.append(overlay, help);
   const view = new BedView(stage);
   view.setBed(cfg.bedW, cfg.bedH);
+
+  // ---------- workpieces ----------
+  let pieces = loadPieces();
+  const maps = new Map<string, BurnMap>();
+  let selected: string | null = null;
+  const mapOf = (p: Piece) => {
+    let m = maps.get(p.id);
+    if (!m || m.w !== p.w || m.h !== p.h) {
+      m = new BurnMap(p.w, p.h, p.look, p.t);
+      maps.set(p.id, m);
+    }
+    return m;
+  };
+  const savePieces = () => store.set(PIECES_KEY, JSON.stringify(pieces));
+  const pushPieces = () => {
+    for (const id of [...maps.keys()]) if (!pieces.some((p) => p.id === id)) maps.delete(id);
+    view.setPieces(pieces, selected);
+    bed3d?.setPieces(pieces.map((piece) => ({ piece, map: mapOf(piece) })), selected);
+  };
+  const onMove = (id: string, x: number, y: number, rot: number, done: boolean) => {
+    pieces = pieces.map((p) => (p.id === id ? { ...p, x, y, rot } : p));
+    pushPieces();
+    if (done) savePieces();
+    renderPieceForm();
+  };
+  const onSelect = (id: string | null) => {
+    selected = id;
+    pushPieces();
+    renderPieces();
+  };
+  view.onMove = onMove;
+  view.onSelect = onSelect;
+
+  // ---------- 2D / 3D ----------
+  let mode: '2d' | '3d' = store.get(VIEW_KEY) === '3d' ? '3d' : '2d';
+  let bed3d: Bed3D | null = null;
+  let loading3d = false;
+  async function setMode(m: '2d' | '3d') {
+    mode = m;
+    store.set(VIEW_KEY, m);
+    b2d.classList.toggle('on', m === '2d');
+    b3d.classList.toggle('on', m === '3d');
+    help.textContent = pieces.length
+      ? m === '3d'
+        ? t('Material ziehen verschiebt es, mit Umschalt drehen, mit Alt ohne Raster. Ansicht: linke Maustaste dreht, rechte verschiebt, Rad zoomt.')
+        : t('Material ziehen verschiebt es, mit Umschalt drehen, mit Alt ohne Raster.')
+      : '';
+    if (m === '3d' && !bed3d && !loading3d) {
+      loading3d = true;
+      const { Bed3D } = await import('./view3d');
+      bed3d = new Bed3D(stage);
+      bed3d.setBed(cfg.bedW, cfg.bedH);
+      bed3d.onMove = onMove;
+      bed3d.onSelect = onSelect;
+      loading3d = false;
+      pushPieces();
+    }
+    view.canvas.style.display = m === '2d' ? '' : 'none';
+    if (bed3d) {
+      bed3d.canvas.style.display = m === '3d' ? '' : 'none';
+      bed3d.active = mode === '3d';
+      bed3d.invalidate();
+    }
+    view.invalidate();
+  }
 
   // ---------- sidebar ----------
   const status = h('dl', { class: 'status' });
@@ -96,8 +210,14 @@ async function start() {
     else if (e.key === 'ArrowDown' && hpos < history.length) input.value = history[++hpos] ?? '';
   });
   const quick = (label: string, fn: () => void) => h('button', { class: 'btn small', onclick: fn }, label);
+  const pieceList = h('div', { class: 'pieces' });
+  const pieceForm = h('div', { class: 'piece-form' });
   const side = h('aside', { class: 'side' },
     h('section', { class: 'card' }, status),
+    h('section', { class: 'card' },
+      h('div', { class: 'row' }, h('h3', {}, t('Material')), h('button', { class: 'btn small', onclick: () => addPiece() }, t('Material einlegen'))),
+      pieceList,
+      pieceForm),
     h('section', { class: 'card' }, h('h3', {}, t('Hier verbinden')), hint, h('h3', {}, t('Verbindungen')), clientsBox),
     h('section', { class: 'card notices-card' }, h('h3', {}, t('Hinweise')), notices),
     h('section', { class: 'card console' },
@@ -107,6 +227,126 @@ async function start() {
       h('div', { class: 'row' }, input, h('button', { class: 'btn', onclick: sendLine }, t('Senden')))));
 
   app.append(header, h('main', { class: 'main' }, stage, side));
+
+  function addPiece() {
+    const n = pieces.length;
+    const w = Math.min(200, cfg.bedW),
+      hh = Math.min(150, cfg.bedH);
+    const last = pieces.find((p) => p.id === selected) ?? pieces[n - 1];
+    const p: Piece = {
+      id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      look: last?.look ?? 'birch',
+      color: last?.color,
+      w: last?.w ?? w,
+      h: last?.h ?? hh,
+      t: last?.t ?? 3,
+      x: Math.max(0, Math.min(cfg.bedW - w, (cfg.bedW - w) / 2 + n * 10)),
+      y: Math.max(0, Math.min(cfg.bedH - hh, (cfg.bedH - hh) / 2 - n * 10)),
+      rot: 0,
+    };
+    pieces = [...pieces, p];
+    selected = p.id;
+    savePieces();
+    pushPieces();
+    renderPieces();
+    setMode(mode);
+  }
+
+  const pieceLabel = (p: Piece) => `${lookName(resolveLook({ id: p.look }))} · ${fmt(p.w, 0)} × ${fmt(p.h, 0)} × ${fmt(p.t, 1)} mm`;
+  let lastList = '';
+  function renderPieces(force = true) {
+    const key = JSON.stringify([pieces.map((p) => [p.id, pieceLabel(p), (maps.get(p.id)?.through ?? 0) > 0]), selected]);
+    if (!force && key === lastList) return;
+    lastList = key;
+    pieceList.replaceChildren(
+      ...(pieces.length
+        ? pieces.map((p) =>
+            h('div', { class: `piece${p.id === selected ? ' on' : ''}`, onclick: () => onSelect(p.id === selected ? null : p.id) },
+              h('span', { class: 'swatch', style: `background:${resolveLook({ id: p.look, color: p.color }).color}` }),
+              h('span', {}, pieceLabel(p)),
+              (maps.get(p.id)?.through ?? 0) > 0 ? h('span', { class: 'cut small' }, t('durchgeschnitten')) : null))
+        : [h('p', { class: 'muted small' }, t('Noch kein Material eingelegt. Gelaserte Linien brennen sich dann in Echtzeit ein.'))]),
+    );
+    renderPieceForm();
+  }
+
+  let formFor = '';
+  function renderPieceForm() {
+    const p = pieces.find((q) => q.id === selected);
+    if (!p) {
+      pieceForm.replaceChildren();
+      formFor = '';
+      return;
+    }
+    // while the same piece is open, only refresh the numbers (keeps focus while typing)
+    if (formFor === p.id) {
+      for (const el of pieceForm.querySelectorAll<HTMLInputElement>('input[data-k]')) {
+        if (document.activeElement === el) continue;
+        const k = el.dataset.k as keyof Piece;
+        el.value = String(Math.round(Number(p[k]) * 100) / 100);
+      }
+      return;
+    }
+    formFor = p.id;
+    const update = (patch: Partial<Piece>) => {
+      pieces = pieces.map((q) => (q.id === p.id ? { ...q, ...patch } : q));
+      const np = pieces.find((q) => q.id === p.id)!;
+      const m = maps.get(p.id);
+      if (m && m.w === np.w && m.h === np.h) m.setMaterial(np.look, np.t);
+      savePieces();
+      pushPieces();
+      renderPieces(false);
+      view.invalidate();
+    };
+    const num = (label: string, k: 'w' | 'h' | 't' | 'x' | 'y' | 'rot', min: number, step = 1) => {
+      const el = h('input', { type: 'number', min, step, value: String(p[k]) });
+      el.dataset.k = k;
+      el.addEventListener('change', () => {
+        const v = Number(el.value);
+        if (Number.isFinite(v) && v >= min) update({ [k]: v });
+      });
+      return [h('label', {}, label), el];
+    };
+    const sel = h('select', {});
+    for (const g of LOOK_GROUPS) {
+      const og = h('optgroup', { label: tApp(g.name) });
+      for (const l of LOOKS.filter((q) => q.group === g.id)) og.append(h('option', { value: l.id }, lookName(l)));
+      sel.append(og);
+    }
+    sel.value = p.look;
+    const color = h('input', { type: 'color', value: resolveLook({ id: p.look, color: p.color }).color });
+    color.addEventListener('change', () => update({ color: color.value }));
+    sel.addEventListener('change', () => {
+      color.value = resolveLook({ id: sel.value }).color;
+      update({ look: sel.value, color: undefined });
+    });
+    pieceForm.replaceChildren(
+      h('div', { class: 'grid2' },
+        h('label', {}, t('Aussehen')), h('div', { class: 'pair' }, sel, color),
+        ...num(t('Breite (mm)'), 'w', 1),
+        ...num(t('Tiefe (mm)'), 'h', 1),
+        ...num(t('Dicke (mm)'), 't', 0.1, 0.1),
+        ...num(t('Lage X (mm)'), 'x', -10000, 0.5),
+        ...num(t('Lage Y (mm)'), 'y', -10000, 0.5),
+        ...num(t('Drehung (°)'), 'rot', -360, 1)),
+      h('p', { class: 'muted small' }, t('Lage = vordere linke Ecke vor dem Drehen; gedreht wird um die Mitte. Eine neue Größe beginnt mit unbearbeitetem Material.')),
+      h('div', { class: 'row quick' },
+        h('button', { class: 'btn small', onclick: () => (maps.get(p.id)?.clear(), renderPieces(), bed3d?.invalidate()) }, t('Abbrand entfernen')),
+        h('button', {
+          class: 'btn small',
+          onclick: () => {
+            pieces = pieces.filter((q) => q.id !== p.id);
+            selected = null;
+            savePieces();
+            pushPieces();
+            renderPieces();
+            setMode(mode);
+          },
+        }, t('Herausnehmen'))));
+  }
+  renderPieces();
+  pushPieces();
+  setMode(mode);
 
   // ---------- rendering ----------
   const renderChips = () => {
@@ -183,6 +423,7 @@ async function start() {
       api.config().then((c) => {
         cfg = c;
         view.setBed(c.bedW, c.bedH);
+        bed3d?.setBed(c.bedW, c.bedH);
       });
     }
   };
@@ -192,7 +433,10 @@ async function start() {
   let lastPoll = 0;
   const frame = async (ts: number) => {
     requestAnimationFrame(frame);
-    view.draw();
+    if (mode === '3d' && bed3d) {
+      bed3d.setTraces(view.version, () => view.traceImage());
+      bed3d.draw();
+    } else view.draw();
     if (busy || ts - lastPoll < 30) return;
     busy = true;
     lastPoll = ts;
@@ -202,8 +446,13 @@ async function start() {
       for (const e of p.events) handle(e);
       while (log.childElementCount > CONSOLE_MAX) log.firstElementChild!.remove();
       if (atBottom) log.scrollTop = log.scrollHeight;
+      if (p.segments.length && pieces.length) {
+        burnSegments(p.segments, cfg.laserWatts, pieces.map((piece) => ({ piece, map: mapOf(piece) })));
+        renderPieces(false);
+      }
       view.addSegments(p.segments);
       view.update(p.snapshot);
+      bed3d?.update(p.snapshot);
       renderStatus(p.snapshot);
       renderClients(p.clients);
     } catch (err) {
@@ -248,6 +497,7 @@ async function start() {
         ...num(t('Beschleunigung (mm/s²)'), 'accel', 50, 10),
         ...num(t('Junction Deviation (mm)'), 'junctionDev', 0.001, 0.001),
         ...num(t('S-Wert für 100 %'), 'sMax', 1, 1),
+        ...num(t('Laserleistung (W, optisch)'), 'laserWatts', 0.5, 0.1),
         ...num(t('Empfangspuffer (Bytes)'), 'rxBuffer', 1, 64),
         ...num(t('Plätze im Planer'), 'plannerBlocks', 1, 4)),
       check(t('Laser-Modus ($32): Laser nur bei G1/G2/G3 an, M4 passt die Leistung an'), 'laserMode'),
@@ -278,6 +528,7 @@ async function start() {
             info = await api.setConfig(c);
             cfg = await api.config();
             view.setBed(cfg.bedW, cfg.bedH);
+            bed3d?.setBed(cfg.bedW, cfg.bedH);
             renderChips();
             dlg.close();
           },

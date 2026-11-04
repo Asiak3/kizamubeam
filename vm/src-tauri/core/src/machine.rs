@@ -1316,7 +1316,13 @@ impl Machine {
                         && lb > 0.0
                         && (cross / (la * lb)).abs() < 1e-4
                         && ax * bx + ay * by > 0.0);
-                if same_dir {
+                // only at the same speed, so a burn map still sees darker corners while braking
+                let same_speed = la == 0.0
+                    || lb == 0.0
+                    || l.dur <= 0.0
+                    || s.dur <= 0.0
+                    || ((la / l.dur) / (lb / s.dur) - 1.0).abs() < 0.02;
+                if same_dir && same_speed {
                     l.x1 = s.x1;
                     l.y1 = s.y1;
                     l.dur += s.dur;

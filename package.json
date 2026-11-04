@@ -56,7 +56,7 @@
     "test:relations": "node scripts/run-ts.mjs scripts/relations-test.ts",
     "test:sketch": "node scripts/run-ts.mjs scripts/sketch-test.ts",
     "test:grid": "node scripts/run-ts.mjs scripts/grid-test.ts",
-    "test:vm": "cd vm/src-tauri && cargo test -p kizamubeam-vm-core"
+    "test:vm": "node scripts/run-ts.mjs scripts/vm-burn-test.ts && cd vm/src-tauri && cargo test -p kizamubeam-vm-core"
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {

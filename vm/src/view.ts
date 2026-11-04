@@ -3,7 +3,9 @@
 // Machine coordinates: origin front left, Y towards the back (up on screen).
 
 import type { Snapshot } from './api';
+import { contains, corners, type Piece } from './burn';
 import { t } from './i18n';
+import { resolveLook } from '../../src/view3d/looks';
 
 const MAX_PX = 4096;
 
@@ -31,6 +33,15 @@ export class BedView {
   private pyramid: { burn: HTMLCanvasElement; rapid: HTMLCanvasElement }[] = [];
   private pyramidAt = 0;
   private pyramidStale = true;
+  /** counts changes of the trace bitmaps (for the 3D view) */
+  version = 0;
+  private composite: HTMLCanvasElement | null = null;
+  private pieces: Piece[] = [];
+  private selected: string | null = null;
+  /** a piece was clicked (null = empty space) */
+  onSelect: (id: string | null) => void = () => {};
+  /** a piece is being dragged; done = pointer released */
+  onMove: (id: string, x: number, y: number, rot: number, done: boolean) => void = () => {};
 
   constructor(host: HTMLElement) {
     this.canvas = document.createElement('canvas');
@@ -68,6 +79,28 @@ export class BedView {
     this.pyramid = [];
     this.pyramidStale = true;
     this.dirty = true;
+    this.version++;
+  }
+
+  setPieces(list: Piece[], selected: string | null) {
+    this.pieces = list;
+    this.selected = selected;
+    this.dirty = true;
+  }
+
+  /** Paths (and rapids, if shown) in one bitmap of at most 2048 px per side, for the 3D view */
+  traceImage() {
+    const k = Math.min(1, 2048 / Math.max(this.burn.width, this.burn.height));
+    const c = (this.composite ??= document.createElement('canvas'));
+    const w = Math.max(1, Math.round(this.burn.width * k)),
+      h = Math.max(1, Math.round(this.burn.height * k));
+    if (c.width !== w || c.height !== h) (c.width = w), (c.height = h);
+    const g = c.getContext('2d')!;
+    g.clearRect(0, 0, w, h);
+    g.imageSmoothingEnabled = true;
+    if (this.showRapids) g.drawImage(this.rapid, 0, 0, w, h);
+    g.drawImage(this.burn, 0, 0, w, h);
+    return c;
   }
 
   /** Bitmaps for level k (0 = full resolution); levels are made by repeated halving */
@@ -133,6 +166,7 @@ export class BedView {
     q.stroke();
     this.pyramidStale = true;
     this.dirty = true;
+    this.version++;
   }
 
   update(s: Snapshot) {
@@ -176,11 +210,47 @@ export class BedView {
   private bindPointer() {
     const c = this.canvas;
     let drag: { x: number; y: number } | null = null;
+    let move: { id: string; mx: number; my: number; x: number; y: number; rot: number; rotate: boolean; a0: number; moved: boolean } | null = null;
+    let down: { x: number; y: number } | null = null;
+    const mm = (e: PointerEvent) => {
+      const dpr = window.devicePixelRatio || 1;
+      const r = c.getBoundingClientRect();
+      return [((e.clientX - r.left) * dpr - this.ox) / this.scale, this.bedH - ((e.clientY - r.top) * dpr - this.oy) / this.scale];
+    };
     c.addEventListener('pointerdown', (e) => {
-      drag = { x: e.clientX, y: e.clientY };
+      down = { x: e.clientX, y: e.clientY };
       c.setPointerCapture(e.pointerId);
+      const [x, y] = mm(e);
+      const hit = e.button === 0 ? [...this.pieces].reverse().find((p) => contains(p, x, y)) : undefined;
+      if (hit) {
+        const cx = hit.x + hit.w / 2,
+          cy = hit.y + hit.h / 2;
+        move = { id: hit.id, mx: x, my: y, x: hit.x, y: hit.y, rot: hit.rot, rotate: e.shiftKey, a0: Math.atan2(y - cy, x - cx), moved: false };
+        if (hit.id !== this.selected) this.onSelect(hit.id);
+        return;
+      }
+      drag = { x: e.clientX, y: e.clientY };
     });
     c.addEventListener('pointermove', (e) => {
+      if (move) {
+        const [x, y] = mm(e);
+        const p = this.pieces.find((q) => q.id === move!.id);
+        if (!p) return;
+        move.moved = true;
+        if (move.rotate) {
+          const cx = move.x + p.w / 2,
+            cy = move.y + p.h / 2;
+          let rot = move.rot + ((Math.atan2(y - cy, x - cx) - move.a0) * 180) / Math.PI;
+          rot = e.altKey ? rot : Math.round(rot);
+          this.onMove(move.id, move.x, move.y, ((rot % 360) + 360) % 360, false);
+        } else {
+          let nx = move.x + x - move.mx,
+            ny = move.y + y - move.my;
+          if (!e.altKey) (nx = Math.round(nx * 2) / 2), (ny = Math.round(ny * 2) / 2);
+          this.onMove(move.id, nx, ny, move.rot, false);
+        }
+        return;
+      }
       if (!drag) return;
       const dpr = window.devicePixelRatio || 1;
       this.ox += (e.clientX - drag.x) * dpr;
@@ -188,7 +258,15 @@ export class BedView {
       drag = { x: e.clientX, y: e.clientY };
       this.dirty = true;
     });
-    c.addEventListener('pointerup', () => (drag = null));
+    c.addEventListener('pointerup', (e) => {
+      if (move) {
+        const p = this.pieces.find((q) => q.id === move!.id);
+        if (move.moved && p) this.onMove(p.id, p.x, p.y, p.rot, true);
+      } else if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 4 && e.button === 0) {
+        this.onSelect(null);
+      }
+      drag = move = down = null;
+    });
     c.addEventListener('dblclick', () => this.fit());
     c.addEventListener('wheel', (e) => {
       e.preventDefault();
@@ -235,6 +313,21 @@ export class BedView {
         g.moveTo(x0, Y);
         g.lineTo(x0 + w, Y);
       }
+      g.stroke();
+    }
+    // workpieces under the paths
+    for (const p of this.pieces) {
+      const look = resolveLook({ id: p.look, color: p.color });
+      const pts = corners(p).map(([x, y]) => [this.sx(x), this.sy(y)]);
+      g.beginPath();
+      pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      g.closePath();
+      g.globalAlpha = look.clear > 0 ? 0.35 : 0.9;
+      g.fillStyle = look.color;
+      g.fill();
+      g.globalAlpha = 1;
+      g.strokeStyle = p.id === this.selected ? v('--accent') : 'rgba(60, 40, 20, 0.45)';
+      g.lineWidth = (p.id === this.selected ? 2 : 1) * dpr;
       g.stroke();
     }
     // matching level: bitmap at most twice as fine as the screen
