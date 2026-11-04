@@ -257,14 +257,12 @@ mod tests {
         store.push(vec![0xff, 0xd8, 9, 0xff, 0xd9]);
         let mut got = Vec::new();
         let mut b = [0u8; 512];
-        while !String::from_utf8_lossy(&got).contains("Content-Length: 5") || got.len() < 200 {
-            let n = s.read(&mut b).unwrap();
-            if n == 0 {
-                break;
-            }
-            got.extend_from_slice(&b[..n]);
-            if got.windows(5).any(|w| w == [0xff, 0xd8, 9, 0xff, 0xd9]) {
-                break;
+        // read until the image arrived: the part header and the image are separate writes, so a read can
+        // end between them (end of stream or the 3 s read timeout stop the loop)
+        while !got.windows(5).any(|w| w == [0xff, 0xd8, 9, 0xff, 0xd9]) {
+            match s.read(&mut b) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => got.extend_from_slice(&b[..n]),
             }
         }
         let text = String::from_utf8_lossy(&got);
