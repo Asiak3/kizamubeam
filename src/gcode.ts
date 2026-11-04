@@ -231,6 +231,8 @@ export const PRESETS: (Partial<Device> & { name: string; fw: Firmware })[] = [
   { name: t('FluidNC-Laser (allgemein)'), fw: 'fluidnc', bedW: 400, bedH: 400 },
   { name: t('Marlin mit Laser'), fw: 'marlin', bedW: 300, bedH: 300, baud: 250000 },
   { name: t('Smoothieware-Laser'), fw: 'smoothie', bedW: 300, bedH: 200 },
+  // Virtuelle Maschine zum Testen ohne Hardware (vm/ im Repo, eigener Download); Ports wie dort voreingestellt
+  { name: 'KizamuBeam Virtual Machine', fw: 'fluidnc', bedW: 400, bedH: 400, conn: 'tcp', host: '127.0.0.1', tcpPort: 2323, wsPort: 8181, limitSwitches: 'yes' },
 ];
 
 export function newDevice(preset: Partial<Device> & { fw: Firmware }): Device {

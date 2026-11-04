@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "KizamuBeam Virtual Machine",
+  "mainBinaryName": "kizamubeam-vm",
+  "version": "0.1.0",
+  "identifier": "org.kizamubeam.vm",
+  "build": {
+    "beforeDevCommand": "npx vite --config vite.config.ts",
+    "devUrl": "http://localhost:1421",
+    "beforeBuildCommand": "npx tsc -p tsconfig.json && npx vite build --config vite.config.ts",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "KizamuBeam Virtual Machine",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 760,
+        "minHeight": 520
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "publisher": "Hanjo Winter",
+    "copyright": "© 2026 Hanjo Winter. GPL-3.0-or-later.",
+    "shortDescription": "Virtuelle Lasermaschine (GRBL/FluidNC) zum Testen ohne Hardware",
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "../../src-tauri/icons/32x32.png",
+      "../../src-tauri/icons/128x128.png",
+      "../../src-tauri/icons/128x128@2x.png",
+      "../../src-tauri/icons/icon.icns",
+      "../../src-tauri/icons/icon.ico"
+    ]
+  }
+}

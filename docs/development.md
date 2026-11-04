@@ -20,6 +20,8 @@ Releases: publishing a release on GitHub (Releases → Draft a new release → n
 
 Updates: Help → Check for Updates looks for a newer release on GitHub (channel Stable, or Beta including pre-releases; by default once a day at startup), verifies its signature and installs it. This needs an updater key pair (`npx tauri signer generate -w ~/.tauri/kizamubeam.key`): the private key as repository secret `TAURI_SIGNING_PRIVATE_KEY` (and its password as `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`), the public key as repository variable `TAURI_UPDATER_PUBKEY`. Builds without the key cannot update themselves. On Linux, updating works for the AppImage.
 
+Virtual Machine: the virtual laser machine is a separate Tauri program in the `vm/` folder (UI in `vm/src/`, Rust in `vm/src-tauri/`, the controller without UI in `vm/src-tauri/core/`, crate `kizamubeam-vm-core`). It uses the packages from the main folder. `npm run vm` starts it with live reload (port 1421, KizamuBeam uses 1420), `npm run vm:build` builds the installer, `npm run vm:headless` runs it without a window (`-- --help` lists the options), `npm run test:vm` tests the controller. VM releases have their own tags `vm-v0.1.0` (version from `vm/src-tauri/tauri.conf.json`) and are published as pre-releases so they never count as the latest release on GitHub; `.github/workflows/vm-release.yml` builds them, `release.yml` skips them, and KizamuBeam’s update check only considers tags starting with `v` and a digit.
+
 ## Translations
 
 UI texts are written in German in the code inside `t('…')` (placeholders in curly braces, `t('{n} Bilder', { n })`; singular/plural with `tn('{n} Bild', '{n} Bilder', n)`). The German text is also the key in the language files `src/locales/<language>.json`. If a translation is missing, the German text is shown. If the same German text has two meanings, it gets a context after `|`, e.g. `t('Verbindung|Gerät')`.
@@ -109,6 +111,7 @@ UI texts are written in German in the code inside `t('…')` (placeholders in cu
 | `src-tauri/src/fluid.rs` | FluidNC web interface over plain HTTP: upload to SD card/flash, search on the local network (with tests against a simulated web interface) |
 | `src-tauri/src/agent.rs` | MCP server (Streamable HTTP on 127.0.0.1, token, levels) and stdio bridge `--mcp-stdio` |
 | `src-tauri/core/` | Computation core without UI (`kizamubeam-core`): image processing and dithering, image raster lines, writing G-code. Computes the same as `images.ts`/`gcode.ts`; the desktop app uses it, the browser uses the TypeScript version. Comparison test: `npm run test:core` |
+| `vm/` | KizamuBeam Virtual Machine: the virtual laser machine as a separate program. `vm/src-tauri/core/src/machine.rs` controller (GRBL/FluidNC, planner, real time), `gcode.rs` line checks, `net.rs` Telnet/WebSocket servers, `vm/src/view.ts` top view with burn marks. Tests: `npm run test:vm` |
 | `src-tauri/src/native.rs` | Computation core for the UI: image grayscale data and finished G-code stay in Rust |
 | `src/native.ts` | Calls into the computation core from the UI |
 

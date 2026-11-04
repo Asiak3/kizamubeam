@@ -1,0 +1,107 @@
+# Builds the KizamuBeam Virtual Machine (folder vm/) for macOS, Windows and Linux and attaches the installers
+# to its release. The VM has its own tags starting with "vm-", e.g. vm-v0.1.0; the version must match
+# vm/src-tauri/tauri.conf.json. Releases of KizamuBeam itself (v…) are built by release.yml.
+#
+# Creating a release: GitHub → Releases → Draft a new release → create tag vm-v0.1.0 → title e.g.
+# "KizamuBeam Virtual Machine 0.1.0" → tick "Set as a pre-release" (otherwise GitHub treats it as the
+# latest release) → Publish release. For a release that is already published: Actions →
+# Virtual Machine Release → Run workflow with the tag.
+name: Virtual Machine Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag eines veröffentlichten Releases der Virtual Machine, z. B. vm-v0.1.0'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+concurrency:
+  group: vm-release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: ${{ startsWith(github.event.release.tag_name || inputs.tag, 'vm-') }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Tag passt zur Version
+        run: |
+          v=$(node -p "require('./vm/src-tauri/tauri.conf.json').version")
+          if [ "$TAG" != "vm-v$v" ]; then
+            echo "::error::Tag $TAG passt nicht zur Version $v in vm/src-tauri/tauri.conf.json (erwartet vm-v$v)."
+            exit 1
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: vm/src-tauri -> target
+      - name: Tests der Steuerung
+        run: cargo test -p kizamubeam-vm-core
+        working-directory: vm/src-tauri/core
+
+  build:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            args: ''
+          - platform: ubuntu-22.04
+            args: --bundles deb,appimage
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Linux-Abhängigkeiten
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: vm/src-tauri -> target
+
+      # The UI and the Tauri CLI come from the packages in the root folder
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS: sign ad hoc without an Apple certificate (as for KizamuBeam)
+          APPLE_SIGNING_IDENTITY: '-'
+        with:
+          projectPath: vm
+          tauriScript: npx tauri
+          tagName: ${{ env.TAG }}
+          releaseName: KizamuBeam Virtual Machine ${{ env.TAG }}
+          releaseBody: 'Virtuelle Lasermaschine (GRBL/FluidNC) zum Testen ohne Hardware. Installer für macOS, Windows und Linux stehen unten unter „Assets“.'
+          releaseDraft: false
+          # never mark as "latest release": the KizamuBeam website and download links point to its releases
+          prerelease: true
+          args: ${{ matrix.args }}

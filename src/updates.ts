@@ -4,7 +4,7 @@
 
 export type Channel = 'stable' | 'beta';
 
-export const RELEASES_API = 'https://api.github.com/repos/negurvulkan/kizamubeam/releases?per_page=30';
+export const RELEASES_API = 'https://api.github.com/repos/negurvulkan/kizamubeam/releases?per_page=100';
 export const RELEASES_PAGE = 'https://github.com/negurvulkan/kizamubeam/releases';
 
 export interface GhRelease {
@@ -48,6 +48,9 @@ export function compareVersions(a: string, b: string): number {
 /** Vorgabe: Wer eine Vorabversion nutzt, bekommt Beta-Updates, sonst nur stabile */
 export const defaultChannel = (current: string): Channel => (current.includes('-') ? 'beta' : 'stable');
 
+/** Releases der App heißen v1.2.3…; andere Programme im selben Repo (Virtual Machine: vm-v0.1.0) nicht */
+export const isAppTag = (tag: string) => /^v?\d/.test(tag);
+
 /**
  * Neuester veröffentlichter Release des Kanals, der eine latest.json hat und neuer als `current` ist.
  * Releases, deren Build noch läuft (noch keine latest.json), werden übersprungen.
@@ -55,7 +58,7 @@ export const defaultChannel = (current: string): Channel => (current.includes('-
 export function pickRelease(releases: GhRelease[], channel: Channel, current: string): Candidate | null {
   let best: Candidate | null = null;
   for (const r of releases) {
-    if (r.draft || (r.prerelease && channel !== 'beta')) continue;
+    if (r.draft || (r.prerelease && channel !== 'beta') || !isAppTag(r.tag_name)) continue;
     const manifest = r.assets.find((a) => a.name === 'latest.json');
     if (!manifest) continue;
     const version = r.tag_name.replace(/^v/, '');
