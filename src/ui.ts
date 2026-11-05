@@ -49,6 +49,7 @@ import { openPrintCutDialog } from './printcutDialog';
 import { encodeShapes } from './generators/jig';
 import { shapesFromSelection } from './generators/jigPanel';
 import { openJigFillDialog } from './jigFillDialog';
+import { openMultiLayerDialog } from './multilayerDialog';
 import { buildParamsPanel, openShowIfDialog } from './paramsPanel';
 import { buildNotesPanel } from './notesPanel';
 import { buildView3dPanel } from './view3d/panel';
@@ -999,6 +1000,7 @@ function buildBars(ed: Editor) {
     { id: 'insert', cat: W, icon: 'insert', label: t('Einsatz mit Fächern erstellen (gesteckte Stege für Box oder Schublade)'), run: () => openGenDialog(ed, 'insert') },
     { id: 'shelf', cat: W, icon: 'shelf', label: t('Steckregal erstellen (Seiten und Böden gesteckt)'), run: () => openGenDialog(ed, 'shelf') },
     { id: 'stack', cat: W, icon: 'stack', label: t('Schichtmodell aus einem 3D-Modell (STL, OBJ) erstellen'), run: () => importModel(ed, 'stack') },
+    { id: 'multilayer', cat: W, icon: 'stack', label: t('Mehrlagenarbeit aus den ausgewählten Formen erstellen oder bearbeiten'), run: () => openMultiLayerDialog(ed), enabled: sel1 },
     { id: 'ribs', cat: W, icon: 'ribs', label: t('Rippenmodell aus einem 3D-Modell (STL, OBJ) erstellen'), run: () => importModel(ed, 'ribs') },
     { id: 'discsphere', cat: W, icon: 'discsphere', label: t('Scheibenkugel erstellen (Lampe aus gesteckten Scheiben)'), run: () => openGenDialog(ed, 'discsphere') },
     { id: 'box', cat: W, icon: 'box', label: t('Box mit Fingerzinken erstellen (Baugruppe, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'box') },

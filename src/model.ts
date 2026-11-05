@@ -2,7 +2,7 @@ import { t } from './i18n';
 import type { ProjectParam } from './params';
 import type { SeriesTable, TemplateInfo } from './templates';
 import { conditionHolds } from './params';
-import type { MaterialLook } from './view3d/looks';
+import { cleanLook, type MaterialLook } from './view3d/looks';
 // Datenmodell: Dokument, Objekte, Layer, Matrizen.
 // Interne Koordinaten sind Millimeter mit y nach unten (wie SVG), Ursprung oben links am Bett.
 // Angezeigt wird in Maschinenkoordinaten (Ursprung unten links, y nach oben).
@@ -590,6 +590,23 @@ export interface Doc {
   assets?: Record<string, string>;
   /** Nur in Projektdateien: 3D-Modelle der Generatoren (Kennung → Daten, siehe model3d/store.ts) */
   meshes?: Record<string, string>;
+  /** Frei gestaltete, gestapelte Platten für die 3D-Ansicht. */
+  multiLayerAssemblies?: MultiLayerAssembly[];
+}
+
+/** Eine Platte referenziert ein oberstes Objekt; dessen Inhalt bleibt vollständig editierbar. */
+export interface MultiLayerPlate {
+  object: number;
+  name: string;
+  thickness: number;
+  look: MaterialLook;
+  /** Lage des obersten Objekts beim Verknüpfen; spätere Nesting-Verschiebungen ändern die Montage nicht. */
+  anchor: Mat;
+}
+
+export interface MultiLayerAssembly {
+  id: string;
+  plates: MultiLayerPlate[];
 }
 
 /** Hilfslinie über das ganze Bett: 'y' = waagrecht auf Höhe v, 'x' = senkrecht bei v (Weltkoordinaten in mm) */
@@ -667,6 +684,26 @@ export function loadDoc(raw: unknown): Doc {
   d.page = Math.min(Math.max(0, Math.floor(Number(d.page) || 0)), pages.length - 1);
   d.bed ??= { w: 400, h: 400 };
   d.layers ??= {};
+  const mla = Array.isArray(d.multiLayerAssemblies) ? d.multiLayerAssemblies : [];
+  const seen = new Set<number>();
+  const cleanAssemblies: MultiLayerAssembly[] = [];
+  for (const rawAsm of mla) {
+    const a = rawAsm as Partial<MultiLayerAssembly>;
+    if (typeof a.id !== 'string' || !a.id || !Array.isArray(a.plates)) continue;
+    const plates: MultiLayerPlate[] = [];
+    for (const rawPlate of a.plates) {
+      const p = rawPlate as Partial<MultiLayerPlate>;
+      if (!Number.isInteger(p.object) || p.object === undefined || seen.has(p.object) || typeof p.name !== 'string' || typeof p.thickness !== 'number' || !isFinite(p.thickness) || p.thickness <= 0 || p.thickness > 50) continue;
+      const look = cleanLook(p.look);
+      if (!look) continue;
+      seen.add(p.object);
+      const anchor = Array.isArray(p.anchor) && p.anchor.length === 6 && p.anchor.every((v) => typeof v === 'number' && isFinite(v)) ? p.anchor as Mat : IDENT;
+      plates.push({ object: p.object, name: p.name, thickness: p.thickness, look, anchor });
+    }
+    if (plates.length) cleanAssemblies.push({ id: a.id, plates });
+  }
+  if (cleanAssemblies.length) d.multiLayerAssemblies = cleanAssemblies;
+  else delete d.multiLayerAssemblies;
   const notes = cleanNotes(d.notes);
   if (notes) d.notes = notes;
   else delete d.notes;
