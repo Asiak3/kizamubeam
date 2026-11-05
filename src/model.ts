@@ -600,7 +600,7 @@ export interface MultiLayerPlate {
   name: string;
   thickness: number;
   look: MaterialLook;
-  /** Lage des obersten Objekts beim Verknüpfen; spätere Nesting-Verschiebungen ändern die Montage nicht. */
+  /** Abbildung der Zeichenfläche in die Montage; spätere Nesting-Verschiebungen ändern die Montage nicht. */
   anchor: Mat;
 }
 

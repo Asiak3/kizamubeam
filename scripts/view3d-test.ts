@@ -50,6 +50,11 @@ test('Mehrlagenarbeit: Platten bleiben über Seiten verknüpft und stapeln sich 
   assert.equal(scene.solids.length, 2);
   assert.deepEqual(scene.solids.map((s) => s.label), ['Basis', 'Decklage']);
   assert.deepEqual(scene.solids.map((s) => [s.pose.o[2], s.th]), [[0, 2], [2, 4]]);
+  const centers = scene.solids.map((s) => {
+    const b = solidBounds(s);
+    return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2];
+  });
+  assert.deepEqual(centers[0], centers[1]);
   assert.deepEqual(pairs(scene.solids), []);
 });
 
