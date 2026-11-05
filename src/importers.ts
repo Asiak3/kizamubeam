@@ -411,7 +411,10 @@ function sanitizeSvgText(input: string): string {
     prev = s;
     s = s.replace(/<(script|foreignObject|iframe|object|embed|audio|video|canvas)\b[\s\S]*?<\/\1\s*>/gi, '');
   } while (s !== prev);
-  s = s.replace(/\son[a-z0-9_-]+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, '');
+  do {
+    prev = s;
+    s = s.replace(/\son[a-z0-9_-]+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, '');
+  } while (s !== prev);
   s = s.replace(/\s(xlink:href|href|src)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (_m, attr, _raw, d1, d2, d3) => {
     const v = (d1 ?? d2 ?? d3 ?? '').trim();
     const low = v.toLowerCase();
