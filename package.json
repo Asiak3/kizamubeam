@@ -1,6 +1,6 @@
 {
   "name": "kizamubeam",
-  "version": "2.6.1",
+  "version": "2.6.2",
   "author": "Hanjo Winter (https://github.com/negurvulkan)",
   "description": "Freie Laser-Software, angelehnt an die Bedienung von LightBurn (Prototyp)",
   "scripts": {
