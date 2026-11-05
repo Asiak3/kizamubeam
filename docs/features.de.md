@@ -4,6 +4,31 @@
 
 Alles, was KizamuBeam kann, mit Menüwegen und Tastenkürzeln. Den schnellen Überblick gibt es im [README](../README.de.md) und auf der [Website](https://negurvulkan.github.io/kizamubeam/).
 
+## Kameraüberlagerung und portable Kalibrierung
+
+Im Kamera-Panel lassen sich X/Y-Verschiebung, Breiten-/Höhenkorrektur und Drehung
+gegen den Uhrzeigersinn um die kalibrierte Bettmitte einstellen. Die ursprüngliche
+Kalibrierung bleibt unverändert; Zurücksetzen stellt die neutrale Abbildung her.
+Helligkeit, Kontrast, Sättigung, Gamma und Graustufen wirken auf Vorschau,
+Überlagerung und eingefügte Kamerabilder, ohne die Geometrie zu verändern.
+Neutrale Vorschauen zeigen die Quelle direkt; Korrekturen laufen im
+Animationstakt statt mit festem 4-fps-Limit. Versteckte Panels fordern keine
+korrigierten Bilder an. Netzwerk-Vorschauflächen werden nur bei Anzeige oder
+ausdrücklichem Abruf aktualisiert.
+
+Export/Import verwendet `.kzb-camera`-JSON (höchstens 256 KiB) mit Kalibrierung,
+Montage, Abmessungen, Ausrichtung und Softwarekorrekturen. Gerätekennungen,
+Netzwerkadressen und Maschinen-/Lasereinstellungen sind ausgeschlossen.
+Import prüft Matrix, Wertebereiche, Montage, Bettmaße und Seitenverhältnis vor
+der Bestätigung. Physische Kamera, Montage und Materialhöhe müssen selbst
+geprüft werden. Hardwareregler erscheinen nur für gemeldete Fähigkeiten der
+geöffneten USB-Kamera; unbestätigte Werte bleiben nicht verfügbar. Hardwarewerte
+gelten nur für die Sitzung. Zoom-/Fokusänderungen machen die Kalibrierung schon
+vor der Anfrage ungültig, auch bei Ablehnung: neu kalibrieren oder ein passendes
+Profil importieren.
+
+Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
+
 ## Oberfläche und Arbeitsfläche
 
 - Vertrautes Layout: Menü, Symbolleiste, Zahlenleiste oben, Werkzeuge links, Schnitte/Layer und Laser rechts, Farbpalette 00–29 plus T1/T2 unten, Statusleiste.
