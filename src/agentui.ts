@@ -109,7 +109,7 @@ export async function openAgentDialog(_ed: Editor) {
         : t('Aus. Kein Agent kann auf KizamuBeam zugreifen.');
     state.classList.toggle('error', !!info.error);
     const exe = info.exe;
-    const quoted = /[\s"']/.test(exe) ? `"${exe.replace(/"/g, '\\"')}"` : exe;
+    const quoted = /[\s"']/.test(exe) ? `"${exe.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"` : exe;
     configs.replaceChildren(
       snippet('Claude Code', t('im Terminal ausführen'), `claude mcp add kizamubeam -- ${quoted} --mcp-stdio`),
       snippet('Claude Desktop', t('in claude_desktop_config.json unter „mcpServers“ eintragen'),
