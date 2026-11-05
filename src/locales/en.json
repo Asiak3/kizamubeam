@@ -3792,7 +3792,7 @@
   "Ungültiges Kameraprofil: {field}": "Invalid camera profile: {field}",
   "Manuell": "Manual",
   "Zoom": "Zoom",
-  "Sättigung": "Saturation"
+  "Sättigung": "Saturation",
   "{n} Objekt wird nicht gelasert.": "{n} object will not be lasered.",
   "{n} Objekte werden nicht gelasert.": "{n} objects will not be lasered.",
   "{n} Objekt wird wieder gelasert.": "{n} object will be lasered again.",
