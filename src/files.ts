@@ -666,7 +666,7 @@ export function installDropAndPaste(ed: Editor, stage: HTMLElement) {
       return true;
     }
     const text = data.getData('image/svg+xml') || data.getData('text/plain');
-    if (/^\s*(<\?xml[^>]*>\s*)?(<!--[\s\S]*?-->\s*)*(<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i.test(text)) {
+    if (/^\s*(<\?xml[^>]*>\s*)?(<!--(?:[^-]|-(?!->))*-->\s*)*(<!DOCTYPE[^>]*>\s*)?<svg[\s>]/i.test(text)) {
       await importBytes(ed, t('Zwischenablage.svg'), new TextEncoder().encode(text));
       return true;
     }
