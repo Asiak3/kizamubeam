@@ -1,0 +1,188 @@
+// In-memory UI/machine doubles only: no application bootstrap or hardware access.
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { readFile } from 'node:fs/promises';
+const dictionary = JSON.parse(await readFile(new URL('../src/locales/en.json', import.meta.url), 'utf8'));
+
+class Element {
+  constructor(tag, props = {}, children = []) {
+    this.tag = tag;
+    this.children = children.filter(Boolean);
+    this.listeners = {};
+    this.disabled = false;
+    this.hidden = false;
+    this.textContent = children.filter((x) => typeof x === 'string').join('');
+    for (const [key, value] of Object.entries(props)) {
+      if (key.startsWith('on')) this.listeners[key.slice(2)] = value;
+      else this[key] = value;
+    }
+  }
+  append(...nodes) { this.children.push(...nodes); }
+  get valueAsNumber() { return this.value?.trim() ? Number(this.value) : NaN; }
+  get validity() { return { valid: Number.isFinite(this.valueAsNumber) && this.valueAsNumber >= Number(this.min) }; }
+  querySelectorAll(selector) {
+    const tags = selector.split(',').map((s) => s.trim());
+    return this.children.filter((x) => x instanceof Element).flatMap((x) => [
+      ...(tags.includes(x.tag) ? [x] : []), ...x.querySelectorAll(selector),
+    ]);
+  }
+  click() { if (!this.disabled) this.listeners.click?.(); }
+}
+const listeners = new Set();
+const deviceListeners = new Set();
+const calls = [];
+const device = { fw: 'grbl', name: 'Offline test device', conn: 'serial', port: 'TEST_ONLY', zAxis: true, limitSwitches: 'yes', homeOnConnect: true };
+let rotary = false;
+let uploading = false;
+let connectWait;
+let sendWait;
+const machine = {
+  connected: false, connecting: false, running: false, where: 'TEST_ONLY',
+  status: { state: '', wpos: null, sd: null },
+  on(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+  async connect(d, home) { calls.push(['connect', d, home]); await connectWait; this.connected = true; },
+  async disconnect() { calls.push(['disconnect']); this.connected = false; },
+  async send(line) { calls.push(['send', line]); await sendWait; },
+};
+const jog = (x, y, f, axis = 'Y') => [`JOG X${x} ${axis}${y} F${f}`];
+globalThis.__calibrationMocks = {
+  t: (key, values = {}) => (dictionary[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? `{${name}}`)),
+  tBackend: (value) => value,
+  h: (tag, props, ...children) => new Element(tag, props, children),
+  machine, isTauri: () => true, device,
+  onDeviceChange: (fn) => { deviceListeners.add(fn); return () => deviceListeners.delete(fn); },
+  runBlocker: () => uploading ? 'Upload active' : null,
+  FIRMWARES: { grbl: { jog, home: 'HOME' } },
+  jogLines: (_d, x, y, f) => jog(x, y, f), rotaryOn: () => rotary,
+};
+const result = await build({
+  entryPoints: ['src/calibrationMachineControls.ts'], bundle: true, write: false, format: 'esm', platform: 'node',
+  plugins: [{ name: 'offline-doubles', setup(b) {
+    b.onResolve({ filter: /^\.\/(dom|gcode|laser|machine|i18n)$/ }, (args) => ({ path: args.path, namespace: 'offline' }));
+    b.onLoad({ filter: /.*/, namespace: 'offline' }, (args) => {
+      const names = {
+        './i18n': ['t', 'tBackend'], './dom': ['h'], './gcode': ['FIRMWARES', 'jogLines', 'rotaryOn'],
+        './laser': ['device', 'onDeviceChange', 'runBlocker'], './machine': ['isTauri', 'machine'],
+      }[args.path];
+      return { contents: `export const {${names.join(',')}} = globalThis.__calibrationMocks;`, loader: 'js' };
+    });
+  } }],
+});
+const { calibrationMachineControls } = await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`);
+let confirmations = 0;
+let confirmResult = true;
+const confirmationMessages = [];
+globalThis.confirm = (message) => { confirmations++; confirmationMessages.push(message); return confirmResult; };
+const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+const emit = (type, extra = {}) => { for (const fn of listeners) fn({ type, ...extra }); };
+let invalidations = 0;
+const actualNow = Date.now;
+let clock = 100000;
+Date.now = () => clock;
+const panel = calibrationMachineControls({ onMotion: () => { invalidations++; calls.push(['invalidate']); } });
+const buttons = panel.element.querySelectorAll('button');
+const find = (label) => buttons.find((b) => b.textContent === label);
+const home = find('Home…');
+const up = find('↑');
+const zPlus = find('Z+');
+const connection = find('Connect');
+assert.equal(calls.length, 0, 'construction must not touch hardware');
+assert.equal(listeners.size, 1);
+assert.equal(up.disabled, true);
+let releaseConnect;
+connectWait = new Promise((resolve) => { releaseConnect = resolve; });
+connection.click();
+assert.equal(connection.disabled, true);
+assert.deepEqual(calls[0], ['connect', device, false], 'must override homeOnConnect');
+releaseConnect();
+await flush();
+machine.status = { state: 'Idle', wpos: [10, 20, 3], sd: null };
+emit('status');
+assert.equal(up.disabled, false);
+clock += 4000;
+// An input event refreshes the UI but must not refresh controller evidence.
+const xyInput = panel.element.querySelectorAll('input')[0];
+xyInput.listeners.input();
+assert.equal(up.disabled, true, 'stale status must block motion');
+assert.equal(home.disabled, true, 'stale Idle must not allow homing');
+const staleCalls = calls.length;
+up.listeners.click(); home.listeners.click(); await flush();
+assert.equal(calls.length, staleCalls);
+emit('status'); assert.equal(up.disabled, false);
+machine.status.wpos = [10]; emit('status');
+assert.equal(up.disabled, true, 'incomplete position must block XY jog');
+machine.status.wpos = [10, 20, 3]; emit('status');
+for (const state of ['', 'Run', 'Hold', 'Jog', 'Alarm', 'Home', 'Door', 'Check', 'Sleep']) {
+  machine.status.state = state; emit('status');
+  assert.equal(up.disabled, true, state);
+  assert.equal(home.disabled, true, state);
+}
+machine.status.state = 'Idle';
+machine.status.wpos = null; emit('status');
+assert.equal(up.disabled, true);
+assert.equal(home.disabled, false, 'home need not know position');
+machine.status.wpos = [10, 20, 3];
+for (const kind of ['job', 'sd', 'rotary', 'upload']) {
+  machine.running = kind === 'job'; machine.status.sd = kind === 'sd' ? {} : null;
+  rotary = kind === 'rotary'; uploading = kind === 'upload'; emit('status');
+  assert.equal(up.disabled, true, kind);
+}
+machine.running = false; machine.status.sd = null; rotary = false; uploading = false; emit('status');
+let releaseSend;
+sendWait = new Promise((resolve) => { releaseSend = resolve; });
+up.click();
+assert.deepEqual(calls.slice(-2), [['invalidate'], ['send', 'JOG X0 Y10 F3000']]);
+assert.equal(up.disabled, true, 'pending request is serialized');
+releaseSend(); await flush();
+assert.equal(up.disabled, true, 'wait for fresh status after request');
+emit('status'); assert.equal(up.disabled, false);
+sendWait = undefined;
+zPlus.click(); await flush();
+assert.deepEqual(calls.at(-1), ['send', 'JOG X0 Z0.1 F60']);
+emit('status');
+confirmResult = false; home.click(); await flush();
+assert.equal(confirmations, 1);
+assert.equal(invalidations, 2, 'cancelled home must not invalidate or send');
+confirmResult = true; home.click(); await flush();
+assert.deepEqual(calls.slice(-2), [['invalidate'], ['send', 'HOME']]);
+emit('line', { dir: 'error', line: 'Synthetic request error' });
+assert.equal(up.disabled, false, 'recover after request error');
+const inputs = panel.element.querySelectorAll('input');
+inputs[0].value = '0'; inputs[0].listeners.input(); assert.equal(up.disabled, true);
+inputs[0].value = '1'; inputs[0].listeners.input(); assert.equal(up.disabled, false);
+device.zAxis = false; for (const fn of deviceListeners) fn(); assert.equal(zPlus.disabled, true);
+device.fw = 'marlin'; machine.status.state = ''; emit('status');
+const beforeMarlin = calls.length;
+const beforeMarlinConfirmations = confirmations;
+assert.equal(up.disabled, true); assert.equal(home.disabled, true);
+assert.ok(panel.element.querySelectorAll('div').some((el) => el.textContent.includes('Marlin position reports')));
+up.listeners.click(); home.listeners.click(); await flush();
+assert.equal(calls.length, beforeMarlin, 'M114 position cannot authorize jog/home');
+assert.equal(confirmations, beforeMarlinConfirmations, 'Unsupported home never reaches confirmation');
+assert.equal(machine.status.state, '', 'Never synthesize Idle for Marlin');
+assert.equal(connection.disabled, false, 'Unknown Marlin state must permit confirmed disconnect');
+for (const busy of ['job', 'sd', 'upload']) {
+  machine.running = busy === 'job'; machine.status.sd = busy === 'sd' ? {} : null;
+  uploading = busy === 'upload'; emit('status');
+  assert.equal(connection.disabled, true, busy);
+  connection.listeners.click(); await flush();
+  assert.equal(calls.length, beforeMarlin, 'Host-busy disconnect stays blocked');
+}
+machine.running = false; machine.status.sd = null; uploading = false; emit('status');
+confirmResult = false; connection.click(); await flush();
+assert.equal(machine.connected, true); assert.equal(calls.length, beforeMarlin);
+assert.match(confirmationMessages.at(-1), /Disconnecting is not a stop command/);
+confirmResult = true; connection.click(); await flush();
+assert.deepEqual(calls.slice(beforeMarlin), [['disconnect']], 'Disconnect never sends a stop or motion command');
+assert.equal(machine.connected, false); assert.equal(machine.status.state, '');
+assert.equal(confirmations, beforeMarlinConfirmations + 2);
+device.fw = 'grbl'; machine.connected = true; machine.status.state = 'Idle'; emit('status');
+assert.equal(up.disabled, false, 'Restore GRBL readiness for remaining checks');
+const count = calls.length;
+panel.dispose(); panel.dispose();
+assert.equal(listeners.size, 0); assert.equal(deviceListeners.size, 0);
+assert.equal(calls.length, count, 'disposal must not operate machine');
+up.listeners.click(); home.listeners.click(); connection.listeners.click(); await flush();
+assert.equal(calls.length, count, 'retained callbacks cannot operate after disposal');
+console.log('Calibration machine controls: offline safety checks passed.');
+Date.now = actualNow;

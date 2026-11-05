@@ -7,7 +7,8 @@ import { h, numInput } from './dom';
 import { ICONS } from './icons';
 import { saveText } from './files';
 import { defaultLayer, loadDoc, Obj, Pt, translate } from './model';
-import { buildJob, estimate, FIRMWARES, writeGCode } from './gcode';
+import { buildJob, estimate, writeGCode } from './gcode';
+import { calibrationMachineControls } from './calibrationMachineControls';
 import { machine } from './machine';
 import { device, onDeviceChange } from './laser';
 import {
@@ -773,6 +774,8 @@ async function markGCode(ed: Editor, m: MarkSettings, pts: Pt[]) {
 // ---------- Kalibrier-Assistent ----------
 
 function openCalibration(ed: Editor, u: CamUnit) {
+  let disposed = false;
+  let captureGeneration = 0;
   const s = u.s;
   const cam = u.stream;
   const head = u.head;
@@ -780,11 +783,19 @@ function openCalibration(ed: Editor, u: CamUnit) {
   const { w: bedW, h: bedH } = ed.doc.bed;
   /** Kopfkamera: Mitte des Markierungsfelds (anfangs die Kopfposition) */
   const hp = headPos();
-  const center: Pt = hp ? { ...hp } : { x: bedW / 2, y: bedH / 2 };
+  const savedCenter = s.marks.center;
+  const center: Pt = savedCenter && Number.isFinite(savedCenter.x) && Number.isFinite(savedCenter.y)
+    ? { ...savedCenter } : hp ? { ...hp } : { x: bedW / 2, y: bedH / 2 };
   const markRect = (): Rect => (head ? headMarkRect(m, center) : { x0: m.margin, y0: m.margin, x1: bedW - m.margin, y1: bedH - m.margin });
   let targets = markPositionsIn(m, markRect());
   /** Kopfkamera: Kopfposition beim Foto */
   let shotPos: Pt | null = null;
+  let shotAxes: number[] | null = null;
+  const axesUnchanged = () => {
+    const axes = machine.status.wpos;
+    return !!shotAxes && !!axes && shotAxes.length === axes.length
+      && shotAxes.every((value, i) => Number.isFinite(value) && value === axes[i]);
+  };
   /** Angeklickte Bildpunkte je Markierung (null = übersprungen / noch offen) */
   let clicks: (Pt | null)[] = targets.map(() => null);
   let cur = 0;
@@ -882,6 +893,8 @@ function openCalibration(ed: Editor, u: CamUnit) {
   lensBox.addEventListener('change', () => ((lens = lensBox.checked), compute()));
   const checkBtn = h('button', { class: 'btn', title: t('Entzerrtes Bild mit den Sollpositionen der Markierungen zeigen') }, t('Prüfen')) as HTMLButtonElement;
   shotBtn.addEventListener('click', async () => {
+    if (disposed) return;
+    const generation = captureGeneration;
     if (head) {
       const p = headPos();
       if (!p) return void (info.textContent = t('Für die Kopfkamera muss der Laser verbunden und seine Position bekannt sein.'));
@@ -889,7 +902,14 @@ function openCalibration(ed: Editor, u: CamUnit) {
       // Neues Foto an anderer Stelle: die Klicks passen nicht mehr
       if (shotPos && Math.hypot(p.x - shotPos.x, p.y - shotPos.y) > 0.05) ((clicks = targets.map(() => null)), (cur = 0));
       shotPos = p;
+      shotAxes = machine.status.wpos ? [...machine.status.wpos] : null;
       await cam.freshFrames(2);
+      if (disposed || generation !== captureGeneration || shotPos !== p) return;
+      const after = headPos();
+      if (!after || !headStill(300) || !axesUnchanged()) {
+        invalidateCapture();
+        return void (info.textContent = t('Der Kopf wurde während der Aufnahme bewegt. Stillstand abwarten und ein neues Foto aufnehmen.'));
+      }
     }
     const g = cam.grab();
     if (!g) return void (info.textContent = t('Kein Kamerabild.'));
@@ -915,24 +935,17 @@ function openCalibration(ed: Editor, u: CamUnit) {
     fitView();
     draw();
   });
-  // Kopfkamera: den Kopf im Dialog verfahren, bis die Kamera alle Markierungen sieht
-  const jogStep = h('select', { title: t('Schrittweite') },
-    ...[1, 5, 10, 20, 50].map((v) => h('option', { value: String(v), selected: v === 10 }, `${v} mm`))) as HTMLSelectElement;
-  const jog = (dx: number, dy: number) => {
-    if (!machine.connected) return void (info.textContent = t('Nicht verbunden.'));
-    if (machine.running) return void (info.textContent = t('Es läuft bereits ein Auftrag.'));
-    const st = Number(jogStep.value);
-    for (const l of FIRMWARES[device.fw].jog(dx * st, dy * st, 3000)) machine.send(l);
+  const invalidateCapture = () => {
+    captureGeneration++;
+    frame = null; shotPos = null; shotAxes = null; result = null; mode = 'click';
+    clicks = targets.map(() => null); cur = 0;
+    checkCache = null;
+    compute();
   };
-  const jogRow = h('div', { class: 'conn-row' },
-    ...([[-1, 0, '←'], [1, 0, '→'], [0, 1, '↑'], [0, -1, '↓']] as const).map(([dx, dy, l]) =>
-      h('button', { class: 'btn', title: t('Laserkopf verfahren'), onclick: () => jog(dx, dy) }, l)),
-    jogStep,
-  );
+  const machinePanel = calibrationMachineControls({ onMotion: () => { if (head) invalidateCapture(); } });
   const step2 = h('div', { class: 'cal-step' },
     h('div', { class: 'form-title' }, t('2. Markierungen anklicken')),
     head ? h('p', { class: 'note' }, t('Den Kopf so verfahren, dass die Kamera alle Markierungen gut sieht (rechts das Live-Bild), dann das Foto aufnehmen. Die Kopfposition beim Foto wird mit gespeichert.')) : '',
-    head ? jogRow : '',
     h('p', { class: 'note' }, t('Foto aufnehmen, dann die Mitte jeder Markierung in der angezeigten Reihenfolge anklicken. Mausrad zoomt, rechte Maustaste verschiebt das Bild, gesetzte Punkte lassen sich ziehen.')),
     h('div', { class: 'conn-row' }, shotBtn, backBtn, skipBtn),
     h('label', { class: 'check' }, lensBox, t('Linsenverzeichnung korrigieren (ab 3 × 3)')),
@@ -956,7 +969,7 @@ function openCalibration(ed: Editor, u: CamUnit) {
   const dlg = h('dialog', { class: 'camera-dialog' },
     h('h3', {}, t('Kamera kalibrieren und ausrichten')),
     h('div', { class: 'cal-body' },
-      h('div', { class: 'cal-left' }, sketch, step1, step2, info),
+      h('div', { class: 'cal-left' }, machinePanel.element, sketch, step1, step2, info),
       h('div', { class: 'cal-right' }, view),
     ),
     h('div', { class: 'dialog-buttons' },
@@ -1229,7 +1242,24 @@ function openCalibration(ed: Editor, u: CamUnit) {
     draw();
   });
   ro.observe(view);
-  dlg.addEventListener('close', () => (ro.disconnect(), dlg.remove()));
+  const offDevice = onDeviceChange(() => dlg.close());
+  const offMachine = machine.on((event) => {
+    if (disposed) return;
+    burnBtn.disabled = !machine.connected || machine.running;
+    if (head && shotPos && (event.type === 'status' || event.type === 'connection')) {
+      const p = headPos();
+      if (!p || !headStill(0) || !axesUnchanged()) invalidateCapture();
+    }
+  });
+  dlg.addEventListener('close', () => {
+    // Nur Markierungsparameter behalten, niemals Foto, Punkte oder Ergebnis.
+    s.marks = { n: m.n, margin: m.margin, field: m.field, size: m.size, speed: m.speed, power: m.power,
+      ...(head ? { center: { ...center } } : {}) };
+    save();
+    disposed = true; captureGeneration++;
+    ro.disconnect(); offDevice(); offMachine(); machinePanel.dispose();
+    cancelAnimationFrame(liveFrame); dlg.remove();
+  });
   dlg.addEventListener('keydown', (e) => e.stopPropagation());
   document.body.append(dlg);
   dlg.showModal();

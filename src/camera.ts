@@ -53,6 +53,8 @@ export interface MarkSettings {
   power: number;
   /** Nur Kopfkamera: Abstand der äußeren Markierungen voneinander in mm */
   field: number;
+  /** Nur Kopfkamera: zuletzt gewählte Mitte des Markierungsfelds. */
+  center?: Pt;
 }
 
 /** fixed: fest über dem Bett; head: am Laserkopf, fährt mit */
