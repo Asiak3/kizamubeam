@@ -25,6 +25,7 @@ import { library } from '../materials';
 import { onImageReady } from '../images';
 import type { MockupBg, Scene3D, Viewer3D, ViewPreset, ViewSolid } from './viewer';
 import { saveDataUrl } from '../files';
+import { plateAnchor } from '../multilayer';
 
 /** Hintergründe des Mockups (Liste hier, damit three.js erst mit dem Fenster geladen wird) */
 const MOCKUP_BGS: MockupBg[] = ['studio', 'white', 'grey', 'dark', 'theme'];
@@ -81,7 +82,10 @@ function collectMultiLayers(ed: Editor, selected: Obj[] | null, fallback: Materi
     let z = 0;
     for (let pi = 0; pi < live.length; pi++) {
       const { p, root } = live[pi];
-      const delta = mul(p.anchor, inv(root.o.m));
+      // Frühe Entwürfe speicherten die Objektmatrix als Anker und ließen Platten dadurch nebeneinander.
+      // Diese alte Form wird beim Anzeigen einmalig als zentrierte Montage interpretiert.
+      const legacyAnchor = p.anchor.every((v, i) => Math.abs(v - root.o.m[i]) < 1e-9);
+      const delta = mul(legacyAnchor ? plateAnchor(root.o) : p.anchor, inv(root.o.m));
       const paths: Paths = [];
       for (const [leaf, m] of leaves([root.o])) {
         used.add(leaf.id);

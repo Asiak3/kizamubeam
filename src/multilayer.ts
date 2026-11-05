@@ -1,7 +1,8 @@
 // Frei gestaltete Mehrlagenarbeiten: die Formen bleiben normale Projektobjekte;
 // nur ihre Montage-Reihenfolge und 3D-Eigenschaften werden im Dokument gespeichert.
 import type { Doc, MultiLayerAssembly, MultiLayerPlate, Obj } from './model';
-import { leaves } from './model';
+import { leaves, translate } from './model';
+import { boundsOf } from './geom';
 import type { MaterialLook } from './view3d/looks';
 
 export const assemblyForObject = (doc: Doc, id: number) => doc.multiLayerAssemblies?.find((a) => a.plates.some((p) => p.object === id));
@@ -39,6 +40,12 @@ export function copyMultiLayers(doc: Doc, pairs: readonly [Obj, Obj][]) {
     copies.push(makeAssembly(a.plates.map((p) => ({ ...p, object: ids.get(p.object)! }))));
   }
   if (copies.length) doc.multiLayerAssemblies.push(...copies);
+}
+
+/** Bringt die Mitte jeder ausgewählten Platte in den gemeinsamen Montageursprung. */
+export function plateAnchor(o: Obj): Obj['m'] {
+  const b = boundsOf([o]);
+  return b ? translate(-b.x - b.w / 2, -b.y - b.h / 2) : [...o.m];
 }
 
 export const defaultPlate = (object: number, name: string, look: MaterialLook, anchor: Obj['m']): MultiLayerPlate => ({ object, name, thickness: 3, look, anchor: [...anchor] });

@@ -2,7 +2,7 @@ import type { Editor } from './editor';
 import { h } from './dom';
 import { t } from './i18n';
 import { objLabel } from './objectsPanel';
-import { assemblyForObject, defaultPlate, hasClosedContour, makeAssembly } from './multilayer';
+import { assemblyForObject, defaultPlate, hasClosedContour, makeAssembly, plateAnchor } from './multilayer';
 import { DEFAULT_LOOK, layerLook } from './view3d/looks';
 import { lookEditor } from './view3d/lookui';
 import { library } from './materials';
@@ -23,7 +23,7 @@ export function openMultiLayerDialog(ed: Editor) {
   const byId = rootsById(ed);
   let plates: MultiLayerPlate[] = existing
     ? existing.plates.filter((p) => byId.has(p.object)).map((p) => ({ ...p, look: { ...p.look } }))
-    : selected.map((o) => defaultPlate(o.id, objLabel(o), layerLook(ed.layer(o.layer), (id) => library.get(id)?.material, DEFAULT_LOOK), o.m));
+    : selected.map((o) => defaultPlate(o.id, objLabel(o), layerLook(ed.layer(o.layer), (id) => library.get(id)?.material, DEFAULT_LOOK), plateAnchor(o)));
 
   const list = h('div', { class: 'multilayer-list' });
   const redraw = () => {
