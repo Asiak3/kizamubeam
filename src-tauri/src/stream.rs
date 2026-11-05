@@ -17,6 +17,7 @@ const POLL: Duration = Duration::from_millis(200);
 const PROGRESS: Duration = Duration::from_millis(200);
 /// Abfrage per Befehlszeile (Marlin: M114) seltener, sie belegt die Leitung
 const POLL_LINE: Duration = Duration::from_millis(1000);
+const WRITE_DEADLINE: Duration = Duration::from_secs(2);
 
 /// Wie mit der Steuerung gesprochen wird
 #[derive(Clone, Debug)]
@@ -93,6 +94,7 @@ pub struct Streamer<P: Read + Write, E: Events> {
     /// Angehalten durch KizamuBeam (Steuerungen ohne Echtzeitbefehle)
     paused: bool,
     iac: u8,
+    serial_retry: bool,
 }
 
 fn is_comment(l: &str) -> bool {
@@ -118,7 +120,15 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             proto,
             paused: false,
             iac: 0,
+            serial_retry: false,
         }
+    }
+
+    /// Nur serielle Verbindungen wiederholen vorübergehende Schreibfehler.
+    /// TCP/WebSocket behalten write_all/flush; ein WS-Fehler darf nicht erneut gesendet werden.
+    pub fn with_serial_retries(mut self) -> Self {
+        self.serial_retry = true;
+        self
     }
 
     /// Hauptschleife: läuft, bis Close kommt oder die Verbindung abreißt.
@@ -220,8 +230,34 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
     }
 
     fn write(&mut self, b: &[u8]) -> Result<(), String> {
-        self.port.write_all(b).map_err(|e| format!("Senden fehlgeschlagen: {e}"))?;
-        self.port.flush().map_err(|e| format!("Senden fehlgeschlagen: {e}"))
+        if self.serial_retry {
+            self.write_serial(b, Instant::now() + WRITE_DEADLINE).map_err(|e| format!("Senden fehlgeschlagen: {e}"))
+        } else {
+            self.port.write_all(b).map_err(|e| format!("Senden fehlgeschlagen: {e}"))?;
+            self.port.flush().map_err(|e| format!("Senden fehlgeschlagen: {e}"))
+        }
+    }
+
+    /// Nur den noch nicht angenommenen Rest wiederholen. Eine feste Frist gilt
+    /// für den gesamten Schreibauftrag, auch bei wiederholten Teilerfolgen.
+    /// Kein serielles flush: unter Windows wartet es auf physisches Leeren.
+    fn write_serial(&mut self, b: &[u8], deadline: Instant) -> std::io::Result<()> {
+        let mut offset = 0;
+        while offset < b.len() {
+            if Instant::now() >= deadline {
+                return Err(ErrorKind::TimedOut.into());
+            }
+            match self.port.write(&b[offset..]) {
+                Ok(n) if n > b.len() - offset => return Err(ErrorKind::InvalidData.into()),
+                Ok(0) => std::thread::sleep(Duration::from_millis(1)),
+                Ok(n) => offset += n,
+                Err(e) if matches!(e.kind(), ErrorKind::Interrupted | ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
     }
 
     /// Einmal lesen, Puffer füllen, Status abfragen.
@@ -414,15 +450,20 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             if !self.fits(len) {
                 break;
             }
+            self.send_line(&line, Kind::Job)?;
+            // Erst nach Annahme der ganzen Zeile einschließlich LF fortschalten.
             if let Some(j) = &mut self.job {
                 j.next += 1;
             }
             self.progress_dirty = true;
-            self.send_line(&line, Kind::Job)?;
         }
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "stream_retry_tests.rs"]
+mod usb_retry_tests;
 
 #[cfg(test)]
 mod tests {
