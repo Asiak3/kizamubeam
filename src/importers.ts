@@ -413,7 +413,7 @@ function sanitizeSvgText(input: string): string {
     const v = (d1 ?? d2 ?? d3 ?? '').trim();
     const low = v.toLowerCase();
     if (low.startsWith('#')) return ` ${attr}="${v}"`;
-    if (low.startsWith('javascript:')) return '';
+    if (low.startsWith('javascript:') || low.startsWith('vbscript:')) return '';
     if (low.startsWith('data:') && !low.startsWith('data:image/')) return '';
     return ` ${attr}="${v}"`;
   });
