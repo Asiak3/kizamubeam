@@ -72,7 +72,7 @@ function limitProblems(ed: Editor, stats: Map<number, LayerStats>): string[] {
 /** Liegt der Job samt Überfahrwegen außerhalb des Bettes? (null = nein oder beim Benutzer-Ursprung nicht feststellbar) */
 function outsideBed(ed: Editor, job: Job): string | null {
   const c = bedCheck(ed, job);
-  return c.kind === 'out' ? bedProblem(ed, job, c)!.replace('\n', ' ') : null;
+  return c.kind === 'out' ? bedProblem(ed, job, c)!.replace(/\n/g, ' ') : null;
 }
 
 async function buildJob(ed: Editor): Promise<Job> {
