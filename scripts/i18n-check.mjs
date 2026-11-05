@@ -3,9 +3,10 @@
 // und nicht mehr benutzte entfernt, Reihenfolge wie im Code; leere Werte zeigen die App deutsch an)
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const srcDir = path.join(root, 'src');
 const keys = new Map(); // Text → erste Fundstelle
 
