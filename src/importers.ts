@@ -398,8 +398,34 @@ function matches(el: Element, sel: string): boolean {
 
 const STYLE_PROPS = ['stroke', 'fill', 'display', 'visibility'];
 
+function sanitizeSvgText(input: string): string {
+  let s = input;
+  s = s.replace(/<\?xml[\s\S]*?\?>/gi, '');
+  s = s.replace(/<!doctype[\s\S]*?>/gi, '');
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(/<!--([\s\S]*?)-->/g, '');
+  } while (s !== prev);
+  do {
+    prev = s;
+    s = s.replace(/<(script|foreignObject|iframe|object|embed|audio|video|canvas)\b[\s\S]*?<\/\1\s*>/gi, '');
+  } while (s !== prev);
+  s = s.replace(/\son[a-z0-9_-]+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, '');
+  s = s.replace(/\s(xlink:href|href|src)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (_m, attr, _raw, d1, d2, d3) => {
+    const v = (d1 ?? d2 ?? d3 ?? '').trim();
+    const low = v.toLowerCase();
+    if (low.startsWith('#')) return ` ${attr}="${v}"`;
+    if (low.startsWith('javascript:') || low.startsWith('vbscript:')) return '';
+    if (low.startsWith('data:') && !low.startsWith('data:image/')) return '';
+    return ` ${attr}="${v}"`;
+  });
+  return s;
+}
+
 export function importSvg(text: string): ImportResult {
-  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const safeText = sanitizeSvgText(text);
+  const doc = new DOMParser().parseFromString(safeText, 'image/svg+xml');
   const root = doc.documentElement;
   if (!root || root.localName !== 'svg' || doc.getElementsByTagName('parsererror').length)
     throw new Error(t('Keine gültige SVG-Datei'));
