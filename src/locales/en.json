@@ -3688,5 +3688,17 @@
   "Keine Antwort": "No response",
   "Netzwerk-Kamera {url}: {error}": "Network camera {url}: {error}",
   "MJPEG-Stream oder Einzelbild über http://, z. B. ESP32-CAM (Port 81, /stream) oder die KizamuBeam Virtual Machine (Port 8282, /stream)": "MJPEG stream or single image over http://, e.g. ESP32-CAM (port 81, /stream) or the KizamuBeam Virtual Machine (port 8282, /stream)",
-  "Netzwerk-Kamera (Adresse)": "Network camera (address)"
+  "Netzwerk-Kamera (Adresse)": "Network camera (address)",
+  "{n} Objekt wird nicht gelasert.": "{n} object will not be lasered.",
+  "{n} Objekte werden nicht gelasert.": "{n} objects will not be lasered.",
+  "{n} Objekt wird wieder gelasert.": "{n} object will be lasered again.",
+  "{n} Objekte werden wieder gelasert.": "{n} objects will be lasered again.",
+  "{n} Objekt liegt ganz außerhalb des Arbeitsbereichs (geparkt) und wird nicht gelasert.": "{n} object lies completely outside the work area (parked) and is not lasered.",
+  "{n} Objekte liegen ganz außerhalb des Arbeitsbereichs (geparkt) und werden nicht gelasert.": "{n} objects lie completely outside the work area (parked) and are not lasered.",
+  "Wieder lasern": "Laser again",
+  "Nicht lasern (bleibt sichtbar)": "Don't laser (stays visible)",
+  "Layer nicht lasern (Ausgabe aus)": "Don't laser this layer (output off)",
+  "Layer wieder lasern (Ausgabe an)": "Laser this layer again (output on)",
+  "Nicht lasern": "Don't laser",
+  "Nicht gewählte Objekte auf der Seite wurden umgangen. Soll eine gezeichnete Form das Material sein, sie mit auswählen und „Gewählte Form (Reststück)“ nehmen, oder „Andere Objekte auf der Seite umgehen“ ausschalten.": "Unselected objects on the page were avoided. If a drawn shape is meant to be the material, select it too and use “Selected shape (scrap piece)”, or turn off “Avoid other objects on the page”."
 }

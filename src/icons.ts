@@ -60,6 +60,8 @@ export const ICONS: Record<string, string> = {
   tolines: svg('<rect x="4" y="4" width="16" height="16" rx="5"/><rect x="2.5" y="10.5" width="3" height="3" fill="currentColor"/><rect x="18.5" y="10.5" width="3" height="3" fill="currentColor"/>'),
   eye: svg('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'),
   eyeoff: svg('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" opacity=".35"/><path d="M4 20L20 4"/>'),
+  laser: svg('<rect x="8" y="3" width="8" height="5" rx="1"/><path d="M12 8v8M8 21l2-2M16 21l-2-2M12 22v-2"/>'),
+  laseroff: svg('<rect x="8" y="3" width="8" height="5" rx="1" opacity=".35"/><path d="M12 8v8M8 21l2-2M16 21l-2-2M12 22v-2" opacity=".35"/><path d="M4 20L20 4"/>'),
   path: svg('<path d="M4 18C7 6 14 18 20 6"/><rect x="2.5" y="16.5" width="3" height="3"/><rect x="18.5" y="4.5" width="3" height="3"/>'),
   lock: svg('<rect x="5" y="11" width="14" height="9" rx="1"/><path d="M8 11V8a4 4 0 018 0v3"/>'),
   unlock: svg('<rect x="5" y="11" width="14" height="9" rx="1"/><path d="M8 11V8a4 4 0 017.5-2"/>'),

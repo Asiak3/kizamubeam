@@ -292,6 +292,8 @@ export interface Obj {
   hidden?: boolean;
   /** Gesperrt: auf der Arbeitsfläche nicht auswählbar (nur oberste Ebene) */
   locked?: boolean;
+  /** Not lasered (still drawn, faded): e.g. a part that is already cut or parked for later */
+  noLaser?: boolean;
   /** Mit dem Verbindungs-Werkzeug angelegte Verbindungen zu anderen Teilen (für die 3D-Ansicht) */
   mates?: Mate[];
   /** Formeln mit Projekt-Parametern für Lage, Größe, Drehung und Formmaße (nur oberste Ebene) */
@@ -806,6 +808,26 @@ export function* visibleLeaves(objs: Obj[], parent: Mat = IDENT): Generator<[Obj
     if (o.shape.kind === 'group') yield* visibleLeaves(o.shape.children, m);
     else yield [o, m];
   }
+}
+
+/** Like visibleLeaves(), but also without objects excluded from output (noLaser, including group contents). */
+export function* laserLeaves(objs: Obj[], parent: Mat = IDENT): Generator<[Obj, Mat]> {
+  for (const o of objs) {
+    if (isOff(o) || o.noLaser) continue;
+    const m = mul(parent, o.m);
+    if (o.shape.kind === 'group') yield* laserLeaves(o.shape.children, m);
+    else yield [o, m];
+  }
+}
+
+/** Leaves that are not lasered because they or a group above them are marked noLaser */
+export function noLaserLeaves(objs: Obj[], out = new Set<Obj>(), off = false): Set<Obj> {
+  for (const o of objs) {
+    const here = off || !!o.noLaser;
+    if (o.shape.kind === 'group') noLaserLeaves(o.shape.children, out, here);
+    else if (here) out.add(o);
+  }
+  return out;
 }
 
 /** Layer, unter dem ein Objekt im Objekte-Fenster steht: bei Gruppen der Layer des ersten Teils */

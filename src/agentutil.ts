@@ -83,6 +83,7 @@ export function describe(ed: Editor, o: Obj, parent: Mat, detail: boolean): Reco
   if (o.showIf) out.showIf = { condition: o.showIf, shown: !isOff(o) };
   if (o.bind) out.formulas = o.bind;
   if (o.locked) out.locked = true;
+  if (o.noLaser) out.noLaser = true;
   const rot = rotationOf(m);
   if (rot) out.rotation = rot;
   // Maße werden nach der Skalierung angegeben, also so groß, wie das Objekt auf dem Bett ist

@@ -2,7 +2,7 @@
 import { IDENT, isOff, Layer, mul, newId, Obj, setLayerDeep, translate, visibleLeaves, homeLayer } from '../model';
 import { Box, boundsOf } from '../geom';
 import type { Editor } from '../editor';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 
 export class EditorObjects {
   /** Gesperrt: selbst oder alle sichtbaren Teile liegen auf gesperrten Layern */
@@ -22,7 +22,7 @@ export class EditorObjects {
     return false;
   }
   /** Name, Sichtbarkeit oder Sperre eines Objekts (auch in Gruppen) ändern */
-  setObjProps(this: Editor, objs: Obj[], patch: { name?: string; hidden?: boolean; locked?: boolean }) {
+  setObjProps(this: Editor, objs: Obj[], patch: { name?: string; hidden?: boolean; locked?: boolean; noLaser?: boolean }) {
     if (!objs.length) return;
     this.snapshot(t('Objekt-Eigenschaften'));
     for (const o of objs) {
@@ -39,9 +39,27 @@ export class EditorObjects {
         if (patch.locked) o.locked = true;
         else delete o.locked;
       }
+      if (patch.noLaser !== undefined) {
+        if (patch.noLaser) o.noLaser = true;
+        else delete o.noLaser;
+      }
     }
     this.emit('doc');
     this.dropUnselectable();
+  }
+  /** Exclude the selection from lasering, or include it again (if every selected object is already excluded) */
+  toggleNoLaser(this: Editor) {
+    if (!this.sel.length) {
+      this.hint = t('Erst Objekte auswählen.');
+      this.emit('tool');
+      return;
+    }
+    const off = !this.sel.every((o) => o.noLaser);
+    this.setObjProps(this.sel, { noLaser: off });
+    this.hint = off
+      ? tn('{n} Objekt wird nicht gelasert.', '{n} Objekte werden nicht gelasert.', this.sel.length)
+      : tn('{n} Objekt wird wieder gelasert.', '{n} Objekte werden wieder gelasert.', this.sel.length);
+    this.emit('tool');
   }
   /** Ausgeblendete oder gesperrte Objekte aus der Auswahl nehmen */
   dropUnselectable(this: Editor) {

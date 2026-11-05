@@ -1,13 +1,14 @@
 // Maschinenausgabe: aus dem Dokument einen Job berechnen (Linien, Füllen, Bilder), G-Code schreiben,
 // Laufzeit schätzen und Rahmenfahrten erzeugen. Alles in Maschinenkoordinaten (mm, Ursprung unten links, y nach oben).
 import ClipperLib from 'clipper-lib';
-import { apply, CutSettings, Doc, ImageLayer, ImageShape, inv, isGrayMode, Layer, LeadSettings, visibleLeaves, Mat, mul, normalizeLayer, Obj, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
+import { apply, CutSettings, Doc, ImageLayer, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
 import { bezierPt, segments, shapeSubs } from './geom';
 import { loadFont, textToSubs } from './fonts';
 import { nativeScanLines, outputGrid, processImage } from './images';
 import { hasNative, native } from './native';
 import { locale, t, tn } from './i18n';
 import { jobOutputsOff, jobOutputsOn } from './fluidnc';
+import { parkedObjs } from './parking';
 
 // ---------- Geräte und Firmware ----------
 
@@ -1386,7 +1387,13 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   const { doc, device } = inp;
   const layerOf = (i: number) => normalizeLayer(inp.layer(i));
   const warnings: string[] = [];
-  const roots = inp.only ?? doc.objs;
+  let roots = inp.only ?? doc.objs;
+  // Parts parked completely outside the work area are not lasered (not with a rotary: there y is the circumference)
+  const parked = rotaryOn(device) ? new Set<Obj>() : parkedObjs(roots, doc.bed, layerOf);
+  if (parked.size) {
+    roots = roots.filter((o) => !parked.has(o));
+    warnings.push(tn('{n} Objekt liegt ganz außerhalb des Arbeitsbereichs (geparkt) und wird nicht gelasert.', '{n} Objekte liegen ganz außerhalb des Arbeitsbereichs (geparkt) und werden nicht gelasert.', parked.size));
+  }
   const toBed = FLIP(doc.bed.h);
 
   // 1. Geometrie je Layer sammeln (Bettkoordinaten, y nach oben)
@@ -1405,7 +1412,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   };
   const bounds = emptyBox();
   let skippedOpen = 0;
-  for (const [o, world] of visibleLeaves(roots)) {
+  for (const [o, world] of laserLeaves(roots)) {
     if (o.reg) continue; // Passermarken nur drucken, nicht lasern
     const L = layerOf(o.layer);
     if (!L.output) continue;

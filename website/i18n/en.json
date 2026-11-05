@@ -113,7 +113,7 @@
       "title": "Production",
       "lead": "From one-off to small batch – name tags, key fobs, labels.",
       "b": [
-        "Automatic nesting by true outlines, parts inside holes, overflow onto new pages, scrap pieces as sheets",
+        "Automatic nesting by true outlines, parts inside holes, overflow onto new pages, scrap pieces as sheets; exclude single parts from lasering or park them next to the bed",
         "Templates with project parameters and formulas – key fob, name tag and labelled box included",
         "Series from a table or CSV: every row becomes a finished copy, edit the table right in the dialog",
         "QR codes (link, Wi-Fi, vCard), barcodes (Code 128, EAN, UPC, Code 39, ITF) and variable text with serial numbers, dates and CSV columns",
