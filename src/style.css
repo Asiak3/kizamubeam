@@ -4027,3 +4027,10 @@ input.jig-count {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
+
+/* Mehrlagenarbeit */
+.multilayer-dialog { width: min(820px, calc(100vw - 30px)); }
+.multilayer-list { display: grid; gap: 7px; margin: 12px 0; }
+.multilayer-row { display: flex; gap: 7px; align-items: center; padding: 7px; border: 1px solid var(--line); border-radius: 5px; flex-wrap: wrap; }
+.multilayer-name { flex: 1 1 150px; }
+.multilayer-thickness { width: 68px; }

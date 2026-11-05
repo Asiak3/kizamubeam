@@ -3,12 +3,14 @@ import { about, clone, cloneObjs, Mat, mul, Pt, rotate, scale, translate, visibl
 import type { Editor } from '../editor';
 import { t } from '../i18n';
 import { genLeaves } from './generators';
+import { copyMultiLayers, pruneMultiLayers } from '../multilayer';
 
 export class EditorCommands {
   deleteSel(this: Editor) {
     if (!this.sel.length) return;
     this.snapshot(t('Löschen'));
     this.doc.objs = this.doc.objs.filter((o) => !this.sel.includes(o));
+    pruneMultiLayers(this.doc);
     this.setSel([]);
     this.emit('doc');
   }
@@ -55,6 +57,7 @@ export class EditorCommands {
     this.snapshot(t('Duplizieren'));
     const objs = cloneObjs(this.sel);
     this.doc.objs.push(...objs);
+    copyMultiLayers(this.doc, this.sel.map((o, i) => [o, objs[i]] as const));
     this.setSel(objs);
     this.emit('doc');
   }

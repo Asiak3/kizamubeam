@@ -3700,5 +3700,16 @@
   "Layer nicht lasern (Ausgabe aus)": "Don't laser this layer (output off)",
   "Layer wieder lasern (Ausgabe an)": "Laser this layer again (output on)",
   "Nicht lasern": "Don't laser",
-  "Nicht gewählte Objekte auf der Seite wurden umgangen. Soll eine gezeichnete Form das Material sein, sie mit auswählen und „Gewählte Form (Reststück)“ nehmen, oder „Andere Objekte auf der Seite umgehen“ ausschalten.": "Unselected objects on the page were avoided. If a drawn shape is meant to be the material, select it too and use “Selected shape (scrap piece)”, or turn off “Avoid other objects on the page”."
+  "Nicht gewählte Objekte auf der Seite wurden umgangen. Soll eine gezeichnete Form das Material sein, sie mit auswählen und „Gewählte Form (Reststück)“ nehmen, oder „Andere Objekte auf der Seite umgehen“ ausschalten.": "Unselected objects on the page were avoided. If a drawn shape is meant to be the material, select it too and use “Selected shape (scrap piece)”, or turn off “Avoid other objects on the page”.",
+  "Mehrlagenarbeit": "Multi-layer work",
+  "Aus ausgewählten Formen oder Gruppen eine frei gestaltete, in der 3D-Ansicht gestapelte Arbeit machen.": "Create a freely designed stacked work in the 3D view from selected shapes or groups.",
+  "Schichten Platten Stapeln Holz Relief Shadowbox 3D mehrlagig|Suchwörter": "layers plates stack wood relief shadowbox 3D multi-layer",
+  "Mehrlagenarbeit: geschlossene Formen oder Gruppen auswählen, die noch zu keiner Mehrlagenarbeit gehören.": "Multi-layer work: select closed shapes or groups that do not yet belong to a multi-layer work.",
+  "Name der Platte": "Plate name",
+  "Eine Ebene höher": "Move up one layer",
+  "Eine Ebene tiefer": "Move down one layer",
+  "Mehrlagenarbeit bearbeiten": "Edit multi-layer work",
+  "Mehrlagenarbeit erstellen": "Create multi-layer work",
+  "Die Liste läuft von unten nach oben. Die Formen bleiben editierbar; die 3D-Ansicht zeigt sie bündig gestapelt.": "The list runs from bottom to top. Shapes remain editable; the 3D view shows them stacked flush.",
+  "Mehrlagenarbeit aus den ausgewählten Formen erstellen oder bearbeiten": "Create or edit a multi-layer work from selected shapes"
 }
