@@ -402,7 +402,11 @@ function sanitizeSvgText(input: string): string {
   let s = input;
   s = s.replace(/<\?xml[\s\S]*?\?>/gi, '');
   s = s.replace(/<!doctype[\s\S]*?>/gi, '');
-  s = s.replace(/<!--([\s\S]*?)-->/g, '');
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(/<!--([\s\S]*?)-->/g, '');
+  } while (s !== prev);
   s = s.replace(/<(script|foreignObject|iframe|object|embed|audio|video|canvas)\b[\s\S]*?<\/\1\s*>/gi, '');
   s = s.replace(/\son[a-z0-9_-]+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, '');
   s = s.replace(/\s(xlink:href|href|src)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (_m, attr, _raw, d1, d2, d3) => {
