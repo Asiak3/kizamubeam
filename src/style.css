@@ -1210,7 +1210,28 @@ table.devices .actions {
 }
 .cal-left {
   overflow-y: auto;
+  padding-right: 4px;
 }
+.camera-preview canvas { width: 100%; height: auto; display: block; }
+/* Camera adjustments */
+.camera-tab details { margin: 8px 0; padding: 6px; border: 1px solid var(--line); border-radius: 4px; }
+.camera-tab summary { cursor: pointer; font-weight: 600; }
+.camera-overlay-adjustments { container-type: inline-size; }
+.camera-overlay-adjustments summary { overflow-wrap: anywhere; }
+.camera-overlay-adjustments .btn { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.camera-adjustment-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px 16px; max-width: 50rem; margin: 8px 0; }
+.camera-adjustment-field { display: grid; grid-template-columns: minmax(0, 1fr) 12ch; gap: 8px; align-items: center; min-width: 0; color: var(--muted); }
+.camera-adjustment-label { overflow-wrap: anywhere; }
+.camera-adjustment-field input[type="number"] { box-sizing: border-box; width: 100%; min-width: 0; }
+@container (min-width: 32rem) {
+  .camera-adjustment-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.camera-tab input[type="range"], .cal-left input[type="range"] { min-width: 0; width: 100%; }
+.camera-image-controls fieldset { min-width: 0; border: 1px solid var(--line); padding: 8px; margin: 6px 0; }
+.camera-image-controls label { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(65px, 1.4fr) auto; gap: 5px; align-items: center; margin: 6px 0; }
+.camera-image-controls input[type="number"], .camera-image-controls select { width: 100%; min-width: 0; }
+.camera-image-controls input[type="checkbox"] { justify-self: start; }
+.camera-image-controls output { font-variant-numeric: tabular-nums; }
 .cal-left .form {
   grid-template-columns: 1fr 110px;
 }

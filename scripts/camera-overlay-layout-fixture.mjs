@@ -1,0 +1,73 @@
+// Synthetic UI only; no camera/app bootstrap.
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const output = resolve(process.argv[2] ?? resolve(root, 'artifacts/camera-overlay-layout'));
+const entry = `
+import { fineTuneControls } from ${JSON.stringify(resolve(root, 'src/cameraFineTune.ts'))};
+import { DEFAULT_FINE_TUNE } from ${JSON.stringify(resolve(root, 'src/cameraProfile.ts'))};
+const cases = [];
+for (const width of [800, 420, 320, 220]) {
+  const host = document.createElement('section');
+  host.className = 'camera-tab'; host.style.width = width + 'px';
+  const title = document.createElement('h2'); title.textContent = width + ' px camera panel';
+  let state = { ...DEFAULT_FINE_TUNE };
+  const controls = fineTuneControls(() => state, value => { state = value; });
+  host.append(title, controls.element); document.querySelector('main').append(host);
+  cases.push({ host, controls, get state() { return state; } });
+}
+window.runOverlayLayoutChecks = () => {
+  const results = [], errors = [];
+  for (const fontSize of [12, 24]) {
+    document.documentElement.style.fontSize = fontSize + 'px';
+    for (const item of cases) {
+      const grid = item.host.querySelector('.camera-adjustment-fields');
+      const details = item.controls.element;
+      const fields = [...grid.querySelectorAll('.camera-adjustment-field')];
+      const inputs = [...grid.querySelectorAll('input')];
+      const rects = fields.map(field => field.getBoundingClientRect());
+      const columns = getComputedStyle(grid).gridTemplateColumns.trim().split(/\\s+/).length;
+      const available = details.clientWidth - 2 * parseFloat(getComputedStyle(details).paddingLeft);
+      const expected = available >= 32 * fontSize ? 2 : 1;
+      if (columns !== expected) errors.push('Unexpected column count at ' + item.host.style.width + '/' + fontSize);
+      if (fields.length !== 5 || inputs.length !== 5) errors.push('Missing numeric field');
+      if (details.scrollWidth > details.clientWidth + 1) errors.push('Panel or reset button overflow');
+      if (columns === 2 && (Math.abs(rects[0].top - rects[1].top) > 1 || Math.abs(rects[2].top - rects[3].top) > 1))
+        errors.push('X/Y or width/height pair is not side by side');
+      if (columns === 1 && rects.some((rect, i) => i && rect.top <= rects[i - 1].top)) errors.push('Narrow fields overlap');
+      for (let i = 0; i < inputs.length; i++) {
+        const input = inputs[i], r = input.getBoundingClientRect();
+        if (!input.labels.length || !input.getAttribute('aria-label')) errors.push('Unlabelled input');
+        if (r.width > 10 * fontSize || r.right > rects[i].right + 1) errors.push('Input too wide/overflowing');
+        if (fields[i].scrollWidth > fields[i].clientWidth + 1) errors.push('Field overflow');
+      }
+      inputs[0].value = '-10000'; inputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+      if (item.state.offsetX !== -10000) errors.push('Numeric boundary changed');
+      item.host.querySelector('button').click();
+      if (JSON.stringify(item.state) !== JSON.stringify(DEFAULT_FINE_TUNE)) errors.push('Reset changed');
+      results.push({ width: item.host.style.width, fontSize, columns, inputWidth: inputs[0].getBoundingClientRect().width });
+    }
+  }
+  document.documentElement.style.fontSize = '12px';
+  return { results, errors };
+};
+`;
+const result = await build({ absWorkingDir: root, stdin: { contents: entry, resolveDir: root, loader: 'js' },
+  bundle: true, write: false, format: 'esm', platform: 'browser', metafile: true });
+for (const input of Object.keys(result.metafile.inputs))
+  assert.ok(!/src\/(camera|cameraui|machine|laser|files)\.ts$/.test(input), `Hardware/application boundary imported: ${input}`);
+const code = result.outputFiles[0].text;
+for (const forbidden of ['getUserMedia', 'enumerateDevices', 'netcam_open']) assert.ok(!code.includes(forbidden));
+mkdirSync(output, { recursive: true });
+writeFileSync(resolve(output, 'fixture.js'), code);
+writeFileSync(resolve(output, 'style.css'), readFileSync(resolve(root, 'src/style.css')));
+writeFileSync(resolve(output, 'index.html'), `<!doctype html><html lang="en" data-theme="dark"><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; media-src 'none'; img-src 'none'">
+<title>Offline camera overlay layout fixture</title><link rel="stylesheet" href="style.css">
+<style>html,body{height:auto;overflow:auto}main{padding:16px;display:grid;gap:20px}.camera-tab{max-width:none}h1{margin:0}h2{font-size:14px;margin:0 0 6px}</style>
+<main><h1>Compact camera overlay controls — synthetic offline fixture</h1></main><script type="module" src="fixture.js"></script></html>`);
+console.log(`Offline-only layout fixture written to ${output}`);

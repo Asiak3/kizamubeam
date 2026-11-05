@@ -1,0 +1,492 @@
+// Run from this fork: node scripts/camera-ui-offline-test.mjs
+// No app bootstrap, browser, hardware, discovery, services, or on-disk test output.
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+const forbidden = [];
+const deny = (name) => () => {
+  forbidden.push(name);
+  throw new Error(`Forbidden offline operation: ${name}`);
+};
+
+class Element {
+  constructor(tag) {
+    this.tag = tag; this.children = []; this.listeners = new Map();
+    this.attributes = {}; this.style = {}; this.className = '';
+    this.disabled = false; this.hidden = false; this.value = '';
+    this.width = 32; this.height = 18;
+    this.classList = { toggle: (name, enabled) => {
+      const classes = new Set(this.className.split(' ').filter(Boolean));
+      if (enabled) classes.add(name); else classes.delete(name);
+      this.className = [...classes].join(' ');
+    } };
+  }
+  append(...nodes) {
+    for (const node of nodes) {
+      if (node instanceof Element) { node.remove(); node.parentNode = this; }
+      this.children.push(node);
+    }
+  }
+  replaceChildren(...nodes) {
+    for (const node of this.children) if (node instanceof Element) node.parentNode = null;
+    this.children = []; this.append(...nodes);
+  }
+  get firstChild() { return this.children[0] ?? null; }
+  set textContent(text) { this.replaceChildren(String(text)); }
+  get textContent() { return this.children.map((node) => node instanceof Element ? node.textContent : node).join(''); }
+  set innerHTML(text) { this.textContent = text; }
+  setAttribute(key, value) {
+    this.attributes[key] = String(value);
+    if (key === 'class') this.className = String(value);
+    else if (key === 'disabled' || key === 'checked' || key === 'selected' || key === 'open') this[key] = true;
+    else this[key] = String(value);
+  }
+  getAttribute(key) { return this.attributes[key] ?? null; }
+  addEventListener(type, fn) {
+    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+    this.listeners.get(type).add(fn);
+  }
+  removeEventListener(type, fn) { this.listeners.get(type)?.delete(fn); }
+  async emit(type, extra = {}) {
+    for (const fn of [...(this.listeners.get(type) ?? [])])
+      await fn({ target: this, preventDefault() {}, stopPropagation() {}, ...extra });
+  }
+  async click() { if (!this.disabled) await this.emit('click'); }
+  get valueAsNumber() { return String(this.value).trim() ? Number(this.value) : NaN; }
+  get validity() { return { valid: Number.isFinite(this.valueAsNumber) && this.valueAsNumber >= Number(this.min ?? -Infinity) }; }
+  get isConnected() { return this === document.body || !!this.parentNode?.isConnected; }
+  querySelectorAll(selector) {
+    const matches = (node) => selector.split(',').some((part) => {
+      const s = part.trim();
+      return s.startsWith('.') ? node.className.split(' ').includes(s.slice(1)) : node.tag === s;
+    });
+    return this.children.filter((node) => node instanceof Element).flatMap((node) => [
+      ...(matches(node) ? [node] : []), ...node.querySelectorAll(selector),
+    ]);
+  }
+  getBoundingClientRect() { return { left: 0, top: 0, width: 32, height: 18 }; }
+  getClientRects() { return this.hidden ? [] : [this.getBoundingClientRect()]; }
+  getContext() { return context; }
+  setPointerCapture() {}
+  showModal() { this.open = true; }
+  async close() { this.open = false; await this.emit('close'); }
+  remove() {
+    if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((node) => node !== this);
+    this.parentNode = null;
+  }
+}
+class Video extends Element {
+  constructor() { super('video'); this.videoWidth = 32; this.videoHeight = 18; }
+}
+class Select extends Element { constructor() { super('select'); } }
+const context = Object.fromEntries([
+  'clearRect', 'fillRect', 'strokeRect', 'beginPath', 'arc', 'fill', 'stroke',
+  'fillText', 'setTransform', 'drawImage', 'putImageData', 'moveTo', 'lineTo',
+].map((name) => [name, () => {}]));
+const previewSources = [];
+context.drawImage = (source) => previewSources.push(source);
+context.getImageData = (_x, _y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4), width: w, height: h });
+context.createImageData = (w, h) => context.getImageData(0, 0, w, h);
+
+const storage = new Map();
+const intervals = new Map(), animations = new Map(), observers = [];
+const nativeClearInterval = globalThis.clearInterval;
+let nextTimer = 1;
+class Observer {
+  constructor(callback) { this.callback = callback; this.active = false; observers.push(this); }
+  observe() { this.active = true; }
+  disconnect() { this.active = false; }
+}
+Object.assign(globalThis, {
+  document: { createElement: (tag) => tag === 'video' ? new Video() : tag === 'select' ? new Select() : new Element(tag), activeElement: null },
+  HTMLVideoElement: Video, HTMLSelectElement: Select,
+  localStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
+  MutationObserver: Observer, ResizeObserver: Observer,
+  getComputedStyle: () => ({ getPropertyValue: () => '' }),
+  requestAnimationFrame: (fn) => { const id = nextTimer++; animations.set(id, fn); return id; },
+  cancelAnimationFrame: (id) => animations.delete(id),
+  clearInterval: (id) => { if (!intervals.delete(id)) nativeClearInterval(id); },
+  fetch: deny('fetch'), WebSocket: deny('WebSocket'),
+});
+document.body = new Element('body');
+globalThis.window = {
+  devicePixelRatio: 1,
+  setInterval: (fn) => { const id = nextTimer++; intervals.set(id, fn); return id; },
+};
+Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {
+  mediaDevices: { getUserMedia: deny('getUserMedia'), enumerateDevices: deny('enumerateDevices') },
+  serial: { getPorts: deny('serial.getPorts'), requestPort: deny('serial.requestPort') },
+  usb: { getDevices: deny('usb.getDevices'), requestDevice: deny('usb.requestDevice') },
+} });
+
+const machineListeners = new Set(), deviceListeners = new Set();
+const subscribe = (set) => (fn) => { set.add(fn); return () => set.delete(fn); };
+const device = { id: 'offline-a', name: 'Offline A', conn: 'serial', port: 'TEST_ONLY', fw: 'grbl', zAxis: true, limitSwitches: 'yes' };
+const machine = {
+  connected: false, connecting: false, running: false,
+  status: { state: '', wpos: null, sd: null }, on: subscribe(machineListeners),
+  connect: deny('machine.connect'), disconnect: deny('machine.disconnect'),
+  send: deny('machine.send'), runJob: deny('machine.runJob'),
+};
+const streams = [];
+let listCalls = 0;
+class CameraStream {
+  constructor() {
+    this.open = false; this.width = 32; this.height = 18;
+    this.video = new Video(); this.stream = null; streams.push(this);
+  }
+  get view() { return this.networkView ?? this.video; }
+  static async list() { listCalls++; return []; }
+  start = deny('CameraStream.start');
+  grab = deny('CameraStream.grab');
+  freshFrames = deny('CameraStream.freshFrames');
+  stop() { this.open = false; }
+}
+const saved = [];
+let opened = null, confirmations = 0, consent = true;
+globalThis.confirm = () => { confirmations++; return consent; };
+const dictionary = JSON.parse(await readFile(new URL('../src/locales/en.json', import.meta.url), 'utf8'));
+const translate = (text, vars = {}) => (dictionary[text] ?? text).replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
+globalThis.__cameraUiMocks = {
+  // Optional independent machine-panel PR has its own strict integration suite.
+  calibrationMachineControls: () => ({ element: document.createElement('section'), dispose() {} }),
+  CameraStream, cameraError: (error) => String(error), machine, device,
+  onDeviceChange: subscribe(deviceListeners),
+  openText: async () => opened,
+  saveText: async (...args) => { saved.push(args); return true; },
+  defaultLayer: deny('defaultLayer'), loadDoc: deny('loadDoc'), translate: deny('model.translate'),
+  buildJob: deny('buildJob'), estimate: deny('estimate'), writeGCode: deny('writeGCode'),
+  FIRMWARES: { grbl: { jog: deny('firmware.jog') } },
+  dec: (text) => text, t: translate, tn: (one, many, n) => translate(n === 1 ? one : many, { n }),
+  openWorkpieceDialog: deny('openWorkpieceDialog'),
+};
+const mocks = {
+  './calibrationMachineControls': ['calibrationMachineControls'],
+  './laser': ['device', 'onDeviceChange'], './machine': ['machine'],
+  './files': ['openText', 'saveText'], './model': ['defaultLayer', 'loadDoc', 'translate'],
+  './gcode': ['buildJob', 'estimate', 'writeGCode', 'FIRMWARES'],
+  './i18n': ['dec', 't', 'tn'], './workpieceDialog': ['openWorkpieceDialog'],
+};
+// Synthetic connection data only; no URL is ever opened by this test.
+const networkSecret = 'http://test-user:test-password@camera.invalid/view?token=TEST_TOKEN';
+storage.set('kizamubeam.camera', JSON.stringify({ 'offline-net': { cur: 0, cams: [{
+  id: 'network-source', name: 'Offline network camera', mount: 'fixed', cam: '',
+  label: networkSecret, url: networkSecret, width: 1920, height: 1080,
+}] } }));
+const bundle = await build({
+  // Test-only exports expose existing units without changing production visibility.
+  absWorkingDir: root, stdin: {
+    contents: await readFile(new URL('../src/cameraui.ts', import.meta.url), 'utf8')
+      + '\nexport { units as testUnits, cfg as testConfig };',
+    resolveDir: fileURLToPath(new URL('../src/', import.meta.url)), loader: 'ts', sourcefile: 'camera-ui-offline-entry.ts',
+  }, bundle: true, write: false,
+  format: 'esm', platform: 'node', metafile: true,
+  plugins: [{ name: 'camera-ui-offline', setup(b) {
+    b.onResolve({ filter: /^\.\/(camera|laser|machine|files|model|gcode|i18n|workpieceDialog|calibrationMachineControls)$/ }, (args) => ({ path: args.path, namespace: 'offline' }));
+    b.onLoad({ filter: /.*/, namespace: 'offline' }, (args) => ({
+      // Real camera mathematics/defaults, but acquisition is replaced completely.
+      contents: args.path === './camera'
+        ? `export * from ${JSON.stringify(fileURLToPath(new URL('../src/camera.ts', import.meta.url)))}; export const { CameraStream, cameraError } = globalThis.__cameraUiMocks;`
+        : `export const { ${mocks[args.path].join(',')} } = globalThis.__cameraUiMocks;`,
+      loader: 'js', resolveDir: root,
+    }));
+  } }],
+});
+for (const input of Object.keys(bundle.metafile.inputs)) {
+  assert.ok(!/src\/(laser|machine|files|model|gcode|i18n|workpieceDialog)\.ts$/.test(input), `Unexpected real boundary: ${input}`);
+}
+assert.ok(!bundle.outputFiles[0].text.includes('getUserMedia'), 'Real acquisition must be tree-shaken out');
+const { cameraTab, cameraViews, testUnits, testConfig } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
+const all = (node, selector) => node.querySelectorAll(selector);
+const button = (node, text) => {
+  const found = all(node, 'button').find((el) => el.textContent === translate(text));
+  assert.ok(found, `Missing button: ${text}`); return found;
+};
+const aria = (node, label) => {
+  const found = all(node, 'input').find((el) => el.getAttribute('aria-label') === label);
+  assert.ok(found, `Missing input: ${label}`); return found;
+};
+const change = async (input, value, event = 'change') => { input.value = String(value); await input.emit(event); };
+const persisted = () => JSON.parse(storage.get('kizamubeam.camera'));
+const emitDevice = async (id) => { device.id = id; for (const fn of [...deviceListeners]) fn(); await Promise.resolve(); };
+const ed = {
+  doc: { bed: { w: 400, h: 300 } }, sel: [],
+  on() {}, redraw() {},
+};
+const tab = cameraTab(ed);
+document.body.append(tab);
+await Promise.resolve();
+assert.equal(listCalls, 1, 'Only the static fake camera list is queried');
+assert.equal(streams.length, 1);
+assert.deepEqual(forbidden, [], 'Startup cannot connect, send, or acquire');
+assert.ok(tab.textContent.includes('Adjust camera overlay'));
+assert.ok(tab.textContent.includes('Image adjustments'));
+assert.ok(tab.textContent.includes('Hardware controls unavailable: no selected open camera.'));
+assert.equal(button(tab, 'Export calibration…').disabled, true, 'Uncalibrated export is gated');
+await button(tab, 'Export calibration…').emit('click');
+assert.equal(saved.length, 0, 'Even a bypassed disabled button cannot export without calibration');
+assert.ok(tab.textContent.includes('No valid calibration to export.'));
+
+await change(aria(tab, 'X shift (mm)'), 2.5);
+const brightness = all(all(tab, '.camera-image-controls')[0], 'input')[0];
+await change(brightness, 1.4, 'input');
+assert.equal(persisted()['offline-a'].cams[0].fineTune.offsetX, 2.5);
+assert.equal(persisted()['offline-a'].cams[0].image.brightness, 1.4);
+await emitDevice('offline-b');
+assert.equal(aria(tab, 'X shift (mm)').value, '0');
+assert.equal(brightness.value, '1');
+await change(aria(tab, 'X shift (mm)'), -3);
+await change(brightness, 0.7, 'input');
+await emitDevice('offline-a');
+assert.equal(aria(tab, 'X shift (mm)').value, '2.5');
+assert.equal(brightness.value, '1.4');
+assert.equal(persisted()['offline-b'].cams[0].fineTune.offsetX, -3);
+assert.equal(persisted()['offline-b'].cams[0].image.brightness, 0.7);
+
+const profile = {
+  schema: 'kizamubeam.camera-profile', version: 1, name: 'Portable source', cameraLabel: 'Source camera',
+  mount: 'fixed', width: 1920, height: 1080,
+  calib: { w: 1920, h: 1080, H: [1, 0, 0, 0, 1, 0, 0, 0, 1], k1: 0, k2: 0,
+    err: 0, maxErr: 0, bedW: 400, bedH: 300, date: '2026-11-03' },
+  fineTune: { offsetX: 6, offsetY: 7, scaleX: 1, scaleY: 1, rotation: 0 },
+  image: { brightness: 1.2, contrast: 1, saturation: 1, gamma: 1, grayscale: false },
+};
+const importProfile = async (p) => {
+  opened = ['offline.kzb-camera', JSON.stringify(p)];
+  await button(tab, 'Import calibration…').click();
+};
+for (const bad of [
+  { ...profile, version: 999 },
+  { ...profile, image: { ...profile.image, gamma: '1' } },
+  { ...profile, calib: { ...profile.calib, bedW: 401 } },
+  { ...profile, calib: { ...profile.calib, w: 640, h: 480 } },
+  { ...profile, mount: 'head', calib: { ...profile.calib, head: { x: 0, y: 0 } } },
+]) {
+  const before = storage.get('kizamubeam.camera');
+  await importProfile(bad);
+  assert.equal(storage.get('kizamubeam.camera'), before, 'Rejected imports must not alter stored settings');
+}
+assert.equal(confirmations, 0, 'Invalid/incompatible profiles fail before confirmation');
+consent = false; await importProfile(profile);
+assert.equal(button(tab, 'Export calibration…').disabled, true);
+consent = true;
+const identity = persisted()['offline-a'].cams[0];
+await importProfile(profile);
+const imported = persisted()['offline-a'].cams[0];
+for (const key of ['id', 'name', 'cam', 'label', 'mount', 'width', 'height'])
+  assert.equal(imported[key], identity[key], `Import must preserve ${key}`);
+assert.deepEqual(imported.calib, profile.calib);
+assert.deepEqual(imported.fineTune, profile.fineTune);
+assert.deepEqual(imported.image, profile.image);
+assert.equal(button(tab, 'Export calibration…').disabled, false);
+await button(tab, 'Export calibration…').click();
+assert.equal(saved.length, 1);
+assert.deepEqual(saved[0].slice(0, 4), ['camera-calibration.kzb-camera', 'Camera calibration', 'kzb-camera', 'application/json']);
+const exported = JSON.parse(saved[0][4]);
+assert.deepEqual(exported.calib, profile.calib);
+assert.deepEqual(exported.fineTune, profile.fineTune);
+assert.deepEqual(exported.image, profile.image);
+assert.equal(exported.schema, profile.schema);
+for (const key of ['id', 'cam', 'port', 'host', 'device']) assert.equal(Object.hasOwn(exported, key), false);
+
+await emitDevice('offline-net');
+const networkProfile = { ...profile, width: 640, height: 480, calib: { ...profile.calib, w: 640, h: 480 } };
+await importProfile(networkProfile);
+assert.deepEqual(persisted()['offline-net'].cams[0].calib, networkProfile.calib,
+  'Disconnected network camera does not have known dimensions until connection');
+assert.equal(persisted()['offline-net'].cams[0].url, networkSecret, 'Import does not rebind network camera');
+await button(tab, 'Export calibration…').click();
+const netExport = JSON.parse(saved.at(-1)[4]);
+assert.equal(netExport.cameraLabel, 'Network camera');
+assert.equal(netExport.width, 640); assert.equal(netExport.height, 480);
+for (const secret of ['test-user', 'test-password', 'TEST_TOKEN', 'camera.invalid'])
+  assert.equal(saved.at(-1)[4].includes(secret), false, 'Portable profile must omit network connection secrets');
+await emitDevice('offline-a');
+
+// Pretend a camera was already opened elsewhere: never invoke acquisition.
+const stream = streams.at(-1);
+stream.open = true;
+stream.stream = { getVideoTracks: () => [{ readyState: 'live', getCapabilities: () => ({}), getSettings: () => ({}), applyConstraints: deny('track.applyConstraints') }] };
+for (const fn of machineListeners) fn({ type: 'connection' });
+assert.ok(tab.textContent.includes('Unavailable (not reported by camera)'));
+for (const [id, fn] of [...animations]) { animations.delete(id); fn(); }
+assert.ok(previewSources.includes(stream.video), 'Adjusted tab preview consumes the USB video');
+const correctedImage = testConfig().image;
+testConfig().image = { brightness: 1, contrast: 1, saturation: 1, gamma: 1, grayscale: false };
+let beforeDraws = previewSources.length;
+for (const [id, fn] of [...animations]) { animations.delete(id); fn(); }
+assert.equal(all(tab, '.camera-preview')[0].firstChild, stream.video, 'Neutral tab uses the actual video element');
+assert.equal(previewSources.length, beforeDraws, 'Neutral tab does not copy frames');
+testConfig().image = correctedImage;
+document.hidden = true;
+for (const [id, fn] of [...animations]) { animations.delete(id); fn(); }
+assert.equal(previewSources.length, beforeDraws, 'Hidden document does no corrected preview work');
+document.hidden = false;
+const usbTrack = stream.stream;
+const networkCanvas = new Element('canvas');
+stream.networkView = networkCanvas;
+stream.stream = null;
+for (const fn of machineListeners) fn({ type: 'connection' });
+for (const [id, fn] of [...animations]) { animations.delete(id); fn(); }
+assert.ok(previewSources.includes(networkCanvas), 'Adjusted tab preview consumes the upstream network canvas, not USB video');
+assert.ok(tab.textContent.includes('Hardware controls unavailable: no selected open camera.'));
+delete stream.networkView;
+stream.stream = usbTrack;
+const machineCount = machineListeners.size, deviceCount = deviceListeners.size;
+await button(tab, 'Kalibrieren …').click();
+const dialog = all(document.body, 'dialog')[0];
+assert.ok(dialog?.open, 'Actual calibration click must construct and open the dialog');
+assert.equal(all(dialog, '.calibration-machine-controls').length, 0, 'New machine panel is excluded from the camera PR');
+for (const label of ['Connect', 'Home…', 'Z+', '←', '→', '↑', '↓'])
+  assert.equal(all(dialog, 'button').some((el) => el.textContent === label), false,
+    `Fixed-camera wizard must not include ${label} machine controls`);
+assert.equal(all(dialog, '.camera-image-controls').length, 1);
+assert.ok(dialog.textContent.includes('Unavailable (not reported by camera)'));
+assert.equal(button(dialog, 'Markierungen lasern').disabled, true);
+await button(dialog, 'Markierungen lasern').emit('click');
+assert.equal(all(dialog, 'input').some((input) => input.getAttribute('aria-label') === 'Grid intensity'), false,
+  'Grid intensity is intentionally excluded from the camera-adjustments PR');
+assert.equal(dialog.textContent.includes('Grid intensity'), false);
+const dialogBrightness = all(all(dialog, '.camera-image-controls')[0], 'input')[0];
+await change(dialogBrightness, 1.6, 'input');
+assert.equal(persisted()['offline-a'].cams[0].image.brightness, 1.6);
+assert.ok(animations.size > 0, 'Live fake-video preview schedules a frame');
+await button(dialog, 'Abbrechen').click();
+assert.equal(dialog.isConnected, false);
+assert.equal(machineListeners.size, machineCount, 'Dialog removes machine subscriptions');
+assert.equal(deviceListeners.size, deviceCount, 'Dialog removes device subscriptions');
+assert.equal(animations.size, 1, 'Close cancels dialog animation; tab preview remains');
+assert.ok(observers.filter((o) => o.active).length === 1, 'Only tab lifecycle observer remains');
+const beforeCloseInput = storage.get('kizamubeam.camera');
+await change(dialogBrightness, 2, 'input');
+assert.equal(storage.get('kizamubeam.camera'), beforeCloseInput, 'Disposed image callbacks cannot persist');
+// Upstream network cameras also work inside the adjusted calibration wizard.
+stream.networkView = networkCanvas;
+stream.stream = null;
+previewSources.length = 0;
+await button(tab, 'Kalibrieren …').click();
+const networkDialog = all(document.body, 'dialog')[0];
+assert.ok(networkDialog?.open);
+assert.ok(previewSources.includes(networkCanvas), 'Calibration live preview consumes the network canvas');
+assert.ok(networkDialog.textContent.includes('Hardware controls unavailable: no selected open camera.'));
+await button(networkDialog, 'Abbrechen').click();
+assert.equal(machineListeners.size, machineCount);
+assert.equal(deviceListeners.size, deviceCount);
+assert.equal(animations.size, 1, 'Only tab animation remains');
+// Optical request integration: native doubles observe persisted invalidation before
+// their first call. Neither rejection nor stale completion may resurrect calibration.
+delete stream.networkView;
+const unit = testUnits.get(testConfig().id);
+assert.ok(unit);
+const nativeField = (node, label) => {
+  const row = all(node, 'label').find((el) => el.textContent.startsWith(`${label}: `));
+  assert.ok(row, `Missing native row: ${label}`);
+  const input = all(row, 'input')[0]; assert.ok(input); return input;
+};
+const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+let finishOptical;
+let opticalCalls = 0;
+const opticalTrack = {
+  readyState: 'live', zoom: 1,
+  getCapabilities: () => ({ zoom: { min: 1, max: 4 } }),
+  getSettings() { return { zoom: this.zoom, width: 32, height: 18 }; },
+  getConstraints: () => ({}),
+  applyConstraints() {
+    opticalCalls++;
+    assert.equal(persisted()['offline-a'].cams[0].calibrationInvalidated, true,
+      'Persist invalidation BEFORE invoking the native track');
+    assert.equal(unit.calib(), null);
+    assert.equal(unit.ready, false); assert.equal(unit.covered, null); assert.equal(unit.empty, null);
+    assert.equal(unit.update(ed), false, 'Rejected calibration must not call even the fake grab boundary');
+    assert.deepEqual(cameraViews(ed), []);
+    return new Promise((resolve) => { finishOptical = resolve; });
+  },
+};
+stream.stream = { getVideoTracks: () => [opticalTrack] };
+for (const fn of machineListeners) fn({ type: 'connection' });
+unit.ready = true; unit.covered = { i0: 0, j0: 0, i1: 10, j1: 10 };
+unit.empty = new Element('canvas'); unit.remapKey = 'old-remap'; unit.footKey = 'old-foot';
+const activeScan = { stop: false }; unit.scan = activeScan;
+await change(nativeField(tab, 'Zoom'), 2);
+assert.equal(opticalCalls, 1); assert.equal(activeScan.stop, true);
+assert.equal(unit.remapKey, ''); assert.equal(unit.footKey, '');
+assert.equal(button(tab, 'Export calibration…').disabled, true);
+const exportsBeforeInvalid = saved.length;
+await button(tab, 'Export calibration…').emit('click');
+assert.equal(saved.length, exportsBeforeInvalid, 'Handler rejects invalid export even when disabled is bypassed');
+assert.ok(tab.textContent.includes('No valid calibration to export.'));
+unit.scan = null;
+const originalCalibration = structuredClone(testConfig().calib);
+await change(aria(tab, 'X shift (mm)'), 8);
+await button(tab, 'Reset overlay adjustment').click();
+await button(tab, 'Reset software adjustments').click();
+assert.equal(testConfig().calibrationInvalidated, true, 'Appearance changes/reset cannot revalidate optics');
+assert.deepEqual(testConfig().calib, originalCalibration, 'Keep original calibration as backup, not as usable geometry');
+await emitDevice('offline-b');
+finishOptical(); await flush();
+assert.equal(persisted()['offline-a'].cams[0].calibrationInvalidated, true,
+  'Changing selection during await preserves the original camera invalidation');
+assert.equal(persisted()['offline-b'].cams[0].calibrationInvalidated, false,
+  'Stale completion cannot invalidate another selected camera');
+await emitDevice('offline-a');
+assert.equal(testConfig().calibrationInvalidated, true);
+assert.deepEqual(cameraViews(ed), []);
+consent = false; await importProfile(profile);
+assert.equal(testConfig().calibrationInvalidated, true, 'Cancelled import cannot revalidate optics');
+consent = true; await importProfile(profile);
+assert.equal(testConfig().calibrationInvalidated, false, 'Explicit matching profile import revalidates');
+assert.equal(button(tab, 'Export calibration…').disabled, false);
+
+// The wizard must also invalidate before apply, even if Cancel closes it while pending.
+const wizardUnit = testUnits.get(testConfig().id);
+const wizardStream = wizardUnit.stream;
+wizardStream.open = true;
+opticalTrack.applyConstraints = () => {
+  opticalCalls++;
+  assert.equal(testConfig().calibrationInvalidated, true);
+  assert.equal(persisted()['offline-a'].cams[0].calibrationInvalidated, true);
+  assert.equal(wizardUnit.calib(), null); assert.equal(wizardUnit.update(ed), false);
+  return new Promise((resolve) => { finishOptical = resolve; });
+};
+wizardStream.stream = { getVideoTracks: () => [opticalTrack] };
+for (const fn of machineListeners) fn({ type: 'connection' });
+await button(tab, 'Kalibrieren …').click();
+const opticalDialog = all(document.body, 'dialog')[0];
+await change(nativeField(opticalDialog, 'Zoom'), 2);
+await button(opticalDialog, 'Abbrechen').click();
+finishOptical(); await flush();
+assert.equal(opticalCalls, 2);
+assert.equal(testConfig().calibrationInvalidated, true, 'Wizard Cancel never restores optical validity');
+assert.equal(persisted()['offline-a'].cams[0].calibrationInvalidated, true);
+assert.equal(wizardUnit.update(ed), false); assert.deepEqual(cameraViews(ed), []);
+assert.equal(button(tab, 'Export calibration…').disabled, true);
+
+// Explicitly applying a new calibration is the other authorized revalidation path.
+await button(tab, 'Kalibrieren …').click();
+const recalibrationDialog = all(document.body, 'dialog')[0];
+await change(all(recalibrationDialog, 'select')[0], 2);
+let syntheticGrabs = 0;
+wizardStream.grab = () => { syntheticGrabs++; return new Element('canvas'); };
+await button(recalibrationDialog, 'Foto aufnehmen').click();
+const calibrationView = all(recalibrationDialog, '.cal-view')[0];
+for (const [clientX, clientY] of [[2, 2], [30, 2], [2, 16], [30, 16]]) {
+  await calibrationView.emit('pointerdown', { button: 0, pointerId: 1, clientX, clientY });
+  await calibrationView.emit('pointerup');
+}
+assert.equal(button(recalibrationDialog, 'Übernehmen').disabled, false, 'Synthetic correspondences produce a calibration');
+await button(recalibrationDialog, 'Übernehmen').click();
+assert.equal(testConfig().calibrationInvalidated, false, 'Explicit new calibration Apply revalidates');
+assert.equal(persisted()['offline-a'].cams[0].calibrationInvalidated, false);
+assert.ok(syntheticGrabs >= 1, 'Only explicitly injected in-memory frames were used');
+assert.equal(machineListeners.size, machineCount); assert.equal(deviceListeners.size, deviceCount);
+assert.equal(animations.size, 1, 'Only tab animation remains');
+tab.remove();
+for (const observer of observers) if (observer.active) observer.callback();
+assert.equal(intervals.size, 0, 'Detached tab releases preview timer');
+assert.equal(animations.size, 0, 'Detached tab releases preview animation');
+assert.equal(observers.filter((o) => o.active).length, 0);
+assert.deepEqual(forbidden, [], 'No connect/send/job/acquisition/discovery/network operations occurred');
+console.log('Camera UI: offline startup, profile I/O, per-device adjustments, optical invalidation/revalidation, stale callbacks, USB/network previews, dialog wiring and cleanup passed.');

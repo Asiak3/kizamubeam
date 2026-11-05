@@ -1,0 +1,60 @@
+import assert from 'node:assert/strict';
+import { DEFAULT_FINE_TUNE, fineTunePoint, inverseFineTunePoint, normalizeFineTune } from '../src/cameraProfile';
+(globalThis as any).document = { documentElement: { lang: '' } };
+const { fineTunedCalibration, fineTunedHeadShift, fineTuneControls } = await import('../src/cameraFineTune');
+const { bedToPixel, pixelToBed, buildRemapRect } = await import('../src/camera');
+const c = { w: 1000, h: 1000, k1: 0, k2: 0,
+  H: [0.01, 0.001, -1, 0.0003, -0.01, 1, 0.0002, 0.0001, 1],
+  err: 0.1, maxErr: 0.2, bedW: 200, bedH: 200, date: '2026-11-03T00:00:00.000Z' };
+const near = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+  assert.ok(Math.hypot(a.x - b.x, a.y - b.y) < 1e-7, `${JSON.stringify(a)} != ${JSON.stringify(b)}`);
+};
+const before = JSON.stringify(c);
+for (const fine of [DEFAULT_FINE_TUNE,
+  { offsetX: 1.3, offsetY: 0.3, scaleX: 1.004, scaleY: 1.003, rotation: 0 },
+  { offsetX: -3, offsetY: 7, scaleX: 0.1, scaleY: 2, rotation: 90 },
+  { offsetX: 5, offsetY: -4, scaleX: 1.2, scaleY: 0.8, rotation: -37 }]) {
+  const adjusted = fineTunedCalibration(c, fine);
+  for (const p of [{ x: 23, y: 42 }, { x: 100, y: 100 }, { x: 180, y: 150 }]) {
+    const target = fineTunePoint(p, fine, c.bedW, c.bedH);
+    near(bedToPixel(adjusted, target.x, target.y, c.w, c.h), bedToPixel(c, p.x, p.y, c.w, c.h));
+    const pixel = bedToPixel(c, p.x, p.y, c.w, c.h);
+    near(pixelToBed(adjusted, pixel, c.w, c.h), target);
+  }
+  const base = { ...c, head: { x: 50, y: 70 } };
+  for (const pos of [{ x: 50, y: 70 }, { x: 60, y: 90 }, { x: 80, y: 60 }]) {
+    const delta = { x: pos.x - base.head.x, y: pos.y - base.head.y };
+    const shift = fineTunedHeadShift(base, pos, fine);
+    const original = { x: 80, y: 100 };
+    const transformed = fineTunePoint(original, fine, c.bedW, c.bedH);
+    const expected = fineTunePoint({ x: original.x + delta.x, y: original.y + delta.y }, fine, c.bedW, c.bedH);
+    near({ x: transformed.x + shift.x, y: transformed.y + shift.y }, expected);
+    const inverse = inverseFineTunePoint({ x: expected.x - shift.x, y: expected.y - shift.y }, fine, c.bedW, c.bedH);
+    near(inverse, original);
+    const adjustedHead = fineTunedCalibration(base, fine);
+    const rect = { x0: expected.x - 0.5, x1: expected.x + 0.5, y0: expected.y - 0.5, y1: expected.y + 0.5 };
+    const remap = buildRemapRect(adjustedHead, 1000, 1000, rect, 1, shift);
+    const pixel = bedToPixel(base, original.x, original.y, 1000, 1000);
+    assert.ok(Math.abs(remap.sx[0] - pixel.x) < 0.0001);
+    assert.ok(Math.abs(remap.sy[0] - pixel.y) < 0.0001);
+  }
+}
+assert.equal(JSON.stringify(c), before, 'base calibration must never change');
+
+// Minimal DOM for the numeric field boundary, not an application/browser launch.
+const elements: any[] = [];
+(globalThis as any).document = { activeElement: null, createElement: (tag: string) => {
+  const e: any = { tag, children: [], events: {}, value: '',
+    append(...nodes: unknown[]) { this.children.push(...nodes); },
+    setAttribute(key: string, value: unknown) { this[key] = value; },
+    addEventListener(key: string, fn: unknown) { this.events[key] = fn; },
+    get valueAsNumber() { return Number(this.value); },
+  }; elements.push(e); return e;
+} };
+let fine = { ...DEFAULT_FINE_TUNE };
+fineTuneControls(() => fine, value => { fine = normalizeFineTune(value); });
+const width = elements.filter(e => e.tag === 'input')[2];
+width.value = '-90'; width.events.change();
+assert.equal(fine.scaleX, 0.1, 'minimum correction must not fall back to identity');
+width.value = '900'; width.events.change(); assert.equal(fine.scaleX, 10);
+console.log('Camera fine-tune matrix, head-motion, remap and numeric-boundary tests passed.');

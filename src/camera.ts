@@ -12,6 +12,7 @@
 
 import type { Pt } from './model';
 import { t } from './i18n';
+import type { CameraFineTune, CameraImageAdjustments } from './cameraProfile';
 import { hasNative, native } from './native';
 
 export interface CameraCalib {
@@ -79,6 +80,10 @@ export interface CameraSettings {
   live: boolean;
   calib: CameraCalib | null;
   marks: MarkSettings;
+  fineTune?: CameraFineTune;
+  image?: CameraImageAdjustments;
+  /** Optical settings changed; require explicit recalibration/profile replacement. */
+  calibrationInvalidated?: boolean;
 }
 
 export const DEFAULT_CAMERA: CameraSettings = {
@@ -488,7 +493,17 @@ export class CameraStream {
   }
   /** Element showing the live image */
   get view(): HTMLVideoElement | HTMLCanvasElement {
+    if (this.net?.image && this.netViewSeq !== this.net.seq) this.drawNetView();
     return this.net ? this.netView : this.video;
+  }
+  private netViewSeq = -1;
+  private drawNetView() {
+    const n = this.net;
+    if (!n?.image) return;
+    const v = this.netView, img = n.image;
+    if (v.width !== img.width || v.height !== img.height) { v.width = img.width; v.height = img.height; }
+    v.getContext('2d')!.drawImage(img, 0, 0);
+    this.netViewSeq = n.seq;
   }
   get width() {
     return this.net ? (this.net.image?.width ?? 0) : this.video.videoWidth;
@@ -514,12 +529,8 @@ export class CameraStream {
           if (this.net !== n) return img.close();
           n.image?.close();
           n.image = img;
-          const v = this.netView;
-          if (v.isConnected) {
-            if (v.width !== img.width || v.height !== img.height) ((v.width = img.width), (v.height = img.height));
-            v.getContext('2d')!.drawImage(img, 0, 0);
-          }
           n.seq = seq;
+          if (this.netView.isConnected && !document.hidden && this.netView.getClientRects().length) this.drawNetView();
           n.frames++;
         }
       } catch (e) {
@@ -576,6 +587,7 @@ export class CameraStream {
   }
 
   stop() {
+    this.netViewSeq = -1;
     const n = this.net;
     if (n) {
       this.net = null;

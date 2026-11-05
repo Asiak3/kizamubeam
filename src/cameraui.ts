@@ -5,7 +5,12 @@
 import type { Editor } from './editor';
 import { h, numInput } from './dom';
 import { ICONS } from './icons';
-import { saveText } from './files';
+import { openText, saveText } from './files';
+import { CameraProfileError, fineTunePoint, inverseFineTunePoint, normalizeFineTune, normalizeImageAdjustments, parseCameraProfile, serializeCameraProfile } from './cameraProfile';
+import { fineTuneControls, fineTunedCalibration, fineTunedHeadShift } from './cameraFineTune';
+import { adjustCameraPixels } from './cameraImageProcessing';
+import { cameraImageControls } from './cameraImageControls';
+import { cameraImageIsIdentity, drawCameraPreview } from './cameraDisplay';
 import { defaultLayer, loadDoc, Obj, Pt, translate } from './model';
 import { buildJob, estimate, writeGCode } from './gcode';
 import { calibrationMachineControls } from './calibrationMachineControls';
@@ -13,7 +18,7 @@ import { machine } from './machine';
 import { device, onDeviceChange } from './laser';
 import {
   bedToPixel, buildRemap, buildRemapRect, calibFits, calibrate, CameraCalib, cameraError, CameraMount, CameraSettings,
-  CameraStream, coverRect, DEFAULT_CAMERA, footprint, headMarkRect, headShift, markPositionsIn, MarkSettings,
+  CameraStream, coverRect, DEFAULT_CAMERA, footprint, headMarkRect, markPositionsIn, MarkSettings,
   NETCAM_EXAMPLES, Rect, Remap, warp,
 } from './camera';
 import { dec, t, tn } from './i18n';
@@ -33,6 +38,9 @@ const newCamId = () => Math.random().toString(36).slice(2, 10);
 function fill(s: Partial<CameraSettings>, i: number): CameraSettings {
   const c: CameraSettings = { ...structuredClone(DEFAULT_CAMERA), ...s };
   c.marks = { ...DEFAULT_CAMERA.marks, ...(s.marks ?? {}) };
+  c.fineTune = normalizeFineTune(s.fineTune);
+  c.image = normalizeImageAdjustments(s.image);
+  c.calibrationInvalidated = s.calibrationInvalidated === true;
   if (!c.id) c.id = newCamId();
   if (!c.name) c.name = t('Kamera {i}', { i: i + 1 });
   if (c.mount !== 'head') c.mount = 'fixed';
@@ -63,11 +71,15 @@ const cfg = () => {
   const d = devCams();
   return d.cams[d.cur];
 };
-function save() {
+let storageError = '';
+function save(): boolean {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(store));
+    storageError = '';
+    return true;
   } catch {
-    /* nicht speicherbar */
+    storageError = t('Kameraeinstellungen sind im Speicher aktiv, konnten aber nicht lokal gespeichert werden. Kalibrierung als Sicherung exportieren.');
+    return false;
   }
 }
 
@@ -135,15 +147,39 @@ class CamUnit {
     const c = this.s.calib;
     const w = this.stream.width,
       hh = this.stream.height;
-    if (!c || !w || !hh || !calibFits(c, w, hh) || this.head !== !!c.head) return null;
-    return c;
+    if (this.s.calibrationInvalidated || !c || !w || !hh || !calibFits(c, w, hh) || this.head !== !!c.head) return null;
+    return fineTunedCalibration(c, normalizeFineTune(this.s.fineTune));
+  }
+
+  invalidate(ed: Editor, geometry = true) {
+    if (geometry) this.remapKey = this.footKey = '';
+    this.empty = null;
+    this.clear(ed);
+  }
+
+  invalidateCalibration(ed: Editor) {
+    if (this.scan) this.scan.stop = true;
+    this.s.calibrationInvalidated = true;
+    save();
+    this.invalidate(ed);
+    changed();
+  }
+
+  grabAdjusted(): HTMLCanvasElement | null {
+    const frame = this.stream.grab();
+    if (!frame) return null;
+    const context = frame.getContext('2d', { willReadFrequently: true })!;
+    const pixels = context.getImageData(0, 0, frame.width, frame.height);
+    adjustCameraPixels(pixels.data, normalizeImageAdjustments(this.s.image));
+    context.putImageData(pixels, 0, 0);
+    return frame;
   }
 
   /** Sichtbereich an der Kalibrierposition (nur Kopfkamera sinnvoll) */
   footprint(): Rect | null {
     const c = this.calib();
     if (!c) return null;
-    const key = `${c.date}|${this.stream.width}x${this.stream.height}`;
+    const key = `${c.date}|${JSON.stringify(c.H)}|${this.stream.width}x${this.stream.height}`;
     if (key !== this.footKey) ((this.foot = footprint(c, this.stream.width, this.stream.height)), (this.footKey = key));
     return this.foot;
   }
@@ -188,20 +224,22 @@ class CamUnit {
 
   /** Neues Kamerabild holen und entzerrt aufs Bett legen; Kopfkamera: an der aktuellen Kopfposition ins Mosaik */
   update(ed: Editor): boolean {
-    const frame = this.stream.grab();
     const c = this.calib();
-    if (!frame || !c) return false;
+    if (!c) return false;
+    const frame = this.stream.grab();
+    if (!frame) return false;
     const src = frame.getContext('2d', { willReadFrequently: true })!.getImageData(0, 0, frame.width, frame.height);
     const { w: bw, h: bh } = ed.doc.bed;
     const o = this.overlay;
     if (!this.head) {
-      const key = `${c.date}|${frame.width}x${frame.height}|${bw}x${bh}`;
+      const key = `${c.date}|${JSON.stringify(c.H)}|${frame.width}x${frame.height}|${bw}x${bh}`;
       if (key !== this.remapKey) ((this.remap = buildRemap(c, frame.width, frame.height, bw, bh)), (this.remapKey = key));
       const r = this.remap!;
       if (o.width !== r.w || o.height !== r.h) ((o.width = r.w), (o.height = r.h));
       const octx = o.getContext('2d')!;
       const out = octx.createImageData(r.w, r.h);
       warp(src, r, out);
+      adjustCameraPixels(out.data, normalizeImageAdjustments(this.s.image));
       octx.putImageData(out, 0, 0);
     } else {
       const pos = headPos();
@@ -214,7 +252,7 @@ class CamUnit {
       if (o.width !== W || o.height !== H) ((o.width = W), (o.height = H), (this.covered = null));
       const kx = bw / W,
         ky = bh / H;
-      const sh = headShift(c, pos);
+      const sh = fineTunedHeadShift(c, pos, normalizeFineTune(this.s.fineTune));
       const clampI = (v: number, n: number) => Math.max(0, Math.min(n, v));
       const i0 = clampI(Math.floor((f.x0 + sh.x) / kx), W),
         i1 = clampI(Math.ceil((f.x1 + sh.x) / kx), W);
@@ -229,6 +267,7 @@ class CamUnit {
       const tctx = tile.getContext('2d')!;
       const out = tctx.createImageData(r.w, r.h);
       warp(src, r, out);
+      adjustCameraPixels(out.data, normalizeImageAdjustments(this.s.image));
       tctx.putImageData(out, 0, 0);
       // Übereinanderlegen: Pixel außerhalb des Kamerabilds sind durchsichtig und lassen das Mosaik stehen
       o.getContext('2d')!.drawImage(tile, i0, j0, i1 - i0, j1 - j0);
@@ -272,7 +311,9 @@ class CamUnit {
       ch = cov.y1 - cov.y0;
     if (!(cw > 1 && ch > 1)) return t('Das Sichtfeld der Kamera ist zu klein.');
     // Linke untere Ecke des lückenlos sichtbaren Bereichs relativ zum Kopf
-    const off = { x: cov.x0 - c.head.x, y: cov.y0 - c.head.y };
+    const fine = normalizeFineTune(this.s.fineTune);
+    const tunedHead = fineTunePoint(c.head, fine, c.bedW, c.bedH);
+    const off = { x: cov.x0 - tunedHead.x, y: cov.y0 - tunedHead.y };
     // 15 % Überlappung, die Bilder gleichmäßig über den Bereich verteilt
     const lay = (a0: number, a1: number, size: number) => {
       const span = a1 - a0;
@@ -284,10 +325,10 @@ class CamUnit {
       ys = lay(r.y0, r.y1, ch).reverse();
     const { w: bw, h: bh } = ed.doc.bed;
     const pts: Pt[] = [];
-    ys.forEach((y, j) => (j % 2 ? [...xs].reverse() : xs).forEach((x) => pts.push({
-      x: Math.max(0, Math.min(bw, x - off.x)),
-      y: Math.max(0, Math.min(bh, y - off.y)),
-    })));
+    ys.forEach((y, j) => (j % 2 ? [...xs].reverse() : xs).forEach((x) => {
+      const p = inverseFineTunePoint({ x: x - off.x, y: y - off.y }, fine, c.bedW, c.bedH);
+      pts.push({ x: Math.max(0, Math.min(bw, p.x)), y: Math.max(0, Math.min(bh, p.y)) });
+    }));
     const scan = (this.scan = { stop: false });
     try {
       await machine.send('G90');
@@ -351,7 +392,7 @@ export function cameraPhoto(ed: Editor): { url: string; view: { x: number; y: nu
     if (!u?.stream.open) continue;
     const snap = u.calib() ? u.snapshot(ed) : null;
     if (snap) return { url: snap.url, view: { x: snap.x, y: snap.y, w: snap.w, h: snap.h } };
-    const g = u.stream.grab();
+    const g = u.grabAdjusted();
     if (g) return { url: g.toDataURL('image/png'), view: null };
   }
   return null;
@@ -375,7 +416,7 @@ export interface CameraView {
 export function cameraViews(ed: Editor): CameraView[] {
   return devCams().cams.flatMap((s) => {
     const u = units.get(s.id);
-    if (!u || !s.calib || (!u.ready && !u.stream.open)) return [];
+    if (!u || !s.calib || s.calibrationInvalidated || (!u.ready && !u.stream.open)) return [];
     return [{
       id: s.id,
       name: s.name,
@@ -422,7 +463,7 @@ export function cameraTab(ed: Editor): HTMLElement {
       const c = u?.calib();
       const f = u?.footprint();
       if (!u || !s.show || !c || !f) continue;
-      const sh = headShift(c, pos);
+      const sh = fineTunedHeadShift(c, pos, normalizeFineTune(s.fineTune));
       ctx.strokeStyle = 'rgba(0,150,255,0.9)';
       ctx.lineWidth = 1.5 * px;
       ctx.setLineDash([6 * px, 4 * px]);
@@ -460,7 +501,10 @@ export function cameraTab(ed: Editor): HTMLElement {
   const stTxt = h('span', {});
   const calTxt = h('div', { class: 'note' });
   const msg = h('div', { class: 'note' });
+  const storageNote = h('div', { class: 'note error', role: 'alert' });
   const preview = h('div', { class: 'camera-preview' });
+  const previewImage = h('canvas', { 'aria-label': t('Angepasste Kameravorschau') }) as HTMLCanvasElement;
+  preview.append(previewImage);
   const show = h('input', { type: 'checkbox' }) as HTMLInputElement;
   const live = h('input', { type: 'checkbox' }) as HTMLInputElement;
   const liveLbl = h('label', { class: 'check' }, live, t('Laufend aktualisieren'));
@@ -477,6 +521,97 @@ export function cameraTab(ed: Editor): HTMLElement {
     msg.classList.toggle('error', error);
   };
   const cur = () => unit(cfg());
+  const appearanceChanged = (geometry = true) => {
+    const u = cur();
+    if (u.scan) u.scan.stop = true;
+    save();
+    u.invalidate(ed, geometry);
+    if (u.stream.open && (!u.head || headStill())) u.update(ed);
+    changed();
+  };
+  const finePanel = fineTuneControls(() => normalizeFineTune(cfg().fineTune), (fine) => {
+    cfg().fineTune = fine; appearanceChanged();
+  });
+  const imagePanel = cameraImageControls({
+    getTrack: () => cur().stream.stream?.getVideoTracks()[0] ?? null,
+    getSettings: () => normalizeImageAdjustments(cfg().image),
+    onChange: (image) => { cfg().image = image; appearanceChanged(false); },
+    onBeforeHardwareChange: () => cur().invalidateCalibration(ed),
+    onHardwareChange: (change) => {
+      if (change.geometryChanged) cur().invalidateCalibration(ed);
+      else appearanceChanged(false);
+    },
+  });
+  const exportCal = h('button', { class: 'btn' }, t('Kalibrierung exportieren…')) as HTMLButtonElement;
+  const importCal = h('button', { class: 'btn' }, t('Kalibrierung importieren…')) as HTMLButtonElement;
+  const profileError = (error: unknown) => {
+    if (error instanceof SyntaxError) return t('Ungültiges Kameraprofil: JSON konnte nicht gelesen werden.');
+    if (!(error instanceof CameraProfileError)) return (error as Error).message;
+    const reasons: Record<string, string> = {
+      'calib.H is singular': t('Kalibrierungsmatrix ist singulär'),
+      'fixed mount cannot have calib.head': t('Feste Montage darf keine Kopfkameraposition enthalten'),
+      'unsupported schema or version': t('Nicht unterstütztes Schema oder Version'),
+      'file exceeds 256 KiB': t('Datei überschreitet 256 KiB'),
+    };
+    return t('Ungültiges Kameraprofil: {field}', { field: reasons[error.field] ?? error.field });
+  };
+  exportCal.addEventListener('click', async () => {
+    try {
+      const s = cfg();
+      if (!s.calib || s.calibrationInvalidated) throw new Error(t('Keine gültige Kalibrierung zum Exportieren. Nach optischen Änderungen neu kalibrieren.'));
+      // Network labels are URLs upstream and may contain credentials/query tokens.
+      // Portable calibration files never include a connection address.
+      const json = serializeCameraProfile({ name: s.name, cameraLabel: s.url ? 'Network camera' : s.label, mount: s.mount,
+        width: s.calib.w, height: s.calib.h, calib: s.calib, fineTune: normalizeFineTune(s.fineTune), image: normalizeImageAdjustments(s.image) });
+      if (await saveText('camera-calibration.kzb-camera', t('Kamerakalibrierung'), 'kzb-camera', 'application/json', json)) say(t('Kalibrierung exportiert.'));
+    } catch (e) { say(profileError(e), true); }
+  });
+  importCal.addEventListener('click', async () => {
+    const s = cfg(), deviceId = device.id;
+    try {
+      const file = await openText(t('Kamerakalibrierung'), ['kzb-camera', 'json']);
+      if (!file) return;
+      const p = parseCameraProfile(file[1]);
+      if (device.id !== deviceId || cfg() !== s) throw new Error(t('Gewählte Maschine oder Kamera geändert. Bitte erneut importieren.'));
+      if (machine.running || cur().scan) throw new Error(t('Aktiven Auftrag oder Kamerascan vor dem Import beenden.'));
+      if (p.mount !== s.mount) throw new Error(t('Kameramontagetyp abweichend. Vor dem Import die richtige Montage wählen.'));
+      if (Math.abs(p.calib.bedW - ed.doc.bed.w) > 0.01 || Math.abs(p.calib.bedH - ed.doc.bed.h) > 0.01)
+        throw new Error(t('Bettmaße der Kalibrierung weichen vom Arbeitsbereich ab. Import nicht angewendet.'));
+      const cam = cur().stream;
+      // A disconnected network source has no known negotiated dimensions.
+      // Its imported calibration remains runtime-gated by calibFits on connect.
+      if ((cam.open || !s.url) && !calibFits(p.calib, cam.open ? cam.width : s.width, cam.open ? cam.height : s.height))
+        throw new Error(t('Kamera-Seitenverhältnis weicht von der Kalibrierung ab. Import nicht angewendet.'));
+      if (!confirm(t('Kalibrierung und Bildanpassungen für „{name}“ ersetzen?\nDatei: {file}\nQuellkamera: {camera}\nVor Verwendung der Überlagerung Kamera, Montage und Materialhöhe prüfen.', { name: s.name, file: file[0], camera: p.cameraLabel || p.name }))) return;
+      s.calib = p.calib; s.fineTune = p.fineTune; s.image = p.image;
+      s.calibrationInvalidated = false;
+      appearanceChanged();
+      say(t('Kalibrierung importiert. Kameraidentität und Maschineneinstellungen unverändert. Ausrichtung vor Verwendung prüfen.'));
+    } catch (e) { say(profileError(e), true); }
+  });
+  // Small adjusted preview only; no acquisition or machine commands here.
+  let previewFrame = 0;
+  const updatePreview = () => {
+    previewFrame = requestAnimationFrame(updatePreview);
+    if (!root.isConnected || document.hidden) return;
+    const u = cur();
+    if (u.stream.open && preview.getClientRects().length) {
+      const image = normalizeImageAdjustments(u.s.image);
+      const source = u.stream.view;
+      const element = cameraImageIsIdentity(image) ? source : previewImage;
+      if (preview.firstChild !== element) preview.replaceChildren(element);
+      if (element === previewImage) drawCameraPreview(previewImage, source, image);
+    }
+  };
+  previewFrame = requestAnimationFrame(updatePreview);
+  // This panel normally lives for the editor lifetime; release detached instances.
+  const lifecycle = new MutationObserver(() => {
+    if (!root.isConnected) { cancelAnimationFrame(previewFrame); imagePanel.dispose(); lifecycle.disconnect(); }
+  });
+  queueMicrotask(() => {
+    if (root.isConnected) lifecycle.observe(document.body, { childList: true, subtree: true });
+    else { cancelAnimationFrame(previewFrame); imagePanel.dispose(); lifecycle.disconnect(); }
+  });
 
   const loadCams = async () => {
     const s = cfg();
@@ -520,10 +655,15 @@ export function cameraTab(ed: Editor): HTMLElement {
     connBtn.textContent = cam.open ? t('Trennen') : t('Verbinden');
     dot.className = `dot ${cam.open ? 'ok' : ''}`;
     stTxt.textContent = cam.open ? t('Verbunden, {width} × {height}', { width: cam.width, height: cam.height }) : t('Nicht verbunden');
-    if (preview.firstChild !== cam.view) preview.replaceChildren(cam.view);
     preview.hidden = !cam.open;
+    finePanel.refresh();
+    imagePanel.refresh();
+    storageNote.textContent = storageError;
+    exportCal.disabled = !s.calib || !!s.calibrationInvalidated;
+    importCal.disabled = machine.running || !!u.scan;
     const c = s.calib;
-    if (!c) calTxt.textContent = t('Nicht kalibriert. Ohne Kalibrierung erscheint das Bild nicht auf der Arbeitsfläche.');
+    if (s.calibrationInvalidated) calTxt.textContent = t('Optische Kameraeinstellungen geändert. Vor Verwendung der Überlagerung neu kalibrieren oder ausdrücklich eine passende Kalibrierung importieren.');
+    else if (!c) calTxt.textContent = t('Nicht kalibriert. Ohne Kalibrierung erscheint das Bild nicht auf der Arbeitsfläche.');
     else if (u.head !== !!c.head)
       calTxt.textContent = u.head
         ? t('Die Kalibrierung stammt von einer festen Kamera. Als Kopfkamera bitte neu kalibrieren.')
@@ -717,6 +857,9 @@ export function cameraTab(ed: Editor): HTMLElement {
     h('div', { class: 'conn-row' }, connBtn, calBtn),
     preview,
     calTxt,
+    h('div', { class: 'conn-row' }, exportCal, importCal),
+    finePanel.element,
+    imagePanel.element,
     h('div', { class: 'form' },
       h('label', { class: 'check' }, show, t('Auf der Arbeitsfläche zeigen')),
       h('label', {}, t('Deckkraft')), opacity,
@@ -726,6 +869,7 @@ export function cameraTab(ed: Editor): HTMLElement {
     h('div', { class: 'conn-row' }, h('button', { class: 'btn', title: t('Gleichartige Werkstücke im Kamerabild erkennen und die Auswahl auf alle übertragen'), onclick: () => openWorkpieceDialog(ed) }, t('Auf Werkstücke übertragen …'))),
     headRow,
     msg,
+    storageNote,
   );
   loadCams();
   refresh();
@@ -862,6 +1006,26 @@ function openCalibration(ed: Editor, u: CamUnit) {
     cy.value = fmt(p.y);
     remark();
   });
+  const invalidateImageCapture = () => {
+    frame = null; shotPos = null; result = null; mode = 'click';
+    clicks = targets.map(() => null); cur = 0;
+    checkCache = null; adjustedFrame = null;
+    compute();
+  };
+  const imagePanel = cameraImageControls({
+    getTrack: () => cam.stream?.getVideoTracks()[0] ?? null,
+    getSettings: () => normalizeImageAdjustments(s.image),
+    onBeforeHardwareChange: () => { u.invalidateCalibration(ed); invalidateImageCapture(); },
+    onChange: (image) => {
+      s.image = image; save(); u.invalidate(ed, false);
+      checkCache = null; adjustedFrame = null; draw();
+    },
+    onHardwareChange: (change) => {
+      if (change.geometryChanged) u.invalidateCalibration(ed);
+      else u.invalidate(ed, false);
+      invalidateImageCapture();
+    },
+  });
   const step1 = h('div', { class: 'cal-step' },
     h('div', { class: 'form-title' }, t('1. Markierungen lasern')),
     h('p', { class: 'note' }, head
@@ -917,6 +1081,7 @@ function openCalibration(ed: Editor, u: CamUnit) {
     frame.width = g.width;
     frame.height = g.height;
     frame.getContext('2d')!.drawImage(g, 0, 0);
+    adjustedFrame = null;
     mode = 'click';
     fitView();
     compute();
@@ -953,13 +1118,16 @@ function openCalibration(ed: Editor, u: CamUnit) {
     h('div', { class: 'conn-row' }, checkBtn),
   );
 
+  step2.append(imagePanel.element);
   const saveCal = h('button', { class: 'btn primary', disabled: true }, t('Übernehmen')) as HTMLButtonElement;
   saveCal.addEventListener('click', () => {
     if (!result) return;
     s.calib = result;
+    s.calibrationInvalidated = false;
+    s.fineTune = normalizeFineTune(undefined);
     s.marks = { ...m };
     save();
-    if (head) u.clear(ed);
+    u.invalidate(ed);
     if (!head || headStill()) u.update(ed);
     u.setLive(ed);
     changed();
@@ -983,7 +1151,18 @@ function openCalibration(ed: Editor, u: CamUnit) {
   let dragPt = -1;
   let pan: { x: number; y: number; ox: number; oy: number } | null = null;
   let mouse: Pt | null = null;
-  const src = () => (mode === 'check' && result ? checkCanvas() : frame);
+  let adjustedFrame: HTMLCanvasElement | null = null;
+  let adjustedSource: HTMLCanvasElement | null = null;
+  const src = () => {
+    if (mode === 'check' && result) return checkCanvas();
+    if (!frame) return null;
+    if (!adjustedFrame || adjustedSource !== frame) {
+      adjustedSource = frame;
+      adjustedFrame = document.createElement('canvas');
+      drawCameraPreview(adjustedFrame, frame, normalizeImageAdjustments(s.image), frame.width);
+    }
+    return adjustedFrame;
+  };
   const fitView = () => {
     const f = src();
     const r = view.getBoundingClientRect();
@@ -1086,6 +1265,7 @@ function openCalibration(ed: Editor, u: CamUnit) {
     const ctx = c.getContext('2d')!;
     const out = ctx.createImageData(r.w, r.h);
     warp(frame.getContext('2d')!.getImageData(0, 0, frame.width, frame.height), r, out);
+    adjustCameraPixels(out.data, normalizeImageAdjustments(s.image));
     ctx.putImageData(out, 0, 0);
     // Sollpositionen und Bettraster einzeichnen
     const k = r.w / aw;
@@ -1148,6 +1328,7 @@ function openCalibration(ed: Editor, u: CamUnit) {
   }
 
   let liveFrame = 0;
+  const livePreview = document.createElement('canvas');
   function draw() {
     drawSketch();
     const r = view.getBoundingClientRect();
@@ -1163,7 +1344,10 @@ function openCalibration(ed: Editor, u: CamUnit) {
     if (!f && cam.open && cam.width) {
       // Vor dem Foto: Live-Bild, damit sich Kamera und Kopf ausrichten lassen
       const z = Math.min(r.width / cam.width, r.height / cam.height);
-      c.drawImage(cam.video, (r.width - cam.width * z) / 2, (r.height - cam.height * z) / 2, cam.width * z, cam.height * z);
+      const image = normalizeImageAdjustments(s.image);
+      const source = cam.view;
+      if (!cameraImageIsIdentity(image)) drawCameraPreview(livePreview, source, image);
+      c.drawImage(cameraImageIsIdentity(image) ? source : livePreview, (r.width - cam.width * z) / 2, (r.height - cam.height * z) / 2, cam.width * z, cam.height * z);
       skipBtn.disabled = backBtn.disabled = true;
       if (!liveFrame) liveFrame = requestAnimationFrame(() => ((liveFrame = 0), dlg.open && !frame && draw()));
       return;
@@ -1236,6 +1420,11 @@ function openCalibration(ed: Editor, u: CamUnit) {
       c.strokeRect(lx, ly, L, L);
     }
   }
+
+  const offImageDevice = onDeviceChange(() => dlg.close());
+  dlg.addEventListener('close', () => {
+    offImageDevice(); imagePanel.dispose(); cancelAnimationFrame(liveFrame);
+  });
 
   const ro = new ResizeObserver(() => {
     if (!vw.z || vw.z === 1) fitView();

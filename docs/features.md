@@ -4,6 +4,29 @@ English · [Deutsch](features.de.md) · [Back to the README](../README.md)
 
 Everything KizamuBeam can do, with menu paths and keyboard shortcuts. For a quick overview, see the [README](../README.md) or the [website](https://negurvulkan.github.io/kizamubeam/en/).
 
+## Camera overlay adjustments and portable calibration
+
+The Camera panel provides X/Y shifts, independent width/height correction and
+counter-clockwise rotation about the calibrated bed centre. These adjustments
+preserve the base calibration; reset restores the identity mapping.
+Brightness, contrast, saturation, gamma and grayscale affect previews, overlays
+and inserted camera images without changing geometry. Neutral previews display
+the source directly; corrected previews run at animation cadence, not a fixed
+4 fps. Hidden panels do not request corrected frames. Network preview canvases
+are updated only when displayed or explicitly read by a consumer.
+
+Export/import uses `.kzb-camera` JSON (maximum 256 KiB) containing calibration,
+mount, dimensions, alignment and software adjustments. It excludes device IDs,
+network addresses and machine/laser settings. Import validates the matrix,
+ranges, mount, bed dimensions and aspect ratio before confirmation. It cannot
+verify the physical camera, mounting or material height: check alignment first.
+Only capabilities reported by the open USB camera expose hardware controls;
+unsupported/unconfirmed controls stay unavailable. Hardware settings are
+session-only. Zoom/focus changes invalidate calibration before applying the
+request, including rejected requests; recalibrate or import a matching profile.
+
+Offline regressions: `npm run test:camera`. No hardware is acquired by the tests.
+
 ## Interface and workspace
 
 - Familiar layout: menu, main toolbar, numeric edits toolbar at the top, tools on the left, Cuts / Layers and Laser on the right, color palette 00–29 plus T1/T2 at the bottom, status bar.
