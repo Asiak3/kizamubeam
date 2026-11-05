@@ -333,7 +333,13 @@ export class EditorNest {
       }
     }
     if (onProgress && onProgress(1) === false) return null;
-    return this.applyNest(units, r, container);
+    const out = this.applyNest(units, r, container);
+    // Unselected objects take up room: say so, an unselected stock outline is easily mistaken for the sheet
+    if (obstacles.length && (out.unplaced.length || out.newPages)) {
+      this.hint += ' ' + t('Nicht gewählte Objekte auf der Seite wurden umgangen. Soll eine gezeichnete Form das Material sein, sie mit auswählen und „Gewählte Form (Reststück)“ nehmen, oder „Andere Objekte auf der Seite umgehen“ ausschalten.');
+      this.emit('tool');
+    }
+    return out;
   }
 
   /** Ergebnis übernehmen: Teile bewegen, Teile für weitere Platten auf neue Seiten hinter der aktuellen */

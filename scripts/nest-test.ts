@@ -295,6 +295,39 @@ await test('Editor: Reststück als Platte bleibt liegen, neue Seiten bekommen ei
     }
 });
 
+await test('Editor: 200×600 und 600×200 passen in jeder Drehrichtung aufs Material (Tester-Meldung)', async () => {
+  for (const [w, h] of [[200, 600], [600, 200]])
+    for (const [SW, SH] of [[700, 300], [300, 700]])
+      for (const rotStep of [90, 45, 5])
+        for (const corner of ['bl', 'tr'] as const) {
+          const part = rectObj(1100, 50, w, h);
+          const ed = fakeEditor([part], { w: 1500, h: 1000 });
+          const r = await ed.nestSel({ ...DEFAULT_NEST_SETTINGS, sheet: 'material', w: SW, h: SH, x: 20, y: 30, quality: 'fast', rotStep, corner, newPages: false });
+          assert.equal(r?.placed.length, 1, `${w}×${h} auf ${SW}×${SH}, ${rotStep}°, ${corner}`);
+          const b = worldBox(part);
+          const y0 = 1000 - 30 - SH;
+          assert.ok(b.x0 >= 20 - 1e-6 && b.x1 <= 20 + SW + 1e-6 && b.y0 >= y0 - 1e-6 && b.y1 <= y0 + SH + 1e-6, JSON.stringify(b));
+        }
+});
+
+await test('Editor: ein nicht gewähltes Rohteil wird umgangen, mit Hinweis', async () => {
+  const stock = rectObj(0, 0, 700, 300);
+  const part = rectObj(800, 400, 600, 200);
+  const ed = fakeEditor([stock, part], { w: 1000, h: 700 });
+  ed.sel = [part];
+  const r = await ed.nestSel({ ...DEFAULT_NEST_SETTINGS, quality: 'fast', newPages: false });
+  assert.ok(r);
+  const b = worldBox(part);
+  assert.ok(b.y0 >= 300 || b.x0 >= 700, 'liegt nicht auf dem Rohteil');
+  assert.ok(ed.hint.length > 0);
+  // Selected along as the sheet: the part goes onto it
+  ed.sel = [stock, part];
+  const r2 = await ed.nestSel({ ...DEFAULT_NEST_SETTINGS, sheet: 'shape', quality: 'fast', newPages: false });
+  assert.equal(r2?.placed.length, 1);
+  const b2 = worldBox(part);
+  assert.ok(b2.x1 <= 700 + 1e-6 && b2.y1 <= 300 + 1e-6, JSON.stringify(b2));
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

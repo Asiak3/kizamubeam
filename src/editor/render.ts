@@ -1,5 +1,5 @@
 // Editor: Zeichnen der Arbeitsfläche.
-import { apply, IDENT, ImageShape, inv, leaves, Mat, mul, Obj, PALETTE, Pt, SubPath, TextShape, visibleLeaves } from '../model';
+import { apply, IDENT, ImageShape, inv, leaves, Mat, mul, noLaserLeaves, Obj, PALETTE, Pt, SubPath, TextShape, visibleLeaves } from '../model';
 import { displayCanvas } from '../images';
 import { EdgePick } from '../joints';
 import { bezierPt, Box, boundsOf, drawText, localPath, segments, shapeSubs, subsToPath2D, textOutline, worldPath } from '../geom';
@@ -158,9 +158,12 @@ export class EditorRender {
     const selSet = new Set<Obj>();
     for (const o of this.sel) for (const [l] of leaves([o])) selSet.add(l);
     // Pfade je Layer sammeln und gebündelt zeichnen (deutlich schneller als einzeln)
-    const batches = new Map<string, { color: string; fill: boolean; sel: boolean; stroke: Path2D; fillPath: Path2D }>();
+    const batches = new Map<string, { color: string; fill: boolean; sel: boolean; faded: boolean; stroke: Path2D; fillPath: Path2D }>();
     const texts: [Obj, Mat, boolean, boolean][] = [];
     const images: [Obj, Mat, boolean][] = [];
+    // Objects that are not lasered are drawn faded
+    const faded = noLaserLeaves(this.doc.objs);
+    const FADE = 0.35;
     for (const [o, m] of visibleLeaves(this.doc.objs)) {
       const ly = this.layer(o.layer);
       if (!ly.show) continue;
@@ -174,9 +177,10 @@ export class EditorRender {
         texts.push([o, m, selected, fill]);
         continue;
       }
-      const key = `${o.layer}|${selected ? 1 : 0}`;
+      const off = faded.has(o);
+      const key = `${o.layer}|${selected ? 1 : 0}|${off ? 1 : 0}`;
       let bt = batches.get(key);
-      if (!bt) batches.set(key, (bt = { color: this.layerDrawColor(o.layer), fill, sel: selected, stroke: new Path2D(), fillPath: new Path2D() }));
+      if (!bt) batches.set(key, (bt = { color: this.layerDrawColor(o.layer), fill, sel: selected, faded: off, stroke: new Path2D(), fillPath: new Path2D() }));
       const p = cachedWorldPath(o, m);
       bt.stroke.addPath(p);
       if (fill) {
@@ -190,6 +194,7 @@ export class EditorRender {
       const s = o.shape as ImageShape;
       const cv = displayCanvas(s, m, this.imgLayer(o.layer));
       ctx.save();
+      if (faded.has(o)) ctx.globalAlpha = FADE;
       ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       if (cv) {
         // Vergrößert scharfe Punkte zeigen, verkleinert glätten
@@ -209,21 +214,25 @@ export class EditorRender {
       ctx.restore();
     }
     for (const bt of batches.values()) {
+      const a = bt.faded ? FADE : 1;
       ctx.strokeStyle = ctx.fillStyle = bt.color;
       if (bt.fill) {
-        ctx.globalAlpha = 0.55;
+        ctx.globalAlpha = 0.55 * a;
         ctx.fill(bt.fillPath, 'evenodd');
-        ctx.globalAlpha = 1;
       }
+      ctx.globalAlpha = a;
       ctx.setLineDash(bt.sel ? [5 * px, 3 * px] : []);
       ctx.lineWidth = bt.sel ? 1.5 * px : 1.2 * px;
       ctx.stroke(bt.stroke);
+      ctx.globalAlpha = 1;
     }
     for (const [o, m, selected, fill] of texts) {
       const t = o.shape as TextShape;
       ctx.strokeStyle = ctx.fillStyle = this.layerDrawColor(o.layer);
       ctx.setLineDash(selected ? [5 * px, 3 * px] : []);
+      ctx.globalAlpha = faded.has(o) ? FADE : 1;
       drawText(ctx, t, m, fill ? 'fill' : 'stroke', fill ? px : px * 1.2);
+      ctx.globalAlpha = 1;
       if (selected && t.path && t.path.link === undefined) {
         // Kurve des Texts als Hilfslinie, wenn die Form nicht mehr da ist
         const g = new Path2D();

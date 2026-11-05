@@ -333,6 +333,8 @@ function buildMenu(ed: Editor) {
       ] },
       'sep',
       [t('Verschachteln …'), '', () => openNestDialog(ed)],
+      'sep',
+      [t('Nicht lasern'), '', () => ed.toggleNoLaser(), () => ed.sel.length > 0 && ed.sel.every((o) => o.noLaser)],
     ]],
     [t('Seiten'), [
       [t('Neue Seite'), '', () => ed.addPage()],

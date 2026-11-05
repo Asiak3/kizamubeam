@@ -176,6 +176,17 @@ test('Außerhalb des Arbeitsbereichs: Korrektur schiebt aufs Bett', () => {
   assert.deepEqual(run([b, c]), []);
 });
 
+test('Geparkte Teile neben dem Bett und „Nicht lasern“ sind kein Befund', () => {
+  const inside = rect(20, 20, 10, 10);
+  const parked = rect(20, 20, 500, 10);
+  assert.deepEqual(run([inside, parked]), []);
+  // Alone outside: still reported (nothing would be lasered on the bed)
+  assert.deepEqual(kinds(run([rect(20, 20, 500, 10)])), ['bed']);
+  const off = rect(50, 50, 380, 10);
+  off.noLaser = true;
+  assert.deepEqual(run([off]), []);
+});
+
 test('Import-Hinweis: ein Befund je Hinweis, Korrektur blendet ihn aus', () => {
   const a = rect(10, 10, 10, 10);
   const b = rect(10, 10, 30, 10);

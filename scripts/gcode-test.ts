@@ -502,6 +502,50 @@ await test('Laser zur Klickposition: absolutes Verfahren je Firmware', () => {
   assert.deepEqual(jogToLines(newDevice({ fw: 'marlin' }), 5, 6, 3000), ['G90', 'G0 X5 Y6 F3000']);
 });
 
+// ---------- Parked parts and parts that are not lasered ----------
+
+const sqObj = (id: number, x: number, y: number, extra: Partial<Obj> = {}): Obj => ({
+  id, m: [1, 0, 0, 1, x, y], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 }, ...extra,
+});
+const lineJob = (objs: Obj[], startFrom: Device['startFrom'] = 'absolute') =>
+  buildJob({
+    doc: loadDoc({ bed: { w: 200, h: 200 }, objs, layers: {} }),
+    layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const }),
+    imgLayer: () => defaultImageLayer(),
+    device: { ...newDevice({ fw: 'fluidnc' }), startFrom },
+  });
+
+await test('Teil ganz außerhalb des Arbeitsbereichs ist geparkt: nicht gelasert, Hinweis statt Warnung', async () => {
+  const job0 = await lineJob([sqObj(1, 10, 10), sqObj(2, 260, 10), sqObj(3, 10, -50)]);
+  assert.ok(job0.bounds!.x1 - job0.bounds!.x0 <= 20 + 1e-6 && job0.bounds!.y1 - job0.bounds!.y0 <= 20 + 1e-6, JSON.stringify(job0.bounds));
+  assert.equal(job0.warnings.length, 1);
+  assert.match(job0.warnings[0], /2/);
+  // Relative to the user origin the bed position does not matter: everything is lasered as before
+  const rel = await lineJob([sqObj(1, 10, 10), sqObj(2, 260, 10), sqObj(3, 10, -50)], 'user');
+  assert.ok(rel.bounds!.x1 - rel.bounds!.x0 > 200, JSON.stringify(rel.bounds));
+  assert.equal(rel.warnings.length, 0);
+  // Partly outside: not parked
+  const job = await lineJob([sqObj(1, 10, 10), sqObj(2, 190, 10)]);
+  assert.ok(job.bounds!.x1 > 205, JSON.stringify(job.bounds));
+  assert.equal(job.warnings.length, 0);
+});
+
+await test('Liegt alles außerhalb, wird nichts geparkt (die Bereichsprüfung meldet es)', async () => {
+  const job = await lineJob([sqObj(1, 300, 10), sqObj(2, 340, 10)]);
+  assert.ok(job.bounds && job.bounds.x0 >= 299, JSON.stringify(job.bounds));
+  assert.equal(job.warnings.length, 0);
+});
+
+await test('„Nicht lasern“ je Objekt, auch für Gruppen', async () => {
+  const group: Obj = { id: 5, m: [1, 0, 0, 1, 0, 0], layer: 1, noLaser: true, shape: { kind: 'group', children: [sqObj(6, 100, 100), sqObj(7, 150, 150)] } };
+  const job = await lineJob([sqObj(1, 10, 10), sqObj(2, 50, 10, { noLaser: true }), group]);
+  assert.ok(job.bounds!.x1 <= 30 + 1e-6, JSON.stringify(job.bounds));
+  // Nothing parked: the excluded objects do not count
+  assert.equal(job.warnings.length, 0);
+  const none = await lineJob([sqObj(1, 10, 10, { noLaser: true })]);
+  assert.equal(none.moves.n, 0);
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

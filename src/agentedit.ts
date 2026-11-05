@@ -894,10 +894,10 @@ export const EDIT_TOOLS: ToolDef[] = [
     name: 'edit_object',
     title: 'Objekt ändern',
     description:
-      'Ändert Eigenschaften eines Objekts (auch in Gruppen). Alle Typen: name (leer = Standardname), hidden (ausgeblendet: nicht gezeichnet und nicht gelasert), locked (auf der Arbeitsfläche nicht auswählbar; nur oberste Ebene). Text: text, font, size (mm auf dem Bett), bold, italic, upper, align, letterSpacing, lineSpacing, weld (Buchstaben schweißen); bei Text auf Pfad (apply_path_to_text) pathOffset (Verschiebung entlang der Kurve, mm), pathDistance (Abstand der Grundlinie, mm, positiv nach oben), pathFlip (andere Seite), removePath (wieder gerade), variable (variabler Text mit Platzhaltern, siehe variable_text), variableOffset, maxWidth (mm, breitere Zeilen werden gestaucht, 0 = aus), maxHeight (mm, ein höherer Block wird verkleinert, 0 = aus), fitShrink (zu breiten Text verkleinern statt stauchen), wrap (Textrahmen: Zeilen an maxWidth an Wortgrenzen umbrechen, Höhe wächst mit; ohne maxWidth gilt die jetzige Breite). QR-Code: data, errorCorrection, qrSize (Kantenlänge mm), invert, quietZone, variable, variableOffset. Strichcode: data, barcodeType, barcodeWidth (Breite der Striche mm), barcodeHeight (mm), showText, checkDigit, barWidthReduction (mm), invert, quietZone, variable, variableOffset. Rechteck: cornerRadius. Vieleck: sides, star, innerRatio. Lage und Größe ändert transform.',
+      'Ändert Eigenschaften eines Objekts (auch in Gruppen). Alle Typen: name (leer = Standardname), hidden (ausgeblendet: nicht gezeichnet und nicht gelasert), locked (auf der Arbeitsfläche nicht auswählbar; nur oberste Ebene), noLaser (sichtbar, aber nicht gelasert, z. B. schon geschnittene oder geparkte Teile; nur oberste Ebene). Text: text, font, size (mm auf dem Bett), bold, italic, upper, align, letterSpacing, lineSpacing, weld (Buchstaben schweißen); bei Text auf Pfad (apply_path_to_text) pathOffset (Verschiebung entlang der Kurve, mm), pathDistance (Abstand der Grundlinie, mm, positiv nach oben), pathFlip (andere Seite), removePath (wieder gerade), variable (variabler Text mit Platzhaltern, siehe variable_text), variableOffset, maxWidth (mm, breitere Zeilen werden gestaucht, 0 = aus), maxHeight (mm, ein höherer Block wird verkleinert, 0 = aus), fitShrink (zu breiten Text verkleinern statt stauchen), wrap (Textrahmen: Zeilen an maxWidth an Wortgrenzen umbrechen, Höhe wächst mit; ohne maxWidth gilt die jetzige Breite). QR-Code: data, errorCorrection, qrSize (Kantenlänge mm), invert, quietZone, variable, variableOffset. Strichcode: data, barcodeType, barcodeWidth (Breite der Striche mm), barcodeHeight (mm), showText, checkDigit, barWidthReduction (mm), invert, quietZone, variable, variableOffset. Rechteck: cornerRadius. Vieleck: sides, star, innerRatio. Lage und Größe ändert transform.',
     tier: Tier.Edit,
     inputSchema: obj({
-      id: { type: 'integer' }, name: { type: 'string' }, hidden: { type: 'boolean' }, locked: { type: 'boolean' }, text: { type: 'string' }, font: { type: 'string' }, size: { type: 'number' }, bold: { type: 'boolean' },
+      id: { type: 'integer' }, name: { type: 'string' }, hidden: { type: 'boolean' }, locked: { type: 'boolean' }, noLaser: { type: 'boolean' }, text: { type: 'string' }, font: { type: 'string' }, size: { type: 'number' }, bold: { type: 'boolean' },
       italic: { type: 'boolean' }, upper: { type: 'boolean' }, align: { type: 'string', enum: ['left', 'center', 'right'] },
       letterSpacing: { type: 'number' }, lineSpacing: { type: 'number' }, weld: { type: 'boolean' }, pathOffset: { type: 'number' },
       pathDistance: { type: 'number' }, pathFlip: { type: 'boolean' }, removePath: { type: 'boolean' }, cornerRadius: { type: 'number' },
@@ -912,12 +912,16 @@ export const EDIT_TOOLS: ToolDef[] = [
       const [o, parent] = hit;
       const m = mul(parent, o.m);
       const s = o.shape;
-      const props: { name?: string; hidden?: boolean; locked?: boolean } = {};
+      const props: { name?: string; hidden?: boolean; locked?: boolean; noLaser?: boolean } = {};
       if (typeof a.name === 'string') props.name = a.name;
       if (a.hidden !== undefined) props.hidden = a.hidden === true;
       if (a.locked !== undefined) {
         if (!ed.doc.objs.includes(o)) throw new ToolError('Sperren geht nur bei Objekten der obersten Ebene (nicht in Gruppen)');
         props.locked = a.locked === true;
+      }
+      if (a.noLaser !== undefined) {
+        if (!ed.doc.objs.includes(o)) throw new ToolError('Nicht lasern geht nur bei Objekten der obersten Ebene (nicht in Gruppen)');
+        props.noLaser = a.noLaser === true;
       }
       const SHAPE_KEYS = [
         'text', 'font', 'size', 'bold', 'italic', 'upper', 'align', 'letterSpacing', 'lineSpacing', 'weld', 'pathOffset', 'pathDistance', 'pathFlip', 'removePath',

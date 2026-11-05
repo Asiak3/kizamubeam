@@ -486,8 +486,12 @@ select:focus {
 }
 .ot-row:hover .ot-btn,
 .ot-btn.ot-lock.on,
-.ot-eye:not(.on) {
+.ot-eye:not(.on),
+.ot-laser:not(.on) {
   opacity: 1;
+}
+.ot-row.nolaser .ot-label {
+  text-decoration: line-through;
 }
 .ot-btn:hover {
   background: var(--surface);
