@@ -1388,8 +1388,9 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   const layerOf = (i: number) => normalizeLayer(inp.layer(i));
   const warnings: string[] = [];
   let roots = inp.only ?? doc.objs;
-  // Parts parked completely outside the work area are not lasered (not with a rotary: there y is the circumference)
-  const parked = rotaryOn(device) ? new Set<Obj>() : parkedObjs(roots, doc.bed, layerOf);
+  // Parts parked completely outside the work area are not lasered. Only with absolute coordinates: relative jobs
+  // ignore the bed position, and with a rotary y is the circumference
+  const parked = device.startFrom !== 'absolute' || rotaryOn(device) ? new Set<Obj>() : parkedObjs(roots, doc.bed, layerOf);
   if (parked.size) {
     roots = roots.filter((o) => !parked.has(o));
     warnings.push(tn('{n} Objekt liegt ganz außerhalb des Arbeitsbereichs (geparkt) und wird nicht gelasert.', '{n} Objekte liegen ganz außerhalb des Arbeitsbereichs (geparkt) und werden nicht gelasert.', parked.size));

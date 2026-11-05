@@ -516,13 +516,14 @@ const lineJob = (objs: Obj[], startFrom: Device['startFrom'] = 'absolute') =>
   });
 
 await test('Teil ganz außerhalb des Arbeitsbereichs ist geparkt: nicht gelasert, Hinweis statt Warnung', async () => {
-  for (const startFrom of ['absolute', 'user'] as const) {
-    const job = await lineJob([sqObj(1, 10, 10), sqObj(2, 260, 10), sqObj(3, 10, -50)], startFrom);
-    assert.ok(job.bounds, startFrom);
-    assert.ok(job.bounds!.x1 - job.bounds!.x0 <= 20 + 1e-6 && job.bounds!.y1 - job.bounds!.y0 <= 20 + 1e-6, `${startFrom}: ${JSON.stringify(job.bounds)}`);
-    assert.equal(job.warnings.length, 1);
-    assert.match(job.warnings[0], /2/);
-  }
+  const job0 = await lineJob([sqObj(1, 10, 10), sqObj(2, 260, 10), sqObj(3, 10, -50)]);
+  assert.ok(job0.bounds!.x1 - job0.bounds!.x0 <= 20 + 1e-6 && job0.bounds!.y1 - job0.bounds!.y0 <= 20 + 1e-6, JSON.stringify(job0.bounds));
+  assert.equal(job0.warnings.length, 1);
+  assert.match(job0.warnings[0], /2/);
+  // Relative to the user origin the bed position does not matter: everything is lasered as before
+  const rel = await lineJob([sqObj(1, 10, 10), sqObj(2, 260, 10), sqObj(3, 10, -50)], 'user');
+  assert.ok(rel.bounds!.x1 - rel.bounds!.x0 > 200, JSON.stringify(rel.bounds));
+  assert.equal(rel.warnings.length, 0);
   // Partly outside: not parked
   const job = await lineJob([sqObj(1, 10, 10), sqObj(2, 190, 10)]);
   assert.ok(job.bounds!.x1 > 205, JSON.stringify(job.bounds));
