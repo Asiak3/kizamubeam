@@ -1,6 +1,6 @@
 {
   "name": "kizamubeam",
-  "version": "2.5.0",
+  "version": "2.6.2",
   "author": "Hanjo Winter (https://github.com/negurvulkan)",
   "description": "Freie Laser-Software, angelehnt an die Bedienung von LightBurn (Prototyp)",
   "scripts": {
@@ -57,6 +57,7 @@
     "test:relations": "node scripts/run-ts.mjs scripts/relations-test.ts",
     "test:sketch": "node scripts/run-ts.mjs scripts/sketch-test.ts",
     "test:grid": "node scripts/run-ts.mjs scripts/grid-test.ts",
+    "test:calibration": "node scripts/calibration-machine-controls-test.mjs && node scripts/calibration-dialog-offline-test.mjs",
     "test:vm": "node scripts/run-ts.mjs scripts/vm-burn-test.ts && node scripts/run-ts.mjs scripts/vm-parts-test.ts && cd vm/src-tauri && cargo test -p kizamubeam-vm-core"
   },
   "license": "GPL-3.0-or-later",

@@ -5,6 +5,7 @@
 import ClipperLib from 'clipper-lib';
 import { apply, IDENT, isOff, Layer, Mat, mul, Obj, Pt, SubPath } from './model';
 import { boundsOf, shapeSubs, textOutline } from './geom';
+import { parkedObjs } from './parking';
 import { bezierPt, segments } from './curves';
 import { SCALE } from './clip';
 import { copySub, extract, joinSubs } from './pathtools';
@@ -214,7 +215,7 @@ function collect(inp: CheckInput): Contour[] {
   const out: Contour[] = [];
   const engrave = new Set(inp.settings.engraveLayers);
   const walk = (top: Obj, o: Obj, parent: Mat) => {
-    if (isOff(o)) return;
+    if (isOff(o) || o.noLaser) return;
     const m = mul(parent, o.m);
     if (o.shape.kind === 'group') {
       for (const c of o.shape.children) walk(top, c, m);
@@ -674,8 +675,11 @@ function checkBed(inp: CheckInput, cs: Contour[], out: CheckIssue[]) {
   const { w, h } = inp.bed;
   const tops = new Set(cs.map((c) => c.top));
   const eps = 1e-3;
+  // Parts parked completely outside the work area are fine: they are not lasered
+  const parked = parkedObjs(inp.objs, inp.bed, inp.layer);
   for (const o of inp.objs) {
-    if (!tops.has(o) && !(o.shape.kind === 'image' && !isOff(o) && inp.layer(o.layer).output)) continue;
+    if (parked.has(o)) continue;
+    if (!tops.has(o) && !(o.shape.kind === 'image' && !isOff(o) && !o.noLaser && inp.layer(o.layer).output)) continue;
     const b = boundsOf([o]);
     if (!b) continue;
     if (b.x >= -eps && b.y >= -eps && b.x + b.w <= w + eps && b.y + b.h <= h + eps) continue;

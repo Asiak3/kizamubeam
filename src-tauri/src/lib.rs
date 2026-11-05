@@ -6,6 +6,7 @@ mod machine;
 mod native;
 mod netcam;
 mod packs;
+mod serial_transport;
 mod stream;
 mod sync;
 mod templates;

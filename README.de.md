@@ -32,7 +32,7 @@ KizamuBeam ist Open Source (GPL-3.0), kostenlos und braucht weder Konto noch Liz
 | **Windows** (64 Bit) | `KizamuBeam_…_x64-setup.exe` |
 | **Linux** (64 Bit) | `KizamuBeam_…_amd64.AppImage`, `.deb` oder `.rpm` |
 
-Die aktuelle Version gibt es auf der [Release-Seite](https://github.com/negurvulkan/kizamubeam/releases) und auf der [Website](https://negurvulkan.github.io/kizamubeam/#download). Aktuelle Version: **2.5.0** (stabil). Einmal installiert, hält sich KizamuBeam selbst aktuell (Hilfe → Nach Updates suchen).
+Die aktuelle Version gibt es auf der [Release-Seite](https://github.com/negurvulkan/kizamubeam/releases) und auf der [Website](https://negurvulkan.github.io/kizamubeam/#download). Aktuelle Version: **2.6.1** (stabil). Einmal installiert, hält sich KizamuBeam selbst aktuell (Hilfe → Nach Updates suchen).
 
 > **Erster Start unter macOS:** Meldet macOS, dass die App nicht überprüft werden kann, unter Systemeinstellungen → Datenschutz & Sicherheit auf „Dennoch öffnen“ klicken.
 

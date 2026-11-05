@@ -486,8 +486,12 @@ select:focus {
 }
 .ot-row:hover .ot-btn,
 .ot-btn.ot-lock.on,
-.ot-eye:not(.on) {
+.ot-eye:not(.on),
+.ot-laser:not(.on) {
   opacity: 1;
+}
+.ot-row.nolaser .ot-label {
+  text-decoration: line-through;
 }
 .ot-btn:hover {
   background: var(--surface);
@@ -1231,6 +1235,11 @@ table.devices .actions {
 .cal-left .form {
   grid-template-columns: 1fr 110px;
 }
+/* Calibration machine controls */
+.calibration-machine-controls { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.calibration-machine-controls h3 { font-size: 14px; }
+.calibration-machine-controls .move-row { flex-wrap: wrap; }
+.calibration-machine-controls .move-form { flex: 1 1 11rem; min-width: 0; grid-template-columns: minmax(0, 1fr) 8ch; }
 .cal-step {
   border-top: 1px solid var(--line);
   padding-top: 8px;
@@ -4044,3 +4053,10 @@ input.jig-count {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
+
+/* Mehrlagenarbeit */
+.multilayer-dialog { width: min(820px, calc(100vw - 30px)); }
+.multilayer-list { display: grid; gap: 7px; margin: 12px 0; }
+.multilayer-row { display: flex; gap: 7px; align-items: center; padding: 7px; border: 1px solid var(--line); border-radius: 5px; flex-wrap: wrap; }
+.multilayer-name { flex: 1 1 150px; }
+.multilayer-thickness { width: 68px; }

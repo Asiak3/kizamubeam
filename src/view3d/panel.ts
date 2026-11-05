@@ -5,7 +5,7 @@
 // Gezeigt wird die Auswahl (eine gewählte Baugruppe immer ganz), ohne Auswahl alles auf der Seite.
 import type { Editor } from '../editor';
 import type { GenShape, Mat, Obj } from '../model';
-import { IDENT, isCutLayer, leaves, visibleLeaves } from '../model';
+import { IDENT, inv, isCutLayer, leaves, mul, visibleLeaves } from '../model';
 import { boundsOf } from '../geom';
 import { region } from '../ops';
 import ClipperLib from 'clipper-lib';
@@ -25,6 +25,7 @@ import { library } from '../materials';
 import { onImageReady } from '../images';
 import type { MockupBg, Scene3D, Viewer3D, ViewPreset, ViewSolid } from './viewer';
 import { saveDataUrl } from '../files';
+import { plateAnchor } from '../multilayer';
 
 /** Hintergründe des Mockups (Liste hier, damit three.js erst mit dem Fenster geladen wird) */
 const MOCKUP_BGS: MockupBg[] = ['studio', 'white', 'grey', 'dark', 'theme'];
@@ -63,6 +64,49 @@ function loadSettings(): Settings {
   return d;
 }
 
+/** Frei gezeichnete Mehrlagenarbeiten: die gespeicherte Ankerlage hält die Montage beim Nesting zusammen. */
+function collectMultiLayers(ed: Editor, selected: Obj[] | null, fallback: MaterialLook, places: Map<string, CanvasPlace>) {
+  const roots = new Map<number, { o: Obj; page: number }>();
+  ed.doc.pages.forEach((pg, page) => pg.objs.forEach((o) => roots.set(o.id, { o, page })));
+  const wanted = selected ? new Set(selected.map((o) => o.id)) : null;
+  const solids: ViewSolid[] = [];
+  const ids: string[] = [];
+  const used = new Set<number>();
+  let count = 0;
+  for (const a of ed.doc.multiLayerAssemblies ?? []) {
+    if (wanted && !a.plates.some((p) => wanted.has(p.object))) continue;
+    const live = a.plates.map((p) => ({ p, root: roots.get(p.object) })).filter((x): x is { p: typeof a.plates[number]; root: { o: Obj; page: number } } => !!x.root);
+    if (!live.length) continue;
+    if (!wanted && live.every((x) => x.root.o.hidden)) continue;
+    count++;
+    let z = 0;
+    for (let pi = 0; pi < live.length; pi++) {
+      const { p, root } = live[pi];
+      // Frühe Entwürfe speicherten die Objektmatrix als Anker und ließen Platten dadurch nebeneinander.
+      // Diese alte Form wird beim Anzeigen einmalig als zentrierte Montage interpretiert.
+      const legacyAnchor = p.anchor.every((v, i) => Math.abs(v - root.o.m[i]) < 1e-9);
+      const delta = mul(legacyAnchor ? plateAnchor(root.o) : p.anchor, inv(root.o.m));
+      const paths: Paths = [];
+      for (const [leaf, m] of leaves([root.o])) {
+        used.add(leaf.id);
+        if (!isCutLayer(ed.layer(leaf.layer)) || leaf.shape.kind === 'text' || leaf.shape.kind === 'image') continue;
+        if (leaf.shape.kind === 'path' && leaf.shape.mark) continue;
+        paths.push(...region({ ...leaf, m: mul(delta, m) }));
+      }
+      let part = 0;
+      for (const { outer, holes } of islands(paths)) {
+        const key = `ml:${a.id}:${pi}:${part++}`;
+        const polys = [outer, ...holes].map((q) => q.map((v) => ({ x: v.X / SCALE, y: v.Y / SCALE })));
+        solids.push({ key, label: p.name, polys, pose: flatPose(0, 0, z), th: p.thickness, group: `ml:${a.id}`, layer: root.o.layer, look: resolveLook(p.look ?? fallback) });
+        places.set(key, { page: root.page, toLocal: delta });
+      }
+      z += p.thickness;
+    }
+    ids.push(`ml:${a.id}`);
+  }
+  return { solids, ids, used, count };
+}
+
 /** Teile für die Ansicht sammeln; liefert auch einen Schlüssel, der sich nur ändert, wenn andere Objekte gezeigt werden */
 export function collectScene(ed: Editor, th: number, marks = true, fallback: MaterialLook = DEFAULT_LOOK): { scene: Scene3D; key: string; asms: number } {
   const roots = ed.sel.length ? ed.sel : ed.doc.objs.filter((o) => !o.hidden);
@@ -71,7 +115,10 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
   const asmDone = new Set<string>();
   /** Lage jeder Platte auf der Arbeitsfläche (für die Gravuren) */
   const places = new Map<string, CanvasPlace>();
-  let asms = 0;
+  const multi = collectMultiLayers(ed, ed.sel.length ? roots : null, fallback, places);
+  solids.push(...multi.solids);
+  ids.push(...multi.ids);
+  let asms = multi.count;
   // Flache Konturen je Dicke sammeln: Ineinanderliegende Konturen sind wie beim Lasern Löcher
   const flats = new Map<number, { paths: Paths; names: { label: string; box: number[]; layer: number }[] }>();
   const flat = (o: Obj, m: Obj['m'], thick: number) => {
@@ -88,7 +135,7 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     ids.push(o.id);
   };
   // Eine Auswahl zeigt auch ausgeblendete Objekte, die ganze Seite nur sichtbare
-  const all = [...(ed.sel.length ? leaves(roots) : visibleLeaves(roots))];
+  const all = [...(ed.sel.length ? leaves(roots) : visibleLeaves(roots))].filter(([o]) => !multi.used.has(o.id));
   const mated = collectMates(ed, all, th, places);
   for (const g of mated.groups) {
     solids.push(...g);
@@ -138,9 +185,11 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
   // Aussehen je Platte aus ihrem Layer
   const looks = new Map<number, LookPreset>();
   for (const s of solids) {
-    const li = s.layer ?? 0;
-    if (!looks.has(li)) looks.set(li, resolveLook(layerLook(ed.layer(li), (id) => library.get(id)?.material, fallback)));
-    s.look = looks.get(li);
+    if (!s.look) {
+      const li = s.layer ?? 0;
+      if (!looks.has(li)) looks.set(li, resolveLook(layerLook(ed.layer(li), (id) => library.get(id)?.material, fallback)));
+      s.look = looks.get(li);
+    }
   }
   if (marks) {
     const eng = engravings(ed, solids, places, (s) => (s as ViewSolid).look?.engrave ?? BURN);

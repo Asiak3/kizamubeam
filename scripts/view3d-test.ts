@@ -12,6 +12,8 @@ const { subsPolys } = await import('../src/view3d/solids');
 const { sphereLayout } = await import('../src/generators/discsphere');
 import type { Obj, Mate } from '../src/model';
 import type { JointOptions } from '../src/joints';
+const { loadDoc, IDENT } = await import('../src/model');
+const { collectScene } = await import('../src/view3d/panel');
 
 let failed = 0;
 function test(name: string, fn: () => void) {
@@ -35,6 +37,26 @@ function bounds(s: Solid[]) {
   return [0, 1, 2].map((k) => [Math.min(...b.map((x) => x.min[k])), Math.max(...b.map((x) => x.max[k]))]);
 }
 const pairs = (s: Solid[]) => findOverlaps(s).map((o) => `${o.a}/${o.b}`);
+
+test('Mehrlagenarbeit: Platten bleiben über Seiten verknüpft und stapeln sich bündig', () => {
+  const rect = (id: number, x: number, y: number): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer: 0, shape: { kind: 'rect', w: 40, h: 30, r: 0 } });
+  const lower = rect(901, 20, 20), upper = rect(902, 180, 90);
+  const doc = loadDoc({ version: 2, bed: { w: 300, h: 200 }, page: 0, layers: {}, pages: [{ name: 'A', objs: [lower] }, { name: 'B', objs: [upper] }], multiLayerAssemblies: [{ id: 'layers', plates: [
+    { object: 901, name: 'Basis', thickness: 2, look: { id: 'birch' }, anchor: IDENT },
+    { object: 902, name: 'Decklage', thickness: 4, look: { id: 'acrylic' }, anchor: IDENT },
+  ] }] });
+  const ed = { doc, sel: [lower], layer: () => ({ mode: 'line', output: true, show: true, material: undefined }) } as never;
+  const scene = collectScene(ed, 3, false).scene;
+  assert.equal(scene.solids.length, 2);
+  assert.deepEqual(scene.solids.map((s) => s.label), ['Basis', 'Decklage']);
+  assert.deepEqual(scene.solids.map((s) => [s.pose.o[2], s.th]), [[0, 2], [2, 4]]);
+  const centers = scene.solids.map((s) => {
+    const b = solidBounds(s);
+    return [(b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2];
+  });
+  assert.deepEqual(centers[0], centers[1]);
+  assert.deepEqual(pairs(scene.solids), []);
+});
 
 test('Box: Platten ergeben den Kasten, mit Spiel ohne und mit Presspassung mit Durchdringung', () => {
   for (const o of [{ top: 'closed' }, { top: 'open', width: 37, depth: 151, height: 23.5, thickness: 4.2, finger: 6 }]) {

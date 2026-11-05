@@ -150,7 +150,7 @@ export function buildObjectsPanel(ed: Editor) {
     const row = h(
       'div',
       {
-        class: `ot-row ot-obj${off ? ' off' : ''}${top.locked ? ' locked' : ''}`,
+        class: `ot-row ot-obj${off ? ' off' : ''}${top.locked ? ' locked' : ''}${top.noLaser ? ' nolaser' : ''}`,
         style: `padding-left:${8 + INDENT + depth * 14}px`,
         draggable: isTop ? 'true' : 'false',
         title: t('Klick: auswählen (Shift/Ctrl: hinzufügen) · Doppelklick auf den Namen: umbenennen · Ziehen: Reihenfolge oder Layer ändern'),
@@ -166,6 +166,11 @@ export function buildObjectsPanel(ed: Editor) {
             onclick: (e: Event) => (e.stopPropagation(), openShowIfDialog(ed, [o])),
           }, 'ƒ')
         : null,
+      isTop
+        ? toggleBtn('ot-laser', !o.noLaser, o.noLaser ? 'laseroff' : 'laser', o.noLaser ? t('Wieder lasern') : t('Nicht lasern (bleibt sichtbar)'), () =>
+            ed.setObjProps([o], { noLaser: !o.noLaser }),
+          )
+        : h('span', { class: 'ot-btn ot-spacer' }),
       toggleBtn('ot-eye', !o.hidden, o.hidden ? 'eyeoff' : 'eye', o.hidden ? t('Einblenden') : t('Ausblenden (wird dann auch nicht gelasert)'), () =>
         ed.setObjProps([o], { hidden: !o.hidden }),
       ),
@@ -211,6 +216,9 @@ export function buildObjectsPanel(ed: Editor) {
       h('span', { class: 'swatch', style: `background:${PALETTE[i]}` }, layerLabel(i)),
       label,
       h('span', { class: 'muted ot-n' }, String(sec.objs.length)),
+      toggleBtn('ot-laser', L.output, L.output ? 'laser' : 'laseroff', L.output ? t('Layer nicht lasern (Ausgabe aus)') : t('Layer wieder lasern (Ausgabe an)'), () =>
+        ed.updateLayer(i, { output: !L.output }),
+      ),
       toggleBtn('ot-eye', L.show, L.show ? 'eye' : 'eyeoff', L.show ? t('Layer ausblenden') : t('Layer einblenden'), () => {
         ed.updateLayer(i, { show: !L.show });
         ed.dropUnselectable();

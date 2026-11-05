@@ -111,11 +111,9 @@ pub async fn machine_connect(
             if port.trim().is_empty() {
                 return Err("Keine Schnittstelle gewählt".into());
             }
-            let p = serialport::new(port.trim(), baud)
-                .timeout(Duration::from_millis(10))
-                .open()
+            let p = crate::serial_transport::open(port.trim(), baud)
                 .map_err(|e| format!("{}: {e}", port.trim()))?;
-            std::thread::spawn(move || Streamer::new(p, events, busy, Protocol { telnet: false, sync, realtime, poll, rx_buffer }).run(rx));
+            std::thread::spawn(move || Streamer::new(p, events, busy, Protocol { telnet: false, sync, realtime, poll, rx_buffer }).with_serial_retries().run(rx));
         }
         "tcp" => {
             let addr = (host.trim(), tcp_port)
