@@ -1518,11 +1518,24 @@ function buildLayers(ed: Editor) {
     pending = true;
     requestAnimationFrame(() => {
       pending = false;
-      if (!root.contains(document.activeElement)) render();
+      if (!isEditingIn(root)) render();
     });
   };
   root.addEventListener('focusout', () => setTimeout(schedule, 0));
   render();
+}
+
+/**
+ * True while the user is typing or choosing in a field inside `root`, so a
+ * rebuild would throw away the unfinished input. Buttons and checkboxes apply
+ * their change immediately and must not hold back the refresh.
+ */
+function isEditingIn(root: HTMLElement): boolean {
+  const el = document.activeElement;
+  if (!el || !root.contains(el)) return false;
+  if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return true;
+  if (el instanceof HTMLInputElement) return !['checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'range', 'file'].includes(el.type);
+  return (el as HTMLElement).isContentEditable;
 }
 
 /** Kurzfassung der weiteren Einstellungen aus dem Layer-Dialog */
