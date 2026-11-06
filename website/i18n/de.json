@@ -31,12 +31,11 @@
     "lang_short": "EN"
   },
   "hero": {
-    "badge": "Neu: Version 2.5.0 – Netzwerk-Kameras wie ESP32-CAM und eine virtuelle Lasermaschine zum Testen ohne Hardware",
     "title": "Dein Laser. Deine Software. Frei.",
     "subtitle": "KizamuBeam ist Open-Source-Lasersoftware zum Entwerfen, Gravieren und Schneiden – für Diodenlaser mit FluidNC, GRBL & Co. Kostenlos für macOS, Windows und Linux.",
     "cta_primary": "Kostenlos herunterladen",
     "cta_secondary": "Auf GitHub ansehen",
-    "meta_line": "GPL-3.0 · macOS · Windows · Linux · Stabile Version",
+    "meta_line": "GPL-3.0 · macOS · Windows · Linux",
     "name_note": "Kizamu (刻む) ist japanisch und heißt „einritzen, gravieren, fein schneiden“."
   },
   "why": {
