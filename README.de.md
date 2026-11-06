@@ -13,6 +13,7 @@
   <a href="https://github.com/negurvulkan/kizamubeam/releases"><b>Herunterladen</b></a> ·
   <a href="https://negurvulkan.github.io/kizamubeam/">Website</a> ·
   <a href="docs/features.de.md">Alle Funktionen</a> ·
+  <a href="https://discord.gg/SSr8VHh7EJ">Discord</a> ·
   <a href="README.md">English</a>
 </p>
 
@@ -83,6 +84,10 @@ npm run tauri build    # Installer für dein System
 ```
 
 Releases, Updates, Übersetzungen und der Aufbau des Codes stehen im [Entwickler-Handbuch](docs/development.de.md). Beiträge sind willkommen.
+
+## Community
+
+Fragen, Ideen oder etwas, das du mit KizamuBeam gemacht hast? Komm auf unseren [Discord-Server](https://discord.gg/SSr8VHh7EJ). Fehler und Wünsche meldest du am besten als [GitHub-Issue](https://github.com/negurvulkan/kizamubeam/issues).
 
 ## Lizenz
 
