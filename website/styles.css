@@ -195,17 +195,7 @@ main:focus { outline: none; }
   mask-image: radial-gradient(ellipse 80% 70% at 60% 40%, #000 30%, transparent 75%);
 }
 .hero-inner { display: grid; gap: var(--s-7); align-items: center; }
-.chip {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 6px 14px 6px 10px; border-radius: 999px;
-  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
-  font-size: var(--fs-small); font-weight: 600; color: var(--text);
-}
-.chip-dot {
-  width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
-  box-shadow: 0 0 0 3px rgb(255 86 0 / .2), 0 0 10px rgb(255 86 0 / .8);
-}
-.hero h1 { font-size: clamp(2.5rem, 1.5rem + 3.6vw, 4.25rem); margin-top: var(--s-5); letter-spacing: -0.03em; line-height: 1.04; }
+.hero h1 { font-size: clamp(2.5rem, 1.5rem + 3.6vw, 4.25rem); letter-spacing: -0.03em; line-height: 1.04; }
 .h1-line { display: block; }
 .h1-accent { color: var(--accent); text-shadow: 0 0 28px rgb(255 86 0 / .35); }
 .hero-sub { margin-top: var(--s-5); font-size: clamp(1.0625rem, 1rem + .35vw, 1.25rem); color: var(--text-muted); max-width: 36em; }
