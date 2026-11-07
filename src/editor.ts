@@ -107,6 +107,8 @@ export class Editor {
   nodeSel = new Set<string>();
   nodeSelObj: Obj | null = null;
   vectorPreview: VectorPlan[] | null = null;
+  suppressContextMenu = false;
+  onCanvasContext: ((event: MouseEvent) => void) | null = null;
   hint = '';
 
   /** Rückgängig-Verlauf mit benannten Schritten (Verlaufsfenster, höchstens 200) */
@@ -262,7 +264,11 @@ export class Editor {
     });
     canvas.addEventListener('dblclick', (e) => this.onDouble(e));
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (this.suppressContextMenu) { this.suppressContextMenu = false; return; }
+      this.onCanvasContext?.(e);
+    });
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('paste', (e) => this.onPaste(e));
     window.addEventListener('keyup', (e) => {

@@ -3835,4 +3835,12 @@
   "Arbeitsgrenze erreicht; zuerst den Pfad aufteilen.": "Fit work limit exceeded; split the path first.",
   "Abtastgrenze des Pfads erreicht.": "Path sampling limit exceeded.",
   "Abtastgrenze der Kurve erreicht.": "Curve sampling limit exceeded."
+  "An Originalposition einfügen": "Paste in place",
+  "Objekte-Fenster anzeigen": "Show Objects window",
+  "Alle Knoten auswählen": "Select all nodes",
+  "Knoten / Segmente löschen": "Delete nodes / segments",
+  "Objektbearbeitung": "Object editing",
+  "Auswahl sperren": "Lock selection",
+  "Bild zuschneiden (Formen werden entfernt)": "Crop image (removes shapes)",
+  "Maske anwenden (Formen werden entfernt)": "Apply mask (removes shapes)"
 }
