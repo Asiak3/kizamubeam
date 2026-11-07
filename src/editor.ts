@@ -41,6 +41,7 @@ import { EditorRelations, RelPick } from './editor/relations';
 import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
+import { installOverlapPicker } from './overlapPicker';
 import { DEFAULT_GRID, GridSettings } from './grid';
 import { EditorIsolation, IsolationState } from './editor/isolation';
 import { EditorVector, VectorPlan } from './editor/vector';
@@ -49,6 +50,7 @@ export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
 
 export class Editor {
+  overlapHover: Obj | null = null;
   doc: Doc = newDoc();
   sel: Obj[] = [];
   tool: Tool = 'select';
@@ -259,6 +261,7 @@ export class Editor {
     onImageReady(() => this.redraw());
     new ResizeObserver(() => this.resize()).observe(canvas);
     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
+    installOverlapPicker(this);
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
     canvas.addEventListener('pointercancel', () => this.cancelDrag());
