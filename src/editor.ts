@@ -42,6 +42,7 @@ import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
 import { DEFAULT_GRID, GridSettings } from './grid';
+import { EditorIsolation, IsolationState } from './editor/isolation';
 
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
@@ -105,6 +106,7 @@ export class Editor {
   /** Ausgewählte Knoten des Knotenziels als "Unterpfad:Index" */
   nodeSel = new Set<string>();
   nodeSelObj: Obj | null = null;
+  isolation: IsolationState | null = null;
   hint = '';
 
   /** Rückgängig-Verlauf mit benannten Schritten (Verlaufsfenster, höchstens 200) */
@@ -284,6 +286,7 @@ export class Editor {
     this.listeners.delete(fn);
   }
   emit(what: 'doc' | 'sel' | 'view' | 'tool') {
+    this.updateIsolation(what);
     this.dirty = true;
     if (what !== 'view') this.snapVer++;
     if (what === 'doc') this.syncTextLinks();
@@ -394,6 +397,7 @@ export class Editor {
     return boundsOf(this.sel);
   }
   setSel(objs: Obj[]) {
+    if (this.isolation) objs = objs.filter((o) => this.isolation!.ids.has(o.id) || !this.isolation!.known.has(o.id));
     if (objs.length !== this.sel.length || objs.some((o, i) => o !== this.sel[i])) {
       this.pivot = null;
       this.rotateMode = false;
@@ -407,7 +411,7 @@ export class Editor {
     const tol = 4 / this.view.zoom;
     for (let i = this.doc.objs.length - 1; i >= 0; i--) {
       const top = this.doc.objs[i];
-      if (this.isLocked(top)) continue;
+      if (!this.selectable(top)) continue;
       for (const [leaf, m] of visibleLeaves([top])) {
         const ly = this.layer(leaf.layer);
         if (!ly.show) continue;
@@ -524,6 +528,7 @@ export interface Editor
     EditorTabs,
     EditorRelations,
     EditorSketch,
+    EditorIsolation,
     EditorRender {}
 
 const PARTS = [
@@ -552,6 +557,7 @@ const PARTS = [
   EditorTabs,
   EditorRelations,
   EditorSketch,
+    EditorIsolation,
   EditorRender,
 ];
 for (const part of PARTS) {

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "test:isolation": "node scripts/vector-offline-test.mjs scripts/isolation-test.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "vm": "cd vm && tauri dev",
