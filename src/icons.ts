@@ -3,6 +3,9 @@ const svg = (body: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 export const ICONS: Record<string, string> = {
+  vectorfit: svg('<path d="m3 17 4-9 5 6 5-9 4 12" opacity=".35" stroke-dasharray="1.5 2"/><path d="M3 17C7 2 17 2 21 17"/><rect x="1.5" y="15.5" width="3" height="3"/><rect x="19.5" y="15.5" width="3" height="3"/>'),
+  isolate: svg('<path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" stroke-dasharray="2 2"/><rect x="8" y="8" width="8" height="8" fill="currentColor" fill-opacity=".2"/>'),
+  isolateExit: svg('<path d="M11 3H3v18h8" stroke-dasharray="2 2"/><rect x="7" y="8" width="7" height="8" fill="currentColor" fill-opacity=".2"/><path d="M14 12h7l-4-4M21 12l-4 4"/>'),
   select: svg('<path d="M5 3l13 8-6 1.5L9 19z" fill="currentColor" fill-opacity=".15"/>'),
   node: svg('<path d="M4 18C8 4 16 4 20 18"/><rect x="2.5" y="16.5" width="3" height="3"/><rect x="18.5" y="16.5" width="3" height="3"/><circle cx="12" cy="7.5" r="1.6" fill="currentColor"/><path d="M7 7.5h10" stroke-dasharray="1.5 1.5"/>'),
   line: svg('<path d="M4 20l5-12 6 7 5-11"/><circle cx="4" cy="20" r="1.3" fill="currentColor"/><circle cx="20" cy="4" r="1.3" fill="currentColor"/>'),

@@ -55,12 +55,14 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 5;
+const CONFIG_V = 8;
 /** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende) */
 const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 3, bar: 'tools', id: 'apps', after: 'grp:gen' },
   { v: 5, bar: 'tools', id: 'grp:relate', after: 'nest' },
   { v: 5, bar: 'tools', id: 'tool:measure', after: 'grp:relate' },
+  { v: 8, bar: 'tools', id: 'vectorfit', after: 'tool:node' },
+  { v: 8, bar: 'tools', id: 'isolate', after: 'vectorfit' },
 ];
 /** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
  *  Leiste verliert sie nur, wenn die Folge seq noch genau so dasteht; sie wird durch keep ersetzt.
