@@ -862,7 +862,8 @@ function buildNumbar(ed: Editor) {
       genIcon.innerHTML = ICONS[getGenerator(gs.gen)?.icon ?? 'gear'] ?? ICONS.gear;
     }
     const nn = ed.nodeSelCount;
-    nodeInfo.textContent = nn ? t('{n} Knoten', { n: nn }) : t('Knoten');
+    const ns = ed.nodeTargets().reduce((n, o) => n + ed.segmentSelection(o).size, 0);
+    nodeInfo.textContent = t('{nodes} Knoten · {segments} Segmente · {objects} Objekte', { nodes: nn, segments: ns, objects: ed.nodeTargets().length });
     nodeProps.classList.toggle('group-disabled', ed.tool === 'node' && !ed.sel.length);
 
     const rect = ed.sel.find((o) => o.shape.kind === 'rect');

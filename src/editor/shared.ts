@@ -50,16 +50,20 @@ export type Drag =
       /** Gezogener Punkt in Weltkoordinaten zu Beginn und Fangpunkte ohne die bewegten Knoten */
       origWorld: Pt; snapSet: SnapSet;
       /** Beim Ziehen eines Knotens: alle ausgewählten Knoten mit Ausgangslage */
-      group: { sub: number; idx: number; orig: Node }[];
+      group: { obj: Obj; sub: number; idx: number; orig: Node }[];
+      shapes: { obj: Obj; shape: Shape }[];
+      redo: import('../history').HistoryEntry[];
     }
-  | { type: 'nodebox'; start: Pt; end: Pt; obj: Obj; base: Set<string>; mode: 'set' | 'add' | 'toggle'; onTarget: boolean };
+  | { type: 'nodebox'; start: Pt; end: Pt; obj: Obj; base: Map<Obj, Set<string>>; mode: 'set' | 'add' | 'toggle'; onTarget: boolean };
 
 export interface NodeHover {
+  obj?: Obj;
   sub: number;
   idx: number;
   which: 'p' | 'cin' | 'cout';
 }
 export interface SegHover {
+  obj?: Obj;
   sub: number;
   seg: number;
   t: number;

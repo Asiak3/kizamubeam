@@ -81,7 +81,7 @@ export class EditorKeyboard {
         if (this.tool === 'joint' && this.jointPicks.length) return this.clearJointPicks();
         if (this.tool === 'relate' && this.relPicks.length) return this.clearRelPicks();
         if (this.tool === 'measure' && this.measure) return ((this.measure = null), this.redraw());
-        if (nodeMode && this.selectedNodes().length) return this.clearNodeSel();
+        if (nodeMode && (this.selectedNodes().length || this.nodeTargets().some((o) => this.segmentSelection(o).size))) return this.clearNodeSel();
         if (this.draft) this.finishLine();
         else if (this.tool !== 'select') this.setTool('select');
         else this.setSel([]);
@@ -99,7 +99,7 @@ export class EditorKeyboard {
       if (k === 't') return run(() => this.trimNodeSegment());
       const st = e.shiftKey ? 10 : 1;
       const arrows: Record<string, [number, number]> = { arrowleft: [-st, 0], arrowright: [st, 0], arrowup: [0, -st], arrowdown: [0, st] };
-      if (arrows[k] && this.selectedNodes().length) return run(() => this.nudgeNodes(...arrows[k]));
+      if (arrows[k] && (this.selectedNodes().length || this.nodeTargets().some((o) => this.segmentSelection(o).size))) return run(() => this.nudgeNodes(...arrows[k]));
     }
     if (k === 'delete' || k === 'backspace') return run(() => this.deleteSel());
     const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;
