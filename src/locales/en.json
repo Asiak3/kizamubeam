@@ -3834,7 +3834,7 @@
   "Unterteilungsgrenze erreicht; Pfadkomplexität verringern.": "Fit subdivision limit exceeded; lower the path complexity.",
   "Arbeitsgrenze erreicht; zuerst den Pfad aufteilen.": "Fit work limit exceeded; split the path first.",
   "Abtastgrenze des Pfads erreicht.": "Path sampling limit exceeded.",
-  "Abtastgrenze der Kurve erreicht.": "Curve sampling limit exceeded."
+  "Abtastgrenze der Kurve erreicht.": "Curve sampling limit exceeded.",
   "An Originalposition einfügen": "Paste in place",
   "Objekte-Fenster anzeigen": "Show Objects window",
   "Alle Knoten auswählen": "Select all nodes",
