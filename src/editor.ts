@@ -105,6 +105,9 @@ export class Editor {
   /** Ausgewählte Knoten des Knotenziels als "Unterpfad:Index" */
   nodeSel = new Set<string>();
   nodeSelObj: Obj | null = null;
+  nodeSets = new Map<Obj, Set<string>>();
+  segmentSets = new Map<Obj, Set<string>>();
+  nodeEditObj: Obj | null = null;
   hint = '';
 
   /** Rückgängig-Verlauf mit benannten Schritten (Verlaufsfenster, höchstens 200) */
@@ -252,6 +255,8 @@ export class Editor {
     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
+    canvas.addEventListener('pointercancel', () => this.cancelDrag());
+    canvas.addEventListener('lostpointercapture', () => { if (this.drag) this.cancelDrag(); });
     canvas.addEventListener('pointerleave', () => {
       if (this.drag || (!this.nodeHover && !this.segHover && !this.snapHit && !this.alignGuides.length)) return;
       this.nodeHover = this.segHover = null;
@@ -394,6 +399,8 @@ export class Editor {
     return boundsOf(this.sel);
   }
   setSel(objs: Obj[]) {
+    for (const o of this.nodeSets.keys()) if (!objs.includes(o)) this.nodeSets.delete(o);
+    for (const o of this.segmentSets.keys()) if (!objs.includes(o)) this.segmentSets.delete(o);
     if (objs.length !== this.sel.length || objs.some((o, i) => o !== this.sel[i])) {
       this.pivot = null;
       this.rotateMode = false;
@@ -475,6 +482,7 @@ export class Editor {
   // ---------- Werkzeuge ----------
 
   setTool(t: Tool) {
+    if (this.drag) this.cancelDrag();
     if (this.draft) this.finishLine();
     this.tool = t;
     this.nodeHover = this.segHover = null;

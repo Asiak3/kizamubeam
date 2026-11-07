@@ -48,6 +48,11 @@ export class EditorDocument {
     return JSON.stringify({ doc: this.doc, sel: this.sel.map((o) => o.id) });
   }
   load(this: Editor, json: string) {
+    // Component references cannot survive document replacement (Undo/Redo).
+    this.nodeSets.clear(); this.segmentSets.clear(); this.nodeSel.clear();
+    this.nodeSelObj = this.nodeEditObj = null;
+    this.nodeHover = this.segHover = null;
+    this.drag = null;
     const st = JSON.parse(json);
     this.doc = loadDoc(st.doc);
     bumpIds(allObjs(this.doc));
@@ -226,6 +231,7 @@ export class EditorDocument {
     this.rotateMode = false;
     this.nodeSel.clear();
     this.nodeSelObj = null;
+    this.nodeSets.clear(); this.segmentSets.clear(); this.nodeEditObj = null;
     this.nodeHover = this.segHover = null;
     this.jointPicks = [];
     this.jointHover = null;

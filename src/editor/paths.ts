@@ -181,11 +181,12 @@ export class EditorPaths {
    * sonst alle Knoten der ausgewählten Formen. Je Blatt: Weltmatrix und Knotenindizes je Unterpfad.
    */
   cornerTargets(this: Editor): { obj: Obj; m: Mat; idx: Map<number, number[]> }[] {
-    const o = this.tool === 'node' ? this.nodeTarget() : null;
-    if (o) {
-      const idx = new Map<number, number[]>();
-      for (const n of this.nodesToEdit(o)) idx.set(n.sub, [...(idx.get(n.sub) ?? []), n.idx]);
-      return idx.size ? [{ obj: o, m: o.m, idx }] : [];
+    if (this.tool === 'node') {
+      return this.nodeTargets().flatMap((o) => {
+        const idx = new Map<number, number[]>();
+        for (const n of this.nodesToEdit(o)) idx.set(n.sub, [...(idx.get(n.sub) ?? []), n.idx]);
+        return idx.size ? [{ obj: o, m: o.m, idx }] : [];
+      });
     }
     return this.selPathLeaves().map(([obj, m]) => ({ obj, m, idx: new Map(shapeSubs(obj.shape).map((sp, i) => [i, sp.nodes.map((_, k) => k)])) }));
   }
@@ -233,7 +234,7 @@ export class EditorPaths {
       if (changed) this.touch(obj.shape);
     }
     // Knotenindizes haben sich verschoben
-    this.nodeSel.clear();
+    this.clearNodeSel();
     this.nodeHover = this.segHover = null;
     this.hint =
       (mode === 'round'
@@ -473,6 +474,7 @@ export class EditorPaths {
 
   /** Knoteneditor, Taste B: Pfad am Knoten unter dem Mauszeiger (oder am einzigen gewählten) aufbrechen */
   breakAtNodeKey(this: Editor) {
+    if (this.nodeBatch(() => this.breakAtNodeKey())) return;
     const o = this.nodeTarget();
     if (!o) return;
     const targets = this.nodesToEdit(o);
