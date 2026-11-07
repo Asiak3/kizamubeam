@@ -62,7 +62,8 @@
     "test:calibration": "node scripts/calibration-machine-controls-test.mjs && node scripts/calibration-dialog-offline-test.mjs",
     "test:vm": "node scripts/run-ts.mjs scripts/vm-burn-test.ts && node scripts/run-ts.mjs scripts/vm-parts-test.ts && cd vm/src-tauri && cargo test -p kizamubeam-vm-core",
     "test:nodes": "node scripts/vector-offline-test.mjs scripts/multi-object-nodes-test.ts",
-    "test:refit": "node scripts/run-ts.mjs scripts/vector-fit-test.ts && node scripts/vector-offline-test.mjs scripts/path-refit-editor-test.ts"
+    "test:refit": "node scripts/run-ts.mjs scripts/vector-fit-test.ts && node scripts/vector-offline-test.mjs scripts/path-refit-editor-test.ts",
+    "test:file-drop": "node scripts/run-ts.mjs scripts/native-file-drop-test.ts"
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {
