@@ -1,5 +1,6 @@
 // Laser-Panel (Laser, Verschieben, Konsole), Geräteeinstellungen, Vorschau und G-Code-Ausgabe.
 import type { Editor } from './editor';
+import { commandMatches } from './commandKeys';
 import { h, numInput } from './dom';
 import { ICONS } from './icons';
 import { saveText } from './files';
@@ -348,7 +349,7 @@ export function buildLaser(ed: Editor) {
   window.addEventListener('keydown', (e) => {
     const el = e.target as HTMLElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
-    if (e.altKey && !e.ctrlKey && e.key.toLowerCase() === 'p') {
+    if (!e.defaultPrevented && commandMatches('preview', e)) {
       e.preventDefault();
       openPreview(ed);
     }

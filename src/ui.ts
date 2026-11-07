@@ -22,6 +22,8 @@ import { openJointDialog } from './jointDialog';
 import { openHingeDialog } from './hingeDialog';
 import { openSlotDialog } from './slotDialog';
 import { openWarpDialog } from './warpDialog';
+import { installEditorContext } from './editorContext';
+import { commandKey, commandMatches } from './commandKeys';
 import { openQrDialog, openVarTextDialog } from './qrDialog';
 import { openBarcodeDialog } from './barcodeDialog';
 import { LINEAR_NAMES } from './barcode1d';
@@ -56,7 +58,7 @@ import { buildView3dPanel } from './view3d/panel';
 import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { installSketchPanel } from './sketchPanel';
 import { isSketchObj } from './editor/sketch';
-import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, windowList } from './dock';
+import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, showWindow, windowList } from './dock';
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
 import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
 import { dec, LangPref, langPref, LANGUAGES, setLangPref, t, tn } from './i18n';
@@ -157,6 +159,11 @@ export function buildUI(ed: Editor) {
   initSync(ed);
   initDock();
   buildMenu(ed);
+  installEditorContext(ed, {
+    adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
+    saveBitmap: () => saveProcessedBitmap(ed),
+    library: () => openAddSelectionDialog(ed), preview: () => openPreview(ed), objects: () => showWindow('objects'),
+  });
   buildPalette(ed);
   buildStatus(ed);
   startAgentBridge(ed);
@@ -176,7 +183,7 @@ export function buildUI(ed: Editor) {
   window.addEventListener('keydown', (e) => {
     const el = e.target as HTMLElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
-    if (e.altKey && !e.ctrlKey && e.key.toLowerCase() === 't' && ed.selImages().length) {
+    if (!e.defaultPrevented && commandMatches('trace', e) && ed.selImages().length) {
       e.preventDefault();
       openTraceDialog(ed);
     }
@@ -238,14 +245,15 @@ function buildMenu(ed: Editor) {
       [t('Rückgängig'), 'Ctrl+Z', () => ed.doUndo()],
       [t('Wiederholen'), 'Ctrl+Y', () => ed.doRedo()],
       'sep',
-      [t('Ausschneiden'), 'Ctrl+X', () => ed.cut()],
-      [t('Kopieren'), 'Ctrl+C', () => ed.copy()],
-      [t('Einfügen'), 'Ctrl+V', () => ed.paste()],
-      [t('Duplizieren'), 'Ctrl+D', () => ed.duplicate()],
+      [t('Ausschneiden'), commandKey('cut'), () => ed.cut()],
+      [t('Kopieren'), commandKey('copy'), () => ed.copy()],
+      [t('Einfügen'), commandKey('paste'), () => ed.paste()],
+      [t('An Originalposition einfügen'), commandKey('paste-in-place'), () => ed.paste(0)],
+      [t('Duplizieren'), commandKey('duplicate'), () => ed.duplicate()],
       [t('Löschen'), t('Entf'), () => ed.deleteSel()],
       'sep',
-      [t('Alles auswählen'), 'Ctrl+A', () => ed.selectAll()],
-      [t('In Pfad umwandeln'), 'Ctrl+Shift+C', () => ed.convertSelToPath()],
+      [t('Alles auswählen'), commandKey('selectall'), () => ed.selectAll()],
+      [t('In Pfad umwandeln'), commandKey('tolines'), () => ed.convertSelToPath()],
       'sep',
       [t('Sichtbar, wenn …'), '', () => openShowIfDialog(ed, ed.sel)],
       [t('Zur Bibliothek hinzufügen …'), '', () => openAddSelectionDialog(ed)],
@@ -308,8 +316,8 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Anordnen'), [
-      [t('Gruppieren'), 'Ctrl+G', () => ed.group()],
-      [t('Gruppierung aufheben'), 'Ctrl+U', () => ed.ungroup()],
+      [t('Gruppieren'), commandKey('group'), () => ed.group()],
+      [t('Gruppierung aufheben'), commandKey('ungroup'), () => ed.ungroup()],
       'sep',
       { sub: t('Spiegeln und drehen'), items: [
         [t('Horizontal spiegeln'), 'Ctrl+Shift+H', () => ed.mirror(true)],
