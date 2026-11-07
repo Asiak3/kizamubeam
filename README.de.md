@@ -33,14 +33,14 @@ KizamuBeam ist Open Source (GPL-3.0), kostenlos und braucht weder Konto noch Liz
 | **Windows** (64 Bit) | `KizamuBeam_…_x64-setup.exe` |
 | **Linux** (64 Bit) | `KizamuBeam_…_amd64.AppImage`, `.deb` oder `.rpm` |
 
-Die aktuelle Version gibt es auf der [Release-Seite](https://github.com/negurvulkan/kizamubeam/releases) und auf der [Website](https://negurvulkan.github.io/kizamubeam/#download). Aktuelle Version: **2.6.1** (stabil). Einmal installiert, hält sich KizamuBeam selbst aktuell (Hilfe → Nach Updates suchen).
+Die aktuelle Version gibt es auf der [Release-Seite](https://github.com/negurvulkan/kizamubeam/releases) und auf der [Website](https://negurvulkan.github.io/kizamubeam/#download). Aktuelle Version: **2.8.0** (stabil). Einmal installiert, hält sich KizamuBeam selbst aktuell (Hilfe → Nach Updates suchen).
 
 > **Erster Start unter macOS:** Meldet macOS, dass die App nicht überprüft werden kann, unter Systemeinstellungen → Datenschutz & Sicherheit auf „Dennoch öffnen“ klicken.
 
 ## Was du damit machen kannst
 
 ### Direkt in der App gestalten
-Linien, Kurven, Formen und Text in jeder Schrift, auch alle Google Fonts mit einem Klick. Formen kombinieren, versetzen, Knoten bearbeiten, Text an einem Pfad entlang laufen lassen, Ecken runden. Fangpunkte, Ausrichten, Arrays und automatisches Verschachteln halten Ordnung, und jedes Ergebnis bleibt eine saubere, bearbeitbare Kurve. Eine Bibliothek mit **400 mitgelieferten Motiven und Designelementen** hilft beim Einstieg.
+Linien, Kurven, Formen und Text in jeder Schrift, auch alle Google Fonts mit einem Klick. Formen kombinieren, versetzen, Knoten bearbeiten (auch über mehrere Objekte hinweg), Pfade vereinfachen und glätten, Text an einem Pfad entlang laufen lassen, Ecken runden. Fangpunkte, Ausrichten, Arrays und automatisches Verschachteln halten Ordnung, und jedes Ergebnis bleibt eine saubere, bearbeitbare Kurve. Eine Bibliothek mit **400 mitgelieferten Motiven und Designelementen** hilft beim Einstieg.
 
 ### Eigene Vorlagen übernehmen
 SVG, DXF, PDF und Illustrator-Dateien, LightBurn-Projekte (`.lbrn2`) und alle gängigen Bildformate öffnen. Fotos bekommen Rasterung, Zeitungsdruck- und Skizzen-Effekt, Hintergrund entfernen, Zuschneiden und Masken und lassen sich in Vektoren nachzeichnen, auch als Mittellinien für Gravuren mit einem Strich.

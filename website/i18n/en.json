@@ -1,7 +1,7 @@
 {
   "lang": "en",
   "locale": "en_US",
-  "version": "2.5.0",
+  "version": "2.8.0",
   "meta": {
     "title": "KizamuBeam – Free laser engraving & cutting software",
     "description": "Free, open-source laser software for macOS, Windows and Linux. Design, engrave photos, generate boxes and gears, and send jobs straight to FluidNC, GRBL, grblHAL, Marlin and Smoothieware lasers.",
@@ -56,7 +56,8 @@
       "lead": "Draw, combine, fine-tune – in a layout that feels familiar from the first click.",
       "b": [
         "Lines, Bézier curves, rounded rectangles, ellipses, polygons, stars and multi-line text",
-        "Boolean operations, offset, node editing, trimming, and snapping to nodes, midpoints and intersections",
+        "Boolean operations, offset, node editing across several objects at once, trimming, and snapping to nodes, midpoints and intersections",
+        "Simplify and smooth paths with a live preview, right-click menus that offer what fits the object, and isolating a selection to work on it undisturbed",
         "Text on a path, welded letters and true outlines from your system fonts",
         "Font manager: search all Google Fonts with preview and install them in one click, add your own TTF/OTF files, favorites – missing fonts in a project are downloaded for you",
         "Warp text, shapes and images into an arc, bulge, flag or perspective, as clean Bézier curves",
