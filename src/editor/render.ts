@@ -530,6 +530,11 @@ export class EditorRender {
       ctx.strokeRect(a.x + 0.5, a.y + 0.5, c.x - a.x, c.y - a.y);
       ctx.setLineDash([]);
     }
+    if(d?.type==='lasso') {
+      ctx.save();ctx.strokeStyle=T.sel;ctx.fillStyle=this.dark?'#5b93f520':'#3070ff20';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();
+      d.points.forEach((p,i)=>{const q=this.toScreen(p);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y)});
+      ctx.closePath();ctx.fill('evenodd');ctx.stroke();ctx.restore();
+    }
     // Knoten
     for (const o of this.tool === 'node' ? this.nodeTargets() : []) {
       const scr = (p: Pt) => this.toScreen(apply(o.m, p.x, p.y));
@@ -566,7 +571,8 @@ export class EditorRender {
             ctx.lineTo(hq.x, hq.y);
             ctx.stroke();
             const hot = this.nodeHover?.obj === o && this.nodeHover.sub === si && this.nodeHover.idx === ni && this.nodeHover.which === which;
-            ctx.fillStyle = hot ? '#ff6020' : T.handleFill;
+            const pickedHandle=this.handleSelection(o).has(`${si}:${ni}:${which}`);
+            ctx.fillStyle = hot ? '#ff6020' : pickedHandle?T.sel:T.handleFill;
             ctx.beginPath();
             ctx.arc(hq.x, hq.y, 3.5, 0, Math.PI * 2);
             ctx.fill();

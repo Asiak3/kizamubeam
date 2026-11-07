@@ -4,7 +4,7 @@ import { Box, worldPath } from '../geom';
 import { SnapSet } from '../snap';
 import { t } from '../i18n';
 
-export type Tool = 'select' | 'node' | 'line' | 'pencil' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure' | 'sketch';
+export type Tool = 'lasso' | 'select' | 'node' | 'line' | 'pencil' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure' | 'sketch';
 
 export const RULER = 22; // px
 
@@ -26,6 +26,7 @@ export const CANVAS_THEMES = {
 export const HANDLE_OFF = 9; // Abstand der Griffe vom Auswahlrahmen in px
 
 export type Drag =
+  | {type:'lasso';points:Pt[];pointerId:number;components:boolean;overflow:boolean;doc:import('../model').Doc;base:Obj[];nodeBase:Map<Obj,Set<string>>;handleBase:Map<Obj,Set<string>>;mode:'set'|'add'|'remove'|'toggle'}
   | { type: 'pan'; sx: number; sy: number; ox: number; oy: number }
   | {
       type: 'move'; start: Pt; orig: Mat[]; moved: boolean; toggleRotate: boolean; sx: number; sy: number;
@@ -54,6 +55,7 @@ export type Drag =
       group: { obj: Obj; sub: number; idx: number; orig: Node }[];
       shapes: { obj: Obj; shape: Shape }[];
       redo: import('../history').HistoryEntry[];
+      handles: {obj:Obj;sub:number;idx:number;which:'cin'|'cout';orig:Node}[];
     }
   | { type: 'nodebox'; start: Pt; end: Pt; obj: Obj; base: Map<Obj, Set<string>>; mode: 'set' | 'add' | 'toggle'; onTarget: boolean };
 
@@ -95,6 +97,7 @@ export const HINGE_HINT_FIRST = t('Scharnier: Oberkante der Rückwand anklicken 
 export const HINGE_HINT_SECOND = t('Scharnier: jetzt die Hinterkante des Deckels anklicken. Erneuter Klick hebt die Wahl auf.');
 
 export const TOOL_HINTS: Record<Tool, string> = {
+  lasso:t('Lasso: Objekte vollständig umschließen. Shift ergänzt, Ctrl schaltet um, Shift+Ctrl entfernt. Esc bricht ab.'),
   select: t('Drehen: knapp außerhalb einer Ecke ziehen oder Auswahl nochmals anklicken. Rahmen nach rechts: umschließend, nach links: kreuzend.'),
   node: t('Klick/Rahmen wählt Knoten, Shift ergänzt. Entf löschen, L Gerade, C Kurve, E Ecke, S glatt, I einfügen (oder Doppelklick auf Kante), B aufbrechen, T trimmen.'),
   line: t('Klicken für Ecken, Ziehen für Kurven. Startpunkt anklicken schließt, Doppelklick/Enter/Rechtsklick beendet.'),

@@ -9,7 +9,7 @@ const rect = (id: number, x = 30): import('../src/model').Obj => ({ id, m: [1, 0
 function editor() {
   const a = rect(1), b = rect(2, 100), ed = Object.create(Editor.prototype) as import('../src/editor').Editor;
   Object.assign(ed, { doc: newDoc(), sel: [a], tool: 'select', history: new History(), listeners: new Set(), isolation: null,
-    nodeSel: new Set(), nodeSets: new Map(), segmentSets: new Map(), drag: null, draft: null, snapVer: 0, alignGuides: [], jointPicks: [], snapGrid: false, snapObjects: false,
+    nodeSel: new Set(), nodeSets: new Map(), segmentSets: new Map(), handleSets:new Map(), drag: null, draft: null, snapVer: 0, alignGuides: [], jointPicks: [], snapGrid: false, snapObjects: false,
     currentLayer: 0, view: { zoom: 1, ox: 0, oy: 0 }, canvas: { style: {} } });
   ed.doc.objs = [a, b]; ed.doc.layers[0] = defaultLayer(0);
   ed.redraw = ed.scheduleSave = ed.syncTextLinks = () => {};
