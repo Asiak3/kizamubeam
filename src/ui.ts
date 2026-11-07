@@ -22,6 +22,7 @@ import { openJointDialog } from './jointDialog';
 import { openHingeDialog } from './hingeDialog';
 import { openSlotDialog } from './slotDialog';
 import { openWarpDialog } from './warpDialog';
+import { openVectorFitDialog } from './vectorDialog';
 import { installEditorContext } from './editorContext';
 import { commandKey, commandMatches } from './commandKeys';
 import { openQrDialog, openVarTextDialog } from './qrDialog';
@@ -265,6 +266,7 @@ function buildMenu(ed: Editor) {
       [t('Knoten bearbeiten'), 'Ctrl+`', () => ed.setTool('node')],
       'sep',
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
+      [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
       [t('Rechteck'), 'Ctrl+R', () => ed.setTool('rect')],
       [t('Ellipse'), 'Ctrl+E', () => ed.setTool('ellipse')],
       [t('Polygon'), '', () => ed.setTool('polygon')],
@@ -978,6 +980,7 @@ function buildBars(ed: Editor) {
     tool('select', 'select', t('Auswählen (Esc)')),
     tool('node', 'node', t('Knoten bearbeiten (Ctrl+`)')),
     tool('line', 'line', t('Linien zeichnen (Ctrl+L)')),
+    { id: 'vectorfit', cat: W, icon: 'node', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
     tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),
     tool('polygon', 'polygon', t('Polygon')),
