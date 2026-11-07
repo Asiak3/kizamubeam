@@ -1,3 +1,4 @@
+import { canEnterIsolation } from './isolation';
 // Oberfläche: Menü, Leisten, Panels, Palette, Statusleiste.
 import { Editor, Tool } from './editor';
 import { initSync, openSyncDialog } from './syncDialog';
@@ -160,6 +161,11 @@ export function buildUI(ed: Editor) {
   initSync(ed);
   initDock();
   buildMenu(ed);
+  const isolationBadge = h('div', { class: 'editor-isolation-badge', hidden: true },
+    h('span', {}, t('Isolation aktiv – kein Ausgabefilter')),
+    h('button', { type: 'button', class: 'btn', onclick: () => ed.leaveIsolation() }, t('Isolation verlassen')));
+  document.body.append(isolationBadge);
+  ed.on(() => { isolationBadge.hidden = !ed.isolation; });
   installEditorContext(ed, {
     adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
     saveBitmap: () => saveProcessedBitmap(ed),
@@ -212,8 +218,8 @@ function translateStatic() {
 
 // ---------- Menü ----------
 
-/** checked: Häkchen vor dem Eintrag (z. B. sichtbare Fenster); sub: Untermenü */
-type MenuItem = [label: string, key: string, action: () => void, checked?: () => boolean] | { sub: string; items: MenuItem[] } | 'sep';
+/** checked: Häkchen; enabled/visible: beim Öffnen prüfen; sub: Untermenü */
+type MenuItem = [label: string, key: string, action: () => void, checked?: () => boolean, enabled?: () => boolean, visible?: () => boolean] | { sub: string; items: MenuItem[] } | 'sep';
 
 function buildMenu(ed: Editor) {
   const menus: [string, MenuItem[]][] = [
@@ -266,6 +272,8 @@ function buildMenu(ed: Editor) {
       [t('Knoten bearbeiten'), 'Ctrl+`', () => ed.setTool('node')],
       'sep',
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
+      [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
+      [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
       [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
       [t('Rechteck'), 'Ctrl+R', () => ed.setTool('rect')],
       [t('Ellipse'), 'Ctrl+E', () => ed.setTool('ellipse')],
@@ -444,7 +452,7 @@ function buildMenu(ed: Editor) {
     openMenu = null;
   };
   // Einträge (auch Untermenüs, die beim Überfahren aufklappen) in eine Liste füllen;
-  // Häkchen werden beim Öffnen des Hauptmenüs aktualisiert
+  // Häkchen und Verfügbarkeit werden beim Öffnen des Hauptmenüs aktualisiert
   const fill = (list: HTMLElement, items: MenuItem[], checks: (() => void)[]) => {
     let hasChecks = false;
     for (const it of items) {
@@ -460,7 +468,11 @@ function buildMenu(ed: Editor) {
         });
         list.append(sub);
       } else {
-        const b = h('button', { onclick: () => (close(), it[2]()) }, h('span', {}, it[0]), it[1] ? h('kbd', {}, it[1]) : null);
+        const enabled = it[4];
+        const b = h('button', { onclick: () => { if (!enabled || enabled()) { close(); it[2](); } } }, h('span', {}, it[0]), it[1] ? h('kbd', {}, it[1]) : null);
+        if (enabled) checks.push(() => { b.disabled = !enabled(); });
+        const visible = it[5];
+        if (visible) checks.push(() => { b.hidden = !visible(); });
         const checked = it[3];
         if (checked) {
           const mark = h('span', { class: 'check-mark' });
@@ -981,6 +993,7 @@ function buildBars(ed: Editor) {
     tool('select', 'select', t('Auswählen (Esc)')),
     tool('node', 'node', t('Knoten bearbeiten (Ctrl+`)')),
     tool('line', 'line', t('Linien zeichnen (Ctrl+L)')),
+    { id: 'isolate', cat: W, icon: 'select', label: t('Auswahl isolieren / Isolation verlassen'), run: () => { if (ed.isolation) ed.leaveIsolation(); else ed.isolateSelection(); }, enabled: () => !!ed.isolation || canEnterIsolation(ed), on: () => !!ed.isolation },
     { id: 'vectorfit', cat: W, icon: 'node', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
     tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),

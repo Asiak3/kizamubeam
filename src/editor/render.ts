@@ -69,6 +69,7 @@ export class EditorRender {
       canvas: this.canvas, ctx: this.ctx, dpr: this.dpr, view: this.view, sel: this.sel,
       nodeHover: this.nodeHover, segHover: this.segHover, snapHit: this.snapHit, alignGuides: this.alignGuides, draft: this.draft,
       centerMarks: this.centerMarks,
+      isolation: this.isolation,
     };
     try {
       this.canvas = off;
@@ -80,6 +81,7 @@ export class EditorRender {
       this.alignGuides = [];
       this.draft = null;
       this.centerMarks = 'off';
+      this.isolation = null;
       this.render();
       return off.toDataURL('image/png');
     } finally {
@@ -164,7 +166,7 @@ export class EditorRender {
     // Objects that are not lasered are drawn faded
     const faded = noLaserLeaves(this.doc.objs);
     const FADE = 0.35;
-    for (const [o, m] of visibleLeaves(this.doc.objs)) {
+    for (const [o, m] of visibleLeaves(this.viewObjects())) {
       const ly = this.layer(o.layer);
       if (!ly.show) continue;
       const selected = selSet.has(o);
@@ -625,7 +627,7 @@ export class EditorRender {
     ctx.strokeStyle = SNAP_COLOR;
     ctx.beginPath();
     const seen: Pt[] = [];
-    for (const top of this.doc.objs) {
+    for (const top of this.viewObjects()) {
       const inFocus = mode === 'all' || focus.has(top);
       for (const [leaf, m] of visibleLeaves([top])) {
         if (!this.layer(leaf.layer).show || leaf.shape.kind === 'text') continue;

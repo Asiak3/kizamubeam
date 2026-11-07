@@ -60,7 +60,7 @@ export class EditorSnapping {
   }
   /** Fangpunkte aller sichtbaren Objekte außer skip, dazu die sichtbaren Hilfslinien (Fang an der ganzen Linie und an Kreuzungen) */
   buildSnap(this: Editor, skip: Obj[] = []): SnapSet {
-    const set = buildSnapSet(this.doc.objs, (o) => this.layer(o.layer).show, new Set(skip));
+    const set = buildSnapSet(this.viewObjects(), (o) => this.layer(o.layer).show, new Set(skip));
     if (this.guidesShown()) {
       const { w, h } = this.doc.bed;
       const m = Math.max(w, h) * 10;
