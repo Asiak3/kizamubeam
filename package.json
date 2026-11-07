@@ -6,6 +6,7 @@
   "scripts": {
     "test:freehand-edit": "node scripts/vector-offline-test.mjs scripts/freehand-edit-test.ts",
     "test:component-selection": "node scripts/vector-offline-test.mjs scripts/component-selection-test.ts",
+    "test:path-islands": "node scripts/vector-offline-test.mjs scripts/path-islands-test.ts",
     "dev": "vite",
     "build": "tsc && vite build",
     "test:isolation": "node scripts/vector-offline-test.mjs scripts/isolation-test.ts",
