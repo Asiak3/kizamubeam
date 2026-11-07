@@ -1,8 +1,10 @@
 // Editor: Tastatur.
 import type { Editor } from '../editor';
+import { commandMatches } from '../commandKeys';
 
 export class EditorKeyboard {
   onKey(this: Editor, e: KeyboardEvent) {
+    if (e.defaultPrevented) return;
     const el = e.target as HTMLElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
     const ctrl = e.ctrlKey || e.metaKey;
@@ -30,17 +32,17 @@ export class EditorKeyboard {
       if (k === 'h') return run(() => this.mirror(true));
       if (k === 'v') return run(() => this.mirror(false));
       if (k === 'z') return run(() => this.doRedo());
-      if (k === 'c') return run(() => this.convertSelToPath());
+      if (commandMatches('tolines', e)) return run(() => this.convertSelToPath());
       if (k === 'a') return run(() => this.onGridArray?.());
     }
     const nodeMode = this.tool === 'node' && !!this.nodeTarget();
-    if (ctrl && !e.shiftKey && k === 'a' && nodeMode) return run(() => this.selectAllNodes());
+    if (commandMatches('selectall', e) && nodeMode) return run(() => this.selectAllNodes());
     if (ctrl) {
       if (k === 'z') return run(() => this.doUndo());
       if (k === 'y') return run(() => this.doRedo());
-      if (k === 'c') return run(() => this.copy());
-      if (k === 'x') return run(() => this.cut());
-      if (k === 'v') {
+      if (commandMatches('copy', e)) return run(() => this.copy());
+      if (commandMatches('cut', e)) return run(() => this.cut());
+      if (commandMatches('paste', e)) {
         // Kein preventDefault: das paste-Ereignis bringt Bilder und SVG aus anderen Programmen.
         // Kommt es nicht (manche Webviews), wird die interne Zwischenablage eingefügt.
         clearTimeout(this.pasteTimer);
@@ -48,20 +50,22 @@ export class EditorKeyboard {
         return;
       }
       if (k === 'i') return run(() => this.onImport?.());
-      if (k === 'd') return run(() => this.duplicate());
-      if (k === 'a') return run(() => this.selectAll());
-      if (k === 'g') return run(() => this.group());
-      if (k === 'u') return run(() => this.ungroup());
+      if (commandMatches('duplicate', e)) return run(() => this.duplicate());
+      if (commandMatches('selectall', e)) return run(() => this.selectAll());
+      if (commandMatches('group', e)) return run(() => this.group());
+      if (commandMatches('ungroup', e)) return run(() => this.ungroup());
       if (k === 'r') return run(() => this.setTool('rect'));
       if (k === 'e') return run(() => this.setTool('ellipse'));
       if (k === 'l') return run(() => this.setTool('line'));
       if (k === 't') return run(() => this.setTool('text'));
-      if (k === '`' || e.code === 'Backquote') return run(() => this.setTool('node'));
+      if (commandMatches('tool:node', e) || (e.code === 'Backquote' && !e.altKey && !e.shiftKey)) return run(() => this.setTool('node'));
       if (k === 'k') return run(() => this.setTool('trim'));
       if (k === '0') return run(() => this.zoomPage());
       return;
     }
     if (k === 'pageup' && !e.altKey) return run(() => this.setPage(this.doc.page - 1));
+    // UI-level image/preview commands must not also trigger unmodified node keys.
+    if (commandMatches('trace', e) || commandMatches('preview', e)) return;
     if (k === 'pagedown' && !e.altKey) return run(() => this.setPage(this.doc.page + 1));
     // Boolesche Operationen: Alt + Plus / Minus / Stern (Mac: Option liefert ±, – bzw. ein Sonderzeichen, daher auch Ziffernblock-Codes)
     if (e.altKey && (k === '+' || k === '±' || e.code === 'NumpadAdd')) return run(() => void this.booleanSel('union'));

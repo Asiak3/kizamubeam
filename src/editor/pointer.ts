@@ -44,6 +44,7 @@ export class EditorPointer {
       return;
     }
     if (e.button === 2) {
+      this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || !!this.pickHandler || !!this.drag;
       if (this.draft) this.finishLine();
       if (this.sketchEdit && this.sketchEdit.draft.length) {
         this.sketchEdit.draft = [];

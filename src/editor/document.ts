@@ -53,6 +53,7 @@ export class EditorDocument {
     this.nodeSelObj = this.nodeEditObj = null;
     this.nodeHover = this.segHover = null;
     this.drag = null;
+    this.vectorPreview = null;
     const st = JSON.parse(json);
     this.doc = loadDoc(st.doc);
     bumpIds(allObjs(this.doc));
@@ -224,6 +225,7 @@ export class EditorDocument {
 
   /** Beim Wechsel der Seite: Auswahl und alles, was auf Objekte der alten Seite zeigt, verwerfen */
   clearPageState(this: Editor) {
+    this.vectorPreview = null;
     if (this.drag) this.cancelDrag();
     if (this.draft) this.finishLine();
     this.sel = [];

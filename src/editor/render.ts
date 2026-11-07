@@ -267,6 +267,12 @@ export class EditorRender {
       ctx.stroke(worldPath(tmp.shape, IDENT));
     }
 
+    if (this.vectorPreview) {
+      ctx.strokeStyle = '#ff6020'; ctx.lineWidth = 1.5 * px;
+      ctx.setLineDash([4 * px, 2 * px]);
+      for (const p of this.vectorPreview) ctx.stroke(subsToPath2D(p.subs));
+      ctx.setLineDash([]);
+    }
     // Vorschau der Biegeschnitte
     if (this.hingePreview) {
       ctx.strokeStyle = '#ff6020';
