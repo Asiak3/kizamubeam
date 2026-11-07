@@ -42,6 +42,7 @@ import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
 import { DEFAULT_GRID, GridSettings } from './grid';
+import { EditorVector, VectorPlan } from './editor/vector';
 
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
@@ -105,6 +106,7 @@ export class Editor {
   /** Ausgewählte Knoten des Knotenziels als "Unterpfad:Index" */
   nodeSel = new Set<string>();
   nodeSelObj: Obj | null = null;
+  vectorPreview: VectorPlan[] | null = null;
   hint = '';
 
   /** Rückgängig-Verlauf mit benannten Schritten (Verlaufsfenster, höchstens 200) */
@@ -524,6 +526,7 @@ export interface Editor
     EditorTabs,
     EditorRelations,
     EditorSketch,
+    EditorVector,
     EditorRender {}
 
 const PARTS = [
@@ -552,6 +555,7 @@ const PARTS = [
   EditorTabs,
   EditorRelations,
   EditorSketch,
+  EditorVector,
   EditorRender,
 ];
 for (const part of PARTS) {
