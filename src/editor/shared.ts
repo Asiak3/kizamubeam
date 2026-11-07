@@ -4,7 +4,7 @@ import { Box, worldPath } from '../geom';
 import { SnapSet } from '../snap';
 import { t } from '../i18n';
 
-export type Tool = 'select' | 'node' | 'line' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure' | 'sketch';
+export type Tool = 'select' | 'node' | 'line' | 'pencil' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure' | 'sketch';
 
 export const RULER = 22; // px
 
@@ -38,6 +38,7 @@ export type Drag =
   | { type: 'marquee'; start: Pt; end: Pt; base: Obj[]; mode: 'set' | 'add' | 'toggle' | 'remove' }
   | { type: 'create'; start: Pt; obj: Obj | null; snapSet: SnapSet }
   | { type: 'linenode'; node: Node }
+  | { type: 'pencil'; points: Pt[]; pointerId: number; overflow: boolean }
   /** Textwerkzeug: Klicken setzt einen Text, Ziehen einen Textrahmen */
   | { type: 'textframe'; start: Pt; end: Pt }
   /**
@@ -105,6 +106,7 @@ export const TOOL_HINTS: Record<Tool, string> = {
   trim: t('Trimmen: Abschnitt bis zu den nächsten Schnittpunkten anklicken (rot) zum Entfernen. Shift: Stück auf aktuellem Layer behalten, Ctrl: nicht verbinden.'),
   start: t('Startpunkt: Knoten anklicken, dort beginnt der Schnitt. Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).'),
   relate: t('Beziehung: zuerst das Element anklicken, das stehen bleibt, dann das Element des Objekts, das sich anpasst.'),
+  pencil: t('Ziehen zeichnet einen angepassten Bézierpfad. Loslassen: übernehmen; Esc: abbrechen. Toleranz und Schließen in den Werkzeugoptionen einstellen.'),
   sketch: '',
   measure: t('Messen: Anfang und Ende anklicken (mit Fang). Über einem Kreis erscheinen Radius und Durchmesser. Esc löscht die Messung.'),
 };
