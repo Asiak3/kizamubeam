@@ -8,13 +8,13 @@ const { commandKey, commandMatches } = await import('../src/commandKeys');
 type Obj = import('../src/model').Obj;
 const a: Obj = { id: 1, m: [1, 0, 0, 1, 30, 30], layer: 0, shape: { kind: 'rect', w: 20, h: 20, r: 0 } };
 const ed = Object.create(Editor.prototype) as import('../src/editor').Editor;
-Object.assign(ed, { doc: newDoc(), sel: [a], tool: 'select', history: new History(), listeners: new Set(), nodeSel: new Set(), clipboard: [],
+Object.assign(ed, { doc: newDoc(), sel: [a], tool: 'select', history: new History(), listeners: new Set(), nodeSel: new Set(), nodeSets: new Map(), segmentSets: new Map(), clipboard: [],
   drag: null, draft: null, snapVer: 0, alignGuides: [], currentLayer: 0, view: { zoom: 1, ox: 0, oy: 0 }, canvas: { style: {}, setPointerCapture() {}, getBoundingClientRect: () => ({ left: 0, top: 0 }) } });
 ed.doc.objs = [a]; ed.doc.layers[0] = defaultLayer(0); ed.redraw = ed.scheduleSave = ed.syncTextLinks = () => {};
 const callbacks = { adjust() {}, trace() {}, background() {}, saveBitmap() {}, library() {}, preview() {}, objects() {} };
 const entries = (blank = false) => editorContextGroups(ed, callbacks, blank).flat().flatMap(a => [a, ...(a.items ?? [])]);
 assert.ok(entries().some(e => e.id === 'tool:node')); assert.ok(!entries().some(e => e.id === 'trace'));
-ed.tool = 'node'; assert.ok(entries().some(e => e.id === 'delete' && e.label.includes('Knoten')));
+ed.tool = 'node'; assert.ok(entries().some(e => e.id === 'delete') && entries().some(e => e.id === 'node-corner'));
 ed.tool = 'select'; const image: Obj = { ...a, id: 2, shape: { kind: 'image', asset: 'offline', w: 20, h: 20, adjust: {} } as Obj['shape'] };
 ed.doc.objs.push(image); ed.setSel([image]); assert.equal(entries().find(e => e.id === 'trace')!.enabled, true);
 const image2 = { ...image, id: 3 }; ed.doc.objs.push(image2); ed.setSel([image, image2]);

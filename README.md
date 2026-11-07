@@ -33,14 +33,14 @@ It is open source (GPL-3.0), free of charge, and needs no account or license key
 | **Windows** (64-bit) | `KizamuBeam_…_x64-setup.exe` |
 | **Linux** (64-bit) | `KizamuBeam_…_amd64.AppImage`, `.deb` or `.rpm` |
 
-Get the latest version from the [releases page](https://github.com/negurvulkan/kizamubeam/releases) or the [website](https://negurvulkan.github.io/kizamubeam/en/#download). Current version: **2.6.1** (stable). Once installed, KizamuBeam keeps itself up to date (Help → Check for Updates).
+Get the latest version from the [releases page](https://github.com/negurvulkan/kizamubeam/releases) or the [website](https://negurvulkan.github.io/kizamubeam/en/#download). Current version: **2.8.0** (stable). Once installed, KizamuBeam keeps itself up to date (Help → Check for Updates).
 
 > **First start on macOS:** if macOS says the app cannot be checked, open System Settings → Privacy & Security and click “Open Anyway”.
 
 ## What you can do with it
 
 ### Design right in the app
-Lines, curves, shapes and text with any font, including all Google Fonts at a click. Combine shapes, offset them, edit nodes, bend text along a path, round corners. Snapping, alignment, arrays and automatic nesting keep things tidy, and every result stays a clean, editable curve. A library with **400 built-in motifs and design elements** gets you started.
+Lines, curves, shapes and text with any font, including all Google Fonts at a click. Combine shapes, offset them, edit nodes (across several objects at once), simplify and smooth paths, bend text along a path, round corners. Snapping, alignment, arrays and automatic nesting keep things tidy, and every result stays a clean, editable curve. A library with **400 built-in motifs and design elements** gets you started.
 
 ### Bring in your artwork
 Open SVG, DXF, PDF and Illustrator files, LightBurn projects (`.lbrn2`) and all common image formats. Photos get dithering, newsprint and sketch effects, background removal, cropping and masks, and can be traced into vectors, including centerlines for single-stroke engraving.
