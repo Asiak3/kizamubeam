@@ -3815,5 +3815,13 @@
   "Mehrlagenarbeit bearbeiten": "Edit multi-layer work",
   "Mehrlagenarbeit erstellen": "Create multi-layer work",
   "Die Liste läuft von unten nach oben. Die Formen bleiben editierbar; die 3D-Ansicht zeigt sie bündig gestapelt.": "The list runs from bottom to top. Shapes remain editable; the 3D view shows them stacked flush.",
-  "Mehrlagenarbeit aus den ausgewählten Formen erstellen oder bearbeiten": "Create or edit a multi-layer work from selected shapes"
+  "Mehrlagenarbeit aus den ausgewählten Formen erstellen oder bearbeiten": "Create or edit a multi-layer work from selected shapes",
+  "An Originalposition einfügen": "Paste in place",
+  "Objekte-Fenster anzeigen": "Show Objects window",
+  "Alle Knoten auswählen": "Select all nodes",
+  "Knoten / Segmente löschen": "Delete nodes / segments",
+  "Objektbearbeitung": "Object editing",
+  "Auswahl sperren": "Lock selection",
+  "Bild zuschneiden (Formen werden entfernt)": "Crop image (removes shapes)",
+  "Maske anwenden (Formen werden entfernt)": "Apply mask (removes shapes)"
 }
