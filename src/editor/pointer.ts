@@ -44,6 +44,7 @@ export class EditorPointer {
       return;
     }
     if (e.button === 2) {
+      if (this.outlinePreview) { this.suppressContextMenu = true; return; }
       this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || !!this.pickHandler || !!this.drag;
       if (this.draft) this.finishLine();
       if (this.sketchEdit && this.sketchEdit.draft.length) {
@@ -54,6 +55,11 @@ export class EditorPointer {
       return;
     }
     if (e.button !== 0) return;
+    if (this.outlinePreview) {
+      if (sx >= RULER && sy >= RULER) this.outlinePreview.pick(wp);
+      return;
+    }
+
     // Punktabfrage (z. B. Laser zur Klickposition): Klick geht nur an sie, nicht ans Werkzeug
     if (this.pickHandler && (sx >= RULER || sy >= RULER)) {
       this.pickHandler(wp);
@@ -270,6 +276,11 @@ export class EditorPointer {
     this.cursor = wp;
     const d = this.drag;
     this.emit('view');
+    if (!d && this.outlinePreview) {
+      this.canvas.style.cursor = 'crosshair';
+      this.outlinePreview.move(wp);
+      return;
+    }
     if (!d && this.pickHandler) {
       this.canvas.style.cursor = 'crosshair';
       return;
@@ -642,6 +653,7 @@ export class EditorPointer {
   }
 
   onDouble(this: Editor, e: MouseEvent) {
+    if (this.outlinePreview) return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     if (this.tool === 'sketch') {

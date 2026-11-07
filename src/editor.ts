@@ -45,6 +45,8 @@ import { DEFAULT_GRID, GridSettings } from './grid';
 import { EditorIsolation, IsolationState } from './editor/isolation';
 import { EditorVector, VectorPlan } from './editor/vector';
 
+import { EditorOutline, type OutlinePreview } from './editor/outline';
+
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
 
@@ -183,6 +185,7 @@ export class Editor {
   boolKeep = false;
   /** Vorschau für den Offset-Dialog (ohne das Dokument zu ändern) */
   offsetPreview: SubPath[] | null = null;
+  outlinePreview: OutlinePreview | null = null;
   /** Vorschau für die Array-Dialoge: Weltmatrix je Kopie (die erste ist das Original) */
   arrayPreview: Mat[] | null = null;
   /** Mittelpunkt des Kreisarrays (Welt), wird als Kreuz gezeigt */
@@ -546,6 +549,7 @@ export interface Editor
     EditorSketch,
     EditorIsolation,
     EditorVector,
+    EditorOutline,
     EditorRender {}
 
 const PARTS = [
@@ -576,6 +580,7 @@ const PARTS = [
   EditorSketch,
   EditorIsolation,
   EditorVector,
+  EditorOutline,
   EditorRender,
 ];
 for (const part of PARTS) {
