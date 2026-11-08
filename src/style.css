@@ -4071,3 +4071,9 @@ input.jig-count {
 .multilayer-row { display: flex; gap: 7px; align-items: center; padding: 7px; border: 1px solid var(--line); border-radius: 5px; flex-wrap: wrap; }
 .multilayer-name { flex: 1 1 150px; }
 .multilayer-thickness { width: 68px; }
+
+.editor-isolation-badge { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 60; padding: 6px 12px; border: 2px solid #ff8c20; border-radius: 6px; background: var(--surface); color: var(--text); display: flex; gap: 12px; align-items: center; }
+.editor-context-menu { max-height: calc(100vh - 16px); overflow-y: auto; min-width: 240px; max-width: calc(100vw - 16px); }
+.editor-context-menu button { white-space: normal; overflow-wrap: anywhere; }
+.editor-context-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.editor-context-submenu { padding-left: 12px; border-left: 2px solid var(--line); }

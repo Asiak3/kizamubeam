@@ -1,3 +1,5 @@
+import { cameraOverlaysVisible, toggleCameraOverlays } from './cameraOverlayVisibility';
+import { canEnterIsolation } from './isolation';
 // Oberfläche: Menü, Leisten, Panels, Palette, Statusleiste.
 import { Editor, Tool } from './editor';
 import { initSync, openSyncDialog } from './syncDialog';
@@ -22,6 +24,9 @@ import { openJointDialog } from './jointDialog';
 import { openHingeDialog } from './hingeDialog';
 import { openSlotDialog } from './slotDialog';
 import { openWarpDialog } from './warpDialog';
+import { openVectorFitDialog } from './vectorDialog';
+import { installEditorContext } from './editorContext';
+import { commandKey, commandMatches } from './commandKeys';
 import { openQrDialog, openVarTextDialog } from './qrDialog';
 import { openBarcodeDialog } from './barcodeDialog';
 import { LINEAR_NAMES } from './barcode1d';
@@ -56,7 +61,7 @@ import { buildView3dPanel } from './view3d/panel';
 import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { installSketchPanel } from './sketchPanel';
 import { isSketchObj } from './editor/sketch';
-import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, windowList } from './dock';
+import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, showWindow, windowList } from './dock';
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
 import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
 import { dec, LangPref, langPref, LANGUAGES, setLangPref, t, tn } from './i18n';
@@ -157,6 +162,16 @@ export function buildUI(ed: Editor) {
   initSync(ed);
   initDock();
   buildMenu(ed);
+  const isolationBadge = h('div', { class: 'editor-isolation-badge', hidden: true },
+    h('span', {}, t('Isolation aktiv – kein Ausgabefilter')),
+    h('button', { type: 'button', class: 'btn', onclick: () => ed.leaveIsolation() }, t('Isolation verlassen')));
+  document.body.append(isolationBadge);
+  ed.on(() => { isolationBadge.hidden = !ed.isolation; });
+  installEditorContext(ed, {
+    adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
+    saveBitmap: () => saveProcessedBitmap(ed),
+    library: () => openAddSelectionDialog(ed), preview: () => openPreview(ed), objects: () => showWindow('objects'),
+  });
   buildPalette(ed);
   buildStatus(ed);
   startAgentBridge(ed);
@@ -176,7 +191,7 @@ export function buildUI(ed: Editor) {
   window.addEventListener('keydown', (e) => {
     const el = e.target as HTMLElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
-    if (e.altKey && !e.ctrlKey && e.key.toLowerCase() === 't' && ed.selImages().length) {
+    if (!e.defaultPrevented && commandMatches('trace', e) && ed.selImages().length) {
       e.preventDefault();
       openTraceDialog(ed);
     }
@@ -204,8 +219,8 @@ function translateStatic() {
 
 // ---------- Menü ----------
 
-/** checked: Häkchen vor dem Eintrag (z. B. sichtbare Fenster); sub: Untermenü */
-type MenuItem = [label: string, key: string, action: () => void, checked?: () => boolean] | { sub: string; items: MenuItem[] } | 'sep';
+/** checked: Häkchen; enabled/visible: beim Öffnen prüfen; sub: Untermenü */
+type MenuItem = [label: string, key: string, action: () => void, checked?: () => boolean, enabled?: () => boolean, visible?: () => boolean] | { sub: string; items: MenuItem[] } | 'sep';
 
 function buildMenu(ed: Editor) {
   const menus: [string, MenuItem[]][] = [
@@ -238,14 +253,15 @@ function buildMenu(ed: Editor) {
       [t('Rückgängig'), 'Ctrl+Z', () => ed.doUndo()],
       [t('Wiederholen'), 'Ctrl+Y', () => ed.doRedo()],
       'sep',
-      [t('Ausschneiden'), 'Ctrl+X', () => ed.cut()],
-      [t('Kopieren'), 'Ctrl+C', () => ed.copy()],
-      [t('Einfügen'), 'Ctrl+V', () => ed.paste()],
-      [t('Duplizieren'), 'Ctrl+D', () => ed.duplicate()],
+      [t('Ausschneiden'), commandKey('cut'), () => ed.cut()],
+      [t('Kopieren'), commandKey('copy'), () => ed.copy()],
+      [t('Einfügen'), commandKey('paste'), () => ed.paste()],
+      [t('An Originalposition einfügen'), commandKey('paste-in-place'), () => ed.paste(0)],
+      [t('Duplizieren'), commandKey('duplicate'), () => ed.duplicate()],
       [t('Löschen'), t('Entf'), () => ed.deleteSel()],
       'sep',
-      [t('Alles auswählen'), 'Ctrl+A', () => ed.selectAll()],
-      [t('In Pfad umwandeln'), 'Ctrl+Shift+C', () => ed.convertSelToPath()],
+      [t('Alles auswählen'), commandKey('selectall'), () => ed.selectAll()],
+      [t('In Pfad umwandeln'), commandKey('tolines'), () => ed.convertSelToPath()],
       'sep',
       [t('Sichtbar, wenn …'), '', () => openShowIfDialog(ed, ed.sel)],
       [t('Zur Bibliothek hinzufügen …'), '', () => openAddSelectionDialog(ed)],
@@ -257,6 +273,10 @@ function buildMenu(ed: Editor) {
       [t('Knoten bearbeiten'), 'Ctrl+`', () => ed.setTool('node')],
       'sep',
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
+      [t('Freihand / Bleistift'), '', () => ed.setTool('pencil')],
+      [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
+      [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
+      [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
       [t('Rechteck'), 'Ctrl+R', () => ed.setTool('rect')],
       [t('Ellipse'), 'Ctrl+E', () => ed.setTool('ellipse')],
       [t('Polygon'), '', () => ed.setTool('polygon')],
@@ -308,8 +328,8 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Anordnen'), [
-      [t('Gruppieren'), 'Ctrl+G', () => ed.group()],
-      [t('Gruppierung aufheben'), 'Ctrl+U', () => ed.ungroup()],
+      [t('Gruppieren'), commandKey('group'), () => ed.group()],
+      [t('Gruppierung aufheben'), commandKey('ungroup'), () => ed.ungroup()],
       'sep',
       { sub: t('Spiegeln und drehen'), items: [
         [t('Horizontal spiegeln'), 'Ctrl+Shift+H', () => ed.mirror(true)],
@@ -377,6 +397,7 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Ansicht'), [
+      [t('Alle Kameraüberlagerungen anzeigen'), '', () => toggleCameraOverlays(ed), cameraOverlaysVisible],
       [t('Ganze Seite'), 'Ctrl+0', () => ed.zoomPage()],
       [t('Auf Auswahl zoomen'), '', () => ed.zoomSelection()],
       [t('Vergrößern'), '+', () => ed.zoomAt(1.25)],
@@ -434,7 +455,7 @@ function buildMenu(ed: Editor) {
     openMenu = null;
   };
   // Einträge (auch Untermenüs, die beim Überfahren aufklappen) in eine Liste füllen;
-  // Häkchen werden beim Öffnen des Hauptmenüs aktualisiert
+  // Häkchen und Verfügbarkeit werden beim Öffnen des Hauptmenüs aktualisiert
   const fill = (list: HTMLElement, items: MenuItem[], checks: (() => void)[]) => {
     let hasChecks = false;
     for (const it of items) {
@@ -450,7 +471,11 @@ function buildMenu(ed: Editor) {
         });
         list.append(sub);
       } else {
-        const b = h('button', { onclick: () => (close(), it[2]()) }, h('span', {}, it[0]), it[1] ? h('kbd', {}, it[1]) : null);
+        const enabled = it[4];
+        const b = h('button', { onclick: () => { if (!enabled || enabled()) { close(); it[2](); } } }, h('span', {}, it[0]), it[1] ? h('kbd', {}, it[1]) : null);
+        if (enabled) checks.push(() => { b.disabled = !enabled(); });
+        const visible = it[5];
+        if (visible) checks.push(() => { b.hidden = !visible(); });
         const checked = it[3];
         if (checked) {
           const mark = h('span', { class: 'check-mark' });
@@ -777,6 +802,18 @@ function buildNumbar(ed: Editor) {
   );
   const sepNode = sep();
 
+  const pencilTolerance = h('input', { type: 'number', min: 0.001, max: 100, step: 0.01, value: String(ed.pencilTolerance),
+    'aria-label': t('Freihandtoleranz in Millimetern'), style: 'width: 7ch' });
+  pencilTolerance.addEventListener('change', () => {
+    const v = pencilTolerance.valueAsNumber;
+    if (Number.isFinite(v) && v >= 0.001 && v <= 100) ed.pencilTolerance = v;
+    else pencilTolerance.value = String(ed.pencilTolerance);
+  });
+  const pencilClosed = h('input', { type: 'checkbox' });
+  pencilClosed.addEventListener('change', () => { ed.pencilClosed = pencilClosed.checked; });
+  const pencilProps = h('span', { class: 'field' }, h('label', {}, t('Anpassungstoleranz (mm)'), pencilTolerance),
+    h('label', { class: 'check' }, pencilClosed, t('Geschlossener Pfad')));
+
   // Bilder
   const imgInfo = h('span', { class: 'muted' });
   const imgProps = h(
@@ -814,7 +851,7 @@ function buildNumbar(ed: Editor) {
   const sepGen = sep();
 
   const sepShape = sep();
-  bar.append(geo, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
+  bar.append(geo, pencilProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
   // Text options get their own bar below the properties bar (can be hidden in the Window menu)
   $('#textbar').append(textProps);
 
@@ -832,6 +869,7 @@ function buildNumbar(ed: Editor) {
     } else [fx, fy, fw, fh, fwp, fhp, fr].forEach((f) => setVal(f, ''));
 
     nodeProps.hidden = sepNode.hidden = ed.tool !== 'node';
+    pencilProps.hidden = ed.tool !== 'pencil';
     const imgs = ed.selImages();
     imgProps.hidden = sepImg.hidden = !imgs.length;
     const canCrop = imgs.length === 1 && ed.sel.length > 1;
@@ -857,7 +895,8 @@ function buildNumbar(ed: Editor) {
       genIcon.innerHTML = ICONS[getGenerator(gs.gen)?.icon ?? 'gear'] ?? ICONS.gear;
     }
     const nn = ed.nodeSelCount;
-    nodeInfo.textContent = nn ? t('{n} Knoten', { n: nn }) : t('Knoten');
+    const ns = ed.nodeTargets().reduce((n, o) => n + ed.segmentSelection(o).size, 0);
+    nodeInfo.textContent = t('{nodes} Knoten · {segments} Segmente · {objects} Objekte', { nodes: nn, segments: ns, objects: ed.nodeTargets().length });
     nodeProps.classList.toggle('group-disabled', ed.tool === 'node' && !ed.sel.length);
 
     const rect = ed.sel.find((o) => o.shape.kind === 'rect');
@@ -950,6 +989,8 @@ function buildBars(ed: Editor) {
     { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern (-)'), run: () => ed.zoomAt(0.8) },
     { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite (Ctrl+0)'), run: () => ed.zoomPage() },
     { id: 'grid', cat: V, icon: 'grid', label: t('Gitter ein-/ausblenden'), run: () => ed.setGrid({ show: !ed.grid.show }), on: () => ed.grid.show },
+    { id: 'camera-overlays', cat: V, icon: 'cameraOverlay', label: t('Alle Kameraüberlagerungen anzeigen'), run: () => toggleCameraOverlays(ed), on: cameraOverlaysVisible,
+      dyn: () => ({ icon: cameraOverlaysVisible() ? 'cameraOverlay' : 'cameraOverlayOff' }) },
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
     { id: 'zoomsel', cat: V, icon: 'zoomsel', label: t('Auf Auswahl zoomen'), run: () => ed.zoomSelection(), enabled: sel1 },
     { id: 'view3d', cat: V, icon: 'view3d', label: t('3D-Ansicht: Baugruppen zusammengesteckt ansehen'), run: () => toggleWindow('view3d') },
@@ -975,6 +1016,9 @@ function buildBars(ed: Editor) {
     tool('select', 'select', t('Auswählen (Esc)')),
     tool('node', 'node', t('Knoten bearbeiten (Ctrl+`)')),
     tool('line', 'line', t('Linien zeichnen (Ctrl+L)')),
+    { id: 'isolate', cat: W, icon: 'isolate', label: t('Auswahl isolieren / Isolation verlassen'), run: () => { if (ed.isolation) ed.leaveIsolation(); else ed.isolateSelection(); }, enabled: () => !!ed.isolation || canEnterIsolation(ed), on: () => !!ed.isolation, dyn: () => ed.isolation ? { icon: 'isolateExit', label: t('Isolation verlassen') } : { icon: 'isolate', label: t('Auswahl isolieren') } },
+    { id: 'vectorfit', cat: W, icon: 'vectorfit', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
+    tool('pencil', 'pencil', t('Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad')),
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
     tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),
     tool('polygon', 'polygon', t('Polygon')),
@@ -1073,11 +1117,11 @@ function buildBars(ed: Editor) {
     {
       main: [
         'new', 'open', 'save', 'import', 'export', SEP, 'undo', 'redo', SEP, 'cut', 'copy', 'paste', 'delete', SEP,
-        'grp:zoom', 'view3d', SEP, 'check', 'preview', SEP,
+        'grp:zoom', 'view3d', 'camera-overlays', SEP, 'check', 'preview', SEP,
         'group', 'ungroup', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
+        'tool:select', 'tool:node', 'vectorfit', 'isolate', SEP, 'tool:line', 'tool:pencil', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
         'grp:bool', 'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure',
       ],
     },
@@ -1523,11 +1567,24 @@ function buildLayers(ed: Editor) {
     pending = true;
     requestAnimationFrame(() => {
       pending = false;
-      if (!root.contains(document.activeElement)) render();
+      if (!isEditingIn(root)) render();
     });
   };
   root.addEventListener('focusout', () => setTimeout(schedule, 0));
   render();
+}
+
+/**
+ * True while the user is typing or choosing in a field inside `root`, so a
+ * rebuild would throw away the unfinished input. Buttons and checkboxes apply
+ * their change immediately and must not hold back the refresh.
+ */
+function isEditingIn(root: HTMLElement): boolean {
+  const el = document.activeElement;
+  if (!el || !root.contains(el)) return false;
+  if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return true;
+  if (el instanceof HTMLInputElement) return !['checkbox', 'radio', 'button', 'submit', 'reset', 'color', 'range', 'file'].includes(el.type);
+  return (el as HTMLElement).isContentEditable;
 }
 
 /** Kurzfassung der weiteren Einstellungen aus dem Layer-Dialog */

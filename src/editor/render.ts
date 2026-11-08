@@ -69,6 +69,7 @@ export class EditorRender {
       canvas: this.canvas, ctx: this.ctx, dpr: this.dpr, view: this.view, sel: this.sel,
       nodeHover: this.nodeHover, segHover: this.segHover, snapHit: this.snapHit, alignGuides: this.alignGuides, draft: this.draft,
       centerMarks: this.centerMarks,
+      isolation: this.isolation,
     };
     try {
       this.canvas = off;
@@ -80,6 +81,7 @@ export class EditorRender {
       this.alignGuides = [];
       this.draft = null;
       this.centerMarks = 'off';
+      this.isolation = null;
       this.render();
       return off.toDataURL('image/png');
     } finally {
@@ -164,7 +166,7 @@ export class EditorRender {
     // Objects that are not lasered are drawn faded
     const faded = noLaserLeaves(this.doc.objs);
     const FADE = 0.35;
-    for (const [o, m] of visibleLeaves(this.doc.objs)) {
+    for (const [o, m] of visibleLeaves(this.viewObjects())) {
       const ly = this.layer(o.layer);
       if (!ly.show) continue;
       const selected = selSet.has(o);
@@ -267,6 +269,17 @@ export class EditorRender {
       ctx.stroke(worldPath(tmp.shape, IDENT));
     }
 
+    if (this.drag?.type === 'pencil') {
+      ctx.strokeStyle = this.layerDrawColor(this.currentLayer);
+      ctx.lineWidth = 1.2 * px;
+      ctx.stroke(subsToPath2D([{ nodes: this.drag.points, closed: false }]));
+    }
+    if (this.vectorPreview) {
+      ctx.strokeStyle = '#ff6020'; ctx.lineWidth = 1.5 * px;
+      ctx.setLineDash([4 * px, 2 * px]);
+      for (const p of this.vectorPreview) ctx.stroke(subsToPath2D(p.subs));
+      ctx.setLineDash([]);
+    }
     // Vorschau der Biegeschnitte
     if (this.hingePreview) {
       ctx.strokeStyle = '#ff6020';
@@ -494,19 +507,19 @@ export class EditorRender {
       ctx.setLineDash([]);
     }
     // Knoten
-    const o = this.tool === 'node' ? this.nodeTarget() : null;
-    if (o) {
+    for (const o of this.tool === 'node' ? this.nodeTargets() : []) {
       const scr = (p: Pt) => this.toScreen(apply(o.m, p.x, p.y));
       const sel = this.nodeSelection(o);
       const subsO = shapeSubs(o.shape);
       // Segmente zwischen ausgewählten Knoten hervorheben (Ziel für Gerade/Kurve)
-      if (sel.size >= 2) {
+      const selectedSegments = this.segmentSelection(o);
+      if (sel.size >= 2 || selectedSegments.size) {
         ctx.strokeStyle = '#ff6020';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
         subsO.forEach((sp, si) =>
-          segments(sp).forEach((sg) => {
-            if (!sel.has(`${si}:${sg.ia}`) || !sel.has(`${si}:${sg.ib}`)) return;
+          segments(sp).forEach((sg, gi) => {
+            if (!selectedSegments.has(`${si}:${gi}`) && (!sel.has(`${si}:${sg.ia}`) || !sel.has(`${si}:${sg.ib}`))) return;
             const a = scr(sg.a), c1 = scr(sg.c1), c2 = scr(sg.c2), b = scr(sg.b);
             ctx.moveTo(a.x, a.y);
             if (sg.curve) ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, b.x, b.y);
@@ -528,14 +541,14 @@ export class EditorRender {
             ctx.moveTo(q.x, q.y);
             ctx.lineTo(hq.x, hq.y);
             ctx.stroke();
-            const hot = this.nodeHover?.sub === si && this.nodeHover.idx === ni && this.nodeHover.which === which;
+            const hot = this.nodeHover?.obj === o && this.nodeHover.sub === si && this.nodeHover.idx === ni && this.nodeHover.which === which;
             ctx.fillStyle = hot ? '#ff6020' : T.handleFill;
             ctx.beginPath();
             ctx.arc(hq.x, hq.y, 3.5, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
           }
-          const hot = this.nodeHover?.sub === si && this.nodeHover.idx === ni && this.nodeHover.which === 'p';
+          const hot = this.nodeHover?.obj === o && this.nodeHover.sub === si && this.nodeHover.idx === ni && this.nodeHover.which === 'p';
           const picked = sel.has(`${si}:${ni}`);
           const col = ni === 0 ? '#20a040' : T.sel;
           // ausgewählt: gefüllt, sonst hohl
@@ -547,7 +560,7 @@ export class EditorRender {
           ctx.strokeRect(q.x - r, q.y - r, 2 * r, 2 * r);
         });
       });
-      if (this.segHover) {
+      if (this.segHover && this.segHover.obj === o) {
         const sg = segments(shapeSubs(o.shape)[this.segHover.sub])[this.segHover.seg];
         const t = this.segHover.t;
         const p = sg.curve ? bezierPt(sg.a, sg.c1, sg.c2, sg.b, t) : { x: sg.a.x + (sg.b.x - sg.a.x) * t, y: sg.a.y + (sg.b.y - sg.a.y) * t };
@@ -619,7 +632,7 @@ export class EditorRender {
     ctx.strokeStyle = SNAP_COLOR;
     ctx.beginPath();
     const seen: Pt[] = [];
-    for (const top of this.doc.objs) {
+    for (const top of this.viewObjects()) {
       const inFocus = mode === 'all' || focus.has(top);
       for (const [leaf, m] of visibleLeaves([top])) {
         if (!this.layer(leaf.layer).show || leaf.shape.kind === 'text') continue;

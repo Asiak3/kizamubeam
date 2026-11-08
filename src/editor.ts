@@ -1,3 +1,4 @@
+import { installPinchGestures } from './canvasZoom';
 // Editor: Zustand, Ansicht, Auswahl und Werkzeugwahl. Die übrigen Bereiche liegen in src/editor/
 // und werden unten in die Klasse eingehängt.
 import { Doc, Mat, newDoc, Obj, Pt, Shape, SubPath, TextShape, visibleLeaves, VarText } from './model';
@@ -42,6 +43,8 @@ import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
 import { DEFAULT_GRID, GridSettings } from './grid';
+import { EditorIsolation, IsolationState } from './editor/isolation';
+import { EditorVector, VectorPlan } from './editor/vector';
 
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
@@ -105,6 +108,15 @@ export class Editor {
   /** Ausgewählte Knoten des Knotenziels als "Unterpfad:Index" */
   nodeSel = new Set<string>();
   nodeSelObj: Obj | null = null;
+  isolation: IsolationState | null = null;
+  nodeSets = new Map<Obj, Set<string>>();
+  segmentSets = new Map<Obj, Set<string>>();
+  nodeEditObj: Obj | null = null;
+  vectorPreview: VectorPlan[] | null = null;
+  pencilTolerance = 0.2;
+  pencilClosed = false;
+  suppressContextMenu = false;
+  onCanvasContext: ((event: MouseEvent) => void) | null = null;
   hint = '';
 
   /** Rückgängig-Verlauf mit benannten Schritten (Verlaufsfenster, höchstens 200) */
@@ -140,7 +152,7 @@ export class Editor {
   // Fangen an Raster, Objekten und Hilfslinien
   /** Ist der Werkzeug-Modus einer, bei dem der Mauszeiger schon ohne Ziehen fängt? */
   get drawTool() {
-    return this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
+    return this.tool === 'pencil' || this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
   }
 
   // Pfad-Werkzeuge: Schließen, Verbinden, Zerlegen, Startpunkt, Trimmen
@@ -252,6 +264,8 @@ export class Editor {
     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
+    canvas.addEventListener('pointercancel', (e) => this.cancelPointerDrag(e));
+    canvas.addEventListener('lostpointercapture', (e) => this.cancelPointerDrag(e));
     canvas.addEventListener('pointerleave', () => {
       if (this.drag || (!this.nodeHover && !this.segHover && !this.snapHit && !this.alignGuides.length)) return;
       this.nodeHover = this.segHover = null;
@@ -260,7 +274,12 @@ export class Editor {
     });
     canvas.addEventListener('dblclick', (e) => this.onDouble(e));
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    installPinchGestures(canvas, (factor, x, y) => this.zoomAt(factor, x, y));
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (this.suppressContextMenu) { this.suppressContextMenu = false; return; }
+      this.onCanvasContext?.(e);
+    });
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('paste', (e) => this.onPaste(e));
     window.addEventListener('keyup', (e) => {
@@ -284,6 +303,7 @@ export class Editor {
     this.listeners.delete(fn);
   }
   emit(what: 'doc' | 'sel' | 'view' | 'tool') {
+    this.updateIsolation(what);
     this.dirty = true;
     if (what !== 'view') this.snapVer++;
     if (what === 'doc') this.syncTextLinks();
@@ -394,6 +414,9 @@ export class Editor {
     return boundsOf(this.sel);
   }
   setSel(objs: Obj[]) {
+    if (this.isolation) objs = objs.filter((o) => this.isolation!.ids.has(o.id) || !this.isolation!.known.has(o.id));
+    for (const o of this.nodeSets.keys()) if (!objs.includes(o)) this.nodeSets.delete(o);
+    for (const o of this.segmentSets.keys()) if (!objs.includes(o)) this.segmentSets.delete(o);
     if (objs.length !== this.sel.length || objs.some((o, i) => o !== this.sel[i])) {
       this.pivot = null;
       this.rotateMode = false;
@@ -407,7 +430,7 @@ export class Editor {
     const tol = 4 / this.view.zoom;
     for (let i = this.doc.objs.length - 1; i >= 0; i--) {
       const top = this.doc.objs[i];
-      if (this.isLocked(top)) continue;
+      if (!this.selectable(top)) continue;
       for (const [leaf, m] of visibleLeaves([top])) {
         const ly = this.layer(leaf.layer);
         if (!ly.show) continue;
@@ -475,6 +498,7 @@ export class Editor {
   // ---------- Werkzeuge ----------
 
   setTool(t: Tool) {
+    if (this.drag) this.cancelDrag();
     if (this.draft) this.finishLine();
     this.tool = t;
     this.nodeHover = this.segHover = null;
@@ -524,6 +548,8 @@ export interface Editor
     EditorTabs,
     EditorRelations,
     EditorSketch,
+    EditorIsolation,
+    EditorVector,
     EditorRender {}
 
 const PARTS = [
@@ -552,6 +578,8 @@ const PARTS = [
   EditorTabs,
   EditorRelations,
   EditorSketch,
+  EditorIsolation,
+  EditorVector,
   EditorRender,
 ];
 for (const part of PARTS) {

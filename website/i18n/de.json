@@ -1,7 +1,7 @@
 {
   "lang": "de",
   "locale": "de_DE",
-  "version": "2.5.0",
+  "version": "2.8.0",
   "meta": {
     "title": "KizamuBeam – freie Lasersoftware zum Gravieren und Schneiden",
     "description": "Kostenlose Open-Source-Lasersoftware für macOS, Windows und Linux. Entwerfen, Bilder gravieren, Boxen und Zahnräder erzeugen und direkt an FluidNC-, GRBL-, grblHAL-, Marlin- und Smoothieware-Laser senden.",
@@ -15,6 +15,7 @@
     "lang_label": "Sprache wählen",
     "lang_current": "Deutsch",
     "github_label": "KizamuBeam auf GitHub",
+    "discord_label": "KizamuBeam auf Discord",
     "recommended": "Für dein System",
     "more_formats": "Weitere Formate",
     "back_top": "Nach oben"
@@ -30,12 +31,11 @@
     "lang_short": "EN"
   },
   "hero": {
-    "badge": "Neu: Version 2.5.0 – Netzwerk-Kameras wie ESP32-CAM und eine virtuelle Lasermaschine zum Testen ohne Hardware",
     "title": "Dein Laser. Deine Software. Frei.",
     "subtitle": "KizamuBeam ist Open-Source-Lasersoftware zum Entwerfen, Gravieren und Schneiden – für Diodenlaser mit FluidNC, GRBL & Co. Kostenlos für macOS, Windows und Linux.",
     "cta_primary": "Kostenlos herunterladen",
     "cta_secondary": "Auf GitHub ansehen",
-    "meta_line": "GPL-3.0 · macOS · Windows · Linux · Stabile Version",
+    "meta_line": "GPL-3.0 · macOS · Windows · Linux",
     "name_note": "Kizamu (刻む) ist japanisch und heißt „einritzen, gravieren, fein schneiden“."
   },
   "why": {
@@ -56,7 +56,8 @@
       "lead": "Zeichnen, kombinieren, feinjustieren – mit einem Layout, in dem du dich sofort zurechtfindest.",
       "b": [
         "Linien, Bézierkurven, Rechtecke mit Radius, Ellipsen, Polygone, Sterne und mehrzeiliger Text",
-        "Boolesche Operationen, Versatz, Knotenbearbeitung, Trimmen und Fangen an Knoten, Mitten und Schnittpunkten",
+        "Boolesche Operationen, Versatz, Knotenbearbeitung auch über mehrere Objekte hinweg, Trimmen und Fangen an Knoten, Mitten und Schnittpunkten",
+        "Pfade vereinfachen und glätten mit Live-Vorschau, Kontextmenüs mit den passenden Befehlen und Auswahl isolieren, um ungestört daran zu arbeiten",
         "Text auf Pfad, verschweißte Buchstaben und echte Schrift-Outlines deiner Systemschriften",
         "Font-Manager: alle Google Fonts mit Vorschau durchsuchen und per Klick laden, eigene TTF/OTF-Dateien, Favoriten – fehlende Schriften eines Projekts werden nachgeladen",
         "Verformen: Text, Formen und Bilder als Bogen, Wölbung, Flagge oder in Perspektive, als saubere Bézierkurven",
@@ -221,7 +222,7 @@
       { "q": "Kann ich meine bisherigen Materialeinstellungen mitnehmen?", "a": "Ja. LightBurn-Materialbibliotheken (.clb) lassen sich importieren, soweit es passende Felder gibt. LightBurn-Projekte (.lbrn2) öffnest du mit Formen, Bildern und Layer-Einstellungen. Projekte und Bibliotheken aus Laserwerk öffnen direkt. SVG, DXF, PDF und Illustrator-Dateien (.ai) importierst du wie gewohnt." },
       { "q": "Ist KizamuBeam stabil genug für echte Projekte?", "a": "Ja – seit Version 2.2.0 gibt es stabile Versionen, und KizamuBeam wird täglich auf echter Hardware genutzt. Wie bei jeder Lasersoftware gilt: neue Jobs mit Vorschau und Rahmen prüfen und wichtige Projekte sichern." },
       { "q": "Was hat es mit dem MCP-Server auf sich?", "a": "Damit können KI-Agenten Entwürfe lesen und bearbeiten. Er ist standardmäßig aus, läuft nur lokal mit Token, und an die Maschine geht nichts ohne deine Bestätigung in KizamuBeam." },
-      { "q": "Wie kann ich mithelfen?", "a": "Teste KizamuBeam mit deinem Laser, melde Fehler und Wünsche auf GitHub, übersetze die Oberfläche in deine Sprache oder schick einen Pull Request." }
+      { "q": "Wie kann ich mithelfen?", "a": "Teste KizamuBeam mit deinem Laser, melde Fehler und Wünsche auf GitHub, stell Fragen und zeig deine Projekte auf unserem Discord-Server, übersetze die Oberfläche in deine Sprache oder schick einen Pull Request." }
     ]
   },
   "footer": {
@@ -230,6 +231,7 @@
     "link_github": "GitHub",
     "link_releases": "Releases",
     "link_issues": "Fehler melden",
+    "link_discord": "Discord",
     "link_license": "Lizenz",
     "trademark": "LightBurn ist eine Marke der LightBurn Software, LLC. KizamuBeam ist ein unabhängiges Projekt und steht in keiner Verbindung zu LightBurn Software. Alle anderen Marken gehören ihren jeweiligen Inhabern."
   },

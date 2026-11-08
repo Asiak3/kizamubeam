@@ -164,6 +164,26 @@ pub fn run() {
         .manage(std::sync::Arc::new(native::Native::default()))
         .setup(|app| {
             use tauri::Manager;
+            // Wry ties IsPinchZoomEnabled to zoom_hotkeys_enabled (false by
+            // default). Enable precision-touchpad pinch independently so the
+            // canvas can consume Ctrl+wheel. Browser zoom hotkeys stay disabled.
+            #[cfg(target_os = "windows")]
+            if let Some(window) = app.get_webview_window("main") {
+                window.with_webview(|webview| {
+                    use windows_core::Interface;
+                    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings5;
+                    let result = (|| -> windows_core::Result<()> {
+                        unsafe {
+                            let settings = webview.controller().CoreWebView2()?.Settings()?;
+                            settings.cast::<ICoreWebView2Settings5>()?.SetIsPinchZoomEnabled(true)
+                        }
+                    })();
+                    if let Err(error) = result {
+                        eprintln!("Touchpad pinch could not be enabled: {error}");
+                    }
+                })?;
+            }
+
             agent::start(app.handle(), &app.state::<agent::Agent>());
             Ok(())
         })
