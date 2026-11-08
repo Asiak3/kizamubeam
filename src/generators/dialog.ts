@@ -1,5 +1,6 @@
 // Dialoge für Generatoren: Parameter-Dialog (aus dem Schema gebaut, mit Vorschau) und die Rückfrage,
 // bevor eine Aktion ein parametrisches Bauteil in Pfade umwandelt.
+import { isDefaultDistribution, resizeDistribution } from './fingerbox-resize';
 import type { Editor } from '../editor';
 import { check, numField, select } from '../arrayDialogs';
 import { h } from '../dom';
@@ -29,6 +30,13 @@ function lastParams(g: Generator): Params {
   }
 }
 
+/** Last-used settings must not carry a legacy layout into a newly created box. */
+export function initialDialogParams(g: Generator, old: GenShape | null, init?: Params): Params {
+  const p = old ? normalizeParams(g, old.params) : init ? normalizeParams(g, init, lastParams(g)) : lastParams(g);
+  if (!old && g.id === 'box-divided') p.jointLayout = 'current';
+  return p;
+}
+
 const UNIT: Record<string, string> = { length: 'mm', angle: '°' };
 const fmtNum = (v: number) => (Number.isInteger(v) ? String(v) : f2(v));
 
@@ -41,7 +49,10 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     ed.emit('tool');
     return;
   }
-  const p: Params = old ? normalizeParams(g, old.params) : init ? normalizeParams(g, init, lastParams(g)) : lastParams(g);
+  const p = initialDialogParams(g, old, init);
+  if (g.id === 'box-divided') for (const [ratio, count] of [['ratiosX', 'compartmentsX'], ['ratiosY', 'compartmentsY']] as const) {
+    if (isDefaultDistribution(String(p[ratio] ?? ''), Number(p[count]))) p[ratio] = '';
+  }
   // Felder mit Formel aus Projekt-Parametern (z. B. Dicke); beim Erstellen ohne Formeln
   const binds: Record<string, string> = { ...(old?.bind ?? {}) };
   const hasParams = projectParams().length > 0;
@@ -64,9 +75,29 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   }
 
   const rows = new Map<string, HTMLElement[]>();
+  const textInputs = new Map<string, HTMLInputElement>();
   const field = (s: ParamSpec): HTMLElement[] => {
     const id = `gen-${s.key}`;
     if (s.type === 'data') return [];
+    if (s.type === 'text') {
+      const control = h('input', { type: 'text', id, value: String(p[s.key] || s.autoText?.(p) || ''), maxlength: 2000 }) as HTMLInputElement;
+      if (s.title) control.title = s.title;
+      textInputs.set(s.key, control);
+      control.addEventListener('input', () => { p[s.key] = control.value; update(); });
+      control.addEventListener('blur', () => {
+        if (g.id === 'box-divided' && (s.key === 'ratiosX' || s.key === 'ratiosY')) {
+          const count = Number(p[s.key === 'ratiosX' ? 'compartmentsX' : 'compartmentsY']);
+          if (isDefaultDistribution(String(p[s.key] ?? ''), count)) {
+            p[s.key] = '';
+            control.value = s.autoText?.(p) ?? '';
+            update();
+            return;
+          }
+        }
+        if (!p[s.key]) control.value = s.autoText?.(p) ?? '';
+      });
+      return [h('label', { for: id, title: s.title ?? '' }, s.label), control];
+    }
     const unit = s.type === 'length' || s.type === 'angle' ? ` (${UNIT[s.type]})` : '';
     let input: HTMLElement;
     if (s.type === 'enum' || s.type === 'bool') {
@@ -97,6 +128,30 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     } else if (hasParams || binds[s.key]) input = formulaField(s, id);
     else input = numField(id, Number(p[s.key]), (v) => ((p[s.key] = v), update()), s.title);
     if (s.title) input.title = s.title;
+    if (g.id === 'box-divided' && (s.key === 'compartmentsX' || s.key === 'compartmentsY')) {
+      const el = input instanceof HTMLInputElement ? input : input.querySelector('input');
+      const ratioKey = s.key === 'compartmentsX' ? 'ratiosX' : 'ratiosY';
+      let previous = Number(p[s.key]), previousBind = binds[s.key], previousText = '';
+      el?.addEventListener('focus', () => { previous = Number(p[s.key]); previousBind = binds[s.key]; previousText = el.value; });
+      el?.addEventListener('blur', () => {
+        const count = Number(p[s.key]);
+        if (!Number.isInteger(count) || count < 1 || count > 20 || count === previous) return;
+        const resized = resizeDistribution(String(p[ratioKey] ?? ''), previous, count);
+        if (resized?.removed.length && !confirm(t('Diese Fachwerte werden entfernt: {values}. Fortfahren?', { values: resized.removed.join(' : ') }))) {
+          p[s.key] = previous;
+          if (previousBind) binds[s.key] = previousBind; else delete binds[s.key];
+          el.value = previousText;
+          update();
+          return;
+        }
+        if (resized) {
+          p[ratioKey] = isDefaultDistribution(resized.text, count) ? '' : resized.text;
+          const target = textInputs.get(ratioKey);
+          if (target) target.value = resized.text;
+        }
+        update();
+      });
+    }
     return [h('label', { for: id, title: s.title ?? '' }, s.label + unit), input];
   };
   /**
@@ -168,6 +223,10 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     // Formeln mit den aktuellen Parameterwerten auswerten (fehlerhafte Formeln sperren Erzeugen)
     const rb = resolveBinds(g, normalizeParams(g, p), binds);
     const np = rb.params;
+    for (const s of g.schema) if (s.type === 'text' && !p[s.key] && document.activeElement !== textInputs.get(s.key)) {
+      const control = textInputs.get(s.key);
+      if (control) control.value = s.autoText?.(np) ?? '';
+    }
     for (const s of g.schema) rows.get(s.key)!.forEach((el) => (el.hidden = !fieldActive(s, np)));
     const r = buildGen(g, np);
     r.issues.unshift(...rb.issues);
@@ -188,14 +247,18 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     if (!built) return;
     // Alle Teile an ihrer vorgeschlagenen Lage, gemeinsam eingepasst
     const pts = built.parts.flatMap((pt) => pt.shape.subs.flatMap((sp) => sp.nodes.map((q) => ({ x: q.x + pt.at.x, y: q.y + pt.at.y }))));
-    const ext = Math.max(1e-6, ...pts.map((q) => Math.max(Math.abs(q.x), Math.abs(q.y))));
+    const minX = Math.min(...pts.map((q) => q.x)), maxX = Math.max(...pts.map((q) => q.x));
+    const minY = Math.min(...pts.map((q) => q.y)), maxY = Math.max(...pts.map((q) => q.y));
+    const previewX = g.id === 'box-divided' && pts.length ? (minX + maxX) / 2 : 0;
+    const previewY = g.id === 'box-divided' && pts.length ? (minY + maxY) / 2 : 0;
+    const ext = Math.max(1e-6, ...pts.map((q) => Math.max(Math.abs(q.x - previewX), Math.abs(q.y - previewY))));
     const k = (canvas.width / 2 - 6) / ext;
     const css = getComputedStyle(canvas);
     ctx.fillStyle = css.getPropertyValue('--accent-soft').trim() || 'rgba(80,140,220,0.18)';
     ctx.strokeStyle = css.color || '#333';
     ctx.lineWidth = 1 / k;
     for (const pt of built.parts) {
-      ctx.setTransform(k, 0, 0, k, canvas.width / 2 + pt.at.x * k, canvas.height / 2 + pt.at.y * k);
+      ctx.setTransform(k, 0, 0, k, canvas.width / 2 + (pt.at.x - previewX) * k, canvas.height / 2 + (pt.at.y - previewY) * k);
       const path = subsToPath2D(pt.shape.subs);
       ctx.fill(path, 'evenodd');
       ctx.stroke(path);
@@ -224,7 +287,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     }
     const kerf = Number(np.kerf ?? 0);
     kerfNote.textContent =
-      layerKerf
+      g.id === 'box-divided' ? '' : layerKerf
         ? t('Der Layer hat zusätzlich einen Kerf-Versatz von {k} mm, der beim Lasern noch dazukommt.', { k: dec(String(layerKerf)) })
         : kerf
           ? t('Die Schnittfuge ist schon in der Kontur enthalten; der Layer hat keinen zusätzlichen Kerf-Versatz.')

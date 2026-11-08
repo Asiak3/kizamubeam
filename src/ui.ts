@@ -1055,6 +1055,7 @@ function buildBars(ed: Editor) {
     { id: 'ribs', cat: W, icon: 'ribs', label: t('Rippenmodell aus einem 3D-Modell (STL, OBJ) erstellen'), run: () => importModel(ed, 'ribs') },
     { id: 'discsphere', cat: W, icon: 'discsphere', label: t('Scheibenkugel erstellen (Lampe aus gesteckten Scheiben)'), run: () => openGenDialog(ed, 'discsphere') },
     { id: 'box', cat: W, icon: 'box', label: t('Box mit Fingerzinken erstellen (Baugruppe, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'box') },
+    { id: 'box-divided', cat: W, icon: 'box', label: t('Box mit Fingerzinken und Trennwänden'), run: () => openGenDialog(ed, 'box-divided') },
     { id: 'vartext', cat: W, icon: 'vartext', short: t('Var. Text'), label: t('Variabler Text …'), run: () => openVarTextDialog(ed) },
     { id: 'textpath', cat: W, short: t('Auf Pfad'), label: t('Text auf Pfad'), run: () => ed.applyPathToText(), enabled: sel2 },
     {
