@@ -273,6 +273,7 @@ function buildMenu(ed: Editor) {
       [t('Knoten bearbeiten'), 'Ctrl+`', () => ed.setTool('node')],
       'sep',
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
+      [t('Freihand / Bleistift'), '', () => ed.setTool('pencil')],
       [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
       [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
       [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
@@ -798,6 +799,18 @@ function buildNumbar(ed: Editor) {
   );
   const sepNode = sep();
 
+  const pencilTolerance = h('input', { type: 'number', min: 0.001, max: 100, step: 0.01, value: String(ed.pencilTolerance),
+    'aria-label': t('Freihandtoleranz in Millimetern'), style: 'width: 7ch' });
+  pencilTolerance.addEventListener('change', () => {
+    const v = pencilTolerance.valueAsNumber;
+    if (Number.isFinite(v) && v >= 0.001 && v <= 100) ed.pencilTolerance = v;
+    else pencilTolerance.value = String(ed.pencilTolerance);
+  });
+  const pencilClosed = h('input', { type: 'checkbox' });
+  pencilClosed.addEventListener('change', () => { ed.pencilClosed = pencilClosed.checked; });
+  const pencilProps = h('span', { class: 'field' }, h('label', {}, t('Anpassungstoleranz (mm)'), pencilTolerance),
+    h('label', { class: 'check' }, pencilClosed, t('Geschlossener Pfad')));
+
   // Bilder
   const imgInfo = h('span', { class: 'muted' });
   const imgProps = h(
@@ -835,7 +848,7 @@ function buildNumbar(ed: Editor) {
   const sepGen = sep();
 
   const sepShape = sep();
-  bar.append(geo, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps, sep(), textProps);
+  bar.append(geo, pencilProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps, sep(), textProps);
 
   const refresh = () => {
     const b = ed.selBounds();
@@ -851,6 +864,7 @@ function buildNumbar(ed: Editor) {
     } else [fx, fy, fw, fh, fwp, fhp, fr].forEach((f) => setVal(f, ''));
 
     nodeProps.hidden = sepNode.hidden = ed.tool !== 'node';
+    pencilProps.hidden = ed.tool !== 'pencil';
     const imgs = ed.selImages();
     imgProps.hidden = sepImg.hidden = !imgs.length;
     const canCrop = imgs.length === 1 && ed.sel.length > 1;
@@ -997,6 +1011,7 @@ function buildBars(ed: Editor) {
     tool('select', 'select', t('Auswählen (Esc)')),
     tool('node', 'node', t('Knoten bearbeiten (Ctrl+`)')),
     tool('line', 'line', t('Linien zeichnen (Ctrl+L)')),
+    tool('pencil', 'pencil', t('Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad')),
     { id: 'isolate', cat: W, icon: 'select', label: t('Auswahl isolieren / Isolation verlassen'), run: () => { if (ed.isolation) ed.leaveIsolation(); else ed.isolateSelection(); }, enabled: () => !!ed.isolation || canEnterIsolation(ed), on: () => !!ed.isolation },
     { id: 'vectorfit', cat: W, icon: 'node', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
@@ -1101,7 +1116,7 @@ function buildBars(ed: Editor) {
         'group', 'ungroup', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
+        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:pencil', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
         'grp:bool', 'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure',
       ],
     },

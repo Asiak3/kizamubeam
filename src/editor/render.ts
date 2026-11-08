@@ -269,6 +269,11 @@ export class EditorRender {
       ctx.stroke(worldPath(tmp.shape, IDENT));
     }
 
+    if (this.drag?.type === 'pencil') {
+      ctx.strokeStyle = this.layerDrawColor(this.currentLayer);
+      ctx.lineWidth = 1.2 * px;
+      ctx.stroke(subsToPath2D([{ nodes: this.drag.points, closed: false }]));
+    }
     if (this.vectorPreview) {
       ctx.strokeStyle = '#ff6020'; ctx.lineWidth = 1.5 * px;
       ctx.setLineDash([4 * px, 2 * px]);
