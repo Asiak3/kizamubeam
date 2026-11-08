@@ -86,7 +86,7 @@ npm run tauri dev      # desktop app with live reload
 npm run tauri build    # installer for your system
 ```
 
-Releases, updates, translations and the code structure are described in the [developer guide](docs/development.md). Contributions are welcome.
+Releases, updates, translations and the code structure are described in the [developer guide](docs/development.md). Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md); to translate KizamuBeam into your language, see [TRANSLATION.md](TRANSLATION.md).
 
 ## Community
 
