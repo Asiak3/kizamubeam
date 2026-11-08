@@ -3869,5 +3869,6 @@
   "Kameraüberlagerungen": "Camera overlays",
   "Kameraüberlagerungen global ausgeblendet. Die Auswahl je Kamera und laufende Aktualisierungen bleiben unverändert.": "Camera overlays are globally hidden. Individual camera selections and ongoing updates remain unchanged.",
   "Fenster zurücksetzen": "Reset window",
-  "Ausblenden": "Hide"
+  "Ausblenden": "Hide",
+  "Textleiste": "Text Toolbar"
 }

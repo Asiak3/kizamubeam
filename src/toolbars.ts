@@ -30,7 +30,7 @@ export interface Action {
 
 export type BarId = 'main' | 'tools';
 /** Leisten, die sich ausblenden lassen */
-export type BarKey = BarId | 'numbar' | 'palette' | 'status';
+export type BarKey = BarId | 'numbar' | 'textbar' | 'palette' | 'status';
 type IconSize = 's' | 'm' | 'l';
 
 interface Config {
@@ -45,7 +45,7 @@ interface Config {
 
 const KEY = 'kizamubeam.toolbars';
 export const SEP = '|';
-const BAR_EL: Record<BarKey, string> = { main: '#toolbar', tools: '#tools', numbar: '#numbar', palette: '#palette', status: '#status' };
+const BAR_EL: Record<BarKey, string> = { main: '#toolbar', tools: '#tools', numbar: '#numbar', textbar: '#textbar', palette: '#palette', status: '#status' };
 
 const actions = new Map<string, Action>();
 /** Aktion zu einer Kennung (z. B. für die Kacheln im Werkzeugkasten) */
@@ -100,6 +100,7 @@ export const barNames = (): Record<BarKey, string> => ({
   main: t('Hauptleiste'),
   tools: t('Werkzeugleiste'),
   numbar: t('Eigenschaftenleiste'),
+  textbar: t('Textleiste'),
   palette: t('Farbpalette'),
   status: t('Statusleiste'),
 });

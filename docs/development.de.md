@@ -39,7 +39,7 @@ Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klam
 | `src/geom.ts` | Formen als Bézierpfade, Begrenzungsrahmen, Text-Layout, Treffertest, SVG-Pfade |
 | `src/editor.ts` | Editor-Klasse: Zustand, Ansicht, Auswahl, Werkzeugwahl; bindet die Teile darunter ein |
 | `src/editor/*.ts` | Teile des Editors: `document` (Undo, Autosave, Seiten), `pointer` (Mauseingaben), `keyboard`, `snapping` (Fangen), `nodes` (Knoten), `paths` (Pfad-Werkzeuge), `shapeops` (Umwandeln, Boolesche Operationen, Offset, Arrays), `joints`, `hinges`, `generators` (parametrische Bauteile), `nest` (Verschachteln), `check` (Konstruktion prüfen), `params` (Projekt-Parameter, Vorlagen), `series` (Serie aus Tabelle), `commands`, `objects`, `text` (QR, variabler Text, Text auf Pfad, Textrahmen), `imageops` (Bilder, Import, Nachzeichnen), `render` (Zeichnen der Arbeitsfläche) |
-| `src/ui.ts` | Menü, Aktionen der Funktionsleisten, Eigenschaftenleiste, Layer-Fenster, Palette, Statusleiste, Texteingabe |
+| `src/ui.ts` | Menü, Aktionen der Funktionsleisten, Eigenschaftenleiste, Textleiste, Layer-Fenster, Palette, Statusleiste, Texteingabe |
 | `src/storageMigration.ts` | Übernimmt Einstellungen unter dem alten Namen (`laserwerk.*`) beim ersten Start nach `kizamubeam.*` |
 | `src/dock.ts` | Andockbare Fenster: Reiter, Gruppen, freie Fenster, Größe, Ein-/Ausblenden, gespeicherte Anordnung |
 | `src/apps.ts`, `src/appsPanel.ts` | Werkzeugkasten: Kacheln mit Gruppen, Erklärung und Suchwörtern, Suche; Fenster mit Filter und Gruppen |
