@@ -3,6 +3,9 @@ const svg = (body: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 export const ICONS: Record<string, string> = {
+  vectorfit: svg('<path d="m3 17 4-9 5 6 5-9 4 12" opacity=".35" stroke-dasharray="1.5 2"/><path d="M3 17C7 2 17 2 21 17"/><rect x="1.5" y="15.5" width="3" height="3"/><rect x="19.5" y="15.5" width="3" height="3"/>'),
+  isolate: svg('<path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" stroke-dasharray="2 2"/><rect x="8" y="8" width="8" height="8" fill="currentColor" fill-opacity=".2"/>'),
+  isolateExit: svg('<path d="M11 3H3v18h8" stroke-dasharray="2 2"/><rect x="7" y="8" width="7" height="8" fill="currentColor" fill-opacity=".2"/><path d="M14 12h7l-4-4M21 12l-4 4"/>'),
   pencil: svg('<path d="M4 15 15.5 3.5l5 5L9 20l-6 1zM13.5 5.5l5 5M4 15l5 5M3 21l3-1"/><path d="M12 21c2-5 5 2 9-3"/>'),
   cameraOverlayOff: svg('<rect x="3" y="7" width="18" height="13" rx="2" opacity=".4"/><path d="m7 7 2-3h6l2 3" opacity=".4"/><circle cx="14" cy="12" r="3" opacity=".4"/><path d="M3 21 21 3"/>'),
   cameraOverlay: svg('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="m7 7 2-3h6l2 3M5 17l3-3 3 3"/><circle cx="14" cy="12" r="3"/><path d="M14 9v6M11 12h6" opacity=".5"/>'),
