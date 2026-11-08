@@ -5,7 +5,8 @@ import { t } from './i18n';
 import { h } from './dom';
 
 export const OVERLAP_HOLD_MS = 550;
-export const OVERLAP_MOVE_PX = 3;
+// Pointer coordinates are CSS pixels, independent of devicePixelRatio.
+export const OVERLAP_MOVE_PX = 6;
 export interface OverlapSettings { trigger:'right'|'left'|'off'; delay:number }
 const SETTINGS_KEY='kizamubeam.overlap-picker';
 export function loadOverlapSettings():OverlapSettings {
@@ -88,13 +89,17 @@ export function installOverlapPicker(ed: Editor): () => void {
     if(menu){if(!menu.contains(event.target as Node))close();return}
     if(pending){if(event.pointerId!==pending.event.pointerId){close();return}clearPending()}
     const settings=loadOverlapSettings();
-    if(settings.trigger==='off' || event.button!==(settings.trigger==='right'?2:0) || event.isPrimary===false || ed.tool!=='select' || ed.space || ed.drag || ed.draft || ed.pickHandler ||
-       event.shiftKey || event.ctrlKey || event.metaKey || event.altKey)return;
+    const ctrlSecondary=settings.trigger==='right' && /Mac/i.test(navigator.platform || navigator.userAgent) && event.button===0 && event.ctrlKey && !event.shiftKey && !event.metaKey && !event.altKey;
+    if(settings.trigger==='off' || (!ctrlSecondary && event.button!==(settings.trigger==='right'?2:0)) || event.isPrimary===false || ed.tool!=='select' || ed.space || ed.drag || ed.draft || ed.pickHandler ||
+       event.shiftKey || (event.ctrlKey && !ctrlSecondary) || event.metaKey || event.altKey)return;
     const {sx,sy}=ed.evPt(event);
     if(sx<22 || sy<22 || ed.hitPivot(sx,sy) || ed.hitHandle(sx,sy)>=0 || ed.hitRotateZone(sx,sy))return;
     if(overlapCandidates(ed,ed.toWorld(sx,sy)).length<2)return;
     event.preventDefault();event.stopImmediatePropagation();
-    const p={event,timer:0,doc:ed.doc,view:JSON.stringify(ed.view),sel:[...ed.sel]};
+    // Replay macOS Ctrl-primary as secondary, never as a selection toggle/drag.
+    const press=ctrlSecondary?new PointerEvent('pointerdown',{button:2,buttons:2,pointerId:event.pointerId,pointerType:event.pointerType,isPrimary:event.isPrimary,
+      clientX:event.clientX,clientY:event.clientY}):event;
+    const p={event:press,timer:0,doc:ed.doc,view:JSON.stringify(ed.view),sel:[...ed.sel]};
     pending=p;p.timer=window.setTimeout(()=>{consumeContext=true;open(p)},settings.delay);canvas.setPointerCapture(event.pointerId);
   };
   const move=(event:PointerEvent)=>{
@@ -102,7 +107,12 @@ export function installOverlapPicker(ed: Editor): () => void {
     const p=pending;if(event.pointerId!==p.event.pointerId){event.stopImmediatePropagation();return}
     if(!valid(p)){clearPending();event.stopImmediatePropagation();return}
     if(Math.hypot(event.clientX-p.event.clientX,event.clientY-p.event.clientY)>=OVERLAP_MOVE_PX){
-      window.clearTimeout(p.timer);pending=null;consumeContext=false;ed.onDown(p.event);return;
+      window.clearTimeout(p.timer);
+      // Keep secondary presses until release: WebKit may already have sent
+      // the contextmenu that we suppressed while waiting. Left drags instead
+      // resume the ordinary editor pointer path immediately.
+      if(p.event.button===2){event.preventDefault();event.stopImmediatePropagation();return}
+      pending=null;consumeContext=false;ed.onDown(p.event);return;
     }
     event.preventDefault();event.stopImmediatePropagation();
   };
@@ -120,7 +130,13 @@ export function installOverlapPicker(ed: Editor): () => void {
   const lost=()=>{if(!opening)clearPending()};
   const outside=(event:PointerEvent)=>{if(menu && !menu.contains(event.target as Node)){close();event.stopImmediatePropagation();event.preventDefault()}};
   const key=(event:KeyboardEvent)=>{
-    if(!menu){if(pending)close();return}
+    if(!menu){
+      if(pending){
+        if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();consumeContext=true}
+        close();
+      }
+      return;
+    }
     event.stopImmediatePropagation();
     const buttons=[...menu.querySelectorAll<HTMLButtonElement>('button')],index=buttons.indexOf(document.activeElement as HTMLButtonElement);
     if(event.key==='Escape' || event.key==='Tab'){event.preventDefault();close()}
