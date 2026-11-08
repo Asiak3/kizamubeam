@@ -24,6 +24,8 @@ Virtual Machine: the virtual laser machine is a separate Tauri program in the `v
 
 ## Translations
 
+The step-by-step guide for translators (app, website, README, feature list) is [TRANSLATION.md](../TRANSLATION.md). The technical details:
+
 UI texts are written in German in the code inside `t('…')` (placeholders in curly braces, `t('{n} Bilder', { n })`; singular/plural with `tn('{n} Bild', '{n} Bilder', n)`). The German text is also the key in the language files `src/locales/<language>.json`. If a translation is missing, the English text is shown, otherwise the German one. If the same German text has two meanings, it gets a context after `|`, e.g. `t('Verbindung|Gerät')`.
 
 - `npm run i18n:check` lists missing, unused and misplaced entries (fails if anything is missing).

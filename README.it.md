@@ -84,7 +84,7 @@ npm run tauri dev      # app desktop con ricaricamento dal vivo
 npm run tauri build    # programma di installazione per il tuo sistema
 ```
 
-Release, aggiornamenti, traduzioni e struttura del codice sono descritti nella [guida per sviluppatori](docs/development.md) (in inglese). I contributi sono benvenuti.
+Release, aggiornamenti, traduzioni e struttura del codice sono descritti nella [guida per sviluppatori](docs/development.md) (in inglese). I contributi sono benvenuti, vedi [CONTRIBUTING.md](CONTRIBUTING.md); per tradurre KizamuBeam nella tua lingua vedi [TRANSLATION.md](TRANSLATION.md) (in inglese).
 
 ## Community
 

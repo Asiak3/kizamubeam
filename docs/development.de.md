@@ -24,6 +24,8 @@ Virtual Machine: Die virtuelle Lasermaschine ist ein eigenes Tauri-Programm im O
 
 ## Übersetzungen
 
+Die Schritt-für-Schritt-Anleitung für Übersetzerinnen und Übersetzer (App, Website, README, Funktionsliste) steht in [TRANSLATION.md](../TRANSLATION.md) (englisch). Die technischen Details:
+
 Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klammern, `t('{n} Bilder', { n })`; Einzahl/Mehrzahl mit `tn('{n} Bild', '{n} Bilder', n)`). Die deutsche Fassung ist zugleich der Schlüssel in den Sprachdateien `src/locales/<sprache>.json`. Fehlt eine Übersetzung, erscheint der englische, sonst der deutsche Text. Hat derselbe deutsche Text zwei Bedeutungen, bekommt er einen Kontext nach `|`, z. B. `t('Verbindung|Gerät')`.
 
 - `npm run i18n:check` listet fehlende, unbenutzte und falsch platzierte Einträge (bricht bei Fehlendem mit Fehler ab).

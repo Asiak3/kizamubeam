@@ -4,6 +4,8 @@ Thank you for helping improve KizamuBeam! Contributions of all sizes are welcome
 
 KizamuBeam is free software under **GPL-3.0-or-later**. It is maintained as a community project, and thoughtful, focused contributions are especially appreciated.
 
+Want to translate the app, the website or the documentation? See **[TRANSLATION.md](TRANSLATION.md)**, no programming needed.
+
 ## Before you start
 
 - Check existing [issues](https://github.com/negurvulkan/kizamubeam/issues) and [pull requests](https://github.com/negurvulkan/kizamubeam/pulls) to avoid duplicating work.
