@@ -787,7 +787,34 @@ export function kerfOffset(polys: Poly[], d: number): Poly[] {
   co.AddPaths(area, JoinType.jtRound, EndType.etClosedPolygon);
   const out: ClipperLib.Paths = [];
   co.Execute(out, d * KSCALE);
-  return out.filter((p) => p.length > 2).map((p) => ({ pts: p.map((q) => ({ x: q.X / KSCALE, y: q.Y / KSCALE })), closed: true }));
+  const res: Poly[] = out.filter((p) => p.length > 2).map((p) => ({ pts: p.map((q) => ({ x: q.X / KSCALE, y: q.Y / KSCALE })), closed: true }));
+  return keepStarts(polys, res);
+}
+
+/**
+ * Carry user-set start points over to offset contours (Clipper starts them anywhere): the contour nearest to the
+ * original start begins at its nearest point and runs in the original direction.
+ */
+function keepStarts(src: Poly[], res: Poly[]): Poly[] {
+  for (const p of src) {
+    if (!p.fixed || !p.closed || !p.pts.length) continue;
+    const s = p.pts[0];
+    let bi = -1,
+      bj = 0,
+      bd = Infinity;
+    res.forEach((r, i) => {
+      if (r.fixed) return;
+      r.pts.forEach((q, j) => {
+        const dd = (q.x - s.x) ** 2 + (q.y - s.y) ** 2;
+        if (dd < bd) [bd, bi, bj] = [dd, i, j];
+      });
+    });
+    if (bi < 0) continue;
+    let q = startAt(res[bi], bj);
+    if (Math.sign(signedArea(q.pts)) !== Math.sign(signedArea(p.pts))) q = { ...q, pts: [q.pts[0], ...q.pts.slice(1).reverse()] };
+    res[bi] = { ...q, fixed: true };
+  }
+  return res;
 }
 
 /** Höchstzahl der Ringe je Insel, falls Abstand und Fläche nicht zusammenpassen */
