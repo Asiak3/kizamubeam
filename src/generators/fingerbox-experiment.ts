@@ -105,8 +105,8 @@ export function fingerboxParts(p: FingerboxParams): GenPart[] {
     key, at,
     subs: [{ closed: true, nodes: clean(points).map((q) => ({ x: q.x - a / 2, y: wallPart ? b / 2 - q.y : q.y - b / 2 })) }],
   });
-  // Keep the original open-box layout so existing assemblies can recognize later lid additions.
-  if (p.top !== 'closed') return [
+  // Boxes created before the layout fix keep their original open-box arrangement so existing projects do not move.
+  if (legacy && p.top !== 'closed') return [
     part('bottom', bottom, W, D, { x: W / 2, y: D / 2 }, false),
     part('front', front, W, H, { x: W + gap + W / 2, y: H / 2 }, true),
     part('back', front, W, H, { x: 2 * (W + gap) + W / 2, y: H / 2 }, true),
@@ -118,7 +118,7 @@ export function fingerboxParts(p: FingerboxParams): GenPart[] {
     [{ key: 'bottom', points: bottom, a: W, b: D, wall: false },
      { key: 'front', points: front, a: W, b: H, wall: true },
      { key: 'back', points: front, a: W, b: H, wall: true }],
-    [{ key: 'top', points: bottom, a: W, b: D, wall: false },
+    [...(p.top === 'closed' ? [{ key: 'top', points: bottom, a: W, b: D, wall: false }] : []),
      { key: 'left', points: side, a: D, b: H, wall: true },
      { key: 'right', points: side, a: D, b: H, wall: true }],
   ];

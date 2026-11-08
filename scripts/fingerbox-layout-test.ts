@@ -6,7 +6,8 @@ assert.equal(fingerboxSegments(100, 24), 3);
 assert.equal(fingerboxSegments(100, 10), 9);
 assert.equal(fingerboxSegments(10, 100), 3);
 const params: FingerboxParams = { width: 300, depth: 200, height: 100, thickness: 6, finger: 20 };
-const open = fingerboxParts(params);
+// 'legacy' keeps the original open-box arrangement; new boxes use the two-row layout (see fingerbox-placement-test)
+const open = fingerboxParts({ ...params, jointLayout: 'legacy' });
 assert.deepEqual(open.map((p) => p.key), ['bottom', 'front', 'back', 'left', 'right']);
 assert.deepEqual(open.map((p) => p.at), [{ x: 150, y: 100 }, { x: 460, y: 50 }, { x: 770, y: 50 }, { x: 100, y: 260 }, { x: 310, y: 260 }]);
 for (const part of [...open, ...fingerboxParts({ ...params, top: 'closed' })]) {
