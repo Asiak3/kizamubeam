@@ -288,6 +288,22 @@ export class EditorRender {
     }
 
     // Offset-Vorschau
+    if (this.outlinePreview) {
+      const preview = this.outlinePreview;
+      ctx.save();
+      if (preview.original) {
+        ctx.strokeStyle = '#a4a9b0'; ctx.lineWidth = 1.2 * px;
+        ctx.setLineDash([2 * px, 3 * px]); ctx.stroke(subsToPath2D(preview.original));
+      }
+      if (preview.hover >= 0 && preview.holes[preview.hover]) {
+        ctx.fillStyle = 'rgba(255,150,35,0.3)';
+        ctx.fill(subsToPath2D(preview.holes[preview.hover]), 'evenodd');
+      }
+      ctx.strokeStyle = '#56d7bd'; ctx.lineWidth = 2 * px;
+      ctx.setLineDash([6 * px, 4 * px]);
+      ctx.stroke(subsToPath2D(preview.subs));
+      ctx.restore();
+    }
     if (this.offsetPreview) {
       ctx.strokeStyle = '#ff6020';
       ctx.setLineDash([4 * px, 2 * px]);

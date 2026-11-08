@@ -4077,3 +4077,9 @@ input.jig-count {
 .editor-context-menu button { white-space: normal; overflow-wrap: anywhere; }
 .editor-context-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .editor-context-submenu { padding-left: 12px; border-left: 2px solid var(--line); }
+
+.outline-dialog { width: min(900px, 94vw); max-height: 92vh; overflow: auto; }
+.outline-dialog canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); touch-action: none; }
+.outline-tool-window { position: fixed; top: 70px; left: auto; right: 16px; margin: 0; box-sizing: border-box; width: min(370px, calc(100vw - 16px)); z-index: 100; }
+.outline-tool-window h3 { cursor: move; touch-action: none; }
+.outline-choices { max-height: 140px; overflow: auto; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; }
