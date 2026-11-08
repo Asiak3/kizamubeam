@@ -5,17 +5,19 @@
 // z. B. t('Verbindung|Gerät'); angezeigt wird nur der Teil davor.
 // Prüfen mit: npm run i18n:check
 import en from './locales/en.json';
+import it from './locales/it.json';
 
-export type Lang = 'de' | 'en';
+export type Lang = 'de' | 'en' | 'it';
 export type LangPref = Lang | 'system';
 
 /** Sprachen mit ihrem Namen in der eigenen Sprache */
 export const LANGUAGES: [Lang, string][] = [
   ['de', 'Deutsch'],
   ['en', 'English'],
+  ['it', 'Italiano'],
 ];
 
-const DICTS: Record<Lang, Record<string, string> | null> = { de: null, en };
+const DICTS: Record<Lang, Record<string, string> | null> = { de: null, en, it };
 const LANG_KEY = 'kizamubeam.lang';
 
 function systemLang(): Lang {
@@ -115,10 +117,10 @@ export function tn(one: string, other: string, n: number, vars?: Record<string, 
 }
 
 /** Zahlenformat der Oberfläche */
-export const locale = lang === 'de' ? 'de-DE' : 'en-US';
+export const locale = lang === 'de' ? 'de-DE' : lang === 'it' ? 'it-IT' : 'en-US';
 
-/** Dezimalzeichen für die Anzeige: Komma auf Deutsch, Punkt auf Englisch. */
-export const dec = (s: string) => (lang === 'de' ? s.replace('.', ',') : s);
+/** Dezimalzeichen für die Anzeige: Komma auf Deutsch und Italienisch, Punkt auf Englisch. */
+export const dec = (s: string) => (lang === 'de' || lang === 'it' ? s.replace('.', ',') : s);
 
 /** Text in der Sprache der Oberfläche, sonst Englisch, sonst Deutsch, sonst der erste (z. B. aus Erweiterungen: „Text“ oder {"de": "…", "en": "…"}) */
 export function localText(v: unknown, l: string = lang): string {
