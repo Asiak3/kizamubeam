@@ -16,7 +16,8 @@
   <a href="https://negurvulkan.github.io/kizamubeam/en/">Website</a> ·
   <a href="docs/features.md">All features</a> ·
   <a href="https://discord.gg/SSr8VHh7EJ">Discord</a> ·
-  <a href="README.de.md">Deutsch</a>
+  <a href="README.de.md">Deutsch</a> ·
+  <a href="README.it.md">Italiano</a>
 </p>
 
 KizamuBeam takes you from the first idea to the finished piece in one app: draw and write directly on the workspace, turn photos into engravings, generate boxes, gears and slot-together models, check everything in 3D and send the job straight to your laser. If you have used LightBurn before, you will feel at home right away.
@@ -71,7 +72,7 @@ A material library stores proven settings. Material tests, focus tests and a fit
 Templates with parameters, variable text and serial numbers from CSV, QR codes and barcodes, multi-page projects, jigs for batches of blanks, **Print and Cut** with registration marks and a camera to place designs right on the workpiece.
 
 ### Make it yours
-Dockable windows and customizable toolbars, light and dark theme, German and English. A Toolbox gathers all generators and special tools in one place. Extensions add device presets, templates, materials and motifs. Settings, devices and libraries can be backed up or transferred as a file, or synced between computers through your own folder (iCloud, Dropbox, Nextcloud). AI agents such as Claude Code or Codex can work with your project through the built-in MCP server, with the access level you choose.
+Dockable windows and customizable toolbars, light and dark theme, English, German and Italian. A Toolbox gathers all generators and special tools in one place. Extensions add device presets, templates, materials and motifs. Settings, devices and libraries can be backed up or transferred as a file, or synced between computers through your own folder (iCloud, Dropbox, Nextcloud). AI agents such as Claude Code or Codex can work with your project through the built-in MCP server, with the access level you choose.
 
 **→ [The complete feature list](docs/features.md)**
 

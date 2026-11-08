@@ -4,12 +4,21 @@
     <loc>https://negurvulkan.github.io/kizamubeam/</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://negurvulkan.github.io/kizamubeam/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://negurvulkan.github.io/kizamubeam/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://negurvulkan.github.io/kizamubeam/it/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://negurvulkan.github.io/kizamubeam/"/>
   </url>
   <url>
     <loc>https://negurvulkan.github.io/kizamubeam/en/</loc>
     <xhtml:link rel="alternate" hreflang="de" href="https://negurvulkan.github.io/kizamubeam/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://negurvulkan.github.io/kizamubeam/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://negurvulkan.github.io/kizamubeam/it/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://negurvulkan.github.io/kizamubeam/"/>
+  </url>
+  <url>
+    <loc>https://negurvulkan.github.io/kizamubeam/it/</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://negurvulkan.github.io/kizamubeam/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://negurvulkan.github.io/kizamubeam/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://negurvulkan.github.io/kizamubeam/it/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://negurvulkan.github.io/kizamubeam/"/>
   </url>
 </urlset>

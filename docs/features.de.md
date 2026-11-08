@@ -1,6 +1,6 @@
 # Funktionen von KizamuBeam
 
-[English](features.md) · Deutsch · [Zurück zum README](../README.de.md)
+[English](features.md) · Deutsch · [Italiano](features.it.md) · [Zurück zum README](../README.de.md)
 
 Alles, was KizamuBeam kann, mit Menüwegen und Tastenkürzeln. Den schnellen Überblick gibt es im [README](../README.de.md) und auf der [Website](https://negurvulkan.github.io/kizamubeam/).
 
@@ -134,7 +134,7 @@ Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
 - Mehrseitige Projekte: Ein Projekt hat eine oder mehrere Seiten (Objekte-Fenster ganz oben, Menü Seiten, Bild ↑/↓ zum Wechseln). Jede Seite hat eigene Objekte; die Layer-Einstellungen gelten für das ganze Projekt. Gezeichnet, bearbeitet, gelasert und exportiert (SVG, DXF, G-Code) wird die aktuelle Seite; PDF- und AI-Export enthalten alle Seiten. Seiten lassen sich anlegen, duplizieren, umbenennen (Doppelklick), löschen und per Ziehen umordnen; Objekte zieht man auf eine Seitenzeile, um sie dorthin zu verschieben. Dateiformat ab `version: 2` mit `pages` und `page`; ältere Dateien öffnen sich als Projekt mit einer Seite. MCP: `get_document` (mit `pages`), `switch_page`, `edit_pages`, `move_to_page`.
 - Projekt-Notizen (Fenster → Notizen): freier Text zu **Material** (Art, Dicke, Bezugsquelle), **Aufbau** (Fokus, Auflage, Ursprung, Fixierung) und **Bearbeitung** (Reihenfolge, Durchgänge, Nachbearbeitung, was beim nächsten Mal anders). Die Notizen stehen in der Projektdatei (`.kzb`, Eintrag `notes`) und in Vorlagen, jede Bearbeitung ist ein Undo-Schritt. MCP: `project_notes`, auch in `get_document`.
 - Verlaufsfenster (Reiter neben Objekte, Menü Fenster): die letzten Änderungen (bis 200) als Liste mit Namen wie „Verschieben“, „Offset“ oder „Text bearbeiten“ und Uhrzeit. Klick auf eine Zeile springt dorthin, mehrere Schritte auf einmal zurück oder vor; rückgängig gemachte Schritte stehen ausgegraut unter dem aktuellen Stand und lassen sich per Klick wiederholen, bis eine neue Änderung sie verwirft. Ctrl+Z / Ctrl+Y (oder Ctrl+Shift+Z) gehen weiter einzeln. Jeder MCP-Aufruf erscheint als ein Schritt mit dem Namen seines Werkzeugs.
-- Oberfläche auf Deutsch und Englisch (Ansicht → Sprache). Standard folgt der Systemsprache (andere Systemsprachen bekommen Englisch), die Wahl bleibt gespeichert; im Englischen die unter Laser-Nutzern üblichen Begriffe.
+- Oberfläche auf Deutsch, Englisch und Italienisch (Ansicht → Sprache). Standard folgt der Systemsprache (andere Systemsprachen bekommen Englisch), die Wahl bleibt gespeichert; im Englischen die unter Laser-Nutzern üblichen Begriffe.
 - Helles und dunkles Design (Ansicht → Design oder Knopf ganz rechts in der Symbolleiste), Standard folgt dem System. Im dunklen Design werden sehr dunkle Layerfarben auf der Arbeitsfläche aufgehellt.
 
 ## Import, Bilder und Nachzeichnen
