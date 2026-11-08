@@ -64,6 +64,7 @@
     "test:nodes": "node scripts/vector-offline-test.mjs scripts/multi-object-nodes-test.ts",
     "test:refit": "node scripts/run-ts.mjs scripts/vector-fit-test.ts && node scripts/vector-offline-test.mjs scripts/path-refit-editor-test.ts",
     "test:file-drop": "node scripts/run-ts.mjs scripts/native-file-drop-test.ts"
+    "test:camera-overlay": "node scripts/camera-overlay-toggle-test.mjs"
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {
