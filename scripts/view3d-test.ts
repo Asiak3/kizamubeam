@@ -73,6 +73,24 @@ test('Box: Platten ergeben den Kasten, mit Spiel ohne und mit Presspassung mit D
   assert.ok(press.every((o) => o.pieces.length > 0 && o.volume > 0.01));
 });
 
+test('Box mit Trennwänden: offene und geschlossene Kisten mit individuellen Trennwänden', () => {
+  const cases: Params[] = [
+    { top: 'open' }, { top: 'closed' },
+    { top: 'open', compartmentsX: 3, ratiosX: '1:2:1' },
+    { top: 'open', compartmentsY: 2, ratiosY: '1:1' },
+    { top: 'open', compartmentsX: 3, compartmentsY: 2, ratiosX: '33mm:50mm*2:1', ratiosY: '1:1' },
+    { top: 'closed', compartmentsX: 3, compartmentsY: 2, ratiosX: '33mm:50mm*2:1', ratiosY: '1:1' },
+  ];
+  for (const options of cases) {
+    const assembled = solids('box-divided', { width: 300, depth: 200, height: 100, thickness: 6, finger: 20, dividerDrop: 10, ...options });
+    assert.equal(assembled.length, (options.top === 'closed' ? 6 : 5) + Number(options.compartmentsX ?? 1) + Number(options.compartmentsY ?? 1) - 2);
+    assert.deepEqual(pairs(assembled), [], JSON.stringify(options));
+    const b = bounds(assembled);
+    [300, 200, 100].forEach((value, axis) => { near(b[axis][0], 0, 1e-6); near(b[axis][1], value, 1e-6); });
+  }
+  assert.equal(asmSolids('box-divided', { ...defaultParams(getGenerator('box-divided')!), compartmentsX: 3, ratiosX: '10000mm:1:1' }, 3), null);
+});
+
 test('Schublade: Schubkasten im Korpus, Blende davor, nichts durchdringt sich', () => {
   for (const o of [{}, { front: 'inset' }, { carcass: false }, { sidePlay: 0, topPlay: 0, backPlay: 0 }, { front: 'none', handle: 'none' }]) assert.deepEqual(pairs(solids('drawer', o)), [], JSON.stringify(o));
   const b = bounds(solids('drawer', { width: 160, height: 80, depth: 150, thickness: 3 }));

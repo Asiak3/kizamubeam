@@ -57,6 +57,7 @@ const rows = (t: (s: string) => string): AppInfo[] => [
   { id: 'cam', group: 'mech', name: t('Nocken'), desc: t('Nockenscheibe für Rolle oder Spitze mit Hub, Rast und Rückhub.'), keys: t('Nocke Kurvenscheibe Hub Exzenter Automat|Suchwörter') },
   { id: 'gearpair', group: 'mech', name: t('Zahnradpaar'), desc: t('Zwei passende Zahnräder mit Achsabstand und Grundplatte als Baugruppe.'), keys: t('Getriebe Übersetzung Zahnräder Achsabstand|Suchwörter') },
   { id: 'box', group: 'box', name: t('Box mit Fingerzinken'), desc: t('Kiste aus Platten mit Fingerzinken, mit oder ohne Deckel, als Baugruppe.'), keys: t('Kiste Kasten Gehäuse Schachtel Fingerzinken Deckel|Suchwörter') },
+  { id: 'box-divided', group: 'box', name: t('Box mit Fingerzinken und Trennwänden'), desc: t('Experimentelle Box mit parametrischen Trennwänden.'), keys: t('Box Fächer Trennwände Fingerzinken|Suchwörter') },
   { id: 'drawer', group: 'box', name: t('Schublade'), desc: t('Korpus, Schubkasten und Blende mit Griff als Baugruppe.'), keys: t('Schublade Schubfach Kommode Korpus|Suchwörter') },
   { id: 'insert', group: 'box', name: t('Einsatz mit Fächern'), desc: t('Gesteckte Trennstege, die eine Box oder Schublade in Fächer teilen.'), keys: t('Einsatz Fächer Trennwand Sortierkasten Box|Suchwörter') },
   { id: 'shelf', group: 'box', name: t('Steckregal'), desc: t('Regal aus Seiten und Böden, die ineinander gesteckt werden.'), keys: t('Regal Böden Stecksystem Möbel|Suchwörter') },

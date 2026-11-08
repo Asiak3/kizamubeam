@@ -27,6 +27,8 @@ export type ParamSpec =
     })
   | (SpecBase & { type: 'enum'; options: [string, string][]; def: string })
   | (SpecBase & { type: 'bool'; def: boolean })
+  /** Text für frei editierbare Generatorparameter. */
+  | (SpecBase & { type: 'text'; def: string; autoText?: (p: Params) => string })
   /** Text, der nicht im Dialog erscheint (z. B. Kennung eines eingelesenen 3D-Modells) */
   | (SpecBase & { type: 'data'; def: string });
 

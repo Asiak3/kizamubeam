@@ -2,6 +2,7 @@
 import type { GenShape, Pt, SubPath } from '../model';
 import { t } from '../i18n';
 import { BOX } from './box';
+import { FINGERBOX } from './fingerbox';
 import { CAM } from './cam';
 import { DRAWER } from './drawer';
 import { INSERT } from './insert';
@@ -20,7 +21,7 @@ import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
 export type { GenPart, Generator, Issue, Params, ParamSpec } from './types';
 
-export const GENERATORS: Generator[] = [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, DRAWER, INSERT, SHELF, DISCSPHERE, STACK, RIBS, JIG];
+export const GENERATORS: Generator[] = [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, FINGERBOX, DRAWER, INSERT, SHELF, DISCSPHERE, STACK, RIBS, JIG];
 
 export const getGenerator = (id: string): Generator | undefined => (id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
 
@@ -45,7 +46,7 @@ export function normalizeParams(g: Generator, raw: Record<string, unknown>, base
     let out: ParamValue = s.def;
     if (s.type === 'bool') out = typeof v === 'boolean' ? v : v === 'true' || v === 1;
     else if (s.type === 'enum') out = s.options.some(([k]) => k === v) ? (v as string) : s.def;
-    else if (s.type === 'data') out = typeof v === 'string' ? v : s.def;
+    else if ((s.type === 'data' || s.type === 'text')) out = typeof v === 'string' ? v : s.def;
     else {
       const n = Number(v);
       out = isFinite(n) ? Math.min(s.max, Math.max(s.min, s.type === 'int' ? Math.round(n) : n)) : s.def;
@@ -65,7 +66,7 @@ export function checkInput(g: Generator, raw: Record<string, unknown>): Issue[] 
     if (s.type === 'bool' && typeof v !== 'boolean') out.push({ key: s.key, level: 'error', msg: t('„{key}“ muss true oder false sein', { key: s.key }) });
     else if (s.type === 'enum' && !s.options.some(([k]) => k === v))
       out.push({ key: s.key, level: 'error', msg: t('„{key}“ muss einer von {values} sein', { key: s.key, values: s.options.map(([k]) => k).join(', ') }) });
-    else if (s.type === 'data') {
+    else if ((s.type === 'data' || s.type === 'text')) {
       if (typeof v !== 'string') out.push({ key: s.key, level: 'error', msg: t('„{key}“ muss ein Text sein', { key: s.key }) });
     } else if (s.type !== 'bool' && s.type !== 'enum') {
       const n = Number(v);
@@ -141,7 +142,7 @@ export function resolveBinds(g: Generator, params: Params, bind: Record<string, 
   const issues: Issue[] = [];
   for (const [key, src] of Object.entries(bind ?? {})) {
     const s = g.schema.find((x) => x.key === key);
-    if (!s || s.type === 'data') continue;
+    if (!s || s.type === 'data' || s.type === 'text') continue;
     try {
       const v = evaluate(src, scope);
       if (s.type === 'bool') raw[key] = typeof v === 'string' ? v !== '' : !!v;
