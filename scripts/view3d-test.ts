@@ -8,7 +8,8 @@ const { rotatePose } = await import('../src/view3d/poses');
 const { defaultParams, getGenerator } = await import('../src/generators/index');
 const { computeJoint, jointMate, DEFAULT_JOINT } = await import('../src/joints');
 const { assembleMates } = await import('../src/view3d/mates');
-const { subsPolys } = await import('../src/view3d/solids');
+const solidsMod = await import('../src/view3d/solids');
+const { subsPolys } = solidsMod;
 const { sphereLayout } = await import('../src/generators/discsphere');
 import type { Obj, Mate } from '../src/model';
 import type { JointOptions } from '../src/joints';
@@ -437,6 +438,29 @@ test('Steckprüfung: loses Teil, eigene Gruppe und widersprüchliche Steckrichtu
   assert.equal(lo.groups.length, 4);
   assert.equal(lo.groups[0].length, 4);
   assert.deepEqual(lo.pieces.filter((p) => p.key === 'T').map((p) => p.island), [1, 2]);
+});
+
+test('outline: aligned slots give no stray lines (issue #182)', () => {
+  const { outlineSegments } = solidsMod;
+  const rect = (x0: number, y0: number, w: number, h: number) => [
+    { x: x0, y: y0 },
+    { x: x0 + w, y: y0 },
+    { x: x0 + w, y: y0 + h },
+    { x: x0, y: y0 + h },
+  ];
+  const polys = [rect(0, 0, 100, 80)];
+  for (const cx of [33.333, 66.667]) for (const y of [8, 26, 44, 62]) polys.push(rect(cx - 1.5, y, 3, 10));
+  const seg = outlineSegments(polys, 3);
+  // 9 rectangles: 4 edges top + 4 bottom + 4 verticals each
+  assert.equal(seg.length / 6, 9 * 12);
+  // Every horizontal segment lies on a contour edge (no line joining two slots)
+  for (let i = 0; i < seg.length; i += 6) {
+    const len = Math.hypot(seg[i + 3] - seg[i], seg[i + 4] - seg[i + 1]);
+    if (len > 0) assert.ok(len <= 10 + 1e-9 || len === 100 || len === 80, `unexpected segment length ${len}`);
+  }
+  // Smooth circle: no vertical edges, closing duplicate point ignored
+  const circle = Array.from({ length: 65 }, (_, k) => ({ x: Math.cos((k / 64) * 2 * Math.PI) * 10, y: Math.sin((k / 64) * 2 * Math.PI) * 10 }));
+  assert.equal(outlineSegments([circle], 3).length / 6, 64 * 2);
 });
 
 if (failed) {

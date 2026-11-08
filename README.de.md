@@ -14,7 +14,8 @@
   <a href="https://negurvulkan.github.io/kizamubeam/">Website</a> ·
   <a href="docs/features.de.md">Alle Funktionen</a> ·
   <a href="https://discord.gg/SSr8VHh7EJ">Discord</a> ·
-  <a href="README.md">English</a>
+  <a href="README.md">English</a> ·
+  <a href="README.it.md">Italiano</a>
 </p>
 
 KizamuBeam bringt dich in einer App von der Idee zum fertigen Stück: direkt auf der Arbeitsfläche zeichnen und schreiben, Fotos in Gravuren verwandeln, Boxen, Zahnräder und Steckmodelle erzeugen, alles in 3D prüfen und den Auftrag direkt an den Laser schicken. Wer LightBurn kennt, findet sich sofort zurecht.
@@ -69,7 +70,7 @@ Eine Material-Bibliothek speichert bewährte Einstellungen. Materialtest, Fokust
 Vorlagen mit Parametern, variabler Text und Seriennummern aus CSV, QR-Codes und Strichcodes, mehrseitige Projekte, Jigs für ganze Ladungen von Rohlingen, **Print and Cut** mit Passermarken und eine Kamera, um Motive direkt auf dem Werkstück zu platzieren.
 
 ### Nach deinem Geschmack
-Andockbare Fenster und anpassbare Werkzeugleisten, helles und dunkles Design, Deutsch und Englisch. Der Werkzeugkasten sammelt alle Generatoren und Spezialwerkzeuge an einem Ort. Erweiterungen bringen Gerätevorlagen, Vorlagen, Materialien und Motive mit. Einstellungen, Geräte und Bibliotheken lassen sich als Datei sichern und übertragen oder über einen eigenen Ordner (iCloud, Dropbox, Nextcloud) zwischen Rechnern synchronisieren. KI-Agenten wie Claude Code oder Codex können über den eingebauten MCP-Server mit deinem Projekt arbeiten, mit der Berechtigungsstufe, die du wählst.
+Andockbare Fenster und anpassbare Werkzeugleisten, helles und dunkles Design, Deutsch, Englisch und Italienisch. Der Werkzeugkasten sammelt alle Generatoren und Spezialwerkzeuge an einem Ort. Erweiterungen bringen Gerätevorlagen, Vorlagen, Materialien und Motive mit. Einstellungen, Geräte und Bibliotheken lassen sich als Datei sichern und übertragen oder über einen eigenen Ordner (iCloud, Dropbox, Nextcloud) zwischen Rechnern synchronisieren. KI-Agenten wie Claude Code oder Codex können über den eingebauten MCP-Server mit deinem Projekt arbeiten, mit der Berechtigungsstufe, die du wählst.
 
 **→ [Die vollständige Funktionsliste](docs/features.de.md)**
 

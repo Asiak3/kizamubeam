@@ -1,6 +1,6 @@
 # KizamuBeam features
 
-English · [Deutsch](features.de.md) · [Back to the README](../README.md)
+English · [Deutsch](features.de.md) · [Italiano](features.it.md) · [Back to the README](../README.md)
 
 Everything KizamuBeam can do, with menu paths and keyboard shortcuts. For a quick overview, see the [README](../README.md) or the [website](https://negurvulkan.github.io/kizamubeam/en/).
 
@@ -133,7 +133,7 @@ Offline regressions: `npm run test:camera`. No hardware is acquired by the tests
 - Multi-page projects: a project has one or more pages (top of the Objects window, Pages menu, Page Up/Down to switch). Each page has its own objects; cut settings apply to the whole project. Drawing, editing, lasering and export (SVG, DXF, G-code) work on the current page; PDF and AI export contain all pages. Pages can be added, duplicated, renamed (double-click), deleted and reordered by dragging; drag objects onto a page row to move them there. File format from `version: 2` with `pages` and `page`; older files open as a project with one page. MCP: `get_document` (with `pages`), `switch_page`, `edit_pages`, `move_to_page`.
 - Project notes (Window → Notes): free text on **material** (type, thickness, source), **setup** (focus, bed, origin, how the piece is held) and **processing** (order, passes, finishing, what to change next time). The notes are stored in the project file (`.kzb`, entry `notes`) and in templates, every edit is one undo step. MCP: `project_notes`, also in `get_document`.
 - History window (tab next to Objects, Window menu): the last changes (up to 200) as a list with names such as “Move”, “Offset” or “Edit text” and the time. A click on a row jumps there, several steps back or forward at once; undone steps are shown greyed out below the current state and can be redone with a click until a new change discards them. Ctrl+Z / Ctrl+Y (or Ctrl+Shift+Z) still step one at a time. Each MCP call appears as one step named after its tool.
-- Interface in German and English (View → Language). The default follows the system language (other system languages get English), the choice is remembered; the English terms are the ones laser users already know.
+- Interface in German, English and Italian (View → Language). The default follows the system language (other system languages get English), the choice is remembered; the English terms are the ones laser users already know.
 - Light and dark theme (View → Theme, or the button at the far right of the toolbar); the default follows the system. In the dark theme, very dark layer colors are lightened on the workspace.
 
 ## Import, images and tracing
