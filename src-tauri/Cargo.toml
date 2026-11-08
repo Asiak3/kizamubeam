@@ -36,3 +36,9 @@ kizamubeam-core = { path = "core" }
 serialport = { version = "4", default-features = false }
 # WebSocket zur Steuerung (FluidNC Port 81), ohne TLS
 tungstenite = { version = "0.27", default-features = false, features = ["handshake"] }
+
+# Already used transitively by Tauri/Wry; expose only the Windows pinch setting,
+# without enabling page-zoom hotkeys or changing other WebView defaults.
+[target.'cfg(target_os = "windows")'.dependencies]
+webview2-com = "0.39"
+windows-core = "0.62"
