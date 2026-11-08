@@ -5,7 +5,7 @@
 // z. B. t('Verbindung|Gerät'); angezeigt wird nur der Teil davor.
 // Prüfen mit: npm run i18n:check
 import en from './locales/en.json';
-import it from './locales/IT.json';
+import it from './locales/it.json';
 
 export type Lang = 'de' | 'en' | 'it';
 export type LangPref = Lang | 'system';

@@ -1,3 +1,4 @@
+
 // Maschinenausgabe: aus dem Dokument einen Job berechnen (Linien, Füllen, Bilder), G-Code schreiben,
 // Laufzeit schätzen und Rahmenfahrten erzeugen. Alles in Maschinenkoordinaten (mm, Ursprung unten links, y nach oben).
 import ClipperLib from 'clipper-lib';
@@ -156,15 +157,15 @@ export interface Device {
 }
 
 export const DEFAULT_DEVICE: Device = {
-  id: 'atomstack-p1',
-  name: 'Atomstack P1',
-  fw: 'grbl',
-  bedW: 110,
-  bedH: 110,
+  id: 'standard',
+  name: 'Swiitol E6 Pro',
+  fw: 'fluidnc',
+  bedW: 400,
+  bedH: 400,
   conn: 'serial',
   port: '',
   baud: 115200,
-  host: '',
+  host: 'fluidnc.local',
   tcpPort: 23,
   wsPort: 81,
   httpPort: 80,
@@ -172,8 +173,8 @@ export const DEFAULT_DEVICE: Device = {
   runFrom: 'stream',
   jobOutputs: [],
   sMax: 1000,
-  rapid: 3000,
-  accel: 1000,
+  rapid: 6000,
+  accel: 1500,
   junction: 0.01,
   startFrom: 'absolute',
   jobOrigin: 6,
@@ -184,7 +185,7 @@ export const DEFAULT_DEVICE: Device = {
   limitSwitches: 'unknown',
   frameLaser: false,
   framePower: 1,
-  frameSpeed: 1500,
+  frameSpeed: 3000,
   airCmd: 'M8',
   startScript: '',
   endScript: '',
