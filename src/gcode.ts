@@ -210,7 +210,17 @@ export const PRESETS: (Partial<Device> & { name: string; fw: Firmware })[] = [
   // atomstack.com/products/atomstack-a20-pro-130w
   { name: 'Atomstack A20 Pro', fw: 'grbl', bedW: 400, bedH: 365 },
   // Atomstack P1; area di lavoro 110 × 110 mm, moduli intercambiabili (diodo 5W / infrarossi 1.2W)
-  { name: 'Atomstack P1', fw: 'grbl', bedW: 110, bedH: 110, baud: 115200 },
+  { 
+    name: 'Atomstack P1', 
+    fw: 'grbl', 
+    bedW: 110, 
+    bedH: 110, 
+    baud: 115200, 
+    rapid: 3000, 
+    accel: 1000, 
+    sMax: 1000, 
+    frameSpeed: 1500 
+  },
   // Herstellerangabe 410 × 400; Nutzer messen im LightBurn-Forum etwa 374 × 362
   { name: 'Sculpfun S30', fw: 'grbl', bedW: 410, bedH: 400 },
   // crealityfalcon.com/blogs/product-reviews/sculpfun-s9-review
