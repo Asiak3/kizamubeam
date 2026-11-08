@@ -30,7 +30,7 @@ export interface Action {
 
 export type BarId = 'main' | 'tools';
 /** Leisten, die sich ausblenden lassen */
-export type BarKey = BarId | 'numbar' | 'palette' | 'status';
+export type BarKey = BarId | 'numbar' | 'textbar' | 'palette' | 'status';
 type IconSize = 's' | 'm' | 'l';
 
 interface Config {
@@ -45,7 +45,7 @@ interface Config {
 
 const KEY = 'kizamubeam.toolbars';
 export const SEP = '|';
-const BAR_EL: Record<BarKey, string> = { main: '#toolbar', tools: '#tools', numbar: '#numbar', palette: '#palette', status: '#status' };
+const BAR_EL: Record<BarKey, string> = { main: '#toolbar', tools: '#tools', numbar: '#numbar', textbar: '#textbar', palette: '#palette', status: '#status' };
 
 const actions = new Map<string, Action>();
 /** Aktion zu einer Kennung (z. B. für die Kacheln im Werkzeugkasten) */
@@ -55,12 +55,15 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 5;
+const CONFIG_V = 8;
 /** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende) */
 const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 3, bar: 'tools', id: 'apps', after: 'grp:gen' },
   { v: 5, bar: 'tools', id: 'grp:relate', after: 'nest' },
   { v: 5, bar: 'tools', id: 'tool:measure', after: 'grp:relate' },
+  { v: 8, bar: 'tools', id: 'vectorfit', after: 'tool:node' },
+  { v: 7, bar: 'main', id: 'camera-overlays', after: 'view3d' },
+  { v: 8, bar: 'tools', id: 'isolate', after: 'vectorfit' },
 ];
 /** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
  *  Leiste verliert sie nur, wenn die Folge seq noch genau so dasteht; sie wird durch keep ersetzt.
@@ -97,6 +100,7 @@ export const barNames = (): Record<BarKey, string> => ({
   main: t('Hauptleiste'),
   tools: t('Werkzeugleiste'),
   numbar: t('Eigenschaftenleiste'),
+  textbar: t('Textleiste'),
   palette: t('Farbpalette'),
   status: t('Statusleiste'),
 });
@@ -132,8 +136,15 @@ export function refreshBars() {
       }
       if (a.enabled) b.disabled = !a.enabled();
       else b.disabled = false;
-      if (a.on) b.classList.toggle('on', a.on());
-      else b.classList.remove('on');
+      if (a.on) {
+        const pressed = a.on();
+        b.classList.toggle('on', pressed);
+        b.setAttribute('aria-pressed', String(pressed));
+      } else {
+        b.classList.remove('on');
+        b.removeAttribute('aria-pressed');
+      }
+
       if (a.dyn) {
         const d = a.dyn();
         if (d.icon && b.dataset.icon !== d.icon) ((b.innerHTML = ICONS[d.icon]), (b.dataset.icon = d.icon));

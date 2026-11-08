@@ -1,4 +1,5 @@
 import { openOutlineDialog } from './outlineDialog';
+import { cameraOverlaysVisible, toggleCameraOverlays } from './cameraOverlayVisibility';
 import { canEnterIsolation } from './isolation';
 // Oberfläche: Menü, Leisten, Panels, Palette, Statusleiste.
 import { Editor, Tool } from './editor';
@@ -273,6 +274,7 @@ function buildMenu(ed: Editor) {
       [t('Knoten bearbeiten'), 'Ctrl+`', () => ed.setTool('node')],
       'sep',
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
+      [t('Freihand / Bleistift'), '', () => ed.setTool('pencil')],
       [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
       [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
       [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
@@ -397,6 +399,7 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Ansicht'), [
+      [t('Alle Kameraüberlagerungen anzeigen'), '', () => toggleCameraOverlays(ed), cameraOverlaysVisible],
       [t('Ganze Seite'), 'Ctrl+0', () => ed.zoomPage()],
       [t('Auf Auswahl zoomen'), '', () => ed.zoomSelection()],
       [t('Vergrößern'), '+', () => ed.zoomAt(1.25)],
@@ -578,7 +581,7 @@ function showHelp() {
   dlg.showModal();
 }
 
-// ---------- Numerik-, Form- und Textleiste ----------
+// ---------- Numerik- und Formleiste, Textleiste ----------
 
 function buildNumbar(ed: Editor) {
   const bar = $('#numbar');
@@ -778,8 +781,11 @@ function buildNumbar(ed: Editor) {
   const textProps = h(
     'div',
     { class: 'field' },
-    h('label', {}, t('Schrift'), fontSel), h('label', {}, t('Höhe'), fSize),
-    h('label', {}, t('Abst. H'), fHs), h('label', {}, 'V', fVs), h('label', {}, t('Max. Breite'), fMaxW), h('label', {}, t('Max. Höhe'), fMaxH), bShrink, bWrap, ...alignBtns, bBold, bItal, bUp, bWeld, bOnPath, pathProps, bVar, vtProps,
+    h('span', { html: ICONS.text, class: 'icon-inline', style: 'color: var(--muted)', title: t('Textleiste') }),
+    h('label', {}, t('Schrift'), fontSel), h('label', {}, t('Höhe'), fSize), bBold, bItal, bUp, ...alignBtns, sep(),
+    h('label', {}, t('Abst. H'), fHs), h('label', {}, 'V', fVs), sep(),
+    h('label', {}, t('Max. Breite'), fMaxW), h('label', {}, t('Max. Höhe'), fMaxH), bShrink, bWrap, sep(),
+    bWeld, bOnPath, pathProps, bVar, vtProps,
   );
 
   // Knotenbearbeitung
@@ -797,6 +803,18 @@ function buildNumbar(ed: Editor) {
     nodeBtn(t('Ecken …'), t('Ausgewählte Ecken runden, innen runden oder fasen'), () => openCornerDialog(ed)),
   );
   const sepNode = sep();
+
+  const pencilTolerance = h('input', { type: 'number', min: 0.001, max: 100, step: 0.01, value: String(ed.pencilTolerance),
+    'aria-label': t('Freihandtoleranz in Millimetern'), style: 'width: 7ch' });
+  pencilTolerance.addEventListener('change', () => {
+    const v = pencilTolerance.valueAsNumber;
+    if (Number.isFinite(v) && v >= 0.001 && v <= 100) ed.pencilTolerance = v;
+    else pencilTolerance.value = String(ed.pencilTolerance);
+  });
+  const pencilClosed = h('input', { type: 'checkbox' });
+  pencilClosed.addEventListener('change', () => { ed.pencilClosed = pencilClosed.checked; });
+  const pencilProps = h('span', { class: 'field' }, h('label', {}, t('Anpassungstoleranz (mm)'), pencilTolerance),
+    h('label', { class: 'check' }, pencilClosed, t('Geschlossener Pfad')));
 
   // Bilder
   const imgInfo = h('span', { class: 'muted' });
@@ -835,7 +853,9 @@ function buildNumbar(ed: Editor) {
   const sepGen = sep();
 
   const sepShape = sep();
-  bar.append(geo, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps, sep(), textProps);
+  bar.append(geo, pencilProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
+  // Text options get their own bar below the properties bar (can be hidden in the Window menu)
+  $('#textbar').append(textProps);
 
   const refresh = () => {
     const b = ed.selBounds();
@@ -851,6 +871,7 @@ function buildNumbar(ed: Editor) {
     } else [fx, fy, fw, fh, fwp, fhp, fr].forEach((f) => setVal(f, ''));
 
     nodeProps.hidden = sepNode.hidden = ed.tool !== 'node';
+    pencilProps.hidden = ed.tool !== 'pencil';
     const imgs = ed.selImages();
     imgProps.hidden = sepImg.hidden = !imgs.length;
     const canCrop = imgs.length === 1 && ed.sel.length > 1;
@@ -970,6 +991,8 @@ function buildBars(ed: Editor) {
     { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern (-)'), run: () => ed.zoomAt(0.8) },
     { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite (Ctrl+0)'), run: () => ed.zoomPage() },
     { id: 'grid', cat: V, icon: 'grid', label: t('Gitter ein-/ausblenden'), run: () => ed.setGrid({ show: !ed.grid.show }), on: () => ed.grid.show },
+    { id: 'camera-overlays', cat: V, icon: 'cameraOverlay', label: t('Alle Kameraüberlagerungen anzeigen'), run: () => toggleCameraOverlays(ed), on: cameraOverlaysVisible,
+      dyn: () => ({ icon: cameraOverlaysVisible() ? 'cameraOverlay' : 'cameraOverlayOff' }) },
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
     { id: 'zoomsel', cat: V, icon: 'zoomsel', label: t('Auf Auswahl zoomen'), run: () => ed.zoomSelection(), enabled: sel1 },
     { id: 'view3d', cat: V, icon: 'view3d', label: t('3D-Ansicht: Baugruppen zusammengesteckt ansehen'), run: () => toggleWindow('view3d') },
@@ -995,8 +1018,9 @@ function buildBars(ed: Editor) {
     tool('select', 'select', t('Auswählen (Esc)')),
     tool('node', 'node', t('Knoten bearbeiten (Ctrl+`)')),
     tool('line', 'line', t('Linien zeichnen (Ctrl+L)')),
-    { id: 'isolate', cat: W, icon: 'select', label: t('Auswahl isolieren / Isolation verlassen'), run: () => { if (ed.isolation) ed.leaveIsolation(); else ed.isolateSelection(); }, enabled: () => !!ed.isolation || canEnterIsolation(ed), on: () => !!ed.isolation },
-    { id: 'vectorfit', cat: W, icon: 'node', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
+    { id: 'isolate', cat: W, icon: 'isolate', label: t('Auswahl isolieren / Isolation verlassen'), run: () => { if (ed.isolation) ed.leaveIsolation(); else ed.isolateSelection(); }, enabled: () => !!ed.isolation || canEnterIsolation(ed), on: () => !!ed.isolation, dyn: () => ed.isolation ? { icon: 'isolateExit', label: t('Isolation verlassen') } : { icon: 'isolate', label: t('Auswahl isolieren') } },
+    { id: 'vectorfit', cat: W, icon: 'vectorfit', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
+    tool('pencil', 'pencil', t('Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad')),
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
     tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),
     tool('polygon', 'polygon', t('Polygon')),
@@ -1096,12 +1120,12 @@ function buildBars(ed: Editor) {
     {
       main: [
         'new', 'open', 'save', 'import', 'export', SEP, 'undo', 'redo', SEP, 'cut', 'copy', 'paste', 'delete', SEP,
-        'grp:zoom', 'view3d', SEP, 'check', 'preview', SEP,
+        'grp:zoom', 'view3d', 'camera-overlays', SEP, 'check', 'preview', SEP,
         'group', 'ungroup', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
-        'grp:bool', 'outline', 'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure',
+        'tool:select', 'tool:node', 'vectorfit', 'isolate', SEP, 'tool:line', 'tool:pencil', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
+        'grp:bool', 'outline' ,'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure',
       ],
     },
     // Gespeicherte Leisten von vor den Knopfgruppen: die alten Standardfolgen durch die Gruppe ersetzen

@@ -24,11 +24,11 @@ Virtual Machine: the virtual laser machine is a separate Tauri program in the `v
 
 ## Translations
 
-UI texts are written in German in the code inside `t('…')` (placeholders in curly braces, `t('{n} Bilder', { n })`; singular/plural with `tn('{n} Bild', '{n} Bilder', n)`). The German text is also the key in the language files `src/locales/<language>.json`. If a translation is missing, the German text is shown. If the same German text has two meanings, it gets a context after `|`, e.g. `t('Verbindung|Gerät')`.
+UI texts are written in German in the code inside `t('…')` (placeholders in curly braces, `t('{n} Bilder', { n })`; singular/plural with `tn('{n} Bild', '{n} Bilder', n)`). The German text is also the key in the language files `src/locales/<language>.json`. If a translation is missing, the English text is shown, otherwise the German one. If the same German text has two meanings, it gets a context after `|`, e.g. `t('Verbindung|Gerät')`.
 
 - `npm run i18n:check` lists missing, unused and misplaced entries (fails if anything is missing).
 - `npm run i18n:check -- --write` adds new texts with an empty value and removes unused ones; afterwards only the empty values need translating.
-- New language: create `src/locales/fr.json` (e.g. a copy of `en.json` with empty values) and register it in `LANGUAGES` and `DICTS` in `src/i18n.ts`.
+- New language: create `src/locales/fr.json` (e.g. a copy of `en.json` with empty values). Nothing else needs registering: the app finds every file in `src/locales/` on its own, the file name is the language code (`fr`, `pt-BR`), and the name in View → Language, the number and date formats and the decimal separator come from the browser's `Intl`. The system language picks the file automatically. `npm run i18n:check` also checks that the file name is a valid language code. The Virtual Machine shares the list; its own texts are only translated to English, which other languages get as well.
 - Messages from the Rust side are in German and are translated in `src/i18n.ts` (`tBackend`).
 
 ## Structure

@@ -78,6 +78,7 @@ h1, h2, h3 {
   text-wrap: balance;
 }
 :lang(de) h1, :lang(de) h2, :lang(de) h3, :lang(de) p, :lang(de) li { hyphens: auto; }
+:lang(it) h1, :lang(it) h2, :lang(it) h3, :lang(it) p, :lang(it) li { hyphens: auto; }
 p { margin: 0; }
 ul { margin: 0; padding: 0; }
 a { color: var(--accent-text); text-underline-offset: 3px; }
@@ -169,8 +170,12 @@ main:focus { outline: none; }
 }
 .lang-switch .lang-current { color: var(--text); }
 .lang-switch .lang-sep { opacity: .5; }
-.lang-switch:hover { border-color: var(--text-muted); }
-.lang-switch:hover .lang-other { color: var(--accent-text); }
+.lang-switch .lang-other { color: inherit; text-decoration: none; padding: 4px 2px; border-radius: var(--r-sm); }
+.lang-switch .lang-other:hover { color: var(--accent-text); }
+@media (max-width: 400px) {
+  .header-actions { gap: var(--s-1); }
+  .lang-switch { gap: 1px; padding: 0 6px; }
+}
 .icon-btn {
   display: inline-grid; place-items: center; width: 40px; height: 40px;
   border-radius: var(--r-md); color: var(--text); border: 1px solid var(--border); background: var(--surface);

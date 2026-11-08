@@ -1,3 +1,4 @@
+
 // Maschinenausgabe: aus dem Dokument einen Job berechnen (Linien, Füllen, Bilder), G-Code schreiben,
 // Laufzeit schätzen und Rahmenfahrten erzeugen. Alles in Maschinenkoordinaten (mm, Ursprung unten links, y nach oben).
 import ClipperLib from 'clipper-lib';
@@ -209,6 +210,18 @@ export const PRESETS: (Partial<Device> & { name: string; fw: Firmware })[] = [
   { name: 'Ortur Laser Master 2 Pro S2', fw: 'grbl', bedW: 400, bedH: 400 },
   // atomstack.com/products/atomstack-a20-pro-130w
   { name: 'Atomstack A20 Pro', fw: 'grbl', bedW: 400, bedH: 365 },
+  // Atomstack P1; area di lavoro 110 × 110 mm, moduli intercambiabili (diodo 5W / infrarossi 1.2W)
+  { 
+    name: 'Atomstack P1', 
+    fw: 'grbl', 
+    bedW: 110, 
+    bedH: 110, 
+    baud: 115200, 
+    rapid: 3000, 
+    accel: 1000, 
+    sMax: 1000, 
+    frameSpeed: 1500 
+  },
   // Herstellerangabe 410 × 400; Nutzer messen im LightBurn-Forum etwa 374 × 362
   { name: 'Sculpfun S30', fw: 'grbl', bedW: 410, bedH: 400 },
   // crealityfalcon.com/blogs/product-reviews/sculpfun-s9-review
@@ -774,7 +787,34 @@ export function kerfOffset(polys: Poly[], d: number): Poly[] {
   co.AddPaths(area, JoinType.jtRound, EndType.etClosedPolygon);
   const out: ClipperLib.Paths = [];
   co.Execute(out, d * KSCALE);
-  return out.filter((p) => p.length > 2).map((p) => ({ pts: p.map((q) => ({ x: q.X / KSCALE, y: q.Y / KSCALE })), closed: true }));
+  const res: Poly[] = out.filter((p) => p.length > 2).map((p) => ({ pts: p.map((q) => ({ x: q.X / KSCALE, y: q.Y / KSCALE })), closed: true }));
+  return keepStarts(polys, res);
+}
+
+/**
+ * Carry user-set start points over to offset contours (Clipper starts them anywhere): the contour nearest to the
+ * original start begins at its nearest point and runs in the original direction.
+ */
+function keepStarts(src: Poly[], res: Poly[]): Poly[] {
+  for (const p of src) {
+    if (!p.fixed || !p.closed || !p.pts.length) continue;
+    const s = p.pts[0];
+    let bi = -1,
+      bj = 0,
+      bd = Infinity;
+    res.forEach((r, i) => {
+      if (r.fixed) return;
+      r.pts.forEach((q, j) => {
+        const dd = (q.x - s.x) ** 2 + (q.y - s.y) ** 2;
+        if (dd < bd) [bd, bi, bj] = [dd, i, j];
+      });
+    });
+    if (bi < 0) continue;
+    let q = startAt(res[bi], bj);
+    if (Math.sign(signedArea(q.pts)) !== Math.sign(signedArea(p.pts))) q = { ...q, pts: [q.pts[0], ...q.pts.slice(1).reverse()] };
+    res[bi] = { ...q, fixed: true };
+  }
+  return res;
 }
 
 /** Höchstzahl der Ringe je Insel, falls Abstand und Fläche nicht zusammenpassen */

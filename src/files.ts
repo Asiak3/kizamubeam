@@ -13,6 +13,7 @@ import { buildDxf, buildPdf, ExportItem, ExportPage, LayerInfo } from './vecexpo
 import { FallbackResolver, importPdfPages, isPdf } from './pdfimport';
 import { t, tn } from './i18n';
 import { tabNameFromPath } from './editor/tabs';
+import { installNativeFileDrop, installDomFileDrop, dispatchNativeFiles } from './nativeFileDrop';
 
 const isTauri = () => '__TAURI_INTERNALS__' in window;
 
@@ -639,16 +640,34 @@ export async function importModel(ed: Editor, gen: 'stack' | 'ribs') {
 
 /** Dateien aus dem Dateimanager auf die Arbeitsfläche ziehen; Bilder/SVG aus der Zwischenablage einfügen */
 export function installDropAndPaste(ed: Editor, stage: HTMLElement) {
-  stage.addEventListener('dragover', (e) => {
-    if (e.dataTransfer?.types.includes('Files')) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
-    }
+  // Native WebView2 drops do not reliably provide DOM File objects. Forward OS
+  // drops as in-memory File objects so canvas and library retain one import path.
+  if (isTauri()) {
+    installNativeFileDrop({
+      subscribe: async receive => {
+        const { getCurrentWebview } = await import('@tauri-apps/api/webview');
+        return getCurrentWebview().onDragDropEvent(event => receive(event.payload));
+      },
+      read: async path => { const { invoke } = await import('@tauri-apps/api/core'); return invoke<ArrayBuffer>('read_file', { path }); },
+      scaleFactor: async () => { const { getCurrentWindow } = await import('@tauri-apps/api/window'); return getCurrentWindow().scaleFactor(); },
+      captureContext: () => { const doc = ed.doc, page = ed.doc.pages[ed.doc.page]; return () => ed.doc === doc && ed.doc.pages[ed.doc.page] === page; },
+      deliver: (files, x, y) => {
+        if (document.querySelector('dialog[open]')) {
+          ed.hint = t('Laufende Bearbeitung beenden, bevor Dateien abgelegt werden.'); ed.emit('view'); return;
+        }
+        dispatchNativeFiles(files, x, y);
+      },
+      error: error => { ed.hint = t('Dateien konnten nicht abgelegt werden: {message}', { message: error instanceof Error ? error.message : String(error) }); ed.emit('tool'); },
+    });
+  }
+  // Prevent a file dropped outside a supported panel from replacing the app page.
+  for (const event of ['dragover', 'drop']) window.addEventListener(event, e => {
+    if ((e as DragEvent).dataTransfer?.types.includes('Files')) e.preventDefault();
   });
-  stage.addEventListener('drop', async (e) => {
-    const files = [...(e.dataTransfer?.files ?? [])];
-    if (!files.length) return;
-    e.preventDefault();
+  installDomFileDrop(stage, async files => {
+    if (document.querySelector('dialog[open]') || ed.drag || ed.draft || ed.sketchEdit || ed.pickHandler) {
+      ed.hint = t('Laufende Bearbeitung beenden, bevor Dateien abgelegt werden.'); ed.emit('view'); return;
+    }
     for (const f of files) {
       if (/\.kzt$/i.test(f.name)) {
         const { useTemplateFile } = await import('./templateDialogs');
@@ -658,7 +677,7 @@ export function installDropAndPaste(ed: Editor, stage: HTMLElement) {
         await installPackFile(f.name, await f.text());
       } else await importBytes(ed, f.name, new Uint8Array(await f.arrayBuffer()));
     }
-  });
+  }, error => { ed.hint = t('Dateien konnten nicht abgelegt werden: {message}', { message: error instanceof Error ? error.message : String(error) }); ed.emit('tool'); });
   ed.externalPaste = async (data) => {
     const file = [...data.files].find((f) => f.type.startsWith('image/'));
     if (file) {

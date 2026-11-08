@@ -1,7 +1,7 @@
 // Variabler Text (wie „Variable Text“ in LightBurn): Platzhalter in Texten und QR-Codes werden beim Zeichnen
 // und Lasern ersetzt. Seriennummer und CSV-Zeile hängen an der projektweiten Nummer (Doc.vt), die nach jedem
 // Job weiterzählen kann.
-import { lang, t } from './i18n';
+import { locale, t } from './i18n';
 import { TextShape, VarText, VarTextRef } from './model';
 import { fillTemplate } from './params';
 
@@ -31,7 +31,7 @@ export function withNow<T>(d: Date, fn: () => T): T {
 const pad = (v: number, n = 2) => String(v).padStart(n, '0');
 
 function dateCode(c: string, d: Date): string | null {
-  const loc = lang === 'de' ? 'de-DE' : 'en-US';
+  const loc = locale;
   switch (c) {
     case 'y': return pad(d.getFullYear() % 100);
     case 'Y': return String(d.getFullYear());

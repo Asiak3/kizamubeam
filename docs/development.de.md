@@ -24,11 +24,11 @@ Virtual Machine: Die virtuelle Lasermaschine ist ein eigenes Tauri-Programm im O
 
 ## Übersetzungen
 
-Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klammern, `t('{n} Bilder', { n })`; Einzahl/Mehrzahl mit `tn('{n} Bild', '{n} Bilder', n)`). Die deutsche Fassung ist zugleich der Schlüssel in den Sprachdateien `src/locales/<sprache>.json`. Fehlt eine Übersetzung, erscheint der deutsche Text. Hat derselbe deutsche Text zwei Bedeutungen, bekommt er einen Kontext nach `|`, z. B. `t('Verbindung|Gerät')`.
+Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klammern, `t('{n} Bilder', { n })`; Einzahl/Mehrzahl mit `tn('{n} Bild', '{n} Bilder', n)`). Die deutsche Fassung ist zugleich der Schlüssel in den Sprachdateien `src/locales/<sprache>.json`. Fehlt eine Übersetzung, erscheint der englische, sonst der deutsche Text. Hat derselbe deutsche Text zwei Bedeutungen, bekommt er einen Kontext nach `|`, z. B. `t('Verbindung|Gerät')`.
 
 - `npm run i18n:check` listet fehlende, unbenutzte und falsch platzierte Einträge (bricht bei Fehlendem mit Fehler ab).
 - `npm run i18n:check -- --write` trägt neue Texte mit leerem Wert ein und entfernt unbenutzte; danach nur noch die leeren Werte übersetzen.
-- Neue Sprache: `src/locales/fr.json` anlegen (z. B. Kopie von `en.json` mit leeren Werten), in `src/i18n.ts` bei `LANGUAGES` und `DICTS` eintragen.
+- Neue Sprache: `src/locales/fr.json` anlegen (z. B. Kopie von `en.json` mit leeren Werten). Eintragen muss man nichts: Die App findet alle Dateien in `src/locales/` selbst, der Dateiname ist der Sprachcode (`fr`, `pt-BR`), Name unter Ansicht → Sprache, Zahlen- und Datumsformat und Dezimalzeichen liefert `Intl` im Browser. Die Systemsprache wählt die Datei automatisch. `npm run i18n:check` prüft auch, ob der Dateiname ein gültiger Sprachcode ist. Die virtuelle Maschine nutzt dieselbe Liste; ihre eigenen Texte gibt es nur auf Englisch, das bekommen auch die anderen Sprachen.
 - Meldungen aus dem Rust-Teil sind deutsch und werden in `src/i18n.ts` (`tBackend`) übersetzt.
 
 ## Aufbau
@@ -39,7 +39,7 @@ Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klam
 | `src/geom.ts` | Formen als Bézierpfade, Begrenzungsrahmen, Text-Layout, Treffertest, SVG-Pfade |
 | `src/editor.ts` | Editor-Klasse: Zustand, Ansicht, Auswahl, Werkzeugwahl; bindet die Teile darunter ein |
 | `src/editor/*.ts` | Teile des Editors: `document` (Undo, Autosave, Seiten), `pointer` (Mauseingaben), `keyboard`, `snapping` (Fangen), `nodes` (Knoten), `paths` (Pfad-Werkzeuge), `shapeops` (Umwandeln, Boolesche Operationen, Offset, Arrays), `joints`, `hinges`, `generators` (parametrische Bauteile), `nest` (Verschachteln), `check` (Konstruktion prüfen), `params` (Projekt-Parameter, Vorlagen), `series` (Serie aus Tabelle), `commands`, `objects`, `text` (QR, variabler Text, Text auf Pfad, Textrahmen), `imageops` (Bilder, Import, Nachzeichnen), `render` (Zeichnen der Arbeitsfläche) |
-| `src/ui.ts` | Menü, Aktionen der Funktionsleisten, Eigenschaftenleiste, Layer-Fenster, Palette, Statusleiste, Texteingabe |
+| `src/ui.ts` | Menü, Aktionen der Funktionsleisten, Eigenschaftenleiste, Textleiste, Layer-Fenster, Palette, Statusleiste, Texteingabe |
 | `src/storageMigration.ts` | Übernimmt Einstellungen unter dem alten Namen (`laserwerk.*`) beim ersten Start nach `kizamubeam.*` |
 | `src/dock.ts` | Andockbare Fenster: Reiter, Gruppen, freie Fenster, Größe, Ein-/Ausblenden, gespeicherte Anordnung |
 | `src/apps.ts`, `src/appsPanel.ts` | Werkzeugkasten: Kacheln mit Gruppen, Erklärung und Suchwörtern, Suche; Fenster mit Filter und Gruppen |

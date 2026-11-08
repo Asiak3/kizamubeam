@@ -1,3 +1,4 @@
+import { installPinchGestures } from './canvasZoom';
 // Editor: Zustand, Ansicht, Auswahl und Werkzeugwahl. Die übrigen Bereiche liegen in src/editor/
 // und werden unten in die Klasse eingehängt.
 import { Doc, Mat, newDoc, Obj, Pt, Shape, SubPath, TextShape, visibleLeaves, VarText } from './model';
@@ -114,6 +115,8 @@ export class Editor {
   segmentSets = new Map<Obj, Set<string>>();
   nodeEditObj: Obj | null = null;
   vectorPreview: VectorPlan[] | null = null;
+  pencilTolerance = 0.2;
+  pencilClosed = false;
   suppressContextMenu = false;
   onCanvasContext: ((event: MouseEvent) => void) | null = null;
   hint = '';
@@ -151,7 +154,7 @@ export class Editor {
   // Fangen an Raster, Objekten und Hilfslinien
   /** Ist der Werkzeug-Modus einer, bei dem der Mauszeiger schon ohne Ziehen fängt? */
   get drawTool() {
-    return this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
+    return this.tool === 'pencil' || this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
   }
 
   // Pfad-Werkzeuge: Schließen, Verbinden, Zerlegen, Startpunkt, Trimmen
@@ -264,8 +267,8 @@ export class Editor {
     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
-    canvas.addEventListener('pointercancel', () => this.cancelDrag());
-    canvas.addEventListener('lostpointercapture', () => { if (this.drag) this.cancelDrag(); });
+    canvas.addEventListener('pointercancel', (e) => this.cancelPointerDrag(e));
+    canvas.addEventListener('lostpointercapture', (e) => this.cancelPointerDrag(e));
     canvas.addEventListener('pointerleave', () => {
       if (this.drag || (!this.nodeHover && !this.segHover && !this.snapHit && !this.alignGuides.length)) return;
       this.nodeHover = this.segHover = null;
@@ -274,6 +277,7 @@ export class Editor {
     });
     canvas.addEventListener('dblclick', (e) => this.onDouble(e));
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+    installPinchGestures(canvas, (factor, x, y) => this.zoomAt(factor, x, y));
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       if (this.suppressContextMenu) { this.suppressContextMenu = false; return; }

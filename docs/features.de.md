@@ -1,6 +1,6 @@
 # Funktionen von KizamuBeam
 
-[English](features.md) · Deutsch · [Zurück zum README](../README.de.md)
+[English](features.md) · Deutsch · [Italiano](features.it.md) · [Zurück zum README](../README.de.md)
 
 Alles, was KizamuBeam kann, mit Menüwegen und Tastenkürzeln. Den schnellen Überblick gibt es im [README](../README.de.md) und auf der [Website](https://negurvulkan.github.io/kizamubeam/).
 
@@ -35,7 +35,8 @@ Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
 - Anpassbare Oberfläche:
   - Werkzeugfenster (Schnitte/Layer, Objekte, Laser, Verschieben, Konsole, Material, Kamera) sind einzeln andockbar. Reiter ziehen: auf einen anderen Reiterkopf = als Reiter dazu, an den oberen oder unteren Rand einer Gruppe = darüber bzw. darunter, an den linken Rand neben der Werkzeugleiste = linke Andockleiste, auf die Arbeitsfläche = freies Fenster (verschieben am Kopf, Größe an der Ecke unten rechts, ⇥ oder Doppelklick dockt rechts an).
   - Größe: Trennlinien zwischen den Fenstern und der Innenrand der Andockleisten lassen sich ziehen. ▾ oder Doppelklick auf den Kopf klappt eine Gruppe ein.
-  - × am Reiter blendet ein Fenster aus; Menü Fenster blendet Fenster und Leisten (Hauptleiste, Werkzeugleiste, Eigenschaftenleiste, Farbpalette, Statusleiste) ein und aus.
+  - × am Reiter blendet ein Fenster aus; Menü Fenster blendet Fenster und Leisten (Hauptleiste, Werkzeugleiste, Eigenschaftenleiste, Textleiste, Farbpalette, Statusleiste) ein und aus.
+  - Textleiste: Die Textoptionen (Schrift, Höhe, Stil, Ausrichtung, Abstände, Max. Breite/Höhe, Schweißen, Text auf Pfad, Variabler Text) stehen in einer eigenen Zeile unter der Eigenschaftenleiste und sind ohne ausgewählten Text ausgegraut.
   - Funktionsleisten anpassen (Fenster → Funktionsleisten oder Rechtsklick auf die Hauptleiste bzw. Werkzeugleiste): Aktionen aus allen Bereichen hinzufügen, entfernen, per Ziehen oder ↑/↓ umsortieren, Trennlinien einfügen, Symbolgröße klein/normal/groß; Aktionen ohne Symbol erscheinen als Text. Knopfgruppen (Zoom, Spiegeln und drehen, Ausrichten und verteilen, Boolesche Operationen, Pfad-Werkzeuge, Arrays) belegen nur einen Platz: der Knopf führt die zuletzt gewählte Aktion aus, der Pfeil ▾ daneben zeigt alle. Ältere gespeicherte Leisten werden dabei automatisch zusammengefasst. „Standard wiederherstellen“ setzt eine Leiste zurück.
   - Anordnung und Leisten werden je Nutzer gespeichert (`localStorage`: `kizamubeam.layout`, `kizamubeam.toolbars`); Fenster → Fenster und Leisten zurücksetzen stellt den Ausgangszustand wieder her.
   - Die Desktop-App merkt sich Größe, Position und Maximiert-Zustand des Hauptfensters. Ändert sich die Fenstergröße (z. B. beim Maximieren), wird der Arbeitsbereich neu eingepasst, wenn er gerade ganz zu sehen war, sonst bleibt die Mitte der Ansicht in der Mitte.
@@ -133,7 +134,7 @@ Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
 - Mehrseitige Projekte: Ein Projekt hat eine oder mehrere Seiten (Objekte-Fenster ganz oben, Menü Seiten, Bild ↑/↓ zum Wechseln). Jede Seite hat eigene Objekte; die Layer-Einstellungen gelten für das ganze Projekt. Gezeichnet, bearbeitet, gelasert und exportiert (SVG, DXF, G-Code) wird die aktuelle Seite; PDF- und AI-Export enthalten alle Seiten. Seiten lassen sich anlegen, duplizieren, umbenennen (Doppelklick), löschen und per Ziehen umordnen; Objekte zieht man auf eine Seitenzeile, um sie dorthin zu verschieben. Dateiformat ab `version: 2` mit `pages` und `page`; ältere Dateien öffnen sich als Projekt mit einer Seite. MCP: `get_document` (mit `pages`), `switch_page`, `edit_pages`, `move_to_page`.
 - Projekt-Notizen (Fenster → Notizen): freier Text zu **Material** (Art, Dicke, Bezugsquelle), **Aufbau** (Fokus, Auflage, Ursprung, Fixierung) und **Bearbeitung** (Reihenfolge, Durchgänge, Nachbearbeitung, was beim nächsten Mal anders). Die Notizen stehen in der Projektdatei (`.kzb`, Eintrag `notes`) und in Vorlagen, jede Bearbeitung ist ein Undo-Schritt. MCP: `project_notes`, auch in `get_document`.
 - Verlaufsfenster (Reiter neben Objekte, Menü Fenster): die letzten Änderungen (bis 200) als Liste mit Namen wie „Verschieben“, „Offset“ oder „Text bearbeiten“ und Uhrzeit. Klick auf eine Zeile springt dorthin, mehrere Schritte auf einmal zurück oder vor; rückgängig gemachte Schritte stehen ausgegraut unter dem aktuellen Stand und lassen sich per Klick wiederholen, bis eine neue Änderung sie verwirft. Ctrl+Z / Ctrl+Y (oder Ctrl+Shift+Z) gehen weiter einzeln. Jeder MCP-Aufruf erscheint als ein Schritt mit dem Namen seines Werkzeugs.
-- Oberfläche auf Deutsch und Englisch (Ansicht → Sprache). Standard folgt der Systemsprache (andere Systemsprachen bekommen Englisch), die Wahl bleibt gespeichert; im Englischen die unter Laser-Nutzern üblichen Begriffe.
+- Oberfläche auf Deutsch, Englisch und Italienisch (Ansicht → Sprache). Standard folgt der Systemsprache (andere Systemsprachen bekommen Englisch), die Wahl bleibt gespeichert; im Englischen die unter Laser-Nutzern üblichen Begriffe.
 - Helles und dunkles Design (Ansicht → Design oder Knopf ganz rechts in der Symbolleiste), Standard folgt dem System. Im dunklen Design werden sehr dunkle Layerfarben auf der Arbeitsfläche aufgehellt.
 
 ## Import, Bilder und Nachzeichnen
