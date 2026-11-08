@@ -50,6 +50,14 @@ const write = process.argv.includes('--write');
 let bad = 0;
 for (const lf of fs.readdirSync(path.join(srcDir, 'locales')).filter((f) => f.endsWith('.json'))) {
   const lpath = path.join(srcDir, 'locales', lf);
+  // The file name is the language code (src/i18n.ts finds the files on its own), so it must be a valid tag
+  const code = lf.slice(0, -5);
+  try {
+    if (Intl.getCanonicalLocales(code)[0].toLowerCase() !== code.toLowerCase()) throw new Error();
+  } catch {
+    console.log(`${lf}: file name is not a language code such as "it" or "pt-BR"`);
+    bad++;
+  }
   const dict = JSON.parse(fs.readFileSync(lpath, 'utf8'));
   const missing = [...keys.keys()].filter((k) => !dict[k]);
   const unused = Object.keys(dict).filter((k) => !keys.has(k));

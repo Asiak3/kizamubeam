@@ -24,11 +24,11 @@ Virtual Machine: Die virtuelle Lasermaschine ist ein eigenes Tauri-Programm im O
 
 ## Übersetzungen
 
-Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klammern, `t('{n} Bilder', { n })`; Einzahl/Mehrzahl mit `tn('{n} Bild', '{n} Bilder', n)`). Die deutsche Fassung ist zugleich der Schlüssel in den Sprachdateien `src/locales/<sprache>.json`. Fehlt eine Übersetzung, erscheint der deutsche Text. Hat derselbe deutsche Text zwei Bedeutungen, bekommt er einen Kontext nach `|`, z. B. `t('Verbindung|Gerät')`.
+Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klammern, `t('{n} Bilder', { n })`; Einzahl/Mehrzahl mit `tn('{n} Bild', '{n} Bilder', n)`). Die deutsche Fassung ist zugleich der Schlüssel in den Sprachdateien `src/locales/<sprache>.json`. Fehlt eine Übersetzung, erscheint der englische, sonst der deutsche Text. Hat derselbe deutsche Text zwei Bedeutungen, bekommt er einen Kontext nach `|`, z. B. `t('Verbindung|Gerät')`.
 
 - `npm run i18n:check` listet fehlende, unbenutzte und falsch platzierte Einträge (bricht bei Fehlendem mit Fehler ab).
 - `npm run i18n:check -- --write` trägt neue Texte mit leerem Wert ein und entfernt unbenutzte; danach nur noch die leeren Werte übersetzen.
-- Neue Sprache: `src/locales/fr.json` anlegen (z. B. Kopie von `en.json` mit leeren Werten), in `src/i18n.ts` bei `LANGUAGES` und `DICTS` eintragen.
+- Neue Sprache: `src/locales/fr.json` anlegen (z. B. Kopie von `en.json` mit leeren Werten). Eintragen muss man nichts: Die App findet alle Dateien in `src/locales/` selbst, der Dateiname ist der Sprachcode (`fr`, `pt-BR`), Name unter Ansicht → Sprache, Zahlen- und Datumsformat und Dezimalzeichen liefert `Intl` im Browser. Die Systemsprache wählt die Datei automatisch. `npm run i18n:check` prüft auch, ob der Dateiname ein gültiger Sprachcode ist. Die virtuelle Maschine nutzt dieselbe Liste; ihre eigenen Texte gibt es nur auf Englisch, das bekommen auch die anderen Sprachen.
 - Meldungen aus dem Rust-Teil sind deutsch und werden in `src/i18n.ts` (`tBackend`) übersetzt.
 
 ## Aufbau
