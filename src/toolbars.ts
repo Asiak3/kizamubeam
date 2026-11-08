@@ -62,6 +62,7 @@ const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 5, bar: 'tools', id: 'grp:relate', after: 'nest' },
   { v: 5, bar: 'tools', id: 'tool:measure', after: 'grp:relate' },
   { v: 8, bar: 'tools', id: 'vectorfit', after: 'tool:node' },
+  { v: 7, bar: 'main', id: 'camera-overlays', after: 'view3d' },
   { v: 8, bar: 'tools', id: 'isolate', after: 'vectorfit' },
 ];
 /** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
@@ -134,8 +135,15 @@ export function refreshBars() {
       }
       if (a.enabled) b.disabled = !a.enabled();
       else b.disabled = false;
-      if (a.on) b.classList.toggle('on', a.on());
-      else b.classList.remove('on');
+      if (a.on) {
+        const pressed = a.on();
+        b.classList.toggle('on', pressed);
+        b.setAttribute('aria-pressed', String(pressed));
+      } else {
+        b.classList.remove('on');
+        b.removeAttribute('aria-pressed');
+      }
+
       if (a.dyn) {
         const d = a.dyn();
         if (d.icon && b.dataset.icon !== d.icon) ((b.innerHTML = ICONS[d.icon]), (b.dataset.icon = d.icon));

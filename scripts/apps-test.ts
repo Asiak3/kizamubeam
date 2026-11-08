@@ -97,6 +97,12 @@ test('Gespeicherte Leisten: Generatoren und Verbindungen wandern in den Werkzeug
   const own = ['grp:gen', 'tool:select', 'apps', 'hinge', 'tool:joint'];
   assert.deepEqual(upgradeBar('tools', own, 3), [...own, 'grp:relate', 'tool:measure', 'vectorfit', 'isolate']);
   assert.deepEqual(upgradeBar('main', ['devsettings', 'check'], 3), ['devsettings', 'check']);
+  assert.deepEqual(upgradeBar('tools', ['qr', 'grp:gen', '|', 'tool:joint', 'lidhinge', 'hinge'], 2), ['qr', 'apps', '|', 'grp:relate', 'tool:measure']);
+  assert.deepEqual(upgradeBar('main', ['check', 'preview', 'devsettings', '|', 'group'], 3), ['check', 'preview', '|', 'group', 'camera-overlays']);
+  // selbst umgestellt: bleibt
+  const own = ['grp:gen', 'tool:select', 'apps', 'hinge', 'tool:joint'];
+  assert.deepEqual(upgradeBar('tools', own, 3), [...own, 'grp:relate', 'tool:measure']);
+  assert.deepEqual(upgradeBar('main', ['devsettings', 'check'], 3), ['devsettings', 'check', 'camera-overlays']);
   // schon aktuell: nichts ändern
   assert.deepEqual(upgradeBar('tools', ['grp:gen', 'apps'], 8), ['grp:gen', 'apps']);
   // v4 → v5: Beziehungen und Messen kommen hinter Verschachteln dazu
