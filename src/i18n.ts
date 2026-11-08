@@ -61,7 +61,8 @@ export function setLangPref(p: LangPref): boolean {
  * t('{n} Bilder', { n: 3 }).
  */
 export function t(de: string, vars?: Record<string, string | number>): string {
-  const s = DICTS[lang]?.[de] || de.replace(/\|[^|]*$/, '');
+  // Fehlt eine Übersetzung, erst Englisch, dann Deutsch
+  const s = DICTS[lang]?.[de] || (lang !== 'de' && (en as Record<string, string>)[de]) || de.replace(/\|[^|]*$/, '');
   return vars ? s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : s;
 }
 
