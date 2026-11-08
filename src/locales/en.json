@@ -3862,5 +3862,12 @@
   "Freihandtoleranz in Millimetern": "Freehand fit tolerance in millimetres",
   "Anpassungstoleranz (mm)": "Fit tolerance (mm)",
   "Geschlossener Pfad": "Closed path",
-  "Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad": "Freehand / Pencil: drag to draw a fitted Bézier path"
+  "Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad": "Freehand / Pencil: drag to draw a fitted Bézier path",
+  "Dateien konnten nicht abgelegt werden: {message}": "Files could not be dropped: {message}",
+  "Laufende Bearbeitung beenden, bevor Dateien abgelegt werden.": "Finish the current edit before dropping files.",
+  "Alle Kameraüberlagerungen anzeigen": "Show all camera overlays",
+  "Kameraüberlagerungen": "Camera overlays",
+  "Kameraüberlagerungen global ausgeblendet. Die Auswahl je Kamera und laufende Aktualisierungen bleiben unverändert.": "Camera overlays are globally hidden. Individual camera selections and ongoing updates remain unchanged.",
+  "Fenster zurücksetzen": "Reset window",
+  "Ausblenden": "Hide"
 }

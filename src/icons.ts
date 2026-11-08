@@ -4,6 +4,8 @@ const svg = (body: string) =>
 
 export const ICONS: Record<string, string> = {
   pencil: svg('<path d="M4 15 15.5 3.5l5 5L9 20l-6 1zM13.5 5.5l5 5M4 15l5 5M3 21l3-1"/><path d="M12 21c2-5 5 2 9-3"/>'),
+  cameraOverlayOff: svg('<rect x="3" y="7" width="18" height="13" rx="2" opacity=".4"/><path d="m7 7 2-3h6l2 3" opacity=".4"/><circle cx="14" cy="12" r="3" opacity=".4"/><path d="M3 21 21 3"/>'),
+  cameraOverlay: svg('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="m7 7 2-3h6l2 3M5 17l3-3 3 3"/><circle cx="14" cy="12" r="3"/><path d="M14 9v6M11 12h6" opacity=".5"/>'),
   select: svg('<path d="M5 3l13 8-6 1.5L9 19z" fill="currentColor" fill-opacity=".15"/>'),
   node: svg('<path d="M4 18C8 4 16 4 20 18"/><rect x="2.5" y="16.5" width="3" height="3"/><rect x="18.5" y="16.5" width="3" height="3"/><circle cx="12" cy="7.5" r="1.6" fill="currentColor"/><path d="M7 7.5h10" stroke-dasharray="1.5 1.5"/>'),
   line: svg('<path d="M4 20l5-12 6 7 5-11"/><circle cx="4" cy="20" r="1.3" fill="currentColor"/><circle cx="20" cy="4" r="1.3" fill="currentColor"/>'),

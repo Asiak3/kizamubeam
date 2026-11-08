@@ -1,3 +1,4 @@
+import { cameraOverlaysVisible, toggleCameraOverlays } from './cameraOverlayVisibility';
 import { canEnterIsolation } from './isolation';
 // Oberfläche: Menü, Leisten, Panels, Palette, Statusleiste.
 import { Editor, Tool } from './editor';
@@ -396,6 +397,7 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Ansicht'), [
+      [t('Alle Kameraüberlagerungen anzeigen'), '', () => toggleCameraOverlays(ed), cameraOverlaysVisible],
       [t('Ganze Seite'), 'Ctrl+0', () => ed.zoomPage()],
       [t('Auf Auswahl zoomen'), '', () => ed.zoomSelection()],
       [t('Vergrößern'), '+', () => ed.zoomAt(1.25)],
@@ -982,6 +984,8 @@ function buildBars(ed: Editor) {
     { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern (-)'), run: () => ed.zoomAt(0.8) },
     { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite (Ctrl+0)'), run: () => ed.zoomPage() },
     { id: 'grid', cat: V, icon: 'grid', label: t('Gitter ein-/ausblenden'), run: () => ed.setGrid({ show: !ed.grid.show }), on: () => ed.grid.show },
+    { id: 'camera-overlays', cat: V, icon: 'cameraOverlay', label: t('Alle Kameraüberlagerungen anzeigen'), run: () => toggleCameraOverlays(ed), on: cameraOverlaysVisible,
+      dyn: () => ({ icon: cameraOverlaysVisible() ? 'cameraOverlay' : 'cameraOverlayOff' }) },
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
     { id: 'zoomsel', cat: V, icon: 'zoomsel', label: t('Auf Auswahl zoomen'), run: () => ed.zoomSelection(), enabled: sel1 },
     { id: 'view3d', cat: V, icon: 'view3d', label: t('3D-Ansicht: Baugruppen zusammengesteckt ansehen'), run: () => toggleWindow('view3d') },
@@ -1108,7 +1112,7 @@ function buildBars(ed: Editor) {
     {
       main: [
         'new', 'open', 'save', 'import', 'export', SEP, 'undo', 'redo', SEP, 'cut', 'copy', 'paste', 'delete', SEP,
-        'grp:zoom', 'view3d', SEP, 'check', 'preview', SEP,
+        'grp:zoom', 'view3d', 'camera-overlays', SEP, 'check', 'preview', SEP,
         'group', 'ungroup', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [

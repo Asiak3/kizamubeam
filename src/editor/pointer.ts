@@ -1,3 +1,4 @@
+import { canvasWheelFactor, pinchGestureActive } from '../canvasZoom';
 // Editor: Maus- und Stifteingaben auf der Arbeitsfläche (Ziehen, Zeichnen, Werkzeuge).
 import { about, apply, clone, IDENT, inv, Mat, mul, newId, Node, Obj, Pt, rotate, scale, Shape, SubPath, TextShape, translate, visibleLeaves } from '../model';
 import { Box, boundsOf, leafIntersectsBox, segments, shapeSubs, textLayout } from '../geom';
@@ -712,8 +713,9 @@ export class EditorPointer {
 
   onWheel(this: Editor, e: WheelEvent) {
     e.preventDefault();
+    if (e.ctrlKey && pinchGestureActive(this.canvas)) return;
     const { sx, sy } = this.evPt(e);
-    if (e.ctrlKey || Math.abs(e.deltaY) > 0 || e.deltaMode) this.zoomAt(Math.pow(1.0015, -e.deltaY * (e.deltaMode ? 30 : 1)), sx, sy);
+    if (e.deltaY) this.zoomAt(canvasWheelFactor(e, Math.log(1.0015)), sx, sy);
   }
 
   newShape(this: Editor): Shape {

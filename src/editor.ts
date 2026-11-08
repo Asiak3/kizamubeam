@@ -1,3 +1,4 @@
+import { installPinchGestures } from './canvasZoom';
 // Editor: Zustand, Ansicht, Auswahl und Werkzeugwahl. Die übrigen Bereiche liegen in src/editor/
 // und werden unten in die Klasse eingehängt.
 import { Doc, Mat, newDoc, Obj, Pt, Shape, SubPath, TextShape, visibleLeaves, VarText } from './model';
@@ -273,6 +274,7 @@ export class Editor {
     });
     canvas.addEventListener('dblclick', (e) => this.onDouble(e));
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+    installPinchGestures(canvas, (factor, x, y) => this.zoomAt(factor, x, y));
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       if (this.suppressContextMenu) { this.suppressContextMenu = false; return; }
