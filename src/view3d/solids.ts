@@ -25,6 +25,43 @@ export function subsPolys(subs: SubPath[]): Pt[][] {
 }
 
 /**
+ * Outline segments of an extruded plate, built from its 2D contours instead of the triangulated mesh
+ * (EdgesGeometry draws stray lines where the cap triangulation has T-junctions, issue #182).
+ * Each contour is drawn at z = 0 and z = th; a vertical edge is added at every vertex where the contour
+ * turns by more than angleDeg (same threshold EdgesGeometry used), so smooth curves stay clean.
+ * Returns flat xyz pairs for a LineSegments geometry.
+ */
+export function outlineSegments(polys: Pt[][], th: number, angleDeg = 25): number[] {
+  const out: number[] = [];
+  const cosMax = Math.cos((angleDeg * Math.PI) / 180);
+  const eps = 1e-9;
+  for (const raw of polys) {
+    // Drop repeated points, including a closing point equal to the first one
+    const poly: Pt[] = [];
+    for (const q of raw) {
+      const last = poly[poly.length - 1];
+      if (!last || Math.hypot(q.x - last.x, q.y - last.y) > eps) poly.push(q);
+    }
+    while (poly.length > 1 && Math.hypot(poly[0].x - poly[poly.length - 1].x, poly[0].y - poly[poly.length - 1].y) <= eps) poly.pop();
+    if (poly.length < 3) continue;
+    const n = poly.length;
+    for (let i = 0; i < n; i++) {
+      const a = poly[i],
+        b = poly[(i + 1) % n];
+      out.push(a.x, a.y, 0, b.x, b.y, 0, a.x, a.y, th, b.x, b.y, th);
+      const p = poly[(i + n - 1) % n];
+      const ix = a.x - p.x,
+        iy = a.y - p.y,
+        ox = b.x - a.x,
+        oy = b.y - a.y;
+      const cos = (ix * ox + iy * oy) / (Math.hypot(ix, iy) * Math.hypot(ox, oy));
+      if (cos < cosMax) out.push(a.x, a.y, 0, a.x, a.y, th);
+    }
+  }
+  return out;
+}
+
+/**
  * Alle Teile einer Baugruppe in Lage, ohne Schnittfuge (so, wie sie nach dem Lasern aussehen).
  * keys: nur diese Teile (vom Nutzer gelöschte fehlen); fallbackTh: Dicke, wenn der Generator keine kennt.
  * Liefert null, wenn der Generator unbekannt ist, keinen räumlichen Aufbau hat oder die Parameter fehlerhaft sind.

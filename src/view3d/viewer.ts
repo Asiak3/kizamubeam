@@ -6,7 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { Pt } from '../model';
 import type { Overlap, Solid } from './solids';
 import type { Engraving } from './engrave';
-import { solidBounds } from './solids';
+import { outlineSegments, solidBounds } from './solids';
 import { Pose, rotatePose } from './poses';
 import { DEFAULT_LOOK, LookPreset, lookTexture, resolveLook, shadeHex } from './looks';
 
@@ -80,6 +80,13 @@ const poseMatrix = (p: Pose) =>
 
 function slabGeometry(s: Solid) {
   return new THREE.ExtrudeGeometry(shapesOf(s.polys), { depth: s.th, bevelEnabled: false, curveSegments: 1 });
+}
+
+/** Outline lines from the 2D contours, independent of the cap triangulation (issue #182) */
+function outlineGeometry(s: Solid) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(outlineSegments(s.polys.filter((p) => p.length > 2), s.th), 3));
+  return g;
 }
 
 /** Texturen je Aussehen (Farbe und Höhenkarte), werden für alle Teile geteilt */
@@ -347,7 +354,7 @@ export class Viewer3D {
       mesh.castShadow = mesh.receiveShadow = true;
       // Feine Umrisslinie, damit Teile gleicher Farbe unterscheidbar bleiben
       const line = new THREE.Color(look.edge ?? shadeHex(look.color, 0.6)).multiplyScalar(look.clear > 0 ? 0.85 : 0.7);
-      mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo, 25), new THREE.LineBasicMaterial({ color: line, transparent: true, opacity: look.clear > 0 ? 0.8 : 0.55 })));
+      mesh.add(new THREE.LineSegments(outlineGeometry(s), new THREE.LineBasicMaterial({ color: line, transparent: true, opacity: look.clear > 0 ? 0.8 : 0.55 })));
       if (s.engraving) mesh.add(engravingMesh(s, s.engraving, look));
       mesh.userData.label = s.label;
       const holder = new THREE.Group();
