@@ -44,7 +44,11 @@ export interface Issue {
 export interface GenPart {
   /** Stabiler Schlüssel innerhalb der Baugruppe (z. B. 'front'); bleibt gleich, wenn sich Parameter ändern */
   key: string;
-  /** Konturen in lokalen Koordinaten (mm, y nach unten, Mitte des Teils im Ursprung), als Bézierkurven */
+  /**
+   * Konturen in lokalen Koordinaten (mm, y nach unten, Mitte des Teils im Ursprung), als Bézierkurven.
+   * Innere Löcher und Schlitze gehören als weitere Unterpfade in diese Liste, nicht in eigene Teile oder in
+   * `marks`, damit sie mit dem Teil geschnitten, verschoben und neu berechnet werden (Muster: box-divided).
+   */
   subs: SubPath[];
   /** Vorschlag für die Lage der Teilmitte beim ersten Anlegen (Koordinaten der Baugruppe, mm) */
   at: Pt;
