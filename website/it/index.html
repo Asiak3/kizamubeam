@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KizamuBeam – software laser gratuito per incidere e tagliare</title>
+<meta name="description" content="Software laser gratuito e open source per macOS, Windows e Linux. Progetta, incidi foto, genera scatole e ingranaggi e invia i lavori direttamente a laser con FluidNC, GRBL, grblHAL, Marlin e Smoothieware.">
+<link rel="canonical" href="https://negurvulkan.github.io/kizamubeam/it/">
+<link rel="alternate" hreflang="de" href="https://negurvulkan.github.io/kizamubeam/">
+<link rel="alternate" hreflang="en" href="https://negurvulkan.github.io/kizamubeam/en/">
+<link rel="alternate" hreflang="it" href="https://negurvulkan.github.io/kizamubeam/it/">
+<link rel="alternate" hreflang="x-default" href="https://negurvulkan.github.io/kizamubeam/">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f7f5f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161c21" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="KizamuBeam">
+<meta property="og:title" content="KizamuBeam – progetta, incidi, taglia. Gratis.">
+<meta property="og:description" content="Software laser gratuito e open source per macOS, Windows e Linux. Progetta, incidi foto, genera scatole e ingranaggi e invia i lavori direttamente a laser con FluidNC, GRBL, grblHAL, Marlin e Smoothieware.">
+<meta property="og:url" content="https://negurvulkan.github.io/kizamubeam/it/">
+<meta property="og:locale" content="it_IT">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:image" content="https://negurvulkan.github.io/kizamubeam/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Logo di KizamuBeam con un raggio laser su sfondo scuro">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="KizamuBeam – progetta, incidi, taglia. Gratis.">
+<meta name="twitter:description" content="Software laser gratuito e open source per macOS, Windows e Linux. Progetta, incidi foto, genera scatole e ingranaggi e invia i lavori direttamente a laser con FluidNC, GRBL, grblHAL, Marlin e Smoothieware.">
+<meta name="twitter:image" content="https://negurvulkan.github.io/kizamubeam/assets/og-image.png">
+<link rel="icon" href="../assets/favicon.ico" sizes="any">
+<link rel="icon" href="../assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="manifest" href="../site.webmanifest">
+<link rel="stylesheet" href="../styles.css">
+
+<script src="../main.js" defer></script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"KizamuBeam","description":"Software laser gratuito e open source per macOS, Windows e Linux. Progetta, incidi foto, genera scatole e ingranaggi e invia i lavori direttamente a laser con FluidNC, GRBL, grblHAL, Marlin e Smoothieware.","applicationCategory":"DesignApplication","operatingSystem":"macOS, Windows, Linux","softwareVersion":"2.8.0","license":"https://github.com/negurvulkan/kizamubeam/blob/main/LICENSE","url":"https://negurvulkan.github.io/kizamubeam/it/","downloadUrl":"https://github.com/negurvulkan/kizamubeam/releases","image":"https://negurvulkan.github.io/kizamubeam/assets/og-image.png","inLanguage":"it","offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"}}</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Vai al contenuto</a>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="./" aria-label="KizamuBeam – pagina iniziale">
+      <picture>
+        <source srcset="../assets/logo-dark.webp" media="(prefers-color-scheme: dark)">
+        <img src="../assets/logo-light.webp" alt="Logo di KizamuBeam" width="337" height="80" class="brand-logo">
+      </picture>
+    </a>
+    <nav class="main-nav" aria-label="Navigazione principale">
+      <ul>
+        <li><a href="#features">Funzioni</a></li>
+        <li><a href="#hardware">Hardware</a></li>
+        <li class="nav-wide"><a href="#vm">Macchina virtuale</a></li>
+        <li><a href="#download">Download</a></li>
+        <li><a href="#faq">FAQ</a></li>
+      </ul>
+    </nav>
+    <div class="header-actions">
+      <nav class="lang-switch" aria-label="Scegli la lingua">
+        <span class="lang-current" lang="it" title="Italiano"><span aria-hidden="true">IT</span><span class="visually-hidden">Italiano</span></span><span class="lang-sep" aria-hidden="true">/</span><a class="lang-other" href="../" hreflang="de" lang="de" data-set-lang="de" title="Deutsch"><span aria-hidden="true">DE</span><span class="visually-hidden">Deutsch</span></a><span class="lang-sep" aria-hidden="true">/</span><a class="lang-other" href="../en/" hreflang="en" lang="en" data-set-lang="en" title="English"><span aria-hidden="true">EN</span><span class="visually-hidden">English</span></a>
+      </nav>
+      <a class="icon-btn" href="https://discord.gg/SSr8VHh7EJ" aria-label="KizamuBeam su Discord"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg></a>
+      <a class="icon-btn" href="https://github.com/negurvulkan/kizamubeam" aria-label="KizamuBeam su GitHub"><svg class="icon" viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a>
+    </div>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="container hero-inner">
+    <div class="hero-copy">
+      <h1 id="hero-title"><span class="h1-line">Il tuo laser.</span> <span class="h1-line">Il tuo software.</span> <span class="h1-line h1-accent">Libero.</span></h1>
+      <p class="hero-sub">KizamuBeam è un software open source per progettare, incidere e tagliare – pensato per laser a diodo con FluidNC, GRBL e simili. Gratuito su macOS, Windows e Linux.</p>
+      <hr class="beam beam-hero">
+      <div class="hero-ctas">
+        <a class="btn btn-primary btn-lg" href="#download"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Scarica gratis</span></a>
+        <a class="btn btn-secondary btn-lg" href="https://github.com/negurvulkan/kizamubeam"><svg class="icon" viewBox="0 0 16 16" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>Vedi su GitHub</span></a>
+      </div>
+      <p class="hero-meta mono">GPL-3.0 · macOS · Windows · Linux</p>
+      <p class="hero-note">Kizamu (刻む) in giapponese significa “intagliare, incidere, tagliare finemente”.</p>
+    </div>
+    <div class="hero-visual">
+      <div class="glow" aria-hidden="true"></div>
+      <figure class="shot shot-hero">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <picture>
+          <source srcset="../assets/editor-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="../assets/editor-light.webp" alt="Finestra principale di KizamuBeam con l’area di lavoro, l’elenco dei livelli a destra e gli strumenti a sinistra" width="1600" height="1000" fetchpriority="high" decoding="async">
+        </picture>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="why" aria-label="Perché KizamuBeam">
+  <div class="container">
+    <ul class="why-grid">
+      
+      <li class="why-item">
+        <span class="why-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>
+        <h2 class="why-title">Non costa nulla</h2>
+        <p>Nessun abbonamento, nessuna chiave di licenza, nessun account. Installa e inizia.</p>
+      </li>
+      
+      <li class="why-item">
+        <span class="why-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 8-5 4 5 4"/><path d="m16 8 5 4-5 4"/><path d="m14 4-4 16"/></svg></span>
+        <h2 class="why-title">Aperto per sempre</h2>
+        <p>GPL-3.0-or-later. Il codice è su GitHub – i contributi sono benvenuti.</p>
+      </li>
+      
+      <li class="why-item">
+        <span class="why-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 8 12 3 3 8v8l9 5 9-5Z"/><path d="m3 8 9 5 9-5"/><path d="M12 13v8"/></svg></span>
+        <h2 class="why-title">Più che incidere</h2>
+        <p>Scatole, cassetti, ingranaggi e cerniere generati in modo parametrico – con accoppiamenti precisi e anteprima 3D.</p>
+      </li>
+      
+      <li class="why-item">
+        <span class="why-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <h2 class="why-title">Sicuro alla macchina</h2>
+        <p>Procedura guidata di configurazione, controllo dell’area di lavoro prima di ogni lavoro e allarmi in linguaggio chiaro.</p>
+      </li>
+      
+    </ul>
+  </div>
+</section>
+
+<section id="features" class="section" aria-labelledby="feat-title">
+  <div class="container">
+    <header class="section-head">
+      <p class="eyebrow">Funzioni</p>
+      <h2 id="feat-title">Tutto, dall’idea al pezzo finito</h2>
+      <p class="section-lead">Un’unica app per disegno, immagini, generazione di parti e controllo della macchina.</p>
+    </header>
+
+    <div class="feature-cards">
+      <article class="card feature-card">
+        <span class="card-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
+        <h3>Disegna e modifica</h3>
+        <p class="card-lead">Disegna, combina, rifinisci – in un’interfaccia familiare fin dal primo clic.</p>
+        <ul class="ticks"><li>Linee, curve di Bézier, rettangoli arrotondati, ellissi, poligoni, stelle e testo su più righe</li><li>Operazioni booleane, offset, modifica dei nodi su più oggetti contemporaneamente, taglio e aggancio a nodi, punti medi e intersezioni</li><li>Semplifica e leviga i percorsi con anteprima dal vivo, menu contestuali che offrono ciò che serve per l’oggetto e isolamento di una selezione per lavorarci senza disturbi</li><li>Testo su percorso, lettere saldate e contorni reali dai font di sistema</li><li>Gestione font: cerca tra tutti i Google Fonts con anteprima e installali con un clic, aggiungi i tuoi file TTF/OTF, preferiti – i font mancanti in un progetto vengono scaricati per te</li><li>Deforma testi, forme e immagini ad arco, rigonfiamento, bandiera o prospettiva, come curve di Bézier pulite</li><li>Array a griglia e circolari con anteprima dal vivo, progetti su più pagine e una cronologia in cui tornare indietro</li><li>Importa SVG, DXF, PDF, Illustrator (.ai), immagini e progetti LightBurn (.lbrn2) – i colori finiscono direttamente sul livello corrispondente</li><li>Esporta in SVG, DXF, PDF e Illustrator (.ai) – le curve restano curve, i livelli restano separati</li><li>Finestre agganciabili, barre degli strumenti personalizzabili, griglia completamente regolabile, tema chiaro e scuro</li></ul>
+      </article>
+      <article class="card feature-card">
+        <span class="card-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></span>
+        <h3>Immagini e incisione</h3>
+        <p class="card-lead">Porta foto, loghi e disegni sul materiale proprio come li avevi immaginati.</p>
+        <ul class="ticks"><li>Dieci modalità immagine, tra cui Floyd-Steinberg, Jarvis, Stucki, mezzitoni, giornale, schizzo e scala di grigi</li><li>Luminosità, contrasto, gamma, nitidezza e riduzione del rumore con confronto prima/dopo e vista 1:1</li><li>L’area di lavoro mostra il risultato rasterizzato alla risoluzione del laser</li><li>Ritaglia, maschera e rimuovi lo sfondo in locale, ricalca le immagini in percorsi di Bézier puliti</li><li>Incisione a riempimento con angolo di scansione, tratteggio incrociato, overscan e modalità bidirezionale, oppure riempimento offset ad anelli</li><li>Sovrapposizione della fotocamera: calibra una fotocamera USB, di rete (ad es. ESP32-CAM) o montata sulla testa, vedi il materiale sull’area di lavoro e posiziona automaticamente un disegno su ogni pezzo rilevato</li></ul>
+      </article>
+      <article class="card feature-card">
+        <span class="card-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 3h6v5l-2 3h-2L9 8Z"/><path d="M12 11v6"/><path d="M4 21h16"/><path d="m8 17 4 2 4-2"/></svg></span>
+        <h3>Macchina e output</h3>
+        <p class="card-lead">Collega, controlla, inquadra, incidi – senza un secondo programma.</p>
+        <ul class="ticks"><li>Configurazione del laser in cinque passi: collegamento, rilevamento del firmware, controllo delle impostazioni, test degli assi, lavoro di prova sicuro</li><li>USB, Telnet o WebSocket – con posizione in tempo reale e allarmi in linguaggio chiaro</li><li>Anteprima con stima del tempo e cursore; “Inizia qui” riprende un lavoro interrotto</li><li>Controllo dell’area di lavoro prima di ogni lavoro e frame, incluso l’offset di lavoro riportato</li><li>Griglia di test del materiale con valutazione da foto, test di messa a fuoco (rampa o serie Z), supporto rotary (a rulli o a mandrino), script G-code personalizzati per dispositivo</li><li>Print and Cut: stampa i segni di registro, misurali con un punto laser a bassa potenza o con la fotocamera e allinea il disegno con precisione sulla stampa</li><li>Generatore di dime: piastre di supporto con sedi precise per i pezzi da un file vettoriale, una foto o la fotocamera, con numeri delle sedi e segni di registro</li><li>Salva il G-code o invialo direttamente – lo streaming gira nel nucleo Rust</li><li>Regola potenza e velocità durante il lavoro; FluidNC: carica i lavori su scheda SD o memoria flash ed eseguili lì, modifica config.yaml con backup, trova il controller in Wi-Fi</li></ul>
+      </article>
+    </div>
+
+    <article class="spotlight">
+      <div class="spotlight-copy">
+        <span class="card-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></span>
+        <h3>Generatori e 3D</h3>
+        <p class="card-lead">Inserisci le misure, ottieni le parti. Doppio clic, modifica, tutto si ricalcola.</p>
+        <ul class="ticks"><li>Scatole a giunzioni a dita, cassetti, inserti a scomparti e scaffali a incastro come assiemi completi</li><li>Ruote dentate cilindriche a evolvente, coppie di ingranaggi, cremagliere, pulegge dentate GT2/HTD e camme</li><li>Strumento giunzioni: giunzioni a dita, tenone e mortasa, incastri a croce, a scatto e a gancio, tenoni a cuneo, cave a T, cerniera del coperchio</li><li>Cerniere flessibili (living hinge) in sette motivi</li><li>Sfera di dischi: un paralume fatto di dischi rotondi con fessure inclinate, da 6 a 32 dischi, senza colla</li><li>Modello a strati: affetta un modello STL o OBJ in fogli impilati e numerati</li><li>Modello a costole: costole con mezze fessure su una spina dorsale, da STL o OBJ; corpo, zampe e una coda curva come sezioni separate, proposte con un clic, con una pagina di montaggio e costole più fitte nei dettagli</li><li>Vista 3D con cursore di esplosione – le collisioni appaiono in rosso prima di sprecare materiale, le incisioni compaiono sulle parti</li><li>Aspetto dei materiali in 3D: venature del legno, ardesia, acrilico con rifrazione, metallo – incisioni come appariranno sul materiale, anche come mockup con ombre ed esportazione PNG per i clienti</li><li>Controllo del progetto e calibrazione dell’accoppiamento: trova e correggi ponti sottili, contorni aperti e fessure troppo strette</li></ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <picture>
+          <source srcset="../assets/3d-drawer-dark.webp" media="(prefers-color-scheme: dark)">
+          <img src="../assets/3d-drawer-light.webp" alt="Generatore di cassetti nella vista 3D: parti a giunzioni a dita separate, nessuna collisione" width="1600" height="1000" loading="lazy" decoding="async">
+        </picture>
+      </figure>
+    </article>
+
+    <article class="spotlight spotlight-rev">
+      <div class="spotlight-copy">
+        <span class="card-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5-9 5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
+        <h3>Produzione</h3>
+        <p class="card-lead">Dal pezzo unico alla piccola serie – targhette, portachiavi, etichette.</p>
+        <ul class="ticks"><li>Nesting automatico sui contorni reali, parti dentro i fori, eccedenze su nuove pagine, ritagli come fogli; escludi singole parti dall’incisione o parcheggiale accanto al piano</li><li>Modelli con parametri di progetto e formule – portachiavi, targhetta e scatola con etichetta inclusi</li><li>Serie da una tabella o da CSV: ogni riga diventa una copia finita, modifica la tabella direttamente nella finestra</li><li>Codici QR (link, Wi-Fi, vCard), codici a barre (Code 128, EAN, UPC, Code 39, ITF) e testo variabile con numeri di serie, date e colonne CSV</li><li>Libreria con 400 motivi ed elementi decorativi integrati (animali, piante, festività, cornici, bordi, ornamenti …) più spazio per i tuoi – con anteprime e ricerca, inserimento con doppio clic o trascinamento</li><li>Impostazioni di taglio per livello con sottolivelli, perforazione, entrata/uscita, sovrataglio, rampa di potenza negli angoli e passo Z per passata</li><li>Libreria materiali per impostazioni di taglio e immagine; le librerie LightBurn (.clb) si possono importare</li><li>Casella degli strumenti: ogni generatore e strumento come riquadro, con ricerca, preferiti, strumenti usati di recente e modelli dalle estensioni</li></ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="../assets/nesting-dialog-light.webp" alt="Finestra di nesting sopra le parti selezionate di una scatola sull’area di lavoro" width="1600" height="1000" loading="lazy" decoding="async">
+      </figure>
+    </article>
+
+    <article class="card card-wide">
+      <div class="card-wide-head">
+        <span class="card-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m8 8-5 4 5 4"/><path d="m16 8 5 4-5 4"/><path d="m14 4-4 16"/></svg></span>
+        <h3>Aperto ed estendibile</h3>
+        <p class="card-lead">Software libero che cresce con te – e dialoga con i tuoi strumenti.</p>
+      </div>
+      <ul class="ticks ticks-cols"><li>Server MCP per agenti IA: leggere, progettare, generare parti. Solo locale, disattivato di default, protetto da token</li><li>Le azioni sulla macchina richieste dagli agenti partono solo dopo la tua conferma – pausa e stop funzionano sempre</li><li>Le estensioni (.kzp) aggiungono profili di dispositivo, modelli, materiali e motivi – senza aggiornare l’app, solo dati, nessun codice</li><li>Trasferisci impostazioni, dispositivi e librerie come file o sincronizzali tra computer tramite una tua cartella (iCloud, Dropbox, Nextcloud)</li><li>Interfaccia in italiano, inglese e tedesco; nuove lingue si aggiungono facilmente</li><li>GPL-3.0-or-later, formati di file JSON aperti, realizzato con Tauri 2, TypeScript e Rust</li><li>Precedentemente “Laserwerk”: impostazioni, dispositivi e materiali vengono ripresi, i vecchi progetti si aprono ancora</li></ul>
+    </article>
+
+    <div class="gallery">
+      <h3 class="gallery-title">Uno sguardo all’interno</h3>
+      <div class="gallery-grid">
+        <figure class="gallery-item">
+          <div class="shot">
+            <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+            <picture>
+              <source srcset="../assets/generator-gearpair-dark.webp" media="(prefers-color-scheme: dark)">
+              <img src="../assets/generator-gearpair-light.webp" alt="Finestra Crea coppia di ingranaggi con campi di inserimento e anteprima di entrambe le ruote" width="1600" height="1000" loading="lazy" decoding="async">
+            </picture>
+          </div>
+          <figcaption>Generatore di coppie di ingranaggi con anteprima dal vivo: 14 e 28 denti, modulo 3, interasse 63 mm</figcaption>
+        </figure>
+        <figure class="gallery-item">
+          <div class="shot">
+            <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+            <img src="../assets/design-check-light.webp" alt="Pannello di controllo a destra con un errore e diversi avvisi, ognuno con un pulsante di correzione" width="1500" height="900" loading="lazy" decoding="async">
+          </div>
+          <figcaption>Controllo del progetto: errori e avvisi con correzioni in un clic</figcaption>
+        </figure>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="hardware" class="section section-alt" aria-labelledby="hw-title">
+  <div class="container">
+    <header class="section-head">
+      <p class="eyebrow">Hardware</p>
+      <h2 id="hw-title">Funziona con il tuo laser</h2>
+      <p class="section-lead">KizamuBeam dialoga con i controller presenti nella maggior parte dei laser a diodo e CNC hobbistici.</p>
+    </header>
+    <div class="hw-grid">
+      <div class="card hw-card">
+        <h3 class="hw-label"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="6" y="6" width="12" height="12" rx="1.5"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>Firmware</h3>
+        <ul class="tags"><li class="mono">FluidNC</li><li class="mono">GRBL 1.1</li><li class="mono">grblHAL</li><li class="mono">Marlin</li><li class="mono">Smoothieware</li></ul>
+      </div>
+      <div class="card hw-card">
+        <h3 class="hw-label"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 2v6M15 2v6"/><path d="M6 8h12v3a6 6 0 0 1-12 0Z"/><path d="M12 17v5"/></svg>Connessione</h3>
+        <ul class="tags"><li>USB (seriale)</li><li>Wi-Fi tramite Telnet</li><li>Wi-Fi tramite WebSocket</li></ul>
+      </div>
+      <div class="card hw-card">
+        <h3 class="hw-label"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>Profili di dispositivo</h3>
+        <p>Profili per macchine diffuse di Swiitol, Ortur, Atomstack, Sculpfun, xTool, Creality Falcon, Two Trees, Longer e Comgrow – oppure generici per controller.</p>
+      </div>
+    </div>
+    <ul class="hw-notes">
+      <li class="ok"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg><span>Testato ogni giorno su uno Swiitol E6 Pro con FluidNC.</span></li>
+      <li class="no"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 6 6 18M6 6l12 12"/></svg><span>Non supportati: laser galvo e controller Ruida/DSP.</span></li>
+    </ul>
+    <p class="fineprint">I nomi dei produttori servono solo a indicare le macchine compatibili; nessuna affiliazione con i produttori.</p>
+  </div>
+</section>
+
+<section id="download" class="section download" aria-labelledby="dl-title">
+  <div class="container">
+    <header class="section-head center">
+      <p class="eyebrow">Download</p>
+      <h2 id="dl-title">Scarica KizamuBeam</h2>
+      <p class="section-lead" data-dl-lead data-template="Versione attuale: {version}. Gratis, senza registrazione.">Versione attuale: 2.8.0. Gratis, senza registrazione.</p>
+      <hr class="beam beam-center">
+    </header>
+    <div class="dl-grid">
+      <article class="card dl-card" data-os="mac">
+        <span class="dl-rec">Per il tuo sistema</span>
+        <span class="dl-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true" focusable="false"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1ZM13.9 5c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3-1.5Z"/></svg></span>
+        <h3>macOS</h3>
+        <p class="dl-detail mono">Universale (Apple Silicon e Intel) · .dmg</p>
+        <a class="btn btn-secondary dl-btn" href="https://github.com/negurvulkan/kizamubeam/releases" data-dl="mac" aria-label="Scarica per macOS"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Scarica</span></a>
+      </article>
+      <article class="card dl-card" data-os="win">
+        <span class="dl-rec">Per il tuo sistema</span>
+        <span class="dl-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true" focusable="false"><path d="M3 5.2 10.4 4v7.3H3Zm8.4-1.3L21 2.5v8.8h-9.6ZM3 12.7h7.4V20L3 18.8Zm8.4 0H21v8.8l-9.6-1.4Z"/></svg></span>
+        <h3>Windows</h3>
+        <p class="dl-detail mono">Programma di installazione (.exe)</p>
+        <a class="btn btn-secondary dl-btn" href="https://github.com/negurvulkan/kizamubeam/releases" data-dl="win" aria-label="Scarica per Windows"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Scarica</span></a>
+      </article>
+      <article class="card dl-card" data-os="linux">
+        <span class="dl-rec">Per il tuo sistema</span>
+        <span class="dl-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></svg></span>
+        <h3>Linux</h3>
+        <p class="dl-detail mono">AppImage · .deb · .rpm</p>
+        <a class="btn btn-secondary dl-btn" href="https://github.com/negurvulkan/kizamubeam/releases" data-dl="linux" aria-label="Scarica per Linux"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg><span>Scarica</span></a>
+        <p class="dl-more" data-dl-more hidden><span>Altri formati:</span></p>
+      </article>
+    </div>
+    <p class="dl-links">
+      <a href="https://github.com/negurvulkan/kizamubeam/releases">Tutte le versioni su GitHub</a>
+      <span aria-hidden="true">·</span>
+      <a href="https://github.com/negurvulkan/kizamubeam#readme">Preferisci compilarlo da te? Vedi il README.</a>
+    </p>
+
+    <div class="notes">
+      <aside class="note note-beta" aria-labelledby="beta-title">
+        <h3 id="beta-title"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 6 9 17l-5-5"/></svg>Stabile – e in continua crescita</h3>
+        <p>La versione 2.2.0 è la prima versione stabile: ogni funzione è stata testata su hardware reale e viene usata ogni giorno. Vuoi le novità prima? Passa al canale Beta in Aiuto → Controlla aggiornamenti. Segnala bug e idee su GitHub.</p>
+      </aside>
+      <aside class="note note-unsigned" aria-labelledby="unsigned-title">
+        <h3 id="unsigned-title"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>Avviso al primo avvio</h3>
+        <p>I programmi di installazione non sono ancora firmati digitalmente, quindi macOS (Gatekeeper) e Windows (SmartScreen) mostrano un avviso la prima volta.</p>
+        <ul>
+          <li>macOS: trascina l’app nella cartella Applicazioni e aprila. Nella finestra fai clic su “Fine” (non su “Sposta nel Cestino”), poi Impostazioni di Sistema → Privacy e sicurezza → scorri in basso → “Apri comunque” → conferma con la password. Oppure nel Terminale: xattr -cr /Applications/KizamuBeam.app</li>
+          <li>Windows: “Ulteriori informazioni” → “Esegui comunque”.</li>
+        </ul>
+      </aside>
+    </div>
+    <p class="safety"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg><span>I laser non sono giocattoli: indossa occhiali protettivi, accendi l’aspirazione e resta vicino alla macchina.</span></p>
+  </div>
+</section>
+
+<section id="vm" class="section section-alt" aria-labelledby="vm-title">
+  <div class="container">
+    <article class="spotlight vm-spotlight">
+      <div class="spotlight-copy">
+        <p class="eyebrow">Prova senza laser</p>
+        <h2 id="vm-title">Macchina virtuale KizamuBeam</h2>
+        <p class="section-lead">Un programma separato e gratuito che si comporta come un laser con FluidNC. Inviagli il tuo lavoro e guardalo incidere e tagliare in tempo reale – senza consumare materiale e senza rischi per la tua macchina.</p>
+        <ul class="ticks"><li>Emula un controller FluidNC tramite Telnet (porta 2323) e WebSocket (porta 8181) – KizamuBeam si collega con il profilo di dispositivo “KizamuBeam Virtual Machine”, altri programmi come dispositivo di rete GRBL o FluidNC</li><li>Si muove con accelerazione reale e pianificatore di movimento: tempo di esecuzione, frame, homing e messaggi di errore proprio come sulla macchina</li><li>Vista 3D del piano con il modulo laser, più una vista dall’alto in 2D</li><li>Posiziona il materiale: compensato, acrilico, cartone e altro – le linee si bruciano in base a potenza e velocità</li><li>Estrai le parti tagliate, girale e osservale da ogni lato; le parti ancora attaccate vengono segnalate</li><li>Fotocamera virtuale sopra il piano o sulla testa – utilizzabile in KizamuBeam come fotocamera di rete, calibrazione inclusa</li></ul>
+      </div>
+      <figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img src="../assets/vm-parts.webp" alt="Macchina virtuale KizamuBeam nella vista 3D: le parti tagliate sono accanto al foglio di compensato, stato della macchina e materiale a destra" width="1200" height="800" loading="lazy" decoding="async">
+      </figure>
+    </article>
+
+    <div class="card vm-dl">
+      <div class="vm-dl-copy">
+        <h3>Scarica la macchina virtuale</h3>
+        <p class="vm-dl-lead" data-vm-lead data-template="Versione di anteprima {version} per macOS, Windows e Linux. Si installa indipendentemente da KizamuBeam.">Versione di anteprima per macOS, Windows e Linux. Si installa indipendentemente da KizamuBeam.</p>
+      </div>
+      <div class="vm-dl-buttons">
+        <a class="btn btn-secondary" href="https://github.com/negurvulkan/kizamubeam/releases?q=vm-v&amp;expanded=true" data-vm-dl="mac" aria-label="Scarica la macchina virtuale per macOS"><svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true" focusable="false"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.1ZM13.9 5c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.1 1.2.1 2.3-.6 3-1.5Z"/></svg><span>macOS</span></a>
+        <a class="btn btn-secondary" href="https://github.com/negurvulkan/kizamubeam/releases?q=vm-v&amp;expanded=true" data-vm-dl="win" aria-label="Scarica la macchina virtuale per Windows"><svg class="icon" viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true" focusable="false"><path d="M3 5.2 10.4 4v7.3H3Zm8.4-1.3L21 2.5v8.8h-9.6ZM3 12.7h7.4V20L3 18.8Zm8.4 0H21v8.8l-9.6-1.4Z"/></svg><span>Windows</span></a>
+        <a class="btn btn-secondary" href="https://github.com/negurvulkan/kizamubeam/releases?q=vm-v&amp;expanded=true" data-vm-dl="linux" aria-label="Scarica la macchina virtuale per Linux"><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="4" width="19" height="16" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></svg><span>Linux</span></a>
+      </div>
+      <p class="vm-dl-foot"><a href="https://github.com/negurvulkan/kizamubeam/releases?q=vm-v&amp;expanded=true">Tutte le versioni della macchina virtuale su GitHub</a> <span aria-hidden="true">·</span> Non firmata, come KizamuBeam stesso: su macOS scegli “Apri comunque”, su Windows “Ulteriori informazioni → Esegui comunque”.</p>
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="section" aria-labelledby="faq-title">
+  <div class="container narrow">
+    <header class="section-head center">
+      <h2 id="faq-title">Domande frequenti</h2>
+    </header>
+    <div class="faq-list">
+      
+      <details class="faq-item">
+        <summary><span>KizamuBeam è davvero gratuito?</span><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></summary>
+        <p>Sì. KizamuBeam è distribuito con licenza GPL-3.0-or-later: nessun costo di licenza, nessun abbonamento, nessun account – uso commerciale incluso.</p>
+      </details>
+      
+      <details class="faq-item">
+        <summary><span>Funziona con il mio laser?</span><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></summary>
+        <p>Se usa FluidNC, GRBL, grblHAL, Marlin o Smoothieware, molto probabilmente sì – questo copre la maggior parte dei laser a diodo. I laser galvo e i controller Ruida/DSP non sono supportati.</p>
+      </details>
+      
+      <details class="faq-item">
+        <summary><span>Perché il computer mostra un avviso durante l’installazione?</span><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></summary>
+        <p>I programmi di installazione non sono ancora firmati digitalmente, cosa comune per i giovani progetti open source. Su macOS: Impostazioni di Sistema → Privacy e sicurezza → “Apri comunque”; su Windows: “Ulteriori informazioni” → “Esegui comunque”.</p>
+      </details>
+      
+      <details class="faq-item">
+        <summary><span>Posso portare con me le mie impostazioni dei materiali?</span><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></summary>
+        <p>Sì. Le librerie materiali di LightBurn (.clb) si possono importare dove i campi hanno un equivalente. I progetti LightBurn (.lbrn2) si aprono con forme, immagini e impostazioni dei livelli. I progetti e le librerie di Laserwerk si aprono direttamente, e i file SVG, DXF, PDF e Illustrator (.ai) si importano come al solito.</p>
+      </details>
+      
+      <details class="faq-item">
+        <summary><span>KizamuBeam è abbastanza stabile per progetti reali?</span><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></summary>
+        <p>Sì – dalla versione 2.2.0 esistono versioni stabili, e KizamuBeam viene usato ogni giorno su hardware reale. Come con qualsiasi software laser: controlla i nuovi lavori con anteprima e frame, e fai un backup dei progetti importanti.</p>
+      </details>
+      
+      <details class="faq-item">
+        <summary><span>A cosa serve il server MCP?</span><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></summary>
+        <p>Permette agli agenti IA di leggere e modificare i tuoi progetti. È disattivato di default, solo locale e protetto da token, e nulla arriva alla tua macchina senza la tua conferma in KizamuBeam.</p>
+      </details>
+      
+      <details class="faq-item">
+        <summary><span>Come posso aiutare?</span><svg class="icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></summary>
+        <p>Prova KizamuBeam sul tuo laser, segnala bug e idee su GitHub, fai domande e condividi i tuoi progetti sul nostro server Discord, traduci l’interfaccia nella tua lingua o invia una pull request.</p>
+      </details>
+      
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <img src="../assets/logo-dark.webp" alt="Logo di KizamuBeam" width="337" height="80" loading="lazy" decoding="async" class="footer-logo">
+      <p>KizamuBeam – software laser libero. 刻む: incidere, tagliare finemente.</p>
+      <p>© 2026 Hanjo Winter · Software libero con licenza GPL-3.0-or-later · Sviluppato con l’aiuto di Claude Code.</p>
+    </div>
+    <nav class="footer-nav" aria-label="Footer">
+      <ul>
+        <li><a href="https://github.com/negurvulkan/kizamubeam">GitHub</a></li>
+        <li><a href="https://github.com/negurvulkan/kizamubeam/releases">Versioni</a></li>
+        <li><a href="https://github.com/negurvulkan/kizamubeam/issues">Segnala un problema</a></li>
+        <li><a href="https://discord.gg/SSr8VHh7EJ">Discord</a></li>
+        <li><a href="https://github.com/negurvulkan/kizamubeam/blob/main/LICENSE">Licenza</a></li>
+        <li><a href="../" hreflang="de" lang="de" data-set-lang="de">Deutsch</a></li>
+        <li><a href="../en/" hreflang="en" lang="en" data-set-lang="en">English</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="container">
+    <hr class="beam beam-footer">
+    <p class="trademark">LightBurn è un marchio di LightBurn Software, LLC. KizamuBeam è un progetto indipendente e non è affiliato né approvato da LightBurn Software. Tutti gli altri marchi appartengono ai rispettivi proprietari.</p>
+  </div>
+</footer>
+</body>
+</html>
