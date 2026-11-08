@@ -1,0 +1,26 @@
+# Categories for GitHub's "Generate release notes" button.
+# Each entry lists the pull request author, and first-time contributors
+# get their own "New Contributors" section automatically.
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+  categories:
+    - title: New features
+      labels:
+        - enhancement
+    - title: Bug fixes
+      labels:
+        - bug
+    - title: Translations and documentation
+      labels:
+        - documentation
+        - translation
+    - title: Accessibility
+      labels:
+        - accessibility
+    - title: Other changes
+      labels:
+        - "*"
