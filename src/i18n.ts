@@ -1,29 +1,62 @@
-// Mehrsprachigkeit. Texte stehen im Code auf Deutsch und laufen durch t(); die deutsche
-// Fassung ist zugleich der Schlüssel. Weitere Sprachen liegen in src/locales/<code>.json
-// (deutscher Text → Übersetzung). Fehlt eine Übersetzung, erscheint der deutsche Text.
-// Gleicher deutscher Text mit verschiedener Bedeutung: Kontext nach „|“ anhängen,
-// z. B. t('Verbindung|Gerät'); angezeigt wird nur der Teil davor.
-// Prüfen mit: npm run i18n:check
+// Internationalisation. Texts are written in German in the code and go through t(); the German
+// text is also the key. Other languages live in src/locales/<code>.json (German text → translation)
+// and are picked up automatically: adding a language only takes dropping its file there. The name
+// in the menu and the number and date formats come from Intl.
+// A missing translation shows the English text, otherwise the German one.
+// Same German text with different meanings: append a context after "|",
+// e.g. t('Verbindung|Gerät'); only the part before it is shown.
+// Check with: npm run i18n:check
 import en from './locales/en.json';
-import it from './locales/it.json';
 
-export type Lang = 'de' | 'en' | 'it';
+/** Language code as in the file name in src/locales, e.g. 'it' or 'pt-BR'; 'de' is the base language. */
+export type Lang = string;
 export type LangPref = Lang | 'system';
 
-/** Sprachen mit ihrem Namen in der eigenen Sprache */
-export const LANGUAGES: [Lang, string][] = [
-  ['de', 'Deutsch'],
-  ['en', 'English'],
-  ['it', 'Italiano'],
-];
+type Dict = Record<string, string>;
 
-const DICTS: Record<Lang, Record<string, string> | null> = { de: null, en, it };
+/** All language files in src/locales. Vite inlines them at build time; the esbuild test runners
+ *  have no import.meta.glob, so they only know German and English. */
+function localeFiles(): Record<string, Dict> {
+  try {
+    return import.meta.glob<Dict>('./locales/*.json', { eager: true, import: 'default' });
+  } catch {
+    return {};
+  }
+}
+
+const DICTS: Record<Lang, Dict | null> = { de: null, en };
+for (const [file, dict] of Object.entries(localeFiles())) {
+  const code = /([^/]+)\.json$/.exec(file)?.[1];
+  if (code && code !== 'de') DICTS[code] = dict;
+}
+
+/** Name of a language in itself, e.g. "Italiano" */
+function nativeName(code: Lang): string {
+  try {
+    const n = new Intl.DisplayNames([code], { type: 'language' }).of(code);
+    if (n && n !== code) return n.charAt(0).toLocaleUpperCase(code) + n.slice(1);
+  } catch {
+    /* unknown language code */
+  }
+  return code;
+}
+
+/** Languages with their native names: German, English, then the others by code */
+export const LANGUAGES: [Lang, string][] = Object.keys(DICTS)
+  .sort((a, b) => (a === 'de' ? -1 : b === 'de' ? 1 : a === 'en' ? -1 : b === 'en' ? 1 : a.localeCompare(b)))
+  .map((code) => [code, nativeName(code)]);
+
+/** Known language for a tag such as 'de-AT' or 'pt-br' (exact match first, then the primary language) */
+function knownLang(tag: string): Lang | undefined {
+  const lower = tag.toLowerCase();
+  return Object.keys(DICTS).find((c) => c.toLowerCase() === lower) ?? Object.keys(DICTS).find((c) => c.toLowerCase() === lower.split('-')[0]);
+}
 const LANG_KEY = 'kizamubeam.lang';
 
 function systemLang(): Lang {
   for (const l of navigator.languages ?? [navigator.language]) {
-    const code = l.slice(0, 2).toLowerCase();
-    if (code in DICTS) return code as Lang;
+    const code = l && knownLang(l);
+    if (code) return code;
   }
   return 'en';
 }
@@ -31,7 +64,7 @@ function systemLang(): Lang {
 function readPref(): LangPref {
   try {
     const v = localStorage.getItem(LANG_KEY);
-    if (v === 'system' || (v && v in DICTS)) return v as LangPref;
+    if (v === 'system' || (v && v in DICTS)) return v;
   } catch {
     /* Speicher nicht verfügbar */
   }
@@ -62,7 +95,7 @@ export function setLangPref(p: LangPref): boolean {
  */
 export function t(de: string, vars?: Record<string, string | number>): string {
   // Fehlt eine Übersetzung, erst Englisch, dann Deutsch
-  const s = DICTS[lang]?.[de] || (lang !== 'de' && (en as Record<string, string>)[de]) || de.replace(/\|[^|]*$/, '');
+  const s = DICTS[lang]?.[de] || (lang !== 'de' && (en as Dict)[de]) || de.replace(/\|[^|]*$/, '');
   return vars ? s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : s;
 }
 
@@ -118,10 +151,19 @@ export function tn(one: string, other: string, n: number, vars?: Record<string, 
 }
 
 /** Zahlenformat der Oberfläche */
-export const locale = lang === 'de' ? 'de-DE' : lang === 'it' ? 'it-IT' : 'en-US';
+export const locale = lang === 'de' ? 'de-DE' : lang === 'en' ? 'en-US' : lang;
 
-/** Dezimalzeichen für die Anzeige: Komma auf Deutsch und Italienisch, Punkt auf Englisch. */
-export const dec = (s: string) => (lang === 'de' || lang === 'it' ? s.replace('.', ',') : s);
+/** Decimal separator of the UI language, e.g. comma in German, point in English */
+const DECIMAL = (() => {
+  try {
+    return new Intl.NumberFormat(locale).formatToParts(1.5).find((p) => p.type === 'decimal')?.value ?? '.';
+  } catch {
+    return '.';
+  }
+})();
+
+/** Decimal separator for display: replaces the point with the UI language's separator. */
+export const dec = (s: string) => (DECIMAL === '.' ? s : s.replace('.', DECIMAL));
 
 /** Text in der Sprache der Oberfläche, sonst Englisch, sonst Deutsch, sonst der erste (z. B. aus Erweiterungen: „Text“ oder {"de": "…", "en": "…"}) */
 export function localText(v: unknown, l: string = lang): string {

@@ -1,5 +1,5 @@
 // Translations of the Virtual Machine: keys are the German texts, English is listed here.
-// The language choice (system, German, English) is shared with the app's i18n module, so material names from
+// The language choice (system, German, English and every file in src/locales) is shared with the app's i18n module, so material names from
 // the app follow it too; a change reloads the window. Placeholders {name} are replaced.
 
 import { lang } from '../../src/i18n';
@@ -151,7 +151,8 @@ const EN: Record<string, string> = {
 };
 
 export function t(de: string, vars?: Record<string, string | number>): string {
-  let s = lang === 'en' ? (EN[de] ?? de) : de;
+  // Only English is translated here; other languages get the English texts, as in the app
+  let s = lang === 'de' ? de : (EN[de] ?? de);
   if (vars) for (const [k, v] of Object.entries(vars)) s = s.split(`{${k}}`).join(String(v));
   return s;
 }
