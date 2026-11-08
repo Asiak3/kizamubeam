@@ -554,7 +554,7 @@ function showHelp() {
   dlg.showModal();
 }
 
-// ---------- Numerik-, Form- und Textleiste ----------
+// ---------- Numerik- und Formleiste, Textleiste ----------
 
 function buildNumbar(ed: Editor) {
   const bar = $('#numbar');
@@ -754,8 +754,11 @@ function buildNumbar(ed: Editor) {
   const textProps = h(
     'div',
     { class: 'field' },
-    h('label', {}, t('Schrift'), fontSel), h('label', {}, t('Höhe'), fSize),
-    h('label', {}, t('Abst. H'), fHs), h('label', {}, 'V', fVs), h('label', {}, t('Max. Breite'), fMaxW), h('label', {}, t('Max. Höhe'), fMaxH), bShrink, bWrap, ...alignBtns, bBold, bItal, bUp, bWeld, bOnPath, pathProps, bVar, vtProps,
+    h('span', { html: ICONS.text, class: 'icon-inline', style: 'color: var(--muted)', title: t('Textleiste') }),
+    h('label', {}, t('Schrift'), fontSel), h('label', {}, t('Höhe'), fSize), bBold, bItal, bUp, ...alignBtns, sep(),
+    h('label', {}, t('Abst. H'), fHs), h('label', {}, 'V', fVs), sep(),
+    h('label', {}, t('Max. Breite'), fMaxW), h('label', {}, t('Max. Höhe'), fMaxH), bShrink, bWrap, sep(),
+    bWeld, bOnPath, pathProps, bVar, vtProps,
   );
 
   // Knotenbearbeitung
@@ -811,7 +814,9 @@ function buildNumbar(ed: Editor) {
   const sepGen = sep();
 
   const sepShape = sep();
-  bar.append(geo, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps, sep(), textProps);
+  bar.append(geo, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
+  // Text options get their own bar below the properties bar (can be hidden in the Window menu)
+  $('#textbar').append(textProps);
 
   const refresh = () => {
     const b = ed.selBounds();
