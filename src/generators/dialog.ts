@@ -287,7 +287,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     }
     const kerf = Number(np.kerf ?? 0);
     kerfNote.textContent =
-      g.id === 'box-divided' ? '' : layerKerf
+      layerKerf
         ? t('Der Layer hat zusätzlich einen Kerf-Versatz von {k} mm, der beim Lasern noch dazukommt.', { k: dec(String(layerKerf)) })
         : kerf
           ? t('Die Schnittfuge ist schon in der Kontur enthalten; der Layer hat keinen zusätzlichen Kerf-Versatz.')
