@@ -4,10 +4,11 @@ import type { GenPart, Generator, Issue, Params } from './types';
 import { fingerboxParts, fingerboxSegments, horizontalSegments, type FingerboxParams } from './fingerbox-experiment';
 import { defaultDistribution, distributeGaps } from './fingerbox-distribution';
 import { makeDividers, type DividerParams } from './fingerbox-dividers';
-import { panelPolys } from './box';
+import { panelPolys, offsetOrtho } from './box';
 
-type FingerParams = FingerboxParams & { slotClearance: number; compartmentsX: number; compartmentsY: number; ratiosX: string; ratiosY: string; dividerDrop: number };
-const values = (p: Params) => ({ ...p, clearance: 0, slotClearance: 0 }) as unknown as FingerParams;
+type FingerParams = FingerboxParams & { slotClearance: number; compartmentsX: number; compartmentsY: number; ratiosX: string; ratiosY: string; dividerDrop: number; kerf: number; clearance: number };
+// clearance/kerf kommen aus dem Dialog; slotClearance folgt dem Steckspiel (Standard der Trennwand-Geometrie).
+const values = (p: Params) => ({ ...p, clearance: Number(p.clearance ?? 0), kerf: Number(p.kerf ?? 0) }) as unknown as FingerParams;
 const names: Record<string, () => string> = {
   bottom: () => t('Boden'), top: () => t('Deckel'), front: () => t('Vorderwand'), back: () => t('Rückwand'),
   left: () => t('Seitenwand links'), right: () => t('Seitenwand rechts'),
@@ -48,13 +49,30 @@ const dividerParams = (p: FingerParams): DividerParams => ({ ...p, dividerHeight
 const hasDividers = (p: FingerParams) => p.compartmentsX > 1 || p.compartmentsY > 1;
 const fmt = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 });
 
+// offsetOrtho rechnet nur mit 90°-Ecken: ein Zwischenpunkt auf einer Geraden würde doppelt versetzt (schiefe Kante).
+function dropCollinear<T extends { x: number; y: number }>(pts: T[]): T[] {
+  const eps = 1e-9;
+  let cur = pts.filter((q, i) => { const n = pts[(i + 1) % pts.length]; return Math.hypot(q.x - n.x, q.y - n.y) > eps; });
+  for (let again = true; again;) {
+    again = false;
+    const next = cur.filter((q, i) => {
+      const a = cur[(i + cur.length - 1) % cur.length], c = cur[(i + 1) % cur.length];
+      const keep = Math.abs((q.x - a.x) * (c.y - q.y) - (q.y - a.y) * (c.x - q.x)) > eps;
+      if (!keep) again = true;
+      return keep;
+    });
+    if (again && next.length >= 3) cur = next; else if (again) break;
+  }
+  return cur;
+}
+
 function adjustedParts(p: FingerParams): GenPart[] {
   const parts = fingerboxParts(p);
   if (p.jointLayout !== 'legacy') {
     // Use the original Box geometry for base and lid, while walls retain our vertical pattern.
     const plates = panelPolys({ sizeMode: 'outer', width: p.width, depth: p.depth, height: p.height,
       thickness: p.thickness, finger: p.finger, top: p.top === 'closed' ? 'closed' : 'open',
-      clearance: 0, kerf: 0 });
+      clearance: p.clearance, kerf: 0 });
     for (const part of parts) if (part.key === 'bottom' || part.key === 'top') {
       const plate = plates.find((candidate) => candidate.key === part.key);
       if (!plate) throw new Error(`Missing Box plate: ${part.key}`);
@@ -76,6 +94,8 @@ function adjustedParts(p: FingerParams): GenPart[] {
       cursor += a+10;
     }
   }
+  // Kerf: Außenkontur um kerf/2 nach außen, Ausschnitte (Schlitze) um kerf/2 nach innen versetzen.
+  if (p.kerf) for (const part of parts) part.subs = part.subs.map((sub, i) => ({ ...sub, nodes: offsetOrtho(dropCollinear(sub.nodes), i === 0 ? p.kerf / 2 : -p.kerf / 2) }));
   return parts;
 }
 
@@ -89,12 +109,14 @@ export const FINGERBOX: Generator = {
     { key: 'height', type: 'length', label: t('Höhe'), min: 5, max: 3000, def: 50 },
     { key: 'thickness', type: 'length', label: t('Materialdicke'), min: 0.3, max: 50, def: 3 },
     { key: 'top', type: 'enum', label: t('Oben'), def: 'open', options: [['open', t('Offen')], ['closed', t('Geschlossen (Deckel mit Zinken)')]] },
-    { key: 'finger', type: 'length', label: t('Zinkenbreite'), min: 0.5, max: 500, def: 10 },
     { key: 'compartmentsX', type: 'int', label: t('Fächer in Breitenrichtung'), min: 1, max: 20, def: 1 },
     { key: 'ratiosX', type: 'text', label: t('Verteilung in Breitenrichtung'), def: '', autoText: (p) => defaultDistribution(Number(p.compartmentsX)), title: t('Freie Fachbreiten als Verhältnis oder mm, getrennt mit Doppelpunkt, z. B. 50mm:1:2. Rechenzeichen + - * / und Klammern sind möglich.') },
     { key: 'compartmentsY', type: 'int', label: t('Fächer in Tiefenrichtung'), min: 1, max: 20, def: 1 },
     { key: 'ratiosY', type: 'text', label: t('Verteilung in Tiefenrichtung'), def: '', autoText: (p) => defaultDistribution(Number(p.compartmentsY)), title: t('Freie Fachbreiten als Verhältnis oder mm, getrennt mit Doppelpunkt, z. B. 50mm:1:2. Rechenzeichen + - * / und Klammern sind möglich.') },
     { key: 'dividerDrop', type: 'length', label: t('Trennwände niedriger als Box'), min: 0, max: 3000, def: 10, showIf: (p) => Number(p.compartmentsX) > 1 || Number(p.compartmentsY) > 1 },
+    { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, damit die Teile die Sollmaße haben. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
+    { key: 'finger', type: 'length', label: t('Zinkenbreite'), min: 0.5, max: 500, def: 10, advanced: true },
+    { key: 'clearance', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0, advanced: true, title: t('Jede Zinke wird um so viel schmaler; negativ = Presspassung') },
   ],
   validate(raw) {
     const p = values(raw), out: Issue[] = [];
@@ -104,6 +126,7 @@ export const FINGERBOX: Generator = {
       out.push({ key: 'thickness', level: 'error', msg: t('Alle Außenmaße müssen größer als die doppelte Materialdicke sein.') });
       return out;
     }
+    if (Math.abs(p.clearance) >= p.finger / 4) out.push({ key: 'clearance', level: 'error', msg: t('Das Steckspiel ist zu groß für diese Zinkenbreite.') });
     const legacy = p.jointLayout === 'legacy';
     const lengths = [p.width - 2 * p.thickness, p.depth - 2 * p.thickness, legacy ? p.height : p.height - p.thickness * (p.top === 'closed' ? 2 : 1)];
     try {
