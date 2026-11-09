@@ -472,6 +472,11 @@ export function buildView3dPanel(ed: Editor) {
     }
   };
   onWindowShow('view3d', open);
+  // The dock does not report windows that are already visible when the app starts (saved layout), so the
+  // viewer would never load until the window is closed and reopened. Check once the dock is built.
+  window.setTimeout(() => {
+    if (isShown('view3d')) open();
+  }, 0);
   explode.addEventListener('input', () => viewer?.setExplode(Number(explode.value)));
   spinBox.addEventListener('change', () => viewer?.setSpin(spinBox.checked));
   ovBox.addEventListener('change', () => {
@@ -503,7 +508,10 @@ export function buildView3dPanel(ed: Editor) {
   });
   ed.on((what) => {
     if (what !== 'doc' && what !== 'sel') return;
-    if (isShown('view3d')) schedule();
+    if (!isShown('view3d')) return;
+    // Fallback: if the window became visible without onShow, load the viewer now instead of doing nothing
+    if (!viewer && !loading) open();
+    else schedule();
   });
   // Neue oder geänderte Bibliotheksmaterialien können das Aussehen ändern
   library.on(() => {
