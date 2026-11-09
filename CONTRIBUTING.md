@@ -4,6 +4,8 @@ Thank you for helping improve KizamuBeam! Contributions of all sizes are welcome
 
 KizamuBeam is free software under **GPL-3.0-or-later**. It is maintained as a community project, and thoughtful, focused contributions are especially appreciated.
 
+Want to translate the app, the website or the documentation? See **[TRANSLATION.md](TRANSLATION.md)**, no programming needed.
+
 ## Before you start
 
 - Check existing [issues](https://github.com/negurvulkan/kizamubeam/issues) and [pull requests](https://github.com/negurvulkan/kizamubeam/pulls) to avoid duplicating work.
@@ -96,3 +98,13 @@ Before submitting a PR, please check that:
 A PR can be useful even if it is not ready to merge. Feel free to mark it as a draft and explain what still needs work. Maintainers may request changes, defer an idea, or decline a PR to keep the project coherent.
 
 Thank you for contributing!
+
+## Credits
+
+Every kind of contribution is credited, not only code. The [Contributors section of the README](README.md#contributors) is maintained with [all-contributors](https://allcontributors.org) and also lists translations, testing on real machines, bug reports and ideas.
+
+- Maintainers add people by commenting on an issue or pull request, for example `@all-contributors please add @name for code, translation`. The bot then opens a pull request that updates `.all-contributorsrc` and all three READMEs. The available types are listed in the [emoji key](https://allcontributors.org/docs/en/emoji-key).
+- If you contributed and are missing from the list, just ask in your issue or pull request, or on Discord.
+- Release notes thank contributors by GitHub handle (for example “Thanks to @name for …”). GitHub's “Generate release notes” groups merged pull requests using `.github/release.yml` and adds a “New Contributors” section for first-time contributors.
+
+Contributors who only test or report on Discord can also be added; tell us which GitHub handle (or name) you would like to be credited with.

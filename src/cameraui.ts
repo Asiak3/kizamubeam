@@ -10,6 +10,7 @@ import { CameraProfileError, fineTunePoint, inverseFineTunePoint, normalizeFineT
 import { fineTuneControls, fineTunedCalibration, fineTunedHeadShift } from './cameraFineTune';
 import { adjustCameraPixels } from './cameraImageProcessing';
 import { cameraImageControls } from './cameraImageControls';
+import { cameraOverlaysVisible, onCameraOverlayVisibilityChange, toggleCameraOverlays } from './cameraOverlayVisibility';
 import { cameraImageIsIdentity, drawCameraPreview } from './cameraDisplay';
 import { defaultLayer, loadDoc, Obj, Pt, translate } from './model';
 import { buildJob, estimate, writeGCode } from './gcode';
@@ -444,6 +445,7 @@ export function cameraViews(ed: Editor): CameraView[] {
 
 export function cameraTab(ed: Editor): HTMLElement {
   ed.background = (ctx) => {
+    if (!cameraOverlaysVisible()) return;
     const { w: bw, h: bh } = ed.doc.bed;
     const cams = devCams().cams;
     for (const s of cams) {
@@ -506,6 +508,14 @@ export function cameraTab(ed: Editor): HTMLElement {
   const previewImage = h('canvas', { 'aria-label': t('Angepasste Kameravorschau') }) as HTMLCanvasElement;
   preview.append(previewImage);
   const show = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  const showAll = h('input', { type: 'checkbox', onchange: () => toggleCameraOverlays(ed) }) as HTMLInputElement;
+  const overlayNote = h('div', { class: 'note' }, t('Kameraüberlagerungen global ausgeblendet. Die Auswahl je Kamera und laufende Aktualisierungen bleiben unverändert.'));
+  const refreshOverlayVisibility = () => {
+    showAll.checked = cameraOverlaysVisible();
+    overlayNote.hidden = cameraOverlaysVisible();
+  };
+  onCameraOverlayVisibilityChange(refreshOverlayVisibility);
+  refreshOverlayVisibility();
   const live = h('input', { type: 'checkbox' }) as HTMLInputElement;
   const liveLbl = h('label', { class: 'check' }, live, t('Laufend aktualisieren'));
   const opacity = h('input', { type: 'range', min: '0.1', max: '1', step: '0.05' }) as HTMLInputElement;
@@ -860,6 +870,8 @@ export function cameraTab(ed: Editor): HTMLElement {
     h('div', { class: 'conn-row' }, exportCal, importCal),
     finePanel.element,
     imagePanel.element,
+    h('label', { class: 'check' }, showAll, t('Alle Kameraüberlagerungen anzeigen')),
+    overlayNote,
     h('div', { class: 'form' },
       h('label', { class: 'check' }, show, t('Auf der Arbeitsfläche zeigen')),
       h('label', {}, t('Deckkraft')), opacity,

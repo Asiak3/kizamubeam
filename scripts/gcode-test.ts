@@ -119,6 +119,54 @@ for (const fixed of [false, true]) {
   });
 }
 
+// Issue #148: a start point set on a contour must survive the kerf offset, in the preview and in the job
+const firstRapid = (mv: Moves) => [Math.round(mv.x[0] * 100) / 100, Math.round(mv.y[0] * 100) / 100];
+/** Direction of the first contour: sign of the shoelace area of the burning moves after the first rapid */
+function firstContourArea(mv: Moves) {
+  const xs = [mv.x[0]],
+    ys = [mv.y[0]];
+  for (let i = 1; i < mv.n && mv.f[i] !== 0; i++) (xs.push(mv.x[i]), ys.push(mv.y[i]));
+  let a = 0;
+  for (let i = 0; i < xs.length; i++) {
+    const j = (i + 1) % xs.length;
+    a += xs[i] * ys[j] - xs[j] * ys[i];
+  }
+  return a / 2;
+}
+for (const kerf of [0, 0.2, -0.2]) {
+  await test(`Startpunkt gesetzt, Kerf ${kerf}: Vorschau und Job beginnen am gesetzten Knoten`, async () => {
+    const corners = [{ x: 100, y: 300 }, { x: 120, y: 300 }, { x: 120, y: 320 }, { x: 100, y: 320 }];
+    const jobAt = async (idx: number | null, reverse = false) => {
+      const sp: { closed: boolean; nodes: { x: number; y: number }[]; start?: boolean } = { closed: true, nodes: corners.map((p) => ({ ...p })) };
+      if (idx !== null) {
+        sp.nodes = sp.nodes.slice(idx).concat(sp.nodes.slice(0, idx));
+        if (reverse) sp.nodes = [sp.nodes[0], ...sp.nodes.slice(1).reverse()];
+        sp.start = true;
+      }
+      const doc = loadDoc({ bed: { w: 400, h: 400 }, objs: [{ id: 1, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [sp] } }], layers: {} });
+      const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: true, returnHome: false };
+      const inp = { doc, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, kerf }), imgLayer: () => defaultImageLayer(), device };
+      const prev = await buildJob({ ...inp, forPreview: true });
+      const real = await buildJob(inp);
+      assert.ok(sameMoves(prev.moves, real.moves, real.offset), 'preview and job differ');
+      return real.moves;
+    };
+    // Machine Y is flipped (bed 400): node (120, 320) → (120, 80), node (100, 300) → (100, 100)
+    const free = await jobAt(null);
+    const near = await jobAt(2);
+    const far = await jobAt(0);
+    const fx = firstRapid(far),
+      nx = firstRapid(near);
+    assert.ok(Math.hypot(nx[0] - 120, nx[1] - 80) <= Math.abs(kerf) * 1.5 + 1e-6, `near start ${nx}`);
+    assert.ok(Math.hypot(fx[0] - 100, fx[1] - 100) <= Math.abs(kerf) * 1.5 + 1e-6, `far start ${fx}`);
+    assert.notDeepEqual(fx, firstRapid(free), 'changing the start point changes the rapid move');
+    // Direction is kept, and reversing it flips the contour orientation
+    const rev = await jobAt(0, true);
+    assert.deepEqual(firstRapid(rev), fx);
+    assert.ok(Math.sign(firstContourArea(rev)) === -Math.sign(firstContourArea(far)), 'reversed direction');
+  });
+}
+
 // ---------- Konturfolgende Füllung ----------
 
 const offsetJob = (objs: Obj[], interval = 1, passes = 1) =>

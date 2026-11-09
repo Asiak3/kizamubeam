@@ -6,6 +6,7 @@
 // Die Lagen stehen hier und nicht in den Generatoren, weil sie nur für die Ansicht gebraucht werden.
 import type { Params } from '../generators';
 import { BoxParams, boxOuter } from '../generators/box';
+import { distributeGaps } from '../generators/fingerbox-distribution';
 import { DrawerParams, drawerDims } from '../generators/drawer';
 import { dividerCenters, InsertParams } from '../generators/insert';
 import { ShelfParams, shelfHeights, sideCenters } from '../generators/shelf';
@@ -79,6 +80,24 @@ export function boxPoses(p: BoxParams): Record<string, Pose> {
   };
 }
 
+/** Fingerbox: reuse Box axes and place each divider at its calculated compartment centre. */
+export function fingerboxPoses(raw: Params): AsmPoses | null {
+  try {
+    const p = raw as Params & { width: number; depth: number; height: number; thickness: number; compartmentsX: number; compartmentsY: number; ratiosX: string; ratiosY: string; dividerDrop: number };
+    const shell = boxPoses({ sizeMode: 'outer', width: p.width, depth: p.depth, height: p.height,
+      thickness: p.thickness, top: p.top === 'closed' ? 'closed' : 'open', finger: Number(p.finger),
+      clearance: 0, kerf: 0 });
+    const xs = distributeGaps(p.width, p.thickness, p.compartmentsX, p.ratiosX).centres;
+    const ys = distributeGaps(p.depth, p.thickness, p.compartmentsY, p.ratiosY).centres;
+    const hd = p.height - p.dividerDrop;
+    xs.forEach((x, i) => { shell[`divx-${i + 1}`] = pose([x - p.thickness / 2, p.depth / 2, hd / 2], Y, neg(Z), X); });
+    ys.forEach((y, i) => { shell[`divy-${i + 1}`] = pose([p.width / 2, y - p.thickness / 2, hd / 2], X, neg(Z), Y); });
+    return { poses: shell };
+  } catch {
+    return null;
+  }
+}
+
 function drawerPoses(p: DrawerParams): AsmPoses {
   const th = p.thickness;
   const { box, front } = drawerDims(p);
@@ -145,6 +164,8 @@ function discSpherePoses(params: Params, th: number): AsmPoses | null {
 /** Lagen aller Teile einer Baugruppe (ohne Schnittfuge); null für Generatoren ohne räumlichen Aufbau */
 export function assemblyPoses(gen: string, params: Params, th: number): AsmPoses | null {
   switch (gen) {
+    case 'box-divided':
+      return fingerboxPoses(params);
     case 'box':
       return { poses: boxPoses({ ...(params as unknown as BoxParams), kerf: 0 }) };
     case 'drawer':

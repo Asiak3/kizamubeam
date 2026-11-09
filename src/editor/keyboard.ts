@@ -13,6 +13,13 @@ export class EditorKeyboard {
       e.preventDefault();
       f();
     };
+    if (this.outlinePreview) {
+      if (e.key === 'Escape') return run(() => this.outlinePreview?.cancel());
+      if (e.code === 'Space') { this.space = true; e.preventDefault(); return; }
+      if (k === '0') return run(() => ctrl ? this.zoomPage() : this.zoomSelection());
+      e.preventDefault();
+      return;
+    }
     // Skizzenmodus: eigene Tasten (Werkzeuge, Beziehungen, Esc/Enter); Ctrl+Z usw. laufen normal weiter
     if (this.pickHandler && e.key === 'Escape') {
       e.preventDefault();

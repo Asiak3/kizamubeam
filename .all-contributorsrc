@@ -1,0 +1,54 @@
+{
+  "projectName": "kizamubeam",
+  "projectOwner": "negurvulkan",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md",
+    "README.de.md",
+    "README.it.md"
+  ],
+  "imageSize": 80,
+  "commit": false,
+  "commitConvention": "none",
+  "contributorsPerLine": 7,
+  "linkToUsage": false,
+  "skipCi": true,
+  "contributors": [
+    {
+      "login": "negurvulkan",
+      "name": "Hanjo Winter",
+      "avatar_url": "https://avatars.githubusercontent.com/u/61453878?v=4",
+      "profile": "https://github.com/negurvulkan",
+      "contributions": ["projectManagement", "maintenance", "code", "doc", "design", "ideas", "test", "translation"]
+    },
+    {
+      "login": "liquid-light",
+      "name": "liquid-light",
+      "avatar_url": "https://avatars.githubusercontent.com/u/21311036?v=4",
+      "profile": "https://github.com/liquid-light",
+      "contributions": ["code", "ideas", "bug", "test"]
+    },
+    {
+      "login": "SimoCassan",
+      "name": "SimoCassan",
+      "avatar_url": "https://avatars.githubusercontent.com/u/96295007?v=4",
+      "profile": "https://github.com/SimoCassan",
+      "contributions": ["translation", "code"]
+    },
+    {
+      "login": "Asiak3",
+      "name": "Asiak C.",
+      "avatar_url": "https://avatars.githubusercontent.com/u/71585581?v=4",
+      "profile": "https://github.com/Asiak3",
+      "contributions": ["code", "ideas", "bug"]
+    },
+    {
+      "login": "Pietrogramma",
+      "name": "Pietrogramma",
+      "avatar_url": "https://avatars.githubusercontent.com/u/11855652?v=4",
+      "profile": "https://github.com/Pietrogramma",
+      "contributions": ["translation", "code"]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { canvasWheelFactor, pinchGestureActive } from '../canvasZoom';
 // Editor: Maus- und Stifteingaben auf der Arbeitsfläche (Ziehen, Zeichnen, Werkzeuge).
 import { about, apply, clone, IDENT, inv, Mat, mul, newId, Node, Obj, Pt, rotate, scale, Shape, SubPath, TextShape, translate, visibleLeaves } from '../model';
 import { Box, boundsOf, leafIntersectsBox, segments, shapeSubs, textLayout } from '../geom';
@@ -5,6 +6,7 @@ import { wrapWidth } from '../fonts';
 import { buildSnapSet, findSnap } from '../snap';
 import { t } from '../i18n';
 import type { Editor } from '../editor';
+import { MAX_VECTOR_SAMPLES } from '../vectorFit';
 import { genLeaves, isMarkGroup } from './generators';
 import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, RULER, SNAP_PX, TOOL_HINTS } from './shared';
 
@@ -35,6 +37,7 @@ export class EditorPointer {
   }
 
   onDown(this: Editor, e: PointerEvent) {
+    if (this.drag?.type === 'pencil') return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     this.canvas.setPointerCapture(e.pointerId);
@@ -44,6 +47,7 @@ export class EditorPointer {
       return;
     }
     if (e.button === 2) {
+      if (this.outlinePreview) { this.suppressContextMenu = true; return; }
       this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || !!this.pickHandler || !!this.drag;
       if (this.draft) this.finishLine();
       if (this.sketchEdit && this.sketchEdit.draft.length) {
@@ -54,6 +58,11 @@ export class EditorPointer {
       return;
     }
     if (e.button !== 0) return;
+    if (this.outlinePreview) {
+      if (sx >= RULER && sy >= RULER) this.outlinePreview.pick(wp);
+      return;
+    }
+
     // Punktabfrage (z. B. Laser zur Klickposition): Klick geht nur an sie, nicht ans Werkzeug
     if (this.pickHandler && (sx >= RULER || sy >= RULER)) {
       this.pickHandler(wp);
@@ -149,6 +158,12 @@ export class EditorPointer {
         this.redraw();
         return;
       }
+      case 'pencil':
+        e.preventDefault();
+        this.clearSnap();
+        this.drag = { type: 'pencil', points: [wp], pointerId: e.pointerId, overflow: false };
+        this.redraw();
+        return;
       case 'text': {
         e.preventDefault(); // Fokus bleibt im Texteingabefeld
         const o = this.hitTest(wp);
@@ -270,6 +285,11 @@ export class EditorPointer {
     this.cursor = wp;
     const d = this.drag;
     this.emit('view');
+    if (!d && this.outlinePreview) {
+      this.canvas.style.cursor = 'crosshair';
+      this.outlinePreview.move(wp);
+      return;
+    }
     if (!d && this.pickHandler) {
       this.canvas.style.cursor = 'crosshair';
       return;
@@ -320,6 +340,18 @@ export class EditorPointer {
       return;
     }
     switch (d.type) {
+      case 'pencil': {
+        if (e.pointerId !== d.pointerId || d.overflow) return;
+        const samples = e.getCoalescedEvents?.() ?? [];
+        for (const sample of [...samples, e]) {
+          const p = this.evPt(sample), world = this.toWorld(p.sx, p.sy), last = d.points[d.points.length - 1];
+          if (!Number.isFinite(world.x) || !Number.isFinite(world.y)) continue;
+          if (Math.hypot(world.x - last.x, world.y - last.y) * this.view.zoom < 1) continue;
+          if (d.points.length >= MAX_VECTOR_SAMPLES) { d.overflow = true; this.hint = t('Strich zu lang. Loslassen und einen kürzeren Strich zeichnen.'); this.emit('tool'); break; }
+          d.points.push(world);
+        }
+        this.redraw(); return;
+      }
       case 'pan':
         this.view.ox = d.ox + sx - d.sx;
         this.view.oy = d.oy + sy - d.sy;
@@ -533,6 +565,7 @@ export class EditorPointer {
   }
 
   onUp(this: Editor, e: PointerEvent) {
+    if (this.drag && 'pointerId' in this.drag && this.drag.pointerId !== e.pointerId) return;
     if (this.tool === 'sketch') this.sketchUp();
     const d = this.drag;
     this.drag = null;
@@ -541,6 +574,13 @@ export class EditorPointer {
     this.alignGuides = [];
     this.redraw();
     switch (d.type) {
+      case 'pencil': {
+        if (e.pointerId !== d.pointerId || d.overflow) return;
+        const p = this.evPt(e), end = this.toWorld(p.sx, p.sy);
+        if (Number.isFinite(end.x) && Number.isFinite(end.y) && d.points.length < MAX_VECTOR_SAMPLES) d.points.push(end);
+        this.finishPencil(d.points, this.pencilClosed);
+        return;
+      }
       case 'guide': {
         if (d.idx === null || !d.moved) return;
         const { sx, sy } = this.evPt(e);
@@ -642,6 +682,7 @@ export class EditorPointer {
   }
 
   onDouble(this: Editor, e: MouseEvent) {
+    if (this.outlinePreview) return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     if (this.tool === 'sketch') {
@@ -684,8 +725,9 @@ export class EditorPointer {
 
   onWheel(this: Editor, e: WheelEvent) {
     e.preventDefault();
+    if (e.ctrlKey && pinchGestureActive(this.canvas)) return;
     const { sx, sy } = this.evPt(e);
-    if (e.ctrlKey || Math.abs(e.deltaY) > 0 || e.deltaMode) this.zoomAt(Math.pow(1.0015, -e.deltaY * (e.deltaMode ? 30 : 1)), sx, sy);
+    if (e.deltaY) this.zoomAt(canvasWheelFactor(e, Math.log(1.0015)), sx, sy);
   }
 
   newShape(this: Editor): Shape {
@@ -715,6 +757,11 @@ export class EditorPointer {
   }
 
   /** Laufendes Ziehen abbrechen und den Ausgangszustand wiederherstellen */
+  cancelPointerDrag(this: Editor, e: PointerEvent) {
+    if (!this.drag || ('pointerId' in this.drag && this.drag.pointerId !== e.pointerId)) return;
+    this.cancelDrag();
+  }
+
   cancelDrag(this: Editor) {
     const d = this.drag;
     if (!d) return;

@@ -251,7 +251,7 @@ function paramArg(a: Args): Record<string, unknown> {
 function genDocs(): string {
   return GENERATORS.map((g) => {
     const ps = g.schema.filter((s) => s.type !== 'data').map((s) => {
-      const range = s.type === 'enum' ? s.options.map(([k]) => k).join('|') : s.type === 'bool' ? 'true|false' : `${s.type === 'int' ? 'ganzzahlig ' : ''}${s.min}–${s.max}`;
+      const range = s.type === 'enum' ? s.options.map(([k]) => k).join('|') : s.type === 'bool' ? 'true|false' : s.type === 'text' ? 'Text' : `${s.type === 'int' ? 'ganzzahlig ' : ''}${s.min}–${s.max}`;
       return `  ${s.key} (${s.label}; ${range}; Standard ${s.def})${s.title ? `: ${s.title}` : ''}`;
     });
     const kind = g.kind === 'assembly' ? ' (Baugruppe: legt mehrere Teile an, nebeneinander zum Ausschneiden)' : '';

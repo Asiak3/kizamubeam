@@ -1,3 +1,5 @@
+# KizamuBeam
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/brand/kizamubeam-logo-dark.png">
@@ -14,7 +16,8 @@
   <a href="https://negurvulkan.github.io/kizamubeam/en/">Website</a> ·
   <a href="docs/features.md">All features</a> ·
   <a href="https://discord.gg/SSr8VHh7EJ">Discord</a> ·
-  <a href="README.de.md">Deutsch</a>
+  <a href="README.de.md">Deutsch</a> ·
+  <a href="README.it.md">Italiano</a>
 </p>
 
 KizamuBeam takes you from the first idea to the finished piece in one app: draw and write directly on the workspace, turn photos into engravings, generate boxes, gears and slot-together models, check everything in 3D and send the job straight to your laser. If you have used LightBurn before, you will feel at home right away.
@@ -69,7 +72,7 @@ A material library stores proven settings. Material tests, focus tests and a fit
 Templates with parameters, variable text and serial numbers from CSV, QR codes and barcodes, multi-page projects, jigs for batches of blanks, **Print and Cut** with registration marks and a camera to place designs right on the workpiece.
 
 ### Make it yours
-Dockable windows and customizable toolbars, light and dark theme, German and English. A Toolbox gathers all generators and special tools in one place. Extensions add device presets, templates, materials and motifs. Settings, devices and libraries can be backed up or transferred as a file, or synced between computers through your own folder (iCloud, Dropbox, Nextcloud). AI agents such as Claude Code or Codex can work with your project through the built-in MCP server, with the access level you choose.
+Dockable windows and customizable toolbars, light and dark theme, English, German and Italian. A Toolbox gathers all generators and special tools in one place. Extensions add device presets, templates, materials and motifs. Settings, devices and libraries can be backed up or transferred as a file, or synced between computers through your own folder (iCloud, Dropbox, Nextcloud). AI agents such as Claude Code or Codex can work with your project through the built-in MCP server, with the access level you choose.
 
 **→ [The complete feature list](docs/features.md)**
 
@@ -83,11 +86,35 @@ npm run tauri dev      # desktop app with live reload
 npm run tauri build    # installer for your system
 ```
 
-Releases, updates, translations and the code structure are described in the [developer guide](docs/development.md). Contributions are welcome.
+Releases, updates, translations and the code structure are described in the [developer guide](docs/development.md). Contributions are welcome, see [CONTRIBUTING.md](CONTRIBUTING.md); to translate KizamuBeam into your language, see [TRANSLATION.md](TRANSLATION.md).
 
 ## Community
 
 Questions, ideas or something you made with KizamuBeam? Join us on [Discord](https://discord.gg/SSr8VHh7EJ). Bugs and feature requests are best filed as [GitHub issues](https://github.com/negurvulkan/kizamubeam/issues).
+
+## Contributors
+
+Thanks go to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)). Code, translations, testing on real machines, bug reports and ideas all count. See [CONTRIBUTING.md](CONTRIBUTING.md#credits) for how to be added.
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/negurvulkan"><img src="https://avatars.githubusercontent.com/u/61453878?v=4?s=80" width="80px;" alt="Hanjo Winter"/><br /><sub><b>Hanjo Winter</b></sub></a><br /><a href="#projectManagement-negurvulkan" title="Project Management">📆</a> <a href="#maintenance-negurvulkan" title="Maintenance">🚧</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=negurvulkan" title="Code">💻</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=negurvulkan" title="Documentation">📖</a> <a href="#design-negurvulkan" title="Design">🎨</a> <a href="#ideas-negurvulkan" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=negurvulkan" title="Tests">⚠️</a> <a href="#translation-negurvulkan" title="Translation">🌍</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/liquid-light"><img src="https://avatars.githubusercontent.com/u/21311036?v=4?s=80" width="80px;" alt="liquid-light"/><br /><sub><b>liquid-light</b></sub></a><br /><a href="https://github.com/negurvulkan/kizamubeam/commits?author=liquid-light" title="Code">💻</a> <a href="#ideas-liquid-light" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/negurvulkan/kizamubeam/issues?q=author%3Aliquid-light" title="Bug reports">🐛</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=liquid-light" title="Tests">⚠️</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/SimoCassan"><img src="https://avatars.githubusercontent.com/u/96295007?v=4?s=80" width="80px;" alt="SimoCassan"/><br /><sub><b>SimoCassan</b></sub></a><br /><a href="#translation-SimoCassan" title="Translation">🌍</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=SimoCassan" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Asiak3"><img src="https://avatars.githubusercontent.com/u/71585581?v=4?s=80" width="80px;" alt="Asiak C."/><br /><sub><b>Asiak C.</b></sub></a><br /><a href="https://github.com/negurvulkan/kizamubeam/commits?author=Asiak3" title="Code">💻</a> <a href="#ideas-Asiak3" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/negurvulkan/kizamubeam/issues?q=author%3AAsiak3" title="Bug reports">🐛</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Pietrogramma"><img src="https://avatars.githubusercontent.com/u/11855652?v=4?s=80" width="80px;" alt="Pietrogramma"/><br /><sub><b>Pietrogramma</b></sub></a><br /><a href="#translation-Pietrogramma" title="Translation">🌍</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=Pietrogramma" title="Code">💻</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 ## License
 

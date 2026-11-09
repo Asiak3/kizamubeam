@@ -1,3 +1,4 @@
+import { installPinchGestures } from './canvasZoom';
 // Editor: Zustand, Ansicht, Auswahl und Werkzeugwahl. Die übrigen Bereiche liegen in src/editor/
 // und werden unten in die Klasse eingehängt.
 import { Doc, Mat, newDoc, Obj, Pt, Shape, SubPath, TextShape, visibleLeaves, VarText } from './model';
@@ -45,6 +46,8 @@ import { installOverlapPicker } from './overlapPicker';
 import { DEFAULT_GRID, GridSettings } from './grid';
 import { EditorIsolation, IsolationState } from './editor/isolation';
 import { EditorVector, VectorPlan } from './editor/vector';
+
+import { EditorOutline, type OutlinePreview } from './editor/outline';
 
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
@@ -114,6 +117,8 @@ export class Editor {
   segmentSets = new Map<Obj, Set<string>>();
   nodeEditObj: Obj | null = null;
   vectorPreview: VectorPlan[] | null = null;
+  pencilTolerance = 0.2;
+  pencilClosed = false;
   suppressContextMenu = false;
   onCanvasContext: ((event: MouseEvent) => void) | null = null;
   hint = '';
@@ -151,7 +156,7 @@ export class Editor {
   // Fangen an Raster, Objekten und Hilfslinien
   /** Ist der Werkzeug-Modus einer, bei dem der Mauszeiger schon ohne Ziehen fängt? */
   get drawTool() {
-    return this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
+    return this.tool === 'pencil' || this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
   }
 
   // Pfad-Werkzeuge: Schließen, Verbinden, Zerlegen, Startpunkt, Trimmen
@@ -185,6 +190,7 @@ export class Editor {
   boolKeep = false;
   /** Vorschau für den Offset-Dialog (ohne das Dokument zu ändern) */
   offsetPreview: SubPath[] | null = null;
+  outlinePreview: OutlinePreview | null = null;
   /** Vorschau für die Array-Dialoge: Weltmatrix je Kopie (die erste ist das Original) */
   arrayPreview: Mat[] | null = null;
   /** Mittelpunkt des Kreisarrays (Welt), wird als Kreuz gezeigt */
@@ -264,8 +270,8 @@ export class Editor {
     installOverlapPicker(this);
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
-    canvas.addEventListener('pointercancel', () => this.cancelDrag());
-    canvas.addEventListener('lostpointercapture', () => { if (this.drag) this.cancelDrag(); });
+    canvas.addEventListener('pointercancel', (e) => this.cancelPointerDrag(e));
+    canvas.addEventListener('lostpointercapture', (e) => this.cancelPointerDrag(e));
     canvas.addEventListener('pointerleave', () => {
       if (this.drag || (!this.nodeHover && !this.segHover && !this.snapHit && !this.alignGuides.length)) return;
       this.nodeHover = this.segHover = null;
@@ -274,6 +280,7 @@ export class Editor {
     });
     canvas.addEventListener('dblclick', (e) => this.onDouble(e));
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+    installPinchGestures(canvas, (factor, x, y) => this.zoomAt(factor, x, y));
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       if (this.suppressContextMenu) { this.suppressContextMenu = false; return; }
@@ -549,6 +556,7 @@ export interface Editor
     EditorSketch,
     EditorIsolation,
     EditorVector,
+    EditorOutline,
     EditorRender {}
 
 const PARTS = [
@@ -579,6 +587,7 @@ const PARTS = [
   EditorSketch,
   EditorIsolation,
   EditorVector,
+  EditorOutline,
   EditorRender,
 ];
 for (const part of PARTS) {

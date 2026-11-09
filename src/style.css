@@ -86,7 +86,7 @@ body {
 #app {
   display: grid;
   /* Leisten lassen sich ausblenden (Menü Fenster): Zeilenhöhen kommen von den Leisten selbst */
-  grid-template-rows: auto auto auto 1fr auto auto;
+  grid-template-rows: auto auto auto auto 1fr auto auto;
   height: 100%;
 }
 #menubar {
@@ -95,7 +95,8 @@ body {
 #toolbar {
   min-height: 36px;
 }
-#numbar {
+#numbar,
+#textbar {
   height: 34px;
 }
 #palette {
@@ -217,11 +218,13 @@ body {
 
 /* Zahlenfelder */
 /* Breite Leisten (z. B. Text auf Pfad) lassen sich seitlich schieben statt abgeschnitten zu werden */
-#numbar {
+#numbar,
+#textbar {
   overflow-x: auto;
   scrollbar-width: thin;
 }
 #numbar label,
+#textbar label,
 .field {
   display: inline-flex;
   align-items: center;
@@ -244,12 +247,18 @@ select:focus {
   outline: 2px solid var(--accent-soft);
   border-color: var(--accent);
 }
-#numbar input.num {
+#numbar input.num,
+#textbar input.num {
   width: 64px;
   text-align: right;
 }
-#numbar input.small {
+#numbar input.small,
+#textbar input.small {
   width: 46px;
+}
+/* The font list can hold very long names; keep the text bar compact */
+#textbar select {
+  max-width: 220px;
 }
 .group-disabled {
   opacity: 0.4;
@@ -788,7 +797,8 @@ dialog {
   background: var(--surface);
   color: var(--text);
 }
-#numbar .muted {
+#numbar .muted,
+#textbar .muted {
   color: var(--muted);
   min-width: 64px;
 }
@@ -2611,6 +2621,7 @@ body.dock-resizing #canvas {
   color: var(--accent);
 }
 #numbar input.bound,
+#textbar input.bound,
 input.bound {
   color: var(--accent);
   font-style: italic;
@@ -4071,3 +4082,9 @@ input.jig-count {
 .overlap-picker > div { padding:5px; font-weight:600; }
 .overlap-picker button { text-align:left; white-space:normal; overflow-wrap:anywhere; padding:6px; flex:none; }
 .overlap-picker button:hover, .overlap-picker button:focus-visible { outline:2px solid #e0218a; outline-offset:-2px; }
+
+.outline-dialog { width: min(900px, 94vw); max-height: 92vh; overflow: auto; }
+.outline-dialog canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); touch-action: none; }
+.outline-tool-window { position: fixed; top: 70px; left: auto; right: 16px; margin: 0; box-sizing: border-box; width: min(370px, calc(100vw - 16px)); z-index: 100; }
+.outline-tool-window h3 { cursor: move; touch-action: none; }
+.outline-choices { max-height: 140px; overflow: auto; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; }

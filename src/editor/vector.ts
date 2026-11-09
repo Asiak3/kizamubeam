@@ -1,9 +1,10 @@
 import type { Editor } from '../editor';
-import { defaultLayer, inv, isOff, Obj, SubPath } from '../model';
+import { defaultLayer, IDENT, inv, isOff, newId, Obj, Pt, SubPath } from '../model';
 import { shapeSubs } from '../geom';
 import { transformSubs } from '../importers';
-import { FitOptions, MAX_VECTOR_SAMPLES, refitSubpath } from '../vectorFit';
+import { fitPoints, FitOptions, MAX_VECTOR_SAMPLES, refitSubpath } from '../vectorFit';
 import { t } from '../i18n';
+import { vectorError } from '../vectorMessages';
 
 // Property ordering must not turn an unchanged preview into an Undo step.
 const canonical = (value: unknown) => JSON.stringify(value, (_key, v) => v && typeof v === 'object' && !Array.isArray(v)
@@ -59,4 +60,26 @@ export class EditorVector {
     return true;
   }
 
+  finishPencil(this: Editor, points: Pt[], closed: boolean) {
+    try {
+      if (points.length < 2 || points.every((p) => Math.hypot(p.x - points[0].x, p.y - points[0].y) < 0.01)) {
+        this.hint = t('Kein Freihandpfad erstellt: zum Zeichnen ziehen, nicht nur klicken.'); this.emit('tool'); return;
+      }
+      if (this.layer(this.currentLayer).locked || !this.layer(this.currentLayer).show) throw new Error(t('Eine sichtbare, entsperrte Ebene wählen.'));
+      const sub = fitPoints(points, closed, { tolerance: this.pencilTolerance, curves: true, preserveCorners: true });
+      if (sub.nodes.length < (closed ? 3 : 2)) {
+        this.hint = t('Kein Freihandpfad erstellt: für einen geschlossenen Pfad eine Fläche zeichnen oder „Geschlossener Pfad“ ausschalten.'); this.emit('tool'); return;
+      }
+      this.snapshot(t('Freihandpfad zeichnen'));
+      const obj: Obj = { id: newId(), m: [...IDENT], layer: this.currentLayer, shape: { kind: 'path', subs: [sub] } };
+      this.doc.objs.push(obj);
+      this.setSel([obj]);
+      this.hint = t('Freihandpfad erstellt: {n} Knoten. Rückgängig mit Ctrl+Z.', { n: sub.nodes.length });
+      this.emit('doc');
+      this.emit('tool');
+    } catch (error) {
+      this.hint = vectorError(error);
+      this.emit('tool');
+    }
+  }
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Builds website/index.html (DE) and website/en/index.html (EN) from
+// Builds website/index.html (DE), website/en/index.html (EN) and
+// website/it/index.html (IT) from
 // template.html + i18n/*.json. Zero dependencies: `node website/build.mjs`.
 // The generated HTML is committed so GitHub Pages can serve it as-is.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -88,19 +89,28 @@ const withVersion = (v, version) =>
         : v;
 
 // Runs inline in <head> of the German root page only. First-time visitors
-// whose browser language is not German go to /en/. Any explicit choice made
-// with the language switch is stored and always wins. Crawlers are left alone.
-const REDIRECT = `<script>(function(){try{var s=localStorage.getItem('kb-lang');if(s)return;if(/bot|crawl|spider|slurp|preview/i.test(navigator.userAgent))return;var l=((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase();if(l&&l.indexOf('de')!==0){location.replace('en/'+location.hash);}}catch(e){}})();</script>`;
+// whose browser language is Italian go to /it/, any other non-German language
+// goes to /en/. Any explicit choice made with the language switch is stored
+// and always wins. Crawlers are left alone.
+const REDIRECT = `<script>(function(){try{var s=localStorage.getItem('kb-lang');if(s)return;if(/bot|crawl|spider|slurp|preview/i.test(navigator.userAgent))return;var l=((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase();if(!l||l.indexOf('de')===0)return;location.replace((l.indexOf('it')===0?'it/':'en/')+location.hash);}catch(e){}})();</script>`;
 
-const pages = [
-  { lang: 'de', out: 'index.html', base: '', url: SITE, altLang: 'en', altHref: 'en/' },
-  { lang: 'en', out: 'en/index.html', base: '../', url: `${SITE}en/`, altLang: 'de', altHref: '../' },
+// Every language of the site: code, name in its own language, path below SITE.
+const LANGS = [
+  { code: 'de', name: 'Deutsch', path: '' },
+  { code: 'en', name: 'English', path: 'en/' },
+  { code: 'it', name: 'Italiano', path: 'it/' },
 ];
+
+const pages = LANGS.map((l) => ({
+  lang: l.code,
+  out: `${l.path}index.html`,
+  base: l.path ? '../' : '',
+  url: `${SITE}${l.path}`,
+}));
 
 for (const p of pages) {
   const raw = load(p.lang);
   const t = withVersion(raw, raw.version);
-  const alt = load(p.altLang);
   t.dl.lead_tpl = raw.dl.lead;
   t.vm.dl_lead_tpl = raw.vm.dl_lead_tpl;
   const jsonld = {
@@ -123,10 +133,15 @@ for (const p of pages) {
     base: p.base,
     site: SITE,
     page_url: p.url,
-    alt_lang: p.altLang,
-    alt_href: p.altHref,
-    alt_locale: alt.locale,
     lang_upper: p.lang.toUpperCase(),
+    // All languages for hreflang links, the others for the language switch.
+    langs: LANGS,
+    langs_other: LANGS.filter((l) => l.code !== p.lang).map((l) => ({
+      ...l,
+      upper: l.code.toUpperCase(),
+      href: p.base + l.path,
+      locale: load(l.code).locale,
+    })),
     repo: REPO,
     releases: RELEASES,
     vm_releases: VM_RELEASES,
@@ -152,6 +167,7 @@ for (const p of pages) {
 {
   const de = load('de');
   const en = load('en');
+  const it = load('it');
   const html = `<!doctype html>
 <html lang="de">
 <head>
@@ -179,7 +195,8 @@ a{color:var(--link);font-weight:600}a:focus-visible{outline:2px solid #ff5600;ou
 <h1>${esc(de.notfound.title)}</h1>
 <p>${esc(de.notfound.text)}</p>
 <div lang="en"><h2 style="font-size:1.5rem;margin:1.25rem 0 .25rem">${esc(en.notfound.title)}</h2><p>${esc(en.notfound.text)}</p></div>
-<p class="links"><a href="${SITE}">${esc(de.notfound.home)}</a><a href="${SITE}en/" lang="en" hreflang="en">${esc(en.notfound.home)}</a></p>
+<div lang="it"><h2 style="font-size:1.5rem;margin:1.25rem 0 .25rem">${esc(it.notfound.title)}</h2><p>${esc(it.notfound.text)}</p></div>
+<p class="links"><a href="${SITE}">${esc(de.notfound.home)}</a><a href="${SITE}en/" lang="en" hreflang="en">${esc(en.notfound.home)}</a><a href="${SITE}it/" lang="it" hreflang="it">${esc(it.notfound.home)}</a></p>
 </main>
 </body>
 </html>
