@@ -4,6 +4,7 @@ const { Editor } = await import('../src/editor');
 const { History } = await import('../src/history');
 const { newDoc, apply } = await import('../src/model');
 const { shapeSubs } = await import('../src/geom');
+const { t } = await import('../src/i18n');
 type E = import('../src/editor').Editor;
 type Obj = import('../src/model').Obj;
 type Pt = import('../src/model').Pt;
@@ -44,7 +45,8 @@ test('unrelated pointer releases cannot silently discard a Pencil stroke', () =>
   const active = ed.drag;
   ed.onUp(event(80, 70, { pointerId: 2 })); assert.equal(ed.drag, active); assert.equal(ed.history.position, 0);
   ed.onUp(event(80, 70)); assert.equal(ed.doc.objs.length, 1); assert.equal(ed.history.position, 1);
-  assert.ok(ed.hint.includes('Freihandpfad erstellt'));
+  // Compare against the translated hint: the test locale is English since the English fallback (#181)
+  assert.equal(ed.hint, t('Freihandpfad erstellt: {n} Knoten. Rückgängig mit Ctrl+Z.', { n: shapeSubs(ed.doc.objs[0].shape)[0].nodes.length }));
 });
 test('second pointer down, cancellation and capture loss do not replace the Pencil owner', () => {
   const ed = editor([]); ed.tool = 'pencil'; ed.onDown(event(40, 40)); ed.onMove(event(60, 55));
@@ -55,6 +57,6 @@ test('second pointer down, cancellation and capture loss do not replace the Penc
 });
 test('an ordinary Pencil click reports why it produces no result without consuming Undo', () => {
   const ed = editor([]); ed.tool = 'pencil'; ed.onDown(event(40, 40)); ed.onUp(event(40, 40));
-  assert.equal(ed.doc.objs.length, 0); assert.equal(ed.history.position, 0); assert.ok(ed.hint.includes('nicht nur klicken'));
+  assert.equal(ed.doc.objs.length, 0); assert.equal(ed.history.position, 0); assert.equal(ed.hint, t('Kein Freihandpfad erstellt: zum Zeichnen ziehen, nicht nur klicken.'));
 });
 console.log("Focused feature checks passed.");

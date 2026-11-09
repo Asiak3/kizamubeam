@@ -173,7 +173,8 @@ for (const mount of ['fixed', 'head']) storage.set('kizamubeam.camera', JSON.str
 const source = fileURLToPath(new URL('../src/', import.meta.url));
 // Also runs against the independent camera-adjustments PR after a merge.
 const allowedFiles = new Set(['camera.ts', 'dom.ts', 'icons.ts', 'calibrationMachineControls.ts',
-  'cameraProfile.ts', 'cameraFineTune.ts', 'cameraImageProcessing.ts', 'cameraImageControls.ts', 'cameraDisplay.ts']);
+  'cameraProfile.ts', 'cameraFineTune.ts', 'cameraImageProcessing.ts', 'cameraImageControls.ts', 'cameraDisplay.ts',
+  'cameraOverlayVisibility.ts']);
 const bundle = await build({
   absWorkingDir: root, stdin: {
     contents: await readFile(new URL('../src/cameraui.ts', import.meta.url), 'utf8'),
