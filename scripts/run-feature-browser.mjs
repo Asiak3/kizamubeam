@@ -62,6 +62,20 @@ try {
   clearTimeout(timeout);
   if (result.exceptionDetails) throw Error(result.exceptionDetails.exception?.description ?? 'Fixture failed');
   const report = result.result.value;
+  if(suite==='prepareTrustedOverlap') {
+    const {x,y}=report;
+    await call('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'right',buttons:2,clickCount:1});
+    await delay(700);
+    await call('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'right',buttons:0,clickCount:1});
+    const menu=await call('Runtime.evaluate',{expression:'window.trustedOverlapMenu()',returnByValue:true});
+    if(!menu.result.value.open)throw Error('Trusted hold did not leave chooser open');
+    const pos=menu.result.value;
+    await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:pos.x,y:pos.y,buttons:0});
+    await call('Input.dispatchMouseEvent',{type:'mousePressed',x:pos.x,y:pos.y,button:'left',buttons:1,clickCount:1});
+    await call('Input.dispatchMouseEvent',{type:'mouseReleased',x:pos.x,y:pos.y,button:'left',buttons:0,clickCount:1});
+    const trusted=await call('Runtime.evaluate',{expression:'window.checkTrustedOverlap()',returnByValue:true});
+    Object.assign(report,trusted.result.value);delete report.x;delete report.y;
+  }
   if (suite === 'preparePencilCheck') {
     const { x, y } = report;
     await call('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });

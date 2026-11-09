@@ -70,6 +70,7 @@ export class EditorRender {
       nodeHover: this.nodeHover, segHover: this.segHover, snapHit: this.snapHit, alignGuides: this.alignGuides, draft: this.draft,
       centerMarks: this.centerMarks,
       isolation: this.isolation,
+      overlapHover: this.overlapHover,
     };
     try {
       this.canvas = off;
@@ -82,6 +83,7 @@ export class EditorRender {
       this.draft = null;
       this.centerMarks = 'off';
       this.isolation = null;
+      this.overlapHover = null;
       this.render();
       return off.toDataURL('image/png');
     } finally {
@@ -425,6 +427,12 @@ export class EditorRender {
 
   renderOverlay(this: Editor, ctx: CanvasRenderingContext2D) {
     const T = this.colors;
+    if(this.overlapHover && this.doc.objs.includes(this.overlapHover) && this.selectable(this.overlapHover)) {
+      ctx.save();ctx.translate(this.view.ox,this.view.oy);ctx.scale(this.view.zoom,this.view.zoom);
+      ctx.strokeStyle='#e0218a';ctx.lineWidth=3/this.view.zoom;ctx.setLineDash([]);
+      for(const [leaf,m] of visibleLeaves([this.overlapHover])) if(this.layer(leaf.layer).show)ctx.stroke(cachedWorldPath(leaf,m));
+      ctx.restore();
+    }
     // Auswahlrahmen
     const b = this.selBounds();
     if (b && this.tool !== 'node') {

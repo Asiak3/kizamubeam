@@ -248,6 +248,7 @@ function buildMenu(ed: Editor) {
       [t('Schriften …'), '', () => openFontManager(ed)],
       [t('Erweiterungen …'), '', () => openPacksDialog()],
       [t('Einstellungen übertragen …'), '', () => openSyncDialog(ed)],
+      [t('Überlappungsauswahl einstellen …'), '', () => openOverlapSettings()],
       [t('KI-Agenten (MCP) …'), '', () => openAgentDialog(ed)],
     ]],
     [t('Bearbeiten'), [
@@ -2075,3 +2076,4 @@ function buildTextEditor(ed: Editor) {
   }, true);
   ta.addEventListener('blur', () => setTimeout(() => document.activeElement !== ta && close(), 0));
 }
+import { openOverlapSettings } from './overlapPicker';
