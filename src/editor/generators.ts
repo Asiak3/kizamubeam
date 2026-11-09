@@ -68,10 +68,28 @@ export class EditorGenerators {
   /** Teil (lokal, m = Lage) mit seiner Gravur zu einer Gruppe verbinden; ohne Gravur bleibt es, wie es ist */
   withMark(this: Editor, part: Obj, marks: SubPath[] | undefined, markLayer: number): Obj {
     const s = part.shape as GenShape;
-    if (!marks?.length || !s.asm) return part;
-    const mark: Obj = { id: newId(), m: IDENT, layer: markLayer, shape: { kind: 'path', subs: marks, mark: markId(s.asm, s.part) } };
+    if (!marks?.length) return part;
+    // Einzelteile (Bauteil-Generatoren) haben keine Baugruppe: die Gravur trägt dann die Generator-Kennung
+    const mark: Obj = { id: newId(), m: IDENT, layer: markLayer, shape: { kind: 'path', subs: marks, mark: markId(s.asm ?? s.gen, s.part) } };
     const g: Obj = { id: newId(), m: part.m, layer: part.layer, shape: { kind: 'group', children: [{ ...part, m: IDENT }, mark] } };
     return g;
+  }
+  /** Gravur eines Einzelteils nach einer Parameter-Änderung nachführen (ändern, entfernen oder neu anlegen) */
+  syncSingleMark(this: Editor, o: Obj, marks: SubPath[] | undefined) {
+    const find = (list: Obj[]): Obj[] | null => {
+      if (list.includes(o)) return list;
+      for (const x of list) if (x.shape.kind === 'group') { const f = find(x.shape.children); if (f) return f; }
+      return null;
+    };
+    let list: Obj[] | null = null;
+    for (const pg of this.doc.pages) if (!list) list = find(pg.objs);
+    if (!list) return;
+    const parent = list === this.doc.objs ? null : this.doc.objs.find((x) => x.shape.kind === 'group' && x.shape.children === list);
+    const sib = parent && isMarkGroup(parent) ? list.find((x) => x.shape.kind === 'path' && !!x.shape.mark) : undefined;
+    if (sib && sib.shape.kind === 'path') {
+      if (marks?.length) { sib.shape = { ...sib.shape, subs: marks }; this.touch(sib.shape); }
+      else list.splice(list.indexOf(sib), 1);
+    } else if (marks?.length && list === this.doc.objs) list.splice(list.indexOf(o), 1, this.withMark(o, marks, this.markLayer(o.layer)));
   }
   /** Bauplan einer Baugruppe als neue Seite hinter der aktuellen (ohne Seitenwechsel), auf einem Layer, der nicht gelasert wird */
   addPlanPage(this: Editor, plan: PlanSheet, name: string) {
@@ -147,6 +165,7 @@ export class EditorGenerators {
     if (!old.asm || !g) {
       o.shape = { ...r.parts[0].shape };
       this.touch(o.shape);
+      this.syncSingleMark(o, r.parts[0].marks);
     } else {
       const asm = old.asm;
       const members = this.asmMembers(asm);
