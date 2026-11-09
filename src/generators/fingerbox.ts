@@ -120,7 +120,6 @@ export const FINGERBOX: Generator = {
   ],
   validate(raw) {
     const p = values(raw), out: Issue[] = [];
-    out.push({ level: 'warn', msg: t('Experimenteller Generator: Noch nicht für den Laserschnitt verwenden.') });
     if (p.jointLayout === 'legacy' && p.top !== 'closed' && p.height > p.depth + 10) out.push({ level: 'warn', msg: t('Bei dieser Höhe können sich Teile in der 2D-Anordnung überlappen; Lage prüfen.') });
     if (Math.min(p.width, p.depth, p.height) <= 2 * p.thickness) {
       out.push({ key: 'thickness', level: 'error', msg: t('Alle Außenmaße müssen größer als die doppelte Materialdicke sein.') });
