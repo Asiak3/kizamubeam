@@ -3925,7 +3925,6 @@
   "Ein Schlitz liegt auf oder außerhalb der Außenkontur.": "A slot touches or lies outside the outer outline.",
   "Ein Zinkenabschnitt ist höchstens so breit wie die Materialdicke; die Geometrie kann ungeeignet sein.": "A finger segment is no wider than the material thickness; the geometry may be unsuitable.",
   "Eingabe ist zu lang.": "The input is too long.",
-  "Experimenteller Generator: Noch nicht für den Laserschnitt verwenden.": "Experimental generator: not yet for laser cutting.",
   "Fächer in Breitenrichtung": "Compartments across width",
   "Fächer in Tiefenrichtung": "Compartments across depth",
   "Fachzahl muss zwischen 1 und 100 liegen.": "The number of compartments must be between 1 and 100.",
@@ -3960,6 +3959,6 @@
   "Zu viele Zinken und Schlitze für diese Vorschau. Weniger Fächer oder größere Zinken wählen.": "Too many fingers and slots for this preview. Choose fewer compartments or larger fingers.",
   "Box mit Fingerzinken und Trennwänden": "Finger Joint Box with Dividers",
   "Box mit Trennwänden {w}×{d}×{h}": "Divided box {w}×{d}×{h}",
-  "Experimentelle Box mit parametrischen Trennwänden.": "Experimental box with parametric dividers.",
+  "Box mit parametrischen Trennwänden.": "Box with parametric dividers.",
   "Box Fächer Trennwände Fingerzinken|Suchwörter": "box compartments dividers finger joints"
 }

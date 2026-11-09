@@ -3883,7 +3883,6 @@
   "Ein Schlitz liegt auf oder außerhalb der Außenkontur.": "Un'asola tocca o si trova al di fuori del contorno esterno.",
   "Ein Zinkenabschnitt ist höchstens so breit wie die Materialdicke; die Geometrie kann ungeeignet sein.": "Un tratto di dita è largo al massimo quanto lo spessore del materiale; la geometria potrebbe non essere adatta.",
   "Eingabe ist zu lang.": "L'input è troppo lungo.",
-  "Experimenteller Generator: Noch nicht für den Laserschnitt verwenden.": "Generatore sperimentale: non ancora da usare per il taglio laser.",
   "Fächer in Breitenrichtung": "Scomparti in larghezza",
   "Fächer in Tiefenrichtung": "Scomparti in profondità",
   "Fachzahl muss zwischen 1 und 100 liegen.": "Il numero di scomparti deve essere compreso tra 1 e 100.",
@@ -3918,6 +3917,6 @@
   "Zu viele Zinken und Schlitze für diese Vorschau. Weniger Fächer oder größere Zinken wählen.": "Troppe dita e asole per questa anteprima. Scegli meno scomparti o dita più grandi.",
   "Box mit Fingerzinken und Trennwänden": "Scatola con giunti a pettine e divisori",
   "Box mit Trennwänden {w}×{d}×{h}": "Scatola con divisori {w}×{d}×{h}",
-  "Experimentelle Box mit parametrischen Trennwänden.": "Scatola sperimentale con divisori parametrici.",
+  "Box mit parametrischen Trennwänden.": "Scatola con divisori parametrici.",
   "Box Fächer Trennwände Fingerzinken|Suchwörter": "scatola scomparti divisori giunti a pettine dita"
 }
