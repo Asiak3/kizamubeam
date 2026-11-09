@@ -102,7 +102,19 @@ function panelOutline(P: PanelSpec, th: number, finger: number, clearance: numbe
   const at = (i: number, s: number, d: number): Pt => ({ x: C[i].x + U[i].x * s + N[i].x * d, y: C[i].y + U[i].y * s + N[i].y * d });
   const cuts: { x0: number; x1: number; y0: number; y1: number }[] = [];
   P.edges.forEach((e, i) => {
-    for (const r of edgeRuns(lens[i], th, e, P.corners, finger, clearance)) {
+    const runs = edgeRuns(lens[i], th, e, P.corners, finger, clearance);
+    // Negatives Steckspiel (Presspassung): Die Eckabschnitte beider Kanten werden kürzer und ließen ein
+    // |Spiel|/2-Quadrat stehen, das unter der Nachbarwand liegt (Stufe/Überlappung). Die ausgesparte Ecke wird deshalb
+    // als volles Quadrat weggeschnitten. Nur Muster A: Es beginnt mit einer Zinke, die Ecke ist ein eigener Abschnitt;
+    // bei B ist sie mit dem ersten Feld verschmolzen. Bei positivem Spiel bleibt die Stufe bewusst erhalten: Sie ist
+    // Bodenmaterial im Innenwinkel, das keine Wand abdeckt.
+    if (clearance < 0 && !P.corners && e.pattern === 'A') {
+      for (const s0 of [0, lens[i] - th]) {
+        const p = at(i, s0, 0), q = at(i, s0 + th, th);
+        cuts.push({ x0: Math.min(p.x, q.x), x1: Math.max(p.x, q.x), y0: Math.min(p.y, q.y), y1: Math.max(p.y, q.y) });
+      }
+    }
+    for (const r of runs) {
       if (r.full) continue;
       const p = at(i, r.s0, 0),
         q = at(i, r.s1, th);
