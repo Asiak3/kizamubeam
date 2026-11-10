@@ -4090,5 +4090,15 @@
   "Materialien: {added} neu, {replaced} ersetzt": "Materiali: {added} nuovi, {replaced} sostituiti",
   "Kameras: {added} neu, {updated} aktualisiert": "Fotocamere: {added} nuove, {updated} aggiornate",
   "Vom Host übernommen: {list}": "Importato dall'host: {list}",
-  "Vom Host übernehmen …": "Importa dall'host …"
+  "Vom Host übernehmen …": "Importa dall'host …",
+  "Rechner im Host-Modus im lokalen Netzwerk suchen": "Cerca nella rete locale i computer in modalità host",
+  "Host suchen …": "Cerca host …",
+  "Suche im Netzwerk … (einige Sekunden)": "Ricerca nella rete … (alcuni secondi)",
+  "KizamuBeam-Hosts im Netzwerk": "Host KizamuBeam nella rete",
+  "Gefunden werden Rechner, auf denen der Host-Modus läuft: per mDNS und an allen Adressen des eigenen Netzes auf Port {port}. Über ein VPN die Adresse von Hand eintragen. macOS fragt beim ersten Mal nach dem Zugriff auf das lokale Netzwerk.": "Trova i computer in modalità host: tramite mDNS e a tutti gli indirizzi della propria rete sulla porta {port}. Tramite VPN inserisci l'indirizzo a mano. La prima volta macOS chiede l'accesso alla rete locale.",
+  "Kein Host gefunden. Läuft am Rechner mit dem Laser der Host-Modus (Laser → Fernsteuerung → Host-Modus …) und ist er im selben Netz?": "Nessun host trovato. Sul computer collegato al laser è attiva la modalità host (Laser → Controllo remoto → Modalità host …) ed è nella stessa rete?",
+  "gekoppelt": "associato",
+  "andere Version": "versione diversa",
+  "Host und dieser Rechner verwenden verschiedene Protokollversionen. Bitte beide KizamuBeam auf dieselbe Version bringen.": "L'host e questo computer usano versioni di protocollo diverse. Porta entrambe le installazioni di KizamuBeam alla stessa versione.",
+  "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visibile nella rete come “{name}”; gli altri computer lo trovano con “Cerca host …”."
 }

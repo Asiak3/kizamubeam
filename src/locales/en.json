@@ -4151,5 +4151,15 @@
   "Materialien: {added} neu, {replaced} ersetzt": "Materials: {added} new, {replaced} replaced",
   "Kameras: {added} neu, {updated} aktualisiert": "Cameras: {added} new, {updated} updated",
   "Vom Host übernommen: {list}": "Taken over from host: {list}",
-  "Vom Host übernehmen …": "Take over from host …"
+  "Vom Host übernehmen …": "Take over from host …",
+  "Rechner im Host-Modus im lokalen Netzwerk suchen": "Search the local network for computers in host mode",
+  "Host suchen …": "Find host …",
+  "Suche im Netzwerk … (einige Sekunden)": "Searching the network … (a few seconds)",
+  "KizamuBeam-Hosts im Netzwerk": "KizamuBeam hosts on the network",
+  "Gefunden werden Rechner, auf denen der Host-Modus läuft: per mDNS und an allen Adressen des eigenen Netzes auf Port {port}. Über ein VPN die Adresse von Hand eintragen. macOS fragt beim ersten Mal nach dem Zugriff auf das lokale Netzwerk.": "Finds computers running host mode: via mDNS and at every address of your own network on port {port}. Over a VPN, enter the address by hand. macOS asks for local network access the first time.",
+  "Kein Host gefunden. Läuft am Rechner mit dem Laser der Host-Modus (Laser → Fernsteuerung → Host-Modus …) und ist er im selben Netz?": "No host found. Is host mode running on the computer with the laser (Laser → Remote control → Host mode …) and is it on the same network?",
+  "gekoppelt": "paired",
+  "andere Version": "different version",
+  "Host und dieser Rechner verwenden verschiedene Protokollversionen. Bitte beide KizamuBeam auf dieselbe Version bringen.": "The host and this computer use different protocol versions. Please bring both KizamuBeam installations to the same version.",
+  "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visible on the network as “{name}”; other computers find it with “Find host …”."
 }

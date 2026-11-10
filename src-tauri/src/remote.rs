@@ -12,6 +12,10 @@
 //! **Pairing:** the host shows a 6-digit code. The client answers with an HMAC of that code over the host
 //! certificate fingerprint it saw, so a machine in the middle cannot relay the pairing. The host then hands
 //! out a per-client key (only its hash is stored on the host); the client stores key and fingerprint.
+//!
+//! **Discovery:** a running host announces itself via mDNS as `_kizamubeam._tcp`. Clients search there and on
+//! port 47900 of their own /24 network, then ask each candidate who it is (`who` → `info`, no pairing needed);
+//! the certificate fingerprint comes from the TLS handshake, not from the announcement.
 
 use ring::rand::{SecureRandom, SystemRandom};
 use ring::{digest, hmac};
@@ -23,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
-use std::net::{TcpListener, TcpStream, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -44,6 +48,8 @@ const PAIR_LABEL: &[u8] = b"kizamubeam-pair-v1";
 /// Poll interval of the connection threads (reading and sending)
 const TICK: Duration = Duration::from_millis(40);
 const SERVER_NAME: &str = "kizamubeam";
+/// mDNS service type of a host
+const MDNS_TYPE: &str = "_kizamubeam._tcp.local.";
 
 pub const VIEWER: &str = "viewer";
 pub const OPERATOR: &str = "operator";
@@ -421,6 +427,8 @@ struct Inner {
     link: Mutex<Option<Link>>,
     link_pending: Mutex<HashMap<u64, Sender<Value>>>,
     pair_session: Mutex<Option<PairSession>>,
+    // mDNS announcement while host mode runs
+    mdns: Mutex<Option<mdns_sd::ServiceDaemon>>,
 }
 
 pub struct Remote(Arc<Inner>);
@@ -480,6 +488,8 @@ pub struct HostInfo {
     fingerprint: String,
     /// Address in the local network, if known
     address: Option<String>,
+    /// Announced via mDNS, so clients find it with "Search …"
+    announced: bool,
 }
 
 fn host_info(inner: &Inner) -> HostInfo {
@@ -496,6 +506,7 @@ fn host_info(inner: &Inner) -> HostInfo {
         error,
         fingerprint: if fp.is_empty() { String::new() } else { show_fingerprint(&fp) },
         address: crate::fluid::local_ipv4().map(|ip| ip.to_string()),
+        announced: inner.mdns.lock().unwrap().is_some(),
     }
 }
 
@@ -538,6 +549,7 @@ fn restart(inner: &Arc<Inner>) {
         p.kill.store(true, Ordering::SeqCst);
     }
     *inner.pairing.lock().unwrap() = None;
+    stop_announcing(inner);
     let s = inner.store.lock().unwrap().host.clone();
     if !s.enabled {
         return;
@@ -567,6 +579,7 @@ fn restart(inner: &Arc<Inner>) {
         }
     };
     let _ = listener.set_nonblocking(true);
+    announce(inner, &s);
     let inner = inner.clone();
     std::thread::spawn(move || loop {
         if inner.generation.load(Ordering::SeqCst) != gen {
@@ -606,6 +619,12 @@ fn serve(inner: Arc<Inner>, mut sock: TcpStream, cfg: Arc<ServerConfig>, gen: u6
     }
     let mut io: ServerIo = Lines::new(StreamOwned::new(conn, sock));
     let Ok(hello) = io.wait(Duration::from_secs(15)) else { return };
+    // Discovery: say who this is, without pairing
+    if kind(&hello) == "who" {
+        let s = inner.store.lock().unwrap().host.clone();
+        let _ = io.send(&json!({ "t": "info", "proto": PROTO, "name": host_name(&s), "port": s.port }));
+        return;
+    }
     if kind(&hello) != "hello" {
         return;
     }
@@ -811,13 +830,20 @@ pub fn remote_host_configure(state: State<'_, Remote>, enabled: bool, port: u16,
     {
         let mut st = state.0.store.lock().unwrap();
         let restart_needed = st.host.enabled != enabled || st.host.port != port;
+        let renamed = st.host.name != name.chars().take(80).collect::<String>();
         st.host.enabled = enabled;
         st.host.port = if port < 1024 { DEFAULT_PORT } else { port };
         st.host.name = name.chars().take(80).collect();
         st.host.confirm = confirm;
         save_store(&st)?;
         if !restart_needed {
+            let s = st.host.clone();
             drop(st);
+            // a new name is announced again without dropping connections
+            if renamed && state.0.mdns.lock().unwrap().is_some() {
+                stop_announcing(&state.0);
+                announce(&state.0, &s);
+            }
             return Ok(host_info(&state.0));
         }
     }
@@ -901,6 +927,163 @@ pub fn remote_host_broadcast(state: State<'_, Remote>, event: String, data: Valu
 pub fn start(app: &AppHandle, state: &Remote) {
     let _ = state.0.app.set(app.clone());
     restart(&state.0);
+}
+
+// ---------- Discovery ----------
+
+/// mDNS host name for this computer: letters, digits and dashes, with a suffix so it never clashes with the
+/// name the operating system announces itself
+fn mdns_host(name: &str) -> String {
+    let mut h: String = name
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|p| !p.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    h.truncate(40);
+    if h.is_empty() {
+        h = "host".into();
+    }
+    format!("{h}-kizamubeam.local.")
+}
+
+/// Announce the running host via mDNS (best effort: without mDNS, clients still find it by scanning)
+fn announce(inner: &Inner, s: &HostSettings) {
+    let Ok(daemon) = mdns_sd::ServiceDaemon::new() else { return };
+    let name = host_name(s);
+    let fp = hex(&inner.fingerprint.lock().unwrap());
+    let props: HashMap<String, String> = [("proto".to_string(), PROTO.to_string()), ("fp".to_string(), fp)].into_iter().collect();
+    let instance: String = name.chars().take(60).collect();
+    let Ok(info) = mdns_sd::ServiceInfo::new(MDNS_TYPE, &instance, &mdns_host(&name), "", s.port, props) else { return };
+    if daemon.register(info.enable_addr_auto()).is_ok() {
+        *inner.mdns.lock().unwrap() = Some(daemon);
+    } else {
+        let _ = daemon.shutdown();
+    }
+}
+
+fn stop_announcing(inner: &Inner) {
+    if let Some(d) = inner.mdns.lock().unwrap().take() {
+        let _ = d.shutdown();
+    }
+}
+
+/// A host found on the network
+#[derive(Serialize, Clone, Debug)]
+pub struct FoundHost {
+    name: String,
+    host: String,
+    port: u16,
+    /// Certificate fingerprint (hex) as seen in the TLS handshake
+    fingerprint: String,
+    /// Fingerprint for people
+    shown: String,
+    /// Found through the mDNS announcement (otherwise by scanning the local network)
+    mdns: bool,
+    /// This computer is already paired with it
+    paired: bool,
+    proto: u64,
+}
+
+/// Ask one address who it is; None when no KizamuBeam host answers there
+fn probe_host(addr: SocketAddr) -> Option<(String, Vec<u8>, u64)> {
+    TcpStream::connect_timeout(&addr, Duration::from_millis(400)).ok()?;
+    let (mut io, fp) = open_client(&addr.ip().to_string(), addr.port(), None).ok()?;
+    io.send(&json!({ "t": "who" })).ok()?;
+    let r = io.wait(Duration::from_secs(3)).ok()?;
+    (kind(&r) == "info").then(|| (r.get("name").and_then(Value::as_str).unwrap_or("").to_string(), fp, r.get("proto").and_then(Value::as_u64).unwrap_or(0)))
+}
+
+/// Addresses announced via mDNS within `wait`
+fn mdns_candidates(wait: Duration) -> Vec<SocketAddr> {
+    let Ok(daemon) = mdns_sd::ServiceDaemon::new() else { return Vec::new() };
+    let mut out = Vec::new();
+    if let Ok(rx) = daemon.browse(MDNS_TYPE) {
+        let end = Instant::now() + wait;
+        while let Some(left) = end.checked_duration_since(Instant::now()) {
+            match rx.recv_timeout(left) {
+                Ok(mdns_sd::ServiceEvent::ServiceResolved(svc)) => {
+                    for ip in svc.get_addresses_v4() {
+                        out.push(SocketAddr::new(IpAddr::V4(ip), svc.get_port()));
+                    }
+                }
+                Ok(_) => {}
+                Err(_) => break,
+            }
+        }
+    }
+    let _ = daemon.shutdown();
+    out
+}
+
+fn discover(inner: &Inner, port: u16) -> Vec<FoundHost> {
+    // mDNS in parallel with the scan of the own /24 network
+    let mdns = std::thread::spawn(|| mdns_candidates(Duration::from_millis(2500)));
+    let mut cands: Vec<(SocketAddr, bool)> = Vec::new();
+    if let Some(ip) = crate::fluid::local_ipv4() {
+        let [a, b, c, _] = ip.octets();
+        for d in 1..=254u8 {
+            cands.push((SocketAddr::new(IpAddr::V4(Ipv4Addr::new(a, b, c, d)), port), false));
+        }
+    }
+    for a in mdns.join().unwrap_or_default() {
+        match cands.iter_mut().find(|(c, _)| *c == a) {
+            Some(c) => c.1 = true,
+            None => cands.push((a, true)),
+        }
+    }
+    let mut found: Vec<FoundHost> = Vec::new();
+    for chunk in cands.chunks(64) {
+        let hits: Vec<FoundHost> = std::thread::scope(|sc| {
+            let hs: Vec<_> = chunk
+                .iter()
+                .map(|&(addr, mdns)| {
+                    sc.spawn(move || {
+                        probe_host(addr).map(|(name, fp, proto)| FoundHost {
+                            name,
+                            host: addr.ip().to_string(),
+                            port: addr.port(),
+                            fingerprint: hex(&fp),
+                            shown: show_fingerprint(&fp),
+                            mdns,
+                            paired: false,
+                            proto,
+                        })
+                    })
+                })
+                .collect();
+            hs.into_iter().filter_map(|h| h.join().ok().flatten()).collect()
+        });
+        found.extend(hits);
+    }
+    // One entry per certificate (a host can answer on several addresses), not this computer's own host mode
+    found.sort_by_key(|f| !f.mdns);
+    let mut seen: Vec<String> = Vec::new();
+    let own_fp = hex(&inner.fingerprint.lock().unwrap());
+    if inner.store.lock().unwrap().host.enabled && !own_fp.is_empty() {
+        seen.push(own_fp);
+    }
+    found.retain(|f| {
+        if seen.contains(&f.fingerprint) {
+            return false;
+        }
+        seen.push(f.fingerprint.clone());
+        true
+    });
+    for f in &mut found {
+        f.paired = find_credential(inner, &f.fingerprint).is_some();
+    }
+    found.sort_by_key(|f| f.name.to_lowercase());
+    found
+}
+
+/// KizamuBeam hosts on the local network (mDNS and a scan of the own /24 network on `port`)
+#[tauri::command]
+pub async fn remote_discover(state: State<'_, Remote>, port: Option<u16>) -> Result<Vec<FoundHost>, String> {
+    let inner = state.0.clone();
+    tauri::async_runtime::spawn_blocking(move || discover(&inner, port.unwrap_or(DEFAULT_PORT))).await.map_err(|e| e.to_string())
 }
 
 // ---------- Client ----------
@@ -1262,6 +1445,39 @@ mod tests {
         io.send(&json!({ "t": "req", "id": 2, "m": "line", "p": { "line": "$H" } })).unwrap();
         let r = io.wait(w).unwrap();
         assert_eq!((r["id"].as_u64(), r["ok"].as_bool()), (Some(2), Some(false)));
+    }
+
+    /// Discovery: a host says who it is without pairing; the fingerprint comes from the handshake
+    #[test]
+    fn who_probe() {
+        let (cert, key) = new_identity().unwrap();
+        let cfg = server_config(&cert, &key).unwrap();
+        let inner = Arc::new(Inner::default());
+        inner.store.lock().unwrap().host.name = "Werkstatt".into();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let srv = inner.clone();
+        std::thread::spawn(move || {
+            for sock in listener.incoming() {
+                let (srv, cfg) = (srv.clone(), cfg.clone());
+                std::thread::spawn(move || serve(srv, sock.unwrap(), cfg, 0));
+            }
+        });
+        let (name, fp, proto) = probe_host(addr).unwrap();
+        assert_eq!((name.as_str(), proto), ("Werkstatt", PROTO));
+        assert_eq!(fp, sha256(&cert));
+        // nobody listening: no answer
+        let closed = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap();
+        assert!(probe_host(closed).is_none());
+        // nobody connected through the probe
+        assert!(inner.peers.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn mdns_host_names() {
+        assert_eq!(mdns_host("Hanjos MacBook Pro"), "hanjos-macbook-pro-kizamubeam.local.");
+        assert_eq!(mdns_host("Werkstatt (Keller)"), "werkstatt-keller-kizamubeam.local.");
+        assert_eq!(mdns_host("ÄÖÜ"), "host-kizamubeam.local.");
     }
 
     /// Full TLS round trip over loopback: pinned certificate accepted, a different one refused

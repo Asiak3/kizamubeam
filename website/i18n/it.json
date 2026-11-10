@@ -90,7 +90,7 @@
         "Generatore di dime: piastre di supporto con sedi precise per i pezzi da un file vettoriale, una foto o la fotocamera, con numeri delle sedi e segni di registro",
         "Salva il G-code o invialo direttamente – lo streaming gira nel nucleo Rust",
         "Regola potenza e velocità durante il lavoro; FluidNC: carica i lavori su scheda SD o memoria flash ed eseguili lì, modifica config.yaml con backup, trova il controller in Wi-Fi",
-        "Laser in un'altra stanza: controllalo tramite il KizamuBeam collegato al laser nella rete di casa o via VPN – quel computer calcola ed esegue il lavoro, tu lo avvii, lo segui (anche con la fotocamera dell'host) e lo fermi dalla scrivania; dispositivo, materiali e fotocamere si possono importare dall'host"
+        "Laser in un'altra stanza: controllalo tramite il KizamuBeam collegato al laser nella rete di casa o via VPN – quel computer calcola ed esegue il lavoro, tu lo avvii, lo segui (anche con la fotocamera dell'host) e lo fermi dalla scrivania; dispositivo, materiali e fotocamere si possono importare dall'host, e KizamuBeam trova l'host da solo nella rete di casa"
       ]
     },
     "gen": {

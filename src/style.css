@@ -4195,3 +4195,23 @@ input.jig-count {
 .remote-sync {
   width: min(520px, 95vw);
 }
+.remote-discover {
+  width: min(520px, 95vw);
+}
+.remote-found {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.remote-found-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.remote-found-row .grow {
+  flex: 1;
+  min-width: 0;
+}

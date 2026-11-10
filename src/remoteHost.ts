@@ -27,6 +27,8 @@ interface HostInfo {
   error: string | null;
   fingerprint: string;
   address: string | null;
+  /** Announced via mDNS (clients find it with "Search …") */
+  announced: boolean;
 }
 
 interface ClientInfo {
@@ -444,7 +446,8 @@ export async function openRemoteHostDialog(ed: Editor) {
     state.textContent = info.error
       ? tBackend(info.error)
       : info.enabled
-        ? t('Läuft. Andere Rechner verbinden sich mit {address}, Port {port}.', { address: info.address ?? t('der Adresse dieses Rechners'), port: info.port })
+        ? t('Läuft. Andere Rechner verbinden sich mit {address}, Port {port}.', { address: info.address ?? t('der Adresse dieses Rechners'), port: info.port }) +
+          (info.announced ? ' ' + t('Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.', { name: info.shown_name }) : '')
         : t('Aus. Kein anderer Rechner kann diesen Laser erreichen.');
     fp.textContent = info.fingerprint ? t('Fingerabdruck: {fp}', { fp: info.fingerprint }) : '';
     table.replaceChildren(

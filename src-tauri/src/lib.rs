@@ -248,6 +248,7 @@ pub fn run() {
             remote::remote_pair_finish,
             remote::remote_pair_cancel,
             remote::remote_paired,
+            remote::remote_discover,
             remote::remote_forget,
             templates::template_list,
             templates::template_read,

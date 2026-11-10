@@ -7,7 +7,7 @@ import { formatDuration } from './gcode';
 import { t, tBackend, tn } from './i18n';
 import { assetUrl } from './images';
 import { isTauri, machine } from './machine';
-import { base64ToBytes, BundleFont, bytesToBase64, deviceDifferences, fontLabel, fontsUsed, HostSync, JobBundle, MAX_BUNDLE, sourceProject } from './remoteBundle';
+import { base64ToBytes, REMOTE_PROTO, BundleFont, bytesToBase64, deviceDifferences, fontLabel, fontsUsed, HostSync, JobBundle, MAX_BUNDLE, sourceProject } from './remoteBundle';
 import { hostCameraSource } from './camera';
 import { FIRMWARES, type Device, type Firmware } from './gcode';
 import { sanitizeEntry, type MaterialEntry } from './materials';
@@ -159,6 +159,66 @@ function confirmStart(host: string, r: Submitted): Promise<boolean> {
     dlg.showModal();
     // Warnings deserve a look: do not start with Enter by accident
     (dlg.querySelector('.dialog-buttons .btn') as HTMLElement).focus();
+  });
+}
+
+/** A KizamuBeam host found on the network (src-tauri/src/remote.rs, remote_discover) */
+export interface FoundHost {
+  name: string;
+  host: string;
+  port: number;
+  fingerprint: string;
+  shown: string;
+  mdns: boolean;
+  paired: boolean;
+  proto: number;
+}
+
+/**
+ * Search the local network for computers in host mode (mDNS and the own network on the port) and let the
+ * person pick one. Resolves with the chosen host or null.
+ */
+export function openHostDiscovery(port: number): Promise<FoundHost | null> {
+  return new Promise((resolve) => {
+    if (!isTauri()) {
+      alert(t('Die Maschinenanbindung gibt es nur in der Desktop-App.'));
+      return resolve(null);
+    }
+    let result: FoundHost | null = null;
+    const list = h('div', { class: 'remote-found' });
+    const note = h('p', { class: 'note' }, t('Suche im Netzwerk … (einige Sekunden)'));
+    const dlg = h('dialog', { class: 'remote-discover' },
+      h('h3', {}, t('KizamuBeam-Hosts im Netzwerk')),
+      h('p', { class: 'note' }, t('Gefunden werden Rechner, auf denen der Host-Modus läuft: per mDNS und an allen Adressen des eigenen Netzes auf Port {port}. Über ein VPN die Adresse von Hand eintragen. macOS fragt beim ersten Mal nach dem Zugriff auf das lokale Netzwerk.', { port })),
+      list,
+      note,
+      h('div', { class: 'dialog-buttons' }, h('button', { class: 'btn', onclick: () => dlg.close() }, t('Schließen'))),
+    );
+    dlg.addEventListener('keydown', (e) => e.stopPropagation());
+    dlg.addEventListener('close', () => {
+      dlg.remove();
+      resolve(result);
+    });
+    document.body.append(dlg);
+    dlg.showModal();
+    invoke<FoundHost[]>('remote_discover', { port })
+      .then((found) => {
+        note.textContent = found.length ? '' : t('Kein Host gefunden. Läuft am Rechner mit dem Laser der Host-Modus (Laser → Fernsteuerung → Host-Modus …) und ist er im selben Netz?');
+        for (const f of found) {
+          const other = f.proto !== REMOTE_PROTO;
+          list.append(h('div', { class: 'remote-found-row' },
+            h('div', { class: 'grow' },
+              h('b', {}, f.name || f.host),
+              h('div', { class: 'note' }, `${f.host}:${f.port}`, f.paired ? ` · ${t('gekoppelt')}` : '', other ? ` · ${t('andere Version')}` : ''),
+              h('div', { class: 'note remote-fp' }, f.shown)),
+            h('button', { class: 'btn small primary', disabled: other, title: other ? t('Host und dieser Rechner verwenden verschiedene Protokollversionen. Bitte beide KizamuBeam auf dieselbe Version bringen.') : '', onclick: () => ((result = f), dlg.close()) }, t('Übernehmen')),
+          ));
+        }
+      })
+      .catch((e) => {
+        note.textContent = (e as Error).message;
+        note.classList.add('error');
+      });
   });
 }
 

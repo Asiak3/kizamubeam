@@ -13,7 +13,7 @@ import { isTauri, machine, PortInfo } from './machine';
 import type { PreparedGCode } from './gcode';
 import { airProblem, digitalOutputs, FluidFs, listCmd, outputCmd, OVERRIDE, parseFileList, pinNames, RAPID_OVERRIDE, TOGGLE_FLOOD, TOGGLE_MIST } from './fluidnc';
 import type { Doc, ImageLayer, Layer, Obj } from './model';
-import { forgetHost, openPairDialog, pairedHost, remoteFrame, remoteJob } from './remote';
+import { forgetHost, openHostDiscovery, openPairDialog, pairedHost, remoteFrame, remoteJob } from './remote';
 import { materialTab } from './materialui';
 import { cameraTab } from './cameraui';
 import { dockWindow, windowBody } from './dock';
@@ -827,7 +827,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   num(t('WebSocket-Port'), () => d.wsPort, (v) => (d.wsPort = Math.round(v)), t('FluidNC: 81; ist er nicht erreichbar, wird 80 versucht'));
   num(t('Web-Port'), () => d.httpPort, (v) => (d.httpPort = Math.round(v)), t('Weboberfläche von FluidNC (meist 80): zum Hochladen auf SD-Karte/Flash und für die Suche'));
   // Remote KizamuBeam: host address is the network address above
-  num(t('Host-Port'), () => d.remotePort, (v) => (d.remotePort = Math.round(v)), t('Port eines anderen KizamuBeam im Host-Modus (Standard 47900)'));
+  const remotePortIn = num(t('Host-Port'), () => d.remotePort, (v) => (d.remotePort = Math.round(v)), t('Port eines anderen KizamuBeam im Host-Modus (Standard 47900)'));
   const pairState = h('span', { class: 'note' });
   const showPair = async () => {
     const name = await pairedHost(d.remoteFp);
@@ -843,19 +843,34 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
       void showPair();
     },
   }, t('Aufheben')) as HTMLButtonElement;
+  const pair = async () => {
+    const r = await openPairDialog(d.host, d.remotePort);
+    if (!r) return;
+    d.remoteFp = r.fingerprint;
+    d.conn = 'remote';
+    connSel.value = 'remote';
+    void showPair();
+  };
   rows.push(h('label', { title: t('Laser an einem anderen Rechner mit KizamuBeam steuern. Dort unter Laser → Fernsteuerung den Host-Modus einschalten.') }, t('Kopplung')),
     h('span', { class: 'conn-row' }, pairState,
       h('button', {
-        class: 'btn small',
+        class: 'btn small', title: t('Rechner im Host-Modus im lokalen Netzwerk suchen'),
         onclick: async () => {
-          const r = await openPairDialog(d.host, d.remotePort);
-          if (!r) return;
-          d.remoteFp = r.fingerprint;
+          const f = await openHostDiscovery(d.remotePort || 47900);
+          if (!f) return;
+          d.host = hostIn.value = f.host;
+          d.remotePort = f.port;
+          remotePortIn.value = String(f.port);
           d.conn = 'remote';
           connSel.value = 'remote';
-          void showPair();
+          // Already paired on this computer: use the stored key, otherwise pair right away
+          if (f.paired) {
+            d.remoteFp = f.fingerprint;
+            void showPair();
+          } else await pair();
         },
-      }, t('Koppeln …')),
+      }, t('Host suchen …')),
+      h('button', { class: 'btn small', onclick: pair }, t('Koppeln …')),
       forgetBtn));
   void showPair();
   // Empfangspuffer für die Zeichenzählung; größer = flüssiger bei vielen kurzen Zeilen (Bildgravur)
