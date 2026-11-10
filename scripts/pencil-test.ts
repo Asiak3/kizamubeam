@@ -15,7 +15,7 @@ function obj(id: number, dx = 0): Obj {
 }
 function editor(objs: Obj[]): E {
   const ed = Object.create(Editor.prototype) as E;
-  Object.assign(ed, { doc: newDoc(), sel: objs, tool: 'node', nodeSets: new Map(), segmentSets: new Map(), nodeSel: new Set(),
+  Object.assign(ed, { doc: newDoc(), sel: objs, tool: 'node', nodeSets: new Map(), segmentSets: new Map(), handleSets: new Map(), nodeSel: new Set(),
     nodeSelObj: null, nodeEditObj: null, nodeHover: null, segHover: null, vectorPreview: null, drag: null, draft: null,
     history: new History(), batching: false, view: { zoom: 1, ox: 0, oy: 0 },
     snapGrid: false, snapObjects: false, alignGuides: [], space: false, currentLayer: 0, pencilTolerance: 0.1, pencilClosed: false,

@@ -433,6 +433,10 @@ export class EditorRender {
       for(const [leaf,m] of visibleLeaves([this.overlapHover])) if(this.layer(leaf.layer).show)ctx.stroke(cachedWorldPath(leaf,m));
       ctx.restore();
     }
+    if(this.drag?.type==='freehand-edit') {
+      ctx.save();ctx.strokeStyle='#e0218a';ctx.lineWidth=2;ctx.beginPath();
+      this.drag.points.forEach((point,i)=>{const p=this.toScreen(point);if(i)ctx.lineTo(p.x,p.y);else ctx.moveTo(p.x,p.y)});ctx.stroke();ctx.restore();
+    }
     // Auswahlrahmen
     const b = this.selBounds();
     if (b && this.tool !== 'node') {
@@ -536,7 +540,7 @@ export class EditorRender {
       ctx.closePath();ctx.fill('evenodd');ctx.stroke();ctx.restore();
     }
     // Knoten
-    for (const o of this.tool === 'node' ? this.nodeTargets() : []) {
+    for (const o of this.tool === 'node' || this.tool === 'freehand-edit' ? this.nodeTargets() : []) {
       const scr = (p: Pt) => this.toScreen(apply(o.m, p.x, p.y));
       const sel = this.nodeSelection(o);
       const subsO = shapeSubs(o.shape);

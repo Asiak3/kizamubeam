@@ -37,7 +37,7 @@ export class EditorPointer {
   }
 
   onDown(this: Editor, e: PointerEvent) {
-    if (this.drag?.type === 'pencil') return;
+    if (this.drag?.type === 'pencil' || this.drag?.type === 'freehand-edit') return;
     if(this.drag?.type==='lasso')return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
@@ -81,6 +81,7 @@ export class EditorPointer {
       return;
     }
     switch (this.tool) {
+      case 'freehand-edit':this.beginFreehandEdit(wp,e.pointerId);return;
       case 'lasso':this.beginLasso(wp,e,false);return;
       case 'select': {
         if (this.hitPivot(sx, sy)) {
@@ -290,6 +291,7 @@ export class EditorPointer {
   }
 
   onMove(this: Editor, e: PointerEvent) {
+    if(this.drag?.type==='freehand-edit' && this.drag.pointerId!==e.pointerId)return;
     if(this.drag?.type==='lasso'&&this.drag.pointerId!==e.pointerId)return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
@@ -363,6 +365,7 @@ export class EditorPointer {
         }
         this.redraw(); return;
       }
+      case 'freehand-edit':this.sampleFreehandEdit(wp,e.pointerId);return;
       case 'lasso':
         if(Math.hypot(wp.x-d.points.at(-1)!.x,wp.y-d.points.at(-1)!.y)*this.view.zoom>=2){if(d.points.length<4096)d.points.push(wp);else d.overflow=true;}
         this.redraw();return;
@@ -604,6 +607,7 @@ export class EditorPointer {
         this.finishPencil(d.points, this.pencilClosed);
         return;
       }
+      case 'freehand-edit': { const {sx,sy}=this.evPt(e);this.finishFreehandEdit(d,this.toWorld(sx,sy));return; }
       case 'lasso': {const {sx,sy}=this.evPt(e);if(d.points.length<4096)d.points.push(this.toWorld(sx,sy));this.finishLasso(d);return;}
       case 'guide': {
         if (d.idx === null || !d.moved) return;

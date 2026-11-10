@@ -43,6 +43,8 @@ import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
 import { installOverlapPicker } from './overlapPicker';
+import { EditorFreehand } from './editor/freehand';
+import type { FreehandMode } from './freehandEdit';
 import { EditorSelection } from './editor/selection';
 import { DEFAULT_GRID, GridSettings } from './grid';
 import { EditorIsolation, IsolationState } from './editor/isolation';
@@ -55,6 +57,8 @@ export { RULER, TOOL_HINTS } from './editor/shared';
 
 export class Editor {
   overlapHover: Obj | null = null;
+  freehandMode:FreehandMode='continue';
+  freehandTolerance=0.2;
   handleSets=new Map<Obj,Set<string>>();
   nodeLasso=false;
   doc: Doc = newDoc();
@@ -533,7 +537,7 @@ export class Editor {
 // Die Teile in src/editor/ sind Klassen ohne eigene Felder; ihre Methoden haben `this: Editor` und werden hier
 // in Editor.prototype kopiert. Neue Methoden kommen in den passenden Teil, neue Felder in die Klasse Editor oben.
 export interface Editor
-  extends EditorSelection, EditorDocument,
+  extends EditorFreehand, EditorSelection, EditorDocument,
     EditorPointer,
     EditorKeyboard,
     EditorSnapping,
@@ -564,6 +568,7 @@ export interface Editor
     EditorRender {}
 
 const PARTS = [
+  EditorFreehand,
   EditorSelection,
   EditorDocument,
   EditorPointer,
