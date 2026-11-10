@@ -1,0 +1,149 @@
+name: Bug report
+description: Something in KizamuBeam does not work as expected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+
+        **Safety first:** if the laser head moved unexpectedly, homing failed or the laser did not switch off, stop testing on the machine. Do not repeat a dangerous movement just to collect a log.
+        Never post Wi-Fi passwords, access tokens or other secrets, and remove personal data from files and logs. Security vulnerabilities belong in a [private report](https://github.com/negurvulkan/kizamubeam/security/advisories/new), not here.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+        3. See …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: KizamuBeam version
+      description: Shown under Help → About. For the Virtual Machine, give its own version.
+      placeholder: e.g. 2.8.0
+    validations:
+      required: true
+  - type: dropdown
+    id: app
+    attributes:
+      label: Application
+      options:
+        - KizamuBeam (desktop app)
+        - KizamuBeam in the browser (npm run dev)
+        - KizamuBeam Virtual Machine
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: e.g. macOS 15.1, Windows 11 24H2, Ubuntu 24.04
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Where does the problem occur? Pick all that apply.
+      multiple: true
+      options:
+        - Drawing and editing
+        - Text and fonts
+        - Import / export (SVG, DXF, PDF, AI, .lbrn2, images)
+        - Layers and cut settings
+        - Job generation / G-code
+        - Machine connection and control
+        - Camera
+        - Generators and toolbox
+        - 3D view
+        - Rotary
+        - Library, templates and packs
+        - Translations
+        - Updates and installation
+        - Other
+  - type: markdown
+    attributes:
+      value: "### Machine (only if the bug involves a laser)"
+  - type: input
+    id: machine
+    attributes:
+      label: Laser and controller
+      placeholder: e.g. Swiitol E6 Pro, MKS DLC32 MAX
+  - type: dropdown
+    id: firmware
+    attributes:
+      label: Firmware
+      options:
+        - FluidNC
+        - GRBL
+        - grblHAL
+        - Marlin
+        - Smoothieware
+        - Other / unknown
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Firmware version
+      placeholder: e.g. FluidNC 3.9.1, GRBL 1.1h
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      options:
+        - USB (serial)
+        - Network (Telnet)
+        - Network (WebSocket)
+        - Remote (second KizamuBeam instance)
+        - Virtual Machine
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, console output or G-code
+      description: Relevant excerpts only, with secrets removed. This will be formatted as code automatically.
+      render: shell
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Screenshots, sample files
+      description: Drag files here. A minimal project file (.kzb) that shows the problem helps a lot.
+  - type: textarea
+    id: other-software
+    attributes:
+      label: Does it work in other software?
+      description: If you know whether the same operation works in another application, tell us.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched the existing issues and this has not been reported yet.
+          required: true
+        - label: I removed passwords, tokens and personal data from everything I posted.
+          required: true

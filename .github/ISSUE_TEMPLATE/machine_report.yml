@@ -1,0 +1,81 @@
+name: Machine compatibility report
+description: Tell us whether KizamuBeam works with your laser, good or bad.
+title: "[Machine] "
+labels: ["hardware"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reports from real machines help other users and tell us which devices to look at. Successful tests are just as welcome as problems.
+        If something went wrong, please also open a **Bug report** with the details.
+  - type: input
+    id: machine
+    attributes:
+      label: Laser model
+      placeholder: e.g. Swiitol E6 Pro, xTool S1
+    validations:
+      required: true
+  - type: input
+    id: controller
+    attributes:
+      label: Controller board
+      placeholder: e.g. MKS DLC32 MAX, stock board
+  - type: dropdown
+    id: firmware
+    attributes:
+      label: Firmware
+      options:
+        - FluidNC
+        - GRBL
+        - grblHAL
+        - Marlin
+        - Smoothieware
+        - Other / unknown
+    validations:
+      required: true
+  - type: input
+    id: firmware-version
+    attributes:
+      label: Firmware version
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection
+      multiple: true
+      options:
+        - USB (serial)
+        - Network (Telnet)
+        - Network (WebSocket)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: KizamuBeam version and OS
+      placeholder: e.g. 2.8.0 on Windows 11
+    validations:
+      required: true
+  - type: input
+    id: bed
+    attributes:
+      label: Work area (mm)
+      placeholder: e.g. 400 × 400
+  - type: checkboxes
+    id: tested
+    attributes:
+      label: What did you test?
+      description: Tick everything that worked.
+      options:
+        - label: Connect and read status
+        - label: Jog and home
+        - label: Frame
+        - label: Vector cut / line job
+        - label: Fill engraving
+        - label: Image engraving
+        - label: Camera
+        - label: Rotary
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything special about the setup, settings you had to change, problems you noticed.

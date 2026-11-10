@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and help (Discord)
+    url: https://discord.gg/SSr8VHh7EJ
+    about: Ask questions, share projects and get help from the community.
+  - name: Report a security vulnerability
+    url: https://github.com/negurvulkan/kizamubeam/security/advisories/new
+    about: Please report security issues privately, not as a public issue. See SECURITY.md.
+  - name: Documentation and feature overview
+    url: https://negurvulkan.github.io/kizamubeam/en/
+    about: Check the website and docs to see what KizamuBeam can already do.
