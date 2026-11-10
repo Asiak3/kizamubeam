@@ -15,7 +15,7 @@ Want to translate the app, the website or the documentation? See **[TRANSLATION.
 
 ## Reporting a bug
 
-Please include as much of the following as you can:
+Please use the [issue forms](https://github.com/negurvulkan/kizamubeam/issues/new/choose): **Bug report**, **Feature request** or **Machine compatibility report** (also for machines that work well). Questions are best asked on [Discord](https://discord.gg/SSr8VHh7EJ). A bug report should include as much of the following as you can:
 
 - KizamuBeam version, operating system, and steps to reproduce the problem.
 - Expected behavior versus actual behavior.
@@ -83,7 +83,7 @@ The person submitting the PR remains responsible for reviewing the changes, unde
 
 ## Pull request checklist
 
-Before submitting a PR, please check that:
+The [pull request template](.github/pull_request_template.md) contains this checklist plus project-specific points (translations, feature docs, website, test fixtures). Before submitting a PR, please check that:
 
 - [ ] The PR has one clear purpose, with a description of the problem and solution.
 - [ ] Changes are limited to the relevant files; unrelated refactoring is kept separate.

@@ -1,0 +1,60 @@
+name: Feature request
+description: Suggest a new feature or an improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Please check the [feature overview](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.md) first, the function you are looking for may already exist under a different name.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: Describe the task or problem from your point of view, e.g. "I want to engrave on round glasses and …".
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How could KizamuBeam help? Menus, dialogs, shortcuts, sketches are all welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and workarounds
+      description: How do you solve it today? Do other programs handle this well, and how?
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - Drawing and editing
+        - Text and fonts
+        - Import / export
+        - Layers and cut settings
+        - Job generation / G-code
+        - Machine connection and control
+        - Camera
+        - Generators and toolbox
+        - 3D view
+        - Rotary
+        - Library, templates and packs
+        - User interface
+        - Translations
+        - Other
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Mockups, examples, files
+      description: Drag images or files here.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribution
+      options:
+        - label: I searched the existing issues and this has not been suggested yet.
+          required: true
+        - label: I would like to help implement or test this.
