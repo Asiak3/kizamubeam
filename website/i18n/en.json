@@ -89,7 +89,8 @@
         "Print and Cut: print registration marks, measure them with a low-power laser dot or the camera, and lay the design precisely onto the print",
         "Jig generator: holding plates with precise cut-outs for workpieces from a vector file, photo or camera, with slot numbers and registration marks",
         "Save G-code or stream it directly – streaming runs in the Rust core",
-        "Adjust power and speed during a job; FluidNC: upload jobs to SD card or flash and run them there, edit config.yaml with backups, find the controller on Wi-Fi"
+        "Adjust power and speed during a job; FluidNC: upload jobs to SD card or flash and run them there, edit config.yaml with backups, find the controller on Wi-Fi",
+        "Laser in another room: control it through the KizamuBeam at the laser over your home network or a VPN – that computer computes and runs the job, you start, watch and stop it from your desk"
       ]
     },
     "gen": {

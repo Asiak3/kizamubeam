@@ -99,6 +99,7 @@ UI texts are written in German in the code inside `t('…')` (placeholders in cu
 | `src/objectsPanel.ts` | Objects window: pages, layers and objects as a tree |
 | `src/history.ts`, `src/historyPanel.ts` | Undo history with named steps, History window |
 | `src/agent.ts`, `src/agentedit.ts`, `src/agentmachine.ts`, `src/agentutil.ts`, `src/agentui.ts` | Tools for AI agents (MCP) by level, safety rules of the machine level, settings dialog |
+| `src/remote.ts`, `src/remoteHost.ts`, `src/remoteBundle.ts` | Controlling a laser through another KizamuBeam: pairing and job bundles on the client, host mode, job computation and job list on the host. Tests: `npm run test:remote` |
 | `src/machine.ts` | Machine connection from the UI’s side: state, status parsing, plain-language alarms, commands to Rust |
 | `src/laser.ts` | Laser, Move and Console windows, device settings, preview |
 | `src/fluidnc.ts`, `src/fluidncDialog.ts` | FluidNC and GRBL family: overrides, files on SD card/flash, configuration with backups, outputs and coolant, network search. Tests: `npm run test:fluidnc` |
@@ -112,6 +113,7 @@ UI texts are written in German in the code inside `t('…')` (placeholders in cu
 | `src-tauri/src/ws.rs` | WebSocket to the controller (tungstenite) as a byte stream for streaming, with a test against a simulated FluidNC |
 | `src-tauri/src/fluid.rs` | FluidNC web interface over plain HTTP: upload to SD card/flash, search on the local network (with tests against a simulated web interface) |
 | `src-tauri/src/agent.rs` | MCP server (Streamable HTTP on 127.0.0.1, token, levels) and stdio bridge `--mcp-stdio` |
+| `src-tauri/src/remote.rs` | Remote KizamuBeam transport: TLS server/client with pinned self-signed certificate, JSON lines, pairing code (HMAC over the fingerprint), per-client keys and roles; forwards machine events to clients |
 | `src-tauri/core/` | Computation core without UI (`kizamubeam-core`): image processing and dithering, image raster lines, writing G-code. Computes the same as `images.ts`/`gcode.ts`; the desktop app uses it, the browser uses the TypeScript version. Comparison test: `npm run test:core` |
 | `vm/` | KizamuBeam Virtual Machine: the virtual laser machine as a separate program. `vm/src-tauri/core/src/machine.rs` controller (GRBL/FluidNC, planner, real time), `gcode.rs` line checks, `net.rs` Telnet/WebSocket servers, `vm/src/view.ts` top view with burn marks, `vm/src/view3d.ts` 3D view (three.js, material looks from `src/view3d/looks.ts`), `vm/src/burn.ts` workpieces and burn maps, `vm/src/parts.ts` cut-out detection (in a worker, `parts.worker.ts`), `vm/src/ui.ts` theme and sidebar layout (language shared with `src/i18n.ts`), `vm/src-tauri/core/src/camera.rs` HTTP camera server (MJPEG/single image; the window renders the images with `Bed3D.cameraImage`). Network cameras in KizamuBeam: `src-tauri/src/netcam.rs`. Tests: `npm run test:vm` (burn maps, cut-out detection and controller) |
 | `src-tauri/src/native.rs` | Computation core for the UI: image grayscale data and finished G-code stay in Rust |

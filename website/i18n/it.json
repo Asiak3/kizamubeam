@@ -89,7 +89,8 @@
         "Print and Cut: stampa i segni di registro, misurali con un punto laser a bassa potenza o con la fotocamera e allinea il disegno con precisione sulla stampa",
         "Generatore di dime: piastre di supporto con sedi precise per i pezzi da un file vettoriale, una foto o la fotocamera, con numeri delle sedi e segni di registro",
         "Salva il G-code o invialo direttamente – lo streaming gira nel nucleo Rust",
-        "Regola potenza e velocità durante il lavoro; FluidNC: carica i lavori su scheda SD o memoria flash ed eseguili lì, modifica config.yaml con backup, trova il controller in Wi-Fi"
+        "Regola potenza e velocità durante il lavoro; FluidNC: carica i lavori su scheda SD o memoria flash ed eseguili lì, modifica config.yaml con backup, trova il controller in Wi-Fi",
+        "Laser in un'altra stanza: controllalo tramite il KizamuBeam collegato al laser nella rete di casa o via VPN – quel computer calcola ed esegue il lavoro, tu lo avvii, lo segui e lo fermi dalla scrivania"
       ]
     },
     "gen": {
