@@ -4,10 +4,21 @@ import type { Editor } from './editor';
 import type { JobSource } from './laser';
 import { h } from './dom';
 import { formatDuration } from './gcode';
-import { t, tBackend } from './i18n';
+import { t, tBackend, tn } from './i18n';
 import { assetUrl } from './images';
 import { isTauri, machine } from './machine';
-import { BundleFont, bytesToBase64, fontLabel, fontsUsed, JobBundle, MAX_BUNDLE, sourceProject } from './remoteBundle';
+import { base64ToBytes, BundleFont, bytesToBase64, deviceDifferences, fontLabel, fontsUsed, HostSync, JobBundle, MAX_BUNDLE, sourceProject } from './remoteBundle';
+import { hostCameraSource } from './camera';
+import { FIRMWARES, type Device, type Firmware } from './gcode';
+import { sanitizeEntry, type MaterialEntry } from './materials';
+import { DEVICE_LOCAL_FIELDS } from './syncCore';
+
+// Images of host cameras come through the remote connection (camera address kizamubeam:<id>)
+hostCameraSource.frame = async (cam) => {
+  const r = await machine.remoteRequest<{ data: string }>('camera_frame', { cam });
+  const b = base64ToBytes(r.data);
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+};
 
 /** Answer of the host to a submitted job */
 interface Submitted {
@@ -221,3 +232,70 @@ export function openPairDialog(host: string, port: number): Promise<{ fingerprin
     })();
   });
 }
+
+/**
+ * Take over settings from the host (stage 2 of issue #188): its device settings for the current device (name
+ * and connection stay), its material library (merged) and its cameras (calibration from the host, the image
+ * through the connection).
+ */
+export async function openHostSyncDialog(ed: Editor) {
+  const { device, laserNotify, patchDevice } = await import('./laser');
+  if (!machine.remote) return laserNotify(t('Erst mit dem Host verbinden (Anschluss „Anderer KizamuBeam (Netzwerk)“).'), true);
+  const host = machine.remote.host;
+  let r: HostSync;
+  try {
+    r = await machine.remoteRequest<HostSync>('sync');
+  } catch (e) {
+    return laserNotify((e as Error).message, true);
+  }
+  const { importHostCameras } = await import('./cameraui');
+  const { library } = await import('./materials');
+  const hd = r.device as Partial<Device>;
+  const diff = deviceDifferences(r.device, device as unknown as Record<string, unknown>, DEVICE_LOCAL_FIELDS);
+  const materials = (Array.isArray(r.materials) ? r.materials : []).map(sanitizeEntry).filter(Boolean) as MaterialEntry[];
+  const cameras = Array.isArray(r.cameras) ? r.cameras : [];
+  const fwLabel = FIRMWARES[hd.fw as Firmware]?.label ?? String(hd.fw ?? '');
+  const choice = (checked: boolean, disabled: boolean, title: string, detail: string) => {
+    const cb = h('input', { type: 'checkbox', checked: checked && !disabled, disabled }) as HTMLInputElement;
+    return { cb, row: h('label', { class: 'sync-section' }, cb, h('span', {}, h('b', {}, title), h('br'), h('small', { class: 'muted' }, detail))) };
+  };
+  const dev = choice(diff.length > 0, !diff.length, t('Geräteeinstellungen'),
+    (diff.length
+      ? tn('{n} Einstellung weicht ab', '{n} Einstellungen weichen ab', diff.length)
+      : t('Gleich wie hier')) + ` · ${fwLabel} · ${hd.bedW ?? '?'} × ${hd.bedH ?? '?'} mm. ` + t('Name und Verbindung bleiben.'));
+  const mat = choice(materials.length > 0, !materials.length, t('Material-Bibliothek'),
+    tn('{n} Eintrag', '{n} Einträge', materials.length) + '. ' + t('Gleiche Material/Dicke/Titel-Kombinationen werden ersetzt, eigene Einträge bleiben.'));
+  const cam = choice(cameras.length > 0, !cameras.length, t('Kameras'),
+    (cameras.length ? cameras.map((c) => c.name).join(', ') : t('Keine')) + '. ' + t('Kalibrierung vom Host, das Bild kommt über die Verbindung.'));
+  const ok = h('button', { class: 'btn primary' }, t('Übernehmen')) as HTMLButtonElement;
+  const dlg = h('dialog', { class: 'remote-sync' },
+    h('h3', {}, t('Vom Host übernehmen: {host}', { host })),
+    h('p', { class: 'note' }, t('Für Gerät „{device}“ auf diesem Rechner. Der Host berechnet Aufträge ohnehin mit seinen eigenen Einstellungen; übernommen sehen Arbeitsfläche, Vorschau und Material-Auswahl hier genauso aus.', { device: device.name })),
+    h('div', { class: 'sync-sections' }, dev.row, mat.row, cam.row),
+    h('div', { class: 'dialog-buttons' }, h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen')), ok),
+  );
+  ok.onclick = () => {
+    const done: string[] = [];
+    if (dev.cb.checked) {
+      const patch: Record<string, unknown> = {};
+      for (const k of diff) patch[k] = structuredClone(r.device[k]);
+      patchDevice(ed, patch as Partial<Device>);
+      done.push(tn('{n} Geräteeinstellung', '{n} Geräteeinstellungen', diff.length));
+    }
+    if (mat.cb.checked) {
+      const m = library.merge(materials);
+      done.push(t('Materialien: {added} neu, {replaced} ersetzt', { added: m.added, replaced: m.replaced }));
+    }
+    if (cam.cb.checked) {
+      const c = importHostCameras(ed, cameras);
+      done.push(t('Kameras: {added} neu, {updated} aktualisiert', { added: c.added, updated: c.updated }));
+    }
+    dlg.close();
+    if (done.length) laserNotify(t('Vom Host übernommen: {list}', { list: done.join('; ') }));
+  };
+  dlg.addEventListener('keydown', (e) => e.stopPropagation());
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg);
+  dlg.showModal();
+}
+

@@ -99,7 +99,7 @@ Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klam
 | `src/objectsPanel.ts` | Objekte-Fenster: Seiten, Layer und Objekte als Baum |
 | `src/history.ts`, `src/historyPanel.ts` | Rückgängig-Verlauf mit benannten Schritten, Verlaufsfenster |
 | `src/agent.ts`, `src/agentedit.ts`, `src/agentmachine.ts`, `src/agentutil.ts`, `src/agentui.ts` | Werkzeuge für KI-Agenten (MCP) nach Stufen, Sicherheitsregeln der Maschinenstufe, Einstellungsdialog |
-| `src/remote.ts`, `src/remoteHost.ts`, `src/remoteBundle.ts` | Laser über einen anderen KizamuBeam steuern: Kopplung und Auftragspakete am Client, Host-Modus, Berechnung und Auftragsliste am Host. Tests: `npm run test:remote` |
+| `src/remote.ts`, `src/remoteHost.ts`, `src/remoteBundle.ts` | Laser über einen anderen KizamuBeam steuern: Kopplung, Auftragspakete und Übernahme von Gerät/Materialien/Kameras am Client, Host-Modus, Berechnung, Auftragsliste und Kamera-Freigabe (`sharedCameras`/`sharedCameraJpeg` in `src/cameraui.ts`) am Host. Tests: `npm run test:remote` |
 | `src/machine.ts` | Verbindung zur Maschine aus Sicht der Oberfläche: Zustand, Statusauswertung, Klartext für Alarme, Befehle an Rust |
 | `src/laser.ts` | Fenster Laser, Verschieben und Konsole, Geräteeinstellungen, Vorschau |
 | `src/fluidnc.ts`, `src/fluidncDialog.ts` | FluidNC und GRBL-Familie: Overrides, Dateien auf SD-Karte/Flash, Konfiguration mit Sicherungen, Ausgänge und Kühlmittel, Suche im Netz. Tests: `npm run test:fluidnc` |

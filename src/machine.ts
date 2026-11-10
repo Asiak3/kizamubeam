@@ -404,6 +404,11 @@ class Machine {
     this.log(t('Verbunden mit {where}.', { where: this.where }));
     if (this.remote.role === 'viewer') this.log(t('Nur zuschauen: Der Host hat diesem Rechner die Rolle „Zuschauer“ gegeben.'));
     if (this.remote.state && !this.remote.state.machine.connected) this.log(t('Der Host ist gerade nicht mit dem Laser verbunden.'), 'error');
+    // The host computes jobs with its own device; a different work area here makes the preview misleading
+    const hm = this.remote.state?.machine;
+    if (hm && (hm.bedW !== d.bedW || hm.bedH !== d.bedH || hm.fw !== d.fw))
+      this.log(t('Der Host arbeitet mit „{device}“ ({w} × {h} mm), dieses Gerät mit {lw} × {lh} mm. Laser → Fernsteuerung → Vom Host übernehmen gleicht es an.',
+        { device: hm.device, w: hm.bedW, h: hm.bedH, lw: d.bedW, lh: d.bedH }));
   }
 
   async disconnect() {

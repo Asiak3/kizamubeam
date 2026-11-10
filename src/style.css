@@ -4192,3 +4192,6 @@ input.jig-count {
   flex-direction: column;
   gap: 4px;
 }
+.remote-sync {
+  width: min(520px, 95vw);
+}

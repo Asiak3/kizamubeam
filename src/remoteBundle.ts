@@ -1,6 +1,7 @@
 // Job bundles for a remote KizamuBeam (issue #188): what a client sends so that the host computes the job
 // itself with its own device. Kept free of editor and window code so it can be tested on its own.
 import { t } from './i18n';
+import { stableJson } from './syncCore';
 import { defaultImageLayer, defaultLayer, Doc, ImageLayer, Layer, leaves, loadDoc, normalizeLayer, Obj } from './model';
 
 /** Protocol version of the remote connection (must match REMOTE PROTO in src-tauri/src/remote.rs) */
@@ -142,3 +143,22 @@ export function fontLabel(f: FontRef): string {
   const style = [f.bold ? t('fett') : '', f.italic ? t('kursiv') : ''].filter(Boolean).join(', ');
   return style ? `${f.family} (${style})` : f.family;
 }
+
+/** What a host offers to take over (request "sync"): its current device without connection details, its
+ * material library and its cameras (settings and calibration; the image comes through the connection) */
+export interface HostSync {
+  device: Record<string, unknown>;
+  materials: unknown[];
+  cameras: import('./cameraui').SharedCamera[];
+}
+
+/** Device fields that differ between the host's device and this one (connection and name do not count) */
+export function deviceDifferences(host: Record<string, unknown>, local: Record<string, unknown>, skip: readonly string[]): string[] {
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(host)) {
+    if (k === 'id' || k === 'name' || skip.includes(k)) continue;
+    if (stableJson(v) !== stableJson(local[k])) out.push(k);
+  }
+  return out;
+}
+

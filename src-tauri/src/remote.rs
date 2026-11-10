@@ -676,7 +676,8 @@ fn host_loop(inner: &Arc<Inner>, io: &mut ServerIo, conn_id: u64, tx: &Sender<Va
 /// Methods a viewer may call; everything else needs the operator role
 fn viewer_may(method: &str, params: &Value) -> bool {
     match method {
-        "state" | "jobs" => true,
+        // watching: status, job list, camera images and the settings to take over
+        "state" | "jobs" | "cameras" | "camera_frame" | "sync" => true,
         // status query only
         "realtime" => params.get("byte").and_then(Value::as_u64) == Some(b'?' as u64),
         _ => false,
@@ -1149,6 +1150,8 @@ mod tests {
         assert!(viewer_may("state", &json!({})));
         assert!(viewer_may("jobs", &json!({})));
         assert!(viewer_may("realtime", &json!({ "byte": 63 })));
+        assert!(viewer_may("camera_frame", &json!({ "cam": "a" })));
+        assert!(viewer_may("sync", &json!({})));
         assert!(!viewer_may("realtime", &json!({ "byte": 0x18 })));
         assert!(!viewer_may("line", &json!({ "line": "$H" })));
         assert!(!viewer_may("stop", &json!({})));

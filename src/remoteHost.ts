@@ -12,7 +12,10 @@ import { bedProblem, device, JobSource, laserNotify, makeJob, onDeviceChange, ru
 import { isTauri, machine, RemoteHostState } from './machine';
 import { allObjs, bumpIds, leaves, PALETTE } from './model';
 import { withFonts } from './fonts';
-import { bundleFonts, docImgLayer, docLayer, fontLabel, JobBundle, openBundle, RemoteJobInfo } from './remoteBundle';
+import { bundleFonts, bytesToBase64, docImgLayer, docLayer, fontLabel, HostSync, JobBundle, openBundle, RemoteJobInfo } from './remoteBundle';
+import { sharedCameraJpeg, sharedCameras } from './cameraui';
+import { library } from './materials';
+import { DEVICE_LOCAL_FIELDS } from './syncCore';
 
 interface HostInfo {
   enabled: boolean;
@@ -301,8 +304,24 @@ async function handle(ed: Editor, r: Request): Promise<unknown> {
       needMachine();
       await frameRemote(ed, p.bundle as JobBundle, !!p.contour);
       return null;
+    // Stage 2: cameras and settings to take over
+    case 'cameras':
+      return sharedCameras();
+    case 'camera_frame': {
+      const jpeg = await sharedCameraJpeg(String(p.cam ?? ''));
+      return { data: bytesToBase64(new Uint8Array(await jpeg.arrayBuffer())) };
+    }
+    case 'sync':
+      return hostSync();
   }
   throw new Error(t('Unbekannte Anfrage: {method}', { method: r.method }));
+}
+
+/** Settings a client can take over: the current device (without connection details), materials, cameras */
+function hostSync(): HostSync {
+  const d: Record<string, unknown> = structuredClone({ ...device });
+  for (const f of ['id', ...DEVICE_LOCAL_FIELDS]) delete d[f];
+  return { device: d, materials: structuredClone(library.entries), cameras: sharedCameras() };
 }
 
 // ---------- Start ----------

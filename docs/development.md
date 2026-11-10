@@ -99,7 +99,7 @@ UI texts are written in German in the code inside `t('…')` (placeholders in cu
 | `src/objectsPanel.ts` | Objects window: pages, layers and objects as a tree |
 | `src/history.ts`, `src/historyPanel.ts` | Undo history with named steps, History window |
 | `src/agent.ts`, `src/agentedit.ts`, `src/agentmachine.ts`, `src/agentutil.ts`, `src/agentui.ts` | Tools for AI agents (MCP) by level, safety rules of the machine level, settings dialog |
-| `src/remote.ts`, `src/remoteHost.ts`, `src/remoteBundle.ts` | Controlling a laser through another KizamuBeam: pairing and job bundles on the client, host mode, job computation and job list on the host. Tests: `npm run test:remote` |
+| `src/remote.ts`, `src/remoteHost.ts`, `src/remoteBundle.ts` | Controlling a laser through another KizamuBeam: pairing, job bundles and taking over device/materials/cameras on the client, host mode, job computation, job list and camera sharing (`sharedCameras`/`sharedCameraJpeg` in `src/cameraui.ts`) on the host. Tests: `npm run test:remote` |
 | `src/machine.ts` | Machine connection from the UI’s side: state, status parsing, plain-language alarms, commands to Rust |
 | `src/laser.ts` | Laser, Move and Console windows, device settings, preview |
 | `src/fluidnc.ts`, `src/fluidncDialog.ts` | FluidNC and GRBL family: overrides, files on SD card/flash, configuration with backups, outputs and coolant, network search. Tests: `npm run test:fluidnc` |

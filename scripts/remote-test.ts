@@ -3,7 +3,8 @@ import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 const { defaultImageLayer, defaultLayer, newDoc } = await import('../src/model');
-const { bundleFonts, bytesToBase64, docImgLayer, docLayer, fontsUsed, openBundle, REMOTE_PROTO, sourceProject } = await import('../src/remoteBundle');
+const { bundleFonts, bytesToBase64, deviceDifferences, docImgLayer, docLayer, fontsUsed, openBundle, REMOTE_PROTO, sourceProject } = await import('../src/remoteBundle');
+const { DEVICE_LOCAL_FIELDS } = await import('../src/syncCore');
 type Obj = import('../src/model').Obj;
 
 let failed = 0;
@@ -92,6 +93,13 @@ test('Font files are decoded; missing ones are listed', () => {
   assert.equal(r.files.length, 1);
   assert.deepEqual([...new Uint8Array(r.files[0].buf)], [...bytes]);
   assert.deepEqual(r.missing.map((m) => m.family), ['Gone', 'Broken']);
+});
+
+test('Device differences ignore id, name and connection; nested values compare by content', () => {
+  const host = { id: 'h', name: 'E6 Pro', fw: 'fluidnc', bedW: 400, bedH: 400, conn: 'serial', port: 'COM3', remoteFp: '', rotary: { on: false, mode: 'roller' } };
+  const local = { id: 'c', name: 'Werkstatt', fw: 'fluidnc', bedW: 365, bedH: 305, conn: 'remote', port: '', remoteFp: 'ab', rotary: { mode: 'roller', on: false } };
+  assert.deepEqual(deviceDifferences(host, local, DEVICE_LOCAL_FIELDS), ['bedW', 'bedH']);
+  assert.deepEqual(deviceDifferences({ ...host, bedW: 365, bedH: 305 }, local, DEVICE_LOCAL_FIELDS), []);
 });
 
 if (failed) {

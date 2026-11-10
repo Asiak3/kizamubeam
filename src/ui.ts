@@ -45,6 +45,7 @@ import { BoolBase } from './ops';
 import { agentStatus, openAgentDialog } from './agentui';
 import { startAgentBridge } from './agent';
 import { openRemoteHostDialog, openRemoteJobsDialog, remoteHostStatus, startRemoteHost } from './remoteHost';
+import { openHostSyncDialog } from './remote';
 import { buildObjectsPanel } from './objectsPanel';
 import { buildTabBar, closeTabAsk } from './tabsBar';
 import { buildHistoryPanel } from './historyPanel';
@@ -396,6 +397,8 @@ function buildMenu(ed: Editor) {
       { sub: t('Fernsteuerung'), items: [
         [t('Host-Modus …'), '', () => openRemoteHostDialog(ed)],
         [t('Fernaufträge …'), '', () => openRemoteJobsDialog(ed)],
+        'sep',
+        [t('Vom Host übernehmen …'), '', () => void openHostSyncDialog(ed)],
       ] },
       { sub: t('Gerät'), items: [
         [t('Geräte …'), '', () => openDevicesDialog(ed)],
