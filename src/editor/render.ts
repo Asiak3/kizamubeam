@@ -304,6 +304,14 @@ export class EditorRender {
       ctx.strokeStyle = '#56d7bd'; ctx.lineWidth = 2 * px;
       ctx.setLineDash([6 * px, 4 * px]);
       ctx.stroke(subsToPath2D(preview.subs));
+      if (preview.removed?.length) {
+        ctx.strokeStyle = '#e99c32'; ctx.lineWidth = 3 * px;
+        ctx.setLineDash([4 * px, 3 * px]); ctx.stroke(subsToPath2D(preview.removed));
+      }
+      if (preview.excluded?.length) {
+        ctx.strokeStyle = '#ff465b'; ctx.lineWidth = 3 * px;
+        ctx.setLineDash([]); ctx.stroke(subsToPath2D(preview.excluded));
+      }
       ctx.restore();
     }
     if (this.offsetPreview) {

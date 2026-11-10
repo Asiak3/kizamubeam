@@ -297,7 +297,7 @@ function buildMenu(ed: Editor) {
         'sep',
         [t('Boolesche Optionen …'), '', () => openBooleanDialog(ed)],
       ] },
-      [t('Außenkontur mit gewählten Löchern …'), '', () => void openOutlineDialog(ed)],
+      [t('Außenkontur und Inseln ableiten …'), '', () => void openOutlineDialog(ed)],
       [t('Offset …'), 'Alt+O', () => openOffsetDialog(ed)],
       [t('Verformen …'), '', () => openWarpDialog(ed)],
       { sub: t('Pfad'), items: [
@@ -1085,7 +1085,7 @@ function buildBars(ed: Editor) {
     },
     { id: 'intersect', cat: M, icon: 'intersect', label: t('Schnittmenge (Alt+*): nur die gemeinsame Fläche behalten'), run: () => ed.booleanSel('intersect'), enabled: sel2 },
     { id: 'boolopts', cat: M, icon: 'settings', small: true, label: t('Boolesche Optionen: Basis und Originale behalten'), run: () => openBooleanDialog(ed) },
-    { id: 'outline', cat: M, icon: 'union', label: t('Außenkontur mit gewählten Löchern …'), run: () => void openOutlineDialog(ed), enabled: sel1 },
+    { id: 'outline', cat: M, icon: 'union', label: t('Außenkontur und Inseln ableiten …'), run: () => void openOutlineDialog(ed), enabled: sel1 },
     { id: 'offset', cat: M, icon: 'offset', label: t('Offset (Alt+O)'), run: () => openOffsetDialog(ed), enabled: sel1 },
     { id: 'warp', cat: M, icon: 'warp', label: t('Verformen: Formen, Text und Bilder biegen, wölben oder perspektivisch verzerren'), run: () => openWarpDialog(ed), enabled: sel1 },
     { id: 'gridarray', cat: M, icon: 'gridArray', label: t('Rasterarray: Auswahl in Spalten und Zeilen kopieren (Ctrl+Shift+A)'), run: () => openGridArrayDialog(ed), enabled: sel1 },
