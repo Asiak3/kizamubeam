@@ -50,7 +50,7 @@ export class EditorDocument {
   load(this: Editor, json: string) {
     this.isolation = null;
     // Component references cannot survive document replacement (Undo/Redo).
-    this.nodeSets.clear(); this.segmentSets.clear(); this.nodeSel.clear();
+    this.nodeSets.clear(); this.segmentSets.clear(); this.handleSets.clear(); this.nodeSel.clear();
     this.nodeSelObj = this.nodeEditObj = null;
     this.nodeHover = this.segHover = null;
     this.drag = null;
@@ -235,7 +235,7 @@ export class EditorDocument {
     this.rotateMode = false;
     this.nodeSel.clear();
     this.nodeSelObj = null;
-    this.nodeSets.clear(); this.segmentSets.clear(); this.nodeEditObj = null;
+    this.nodeSets.clear(); this.segmentSets.clear(); this.handleSets.clear(); this.nodeEditObj = null;
     this.nodeHover = this.segHover = null;
     this.jointPicks = [];
     this.jointHover = null;

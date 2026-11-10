@@ -43,6 +43,7 @@ import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
 import { installOverlapPicker } from './overlapPicker';
+import { EditorSelection } from './editor/selection';
 import { DEFAULT_GRID, GridSettings } from './grid';
 import { EditorIsolation, IsolationState } from './editor/isolation';
 import { EditorVector, VectorPlan } from './editor/vector';
@@ -54,6 +55,8 @@ export { RULER, TOOL_HINTS } from './editor/shared';
 
 export class Editor {
   overlapHover: Obj | null = null;
+  handleSets=new Map<Obj,Set<string>>();
+  nodeLasso=false;
   doc: Doc = newDoc();
   sel: Obj[] = [];
   tool: Tool = 'select';
@@ -423,6 +426,7 @@ export class Editor {
     if (this.isolation) objs = objs.filter((o) => this.isolation!.ids.has(o.id) || !this.isolation!.known.has(o.id));
     for (const o of this.nodeSets.keys()) if (!objs.includes(o)) this.nodeSets.delete(o);
     for (const o of this.segmentSets.keys()) if (!objs.includes(o)) this.segmentSets.delete(o);
+    for (const o of this.handleSets.keys()) if (!objs.includes(o)) this.handleSets.delete(o);
     if (objs.length !== this.sel.length || objs.some((o, i) => o !== this.sel[i])) {
       this.pivot = null;
       this.rotateMode = false;
@@ -529,7 +533,7 @@ export class Editor {
 // Die Teile in src/editor/ sind Klassen ohne eigene Felder; ihre Methoden haben `this: Editor` und werden hier
 // in Editor.prototype kopiert. Neue Methoden kommen in den passenden Teil, neue Felder in die Klasse Editor oben.
 export interface Editor
-  extends EditorDocument,
+  extends EditorSelection, EditorDocument,
     EditorPointer,
     EditorKeyboard,
     EditorSnapping,
@@ -560,6 +564,7 @@ export interface Editor
     EditorRender {}
 
 const PARTS = [
+  EditorSelection,
   EditorDocument,
   EditorPointer,
   EditorKeyboard,

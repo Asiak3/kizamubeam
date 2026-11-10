@@ -25,7 +25,7 @@ export class EditorNodes {
     if (this.nodeEditObj) return false;
     const targets = this.nodeTargets();
     if (!targets.length) return true;
-    const chosen = targets.filter((o) => this.selectedNodes(o).length || this.segmentSelection(o).size);
+    const chosen = targets.filter((o) => this.selectedNodes(o).length || this.segmentSelection(o).size || this.selectedHandles(o).length);
     if (!chosen.length) { const o = this.nodeTarget(); if (o) chosen.push(o); }
     const before = this.state(), redo = this.history.saveRedo(), batching = this.batching;
     this.snapshot(t('Pfadkomponenten bearbeiten')); this.batching = true;
@@ -125,7 +125,7 @@ export class EditorNodes {
   }
 
   clearNodeSel(this: Editor) {
-    this.nodeSets.clear(); this.segmentSets.clear(); this.nodeSel.clear(); this.nodeSelObj = null;
+    this.nodeSets.clear(); this.segmentSets.clear(); this.handleSets.clear(); this.nodeSel.clear(); this.nodeSelObj = null;
     this.emit('sel');
   }
 
@@ -168,15 +168,18 @@ export class EditorNodes {
     if (!o) return;
     if (this.segmentSelection(o).size) { this.deleteSelectedSegments(o); return; }
     const h = this.nodeHover;
-    const handle = !this.selectedNodes(o).length && h && (!h.obj || h.obj === o) && h.which !== 'p' ? h : null;
+    const pickedHandles=this.selectedHandles(o);
+    const handle = !this.selectedNodes(o).length && !pickedHandles.length && h && (!h.obj || h.obj === o) && h.which !== 'p' ? h : null;
     const targets = handle ? [] : this.nodesToEdit(o);
-    if (!handle && !targets.length) {
+    if (!handle && !targets.length && !pickedHandles.length) {
       this.hint = t('Erst Knoten auswählen (Klick, Shift+Klick oder Rahmen).');
       this.emit('tool');
       return;
     }
     this.snapshot(t('Knoten löschen'));
     const subs = this.pathTarget()!;
+    for(const picked of pickedHandles){const node=subs[picked.sub].nodes[picked.idx];delete node[picked.which];node.smooth=false}
+    this.handleSets.delete(o);
     if (handle) {
       const n = subs[handle.sub].nodes[handle.idx];
       delete n[handle.which as 'cin' | 'cout'];
@@ -318,12 +321,12 @@ export class EditorNodes {
   /** Ausgewählte Knoten mit den Pfeiltasten verschieben (Weltabstand in mm) */
   nudgeNodes(this: Editor, dx: number, dy: number) {
     if (!this.nodeEditObj) {
-      if (!this.selectedNodes().length && !this.nodeTargets().some((o) => this.segmentSelection(o).size)) return false;
+      if (!this.selectedNodes().length && !this.selectedHandles().length && !this.nodeTargets().some((o) => this.segmentSelection(o).size)) return false;
       this.nodeBatch(() => { this.nudgeNodes(dx, dy); }); return true;
     }
     const o = this.nodeTarget();
     const targets = o ? this.movingNodes(o) : [];
-    if (!o || !targets.length) return false;
+    if (!o || (!targets.length && !this.selectedHandles(o).length)) return false;
     this.snapshot(t('Knoten verschieben'));
     const subs = this.pathTarget()!;
     const im = inv(o.m);
@@ -332,6 +335,9 @@ export class EditorNodes {
     const lx = p1.x - p0.x,
       ly = p1.y - p0.y;
     const sh = (p?: Pt) => p && ((p.x += lx), (p.y += ly));
+    for(const h of this.selectedHandles(o))if(!targets.some(n=>n.sub===h.sub&&n.idx===h.idx)){
+      const node=subs[h.sub].nodes[h.idx];sh(node[h.which]);node.smooth=false;
+    }
     for (const t of targets) {
       const n = subs[t.sub].nodes[t.idx];
       n.x += lx;
