@@ -189,7 +189,7 @@ export class EditorPointer {
       case 'start': {
         const h = this.startHover;
         if (h) {
-          this.setStartPoint(h.obj, h.sub, h.idx, e.ctrlKey || e.metaKey ? 'reset' : e.shiftKey ? 'reverse' : 'set');
+          this.setStartPoint(h.obj, h.sub, h.idx, e.ctrlKey || e.metaKey ? 'reset' : e.shiftKey ? 'reverse' : 'set', h.u);
           return;
         }
         const o = this.hitTest(wp);

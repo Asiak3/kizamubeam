@@ -168,8 +168,8 @@ export class Editor {
 
   // Pfad-Werkzeuge: Schließen, Verbinden, Zerlegen, Startpunkt, Trimmen
   // Startpunkt setzen
-  /** Knoten unter dem Mauszeiger im Startpunkt-Werkzeug */
-  startHover: { obj: Obj; m: Mat; sub: number; idx: number } | null = null;
+  /** Node under the pointer in the start point tool; on an edge of a closed contour: u = path parameter, pt = world point */
+  startHover: { obj: Obj; m: Mat; sub: number; idx: number; u?: number; pt?: Pt } | null = null;
   // Trimmen
   /** Abschnitt unter dem Mauszeiger im Trimm-Werkzeug (Welt) */
   trimHover: { obj: Obj; sub: number; span: [number, number] | null; piece: SubPath } | null = null;

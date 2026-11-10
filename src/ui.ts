@@ -1043,7 +1043,7 @@ function buildBars(ed: Editor) {
     tool('polygon', 'polygon', t('Polygon')),
     tool('text', 'text', t('Text (Ctrl+T)')),
     tool('trim', 'trim', t('Formen trimmen (Ctrl+K): Abschnitte bis zum nächsten Schnittpunkt anklicken und entfernen')),
-    tool('start', 'startpoint', t('Startpunkt setzen: Knoten anklicken, an dem der Schnitt beginnt (Shift: Richtung umkehren)')),
+    tool('start', 'startpoint', t('Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)')),
     tool('measure', 'measure', t('Messen: Abstand, Winkel, Radius und Durchmesser')),
     ...REL_MODES.map((m): Action => ({
       id: `rel:${m}`, cat: A, icon: REL_ICONS[m], label: `${REL_LABELS[m]}: ${REL_HINTS[m]}`, short: REL_LABELS[m],

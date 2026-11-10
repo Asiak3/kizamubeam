@@ -1478,7 +1478,7 @@ export const EDIT_TOOLS: ToolDef[] = [
       'Pfad-Werkzeuge wie in LightBurn. op "close": offene Pfade schließen, deren Anfang und Ende höchstens tolerance mm (Standard 0.5) auseinanderliegen; close_mode "line" fügt eine Gerade ein, "move" zieht die Enden zusammen. ' +
       'op "join": offene Pfade verbinden, deren Enden höchstens tolerance mm (Standard 0.05) auseinanderliegen (Auto-Join); beteiligte Objekte werden zu einem. ' +
       'op "break_apart": in einzelne Geraden und Kurven zerlegen (Texte über ihre Konturen). op "reverse": Laufrichtung umkehren. ' +
-      'op "set_start": Startpunkt des Schnitts auf den Knoten legen, der x/y am nächsten liegt (ein Objekt in ids); reverse kehrt dabei die Richtung um, reset überlässt Startpunkt und Richtung wieder der Optimierung. Offene Pfade beginnen nur an einem Ende. ' +
+      'op "set_start": Startpunkt des Schnitts auf den Knoten legen, der x/y am nächsten liegt (ein Objekt in ids); reverse kehrt dabei die Richtung um, reset überlässt Startpunkt und Richtung wieder der Optimierung; on_edge legt stattdessen an der nächsten Stelle einer Kante einer geschlossenen Kontur einen neuen Knoten an und beginnt dort. Offene Pfade beginnen nur an einem Ende. ' +
       'op "trim": den Abschnitt der Kurve bei x/y bis zu den nächsten Schnittpunkten mit anderen Kurven entfernen (ids nicht nötig); ohne Schnittpunkt wird der ganze Pfad entfernt. Reste werden an den Schnittpunkten verbunden, außer no_join; keep_piece behält das entfernte Stück auf dem aktuellen Layer. ' +
       'op "corners": Ecken der Objekte in ids runden (corner_mode "round", Radius radius mm), nach innen runden ("inverse", Bogen um die Ecke mit Radius radius) oder fasen ("chamfer", radius = Abstand von der Ecke); ' +
       'points beschränkt das auf die Ecken, die diesen Punkten {x, y} am nächsten liegen (ein Objekt in ids), sonst alle Ecken. Zu kurze Kanten verkleinern den Radius. ' +
@@ -1489,7 +1489,7 @@ export const EDIT_TOOLS: ToolDef[] = [
       corner_mode: { type: 'string', enum: ['round', 'inverse', 'chamfer'] }, radius: { type: 'number', exclusiveMinimum: 0 },
       points: { type: 'array', items: obj({ x: { type: 'number' }, y: { type: 'number' } }, ['x', 'y']) },
       tolerance: { type: 'number', exclusiveMinimum: 0 }, close_mode: { type: 'string', enum: ['line', 'move'] },
-      x: { type: 'number' }, y: { type: 'number' }, reverse: { type: 'boolean' }, reset: { type: 'boolean' },
+      x: { type: 'number' }, y: { type: 'number' }, reverse: { type: 'boolean' }, reset: { type: 'boolean' }, on_edge: { type: 'boolean' },
       keep_piece: { type: 'boolean' }, no_join: { type: 'boolean' },
     }, ['op']),
     run: async (ed, a) => {
@@ -1556,7 +1556,7 @@ export const EDIT_TOOLS: ToolDef[] = [
       const o = objs[0];
       if (!['path', 'rect', 'ellipse', 'polygon'].includes(o.shape.kind)) throw new ToolError(`Objekt ${o.id} (${o.shape.kind}) hat keine Knoten`);
       const mode = bool(a, 'reset', false) ? 'reset' : bool(a, 'reverse', false) ? 'reverse' : 'set';
-      if (!ed.startAtPoint(o, W(ed, num(a, 'x'), num(a, 'y')), mode)) throw new ToolError(ed.hint || 'Startpunkt nicht gesetzt');
+      if (!ed.startAtPoint(o, W(ed, num(a, 'x'), num(a, 'y')), mode, bool(a, 'on_edge', false))) throw new ToolError(ed.hint || 'Startpunkt nicht gesetzt');
       return result(ed, before, { object: describe(ed, o, IDENT, false) });
     },
   },

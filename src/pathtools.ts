@@ -78,6 +78,30 @@ export function setStart(sp: SubPath, idx: number, reverse = false): boolean {
   return true;
 }
 
+/**
+ * Insert a node at path parameter u (segment index + t), splitting the segment exactly (de Casteljau),
+ * and return its index. If u lies within eps of an existing node, that node's index is returned instead.
+ */
+export function splitAt(sp: SubPath, u: number, eps = 1e-6): number {
+  const segs = segments(sp);
+  if (!segs.length) return -1;
+  const k = Math.min(segs.length - 1, Math.max(0, Math.floor(u)));
+  const t = Math.min(1, Math.max(0, u - k));
+  const sg = segs[k];
+  if (t <= eps) return sg.ia;
+  if (t >= 1 - eps) return sg.ib;
+  let n: Node;
+  if (sg.curve) {
+    const p01 = lerp(sg.a, sg.c1, t), p12 = lerp(sg.c1, sg.c2, t), p23 = lerp(sg.c2, sg.b, t);
+    const p012 = lerp(p01, p12, t), p123 = lerp(p12, p23, t), p = lerp(p012, p123, t);
+    sg.a.cout = p01;
+    sg.b.cin = p23;
+    n = { x: p.x, y: p.y, cin: p012, cout: p123, smooth: true };
+  } else n = lerp(sg.a, sg.b, t);
+  sp.nodes.splice(sg.ia + 1, 0, n);
+  return sg.ia + 1;
+}
+
 // ---------- Schließen ----------
 
 /** Letzten Knoten mit dem ersten verschmelzen (an der Stelle p) und den Pfad schließen */

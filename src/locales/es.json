@@ -994,7 +994,6 @@
   "Klicken, um Text zu setzen, Ziehen für einen Textrahmen mit Zeilenumbruch, oder vorhandenen Text anklicken.": "Haz clic para colocar texto, arrastra para un cuadro de texto con ajuste de línea, o haz clic en un texto existente.",
   "Verbindung: erste gerade Kante anklicken (Zinken, Zapfen oder Schlitze). Esc hebt die Wahl auf.": "Unión: haz clic en el primer borde recto (dedos, pestañas o ranuras). Esc anula la elección.",
   "Trimmen: Abschnitt bis zu den nächsten Schnittpunkten anklicken (rot) zum Entfernen. Shift: Stück auf aktuellem Layer behalten, Ctrl: nicht verbinden.": "Recortar: haz clic en un tramo entre intersecciones (rojo) para eliminarlo. Mayús: conserva la pieza en la capa actual; Ctrl: no unir.",
-  "Startpunkt: Knoten anklicken, dort beginnt der Schnitt. Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Punto de inicio: haz clic en un nodo para que el corte empiece allí. Mayús+clic: invertir dirección; Ctrl+clic: restablecer (decide la optimización).",
   "Beziehung: zuerst das Element anklicken, das stehen bleibt, dann das Element des Objekts, das sich anpasst.": "Relación: haz clic primero en el elemento que se queda y luego en el elemento del objeto que se adapta.",
   "Ziehen zeichnet einen angepassten Bézierpfad. Loslassen: übernehmen; Esc: abbrechen. Toleranz und Schließen in den Werkzeugoptionen einstellen.": "Arrastrar dibuja un trazado Bézier ajustado. Soltar: aceptar; Esc: cancelar. Ajusta la tolerancia y el cierre en las opciones de la herramienta.",
   "Messen: Anfang und Ende anklicken (mit Fang). Über einem Kreis erscheinen Radius und Durchmesser. Esc löscht die Messung.": "Medir: haz clic en el inicio y el final (con ajuste). Sobre un círculo aparecen radio y diámetro. Esc borra la medición.",
@@ -3597,7 +3596,6 @@
   "Ellipse (Ctrl+E)": "Elipse (Ctrl+E)",
   "Text (Ctrl+T)": "Texto (Ctrl+T)",
   "Formen trimmen (Ctrl+K): Abschnitte bis zum nächsten Schnittpunkt anklicken und entfernen": "Recortar formas (Ctrl+K): haz clic en tramos hasta la siguiente intersección para eliminarlos",
-  "Startpunkt setzen: Knoten anklicken, an dem der Schnitt beginnt (Shift: Richtung umkehren)": "Fijar punto de inicio: haz clic en el nodo donde empieza el corte (Mayús: invertir dirección)",
   "Messen: Abstand, Winkel, Radius und Durchmesser": "Medir: distancia, ángulo, radio y diámetro",
   "Verbindung: Fingerzinken, Zapfen, Überblattung, Schnapp-, Haken-, Keil- oder T-Slot-Verbindung auf gerade Kanten anwenden": "Unión: aplica una unión de dedos, espiga, media madera, a presión, de gancho, de cuña o T-slot a bordes rectos",
   "Scharnier für Deckel: Oberkante der Rückwand und Hinterkante des Deckels anklicken; erzeugt Knöchel, Schlitze und Stiftlöcher": "Bisagra de tapa: haz clic en el canto superior de la pared trasera y en el canto trasero de la tapa; crea nudillos, ranuras y agujeros para el pasador",
@@ -3983,5 +3981,7 @@
   "{n} Schicht besteht aus mehreren Stücken: Die Stücke beim Verleimen nach der Schicht darunter ausrichten.": "{n} capa consta de varios trozos: al pegar, alinea los trozos con la capa de abajo.",
   "{n} Bein": "{n} pata",
   "Fertig nach {time} min, {n} Fehler|one": "Terminado tras {time} min, {n} error",
-  "Fertig nach {time} min, {n} Fehler": "Terminado tras {time} min, {n} errores"
+  "Fertig nach {time} min, {n} Fehler": "Terminado tras {time} min, {n} errores",
+  "Startpunkt: Knoten oder Kante anklicken, dort beginnt der Schnitt (auf einer Kante geschlossener Konturen entsteht ein neuer Knoten). Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Punto de inicio: haz clic en un nodo o en un borde para que el corte empiece allí (en el borde de un contorno cerrado se crea un nodo nuevo). Mayús+clic: invertir dirección; Ctrl+clic: restablecer (decide la optimización).",
+  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Fijar punto de inicio: haz clic en el nodo o borde donde empieza el corte (Mayús: invertir dirección)"
 }
