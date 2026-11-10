@@ -118,6 +118,11 @@ const BACKEND_PATTERNS: [RegExp, string, string?][] = [
   [/^Port (\d+) nicht verfügbar: (.*)$/s, 'Port {port} nicht verfügbar: {error}'],
   [/^Hochladen fehlgeschlagen \(HTTP (\d+)\)(.*)$/s, 'Hochladen fehlgeschlagen (HTTP {status}){details}'],
   [/^Unbekannter Speicher „(.*)“$/, 'Unbekannter Speicher „{fs}“'],
+  [/^Zertifikat: (.*)$/s, 'Zertifikat: {error}'],
+  [/^TLS: (.*)$/s, 'TLS: {error}'],
+  [/^Falscher Code, noch (\d+) Versuche?\.$/, 'Falscher Code, noch {n} Versuche.', 'Falscher Code, noch {n} Versuch.'],
+  [/^Host und dieser Rechner verwenden verschiedene Protokollversionen \((\d+) statt (\d+)\)\. Bitte beide KizamuBeam auf dieselbe Version bringen\.$/,
+    'Host und dieser Rechner verwenden verschiedene Protokollversionen ({theirs} statt {ours}). Bitte beide KizamuBeam auf dieselbe Version bringen.'],
 ];
 const BACKEND_MESSAGES = [
   'Ungültige Daten',
@@ -134,6 +139,23 @@ const BACKEND_MESSAGES = [
   'Kein G-Code',
   'Zeitüberschreitung beim Warten auf die Antwort',
   'Ungültige Antwort der Steuerung',
+  'Dieser Rechner ist beim Host nicht (mehr) gekoppelt. Bitte neu koppeln.',
+  'Nur Bediener dürfen den Laser steuern. Die Rolle stellt der Host ein.',
+  'Der Host hat nicht rechtzeitig geantwortet.',
+  'Am Host läuft gerade eine andere Kopplung.',
+  'Kopplung am Host abgebrochen oder abgelaufen.',
+  'Dreimal ein falscher Code. Die Kopplung wurde abgebrochen.',
+  'Unbekannter Rechner',
+  'Der Host hat die Kopplung mit diesem Rechner aufgehoben.',
+  'Keine Adresse angegeben',
+  'Der Host meldet sich mit einem anderen Zertifikat. Wurde KizamuBeam dort neu eingerichtet, bitte neu koppeln.',
+  'Dieser Rechner ist mit dem Host noch nicht gekoppelt. Erst in den Geräteeinstellungen koppeln.',
+  'Der Host antwortet nicht.',
+  'Der Host antwortet nicht. Ist dort der Host-Modus eingeschaltet?',
+  'Unerwartete Antwort vom Host',
+  'Verbindung zum Host verloren',
+  'Verbindung zum Host getrennt',
+  'Keine Kopplung begonnen',
 ];
 // i18n-keys-end
 

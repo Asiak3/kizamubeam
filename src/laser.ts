@@ -12,7 +12,8 @@ import {
 import { isTauri, machine, PortInfo } from './machine';
 import type { PreparedGCode } from './gcode';
 import { airProblem, digitalOutputs, FluidFs, listCmd, outputCmd, OVERRIDE, parseFileList, pinNames, RAPID_OVERRIDE, TOGGLE_FLOOD, TOGGLE_MIST } from './fluidnc';
-import type { Doc, ImageLayer, Layer } from './model';
+import type { Doc, ImageLayer, Layer, Obj } from './model';
+import { forgetHost, openPairDialog, pairedHost, remoteFrame, remoteJob } from './remote';
 import { materialTab } from './materialui';
 import { cameraTab } from './cameraui';
 import { dockWindow, windowBody } from './dock';
@@ -95,6 +96,8 @@ export interface JobSource {
   name: string;
   /** Farbe je Layer in der Vorschau */
   color: (i: number) => string;
+  /** Only these top-level objects (remote jobs with "selection only"); default: all */
+  only?: Obj[] | null;
 }
 
 export async function makeJob(ed: Editor, forPreview: boolean, src?: JobSource): Promise<Job> {
@@ -104,7 +107,7 @@ export async function makeJob(ed: Editor, forPreview: boolean, src?: JobSource):
     layer: src?.layer ?? ((i) => ed.layer(i)),
     imgLayer: src?.imgLayer ?? ((i) => ed.imgLayer(i)),
     device,
-    only: !src && device.cutSelected ? ed.sel : null,
+    only: src ? (src.only ?? null) : device.cutSelected ? ed.sel : null,
     position: pos ? { x: pos[0], y: pos[1] } : null,
     forPreview,
   });
@@ -178,6 +181,12 @@ function designOk(ed: Editor): boolean {
 export function runBlocker(): string | null {
   if (!machine.connected) return t('Nicht verbunden.');
   if (machine.running || uploading) return t('Es läuft bereits ein Auftrag.');
+  if (machine.remote) {
+    // The host checks alarm state, start position and work area with its own device
+    if (machine.remote.role === 'viewer') return t('Nur zuschauen: Der Host hat diesem Rechner die Rolle „Zuschauer“ gegeben.');
+    if (machine.remote.state && !machine.remote.state.machine.connected) return t('Der Host ist gerade nicht mit dem Laser verbunden.');
+    return null;
+  }
   if (machine.status.state.startsWith('Alarm'))
     return fw().unlock
       ? t('Die Maschine ist im Alarmzustand. Erst referenzieren (Home) oder entsperren ({unlock}).', { unlock: fw().unlock! })
@@ -239,6 +248,7 @@ export async function runGCode(g: PreparedGCode): Promise<boolean> {
 
 /** Aktuellen Job berechnen und als Datei auf die Steuerung laden (ohne zu starten) */
 export async function uploadJob(ed: Editor, fs: FluidFs, file: string): Promise<number | null> {
+  if (machine.remote) return notify(t('Über einen anderen KizamuBeam nicht möglich.'), true), null;
   const job = await makeJob(ed, false);
   if (nothingToDo(job)) return null;
   job.warnings.forEach((w) => notify(w));
@@ -254,6 +264,11 @@ function canRun(): boolean {
 
 export async function startJob(ed: Editor, src?: JobSource) {
   if (!canRun()) return;
+  if (machine.remote) {
+    if (!src && !designOk(ed)) return;
+    if ((await remoteJob(ed, src, device.cutSelected, notify)) && !src) ed.afterJob();
+    return;
+  }
   const job = await makeJob(ed, false, src);
   if (nothingToDo(job) || (!src && !designOk(ed)) || !boundsOk(ed, job) || !airOk(job)) return;
   job.warnings.forEach((w) => notify(w));
@@ -269,6 +284,7 @@ export async function startJob(ed: Editor, src?: JobSource) {
  */
 export async function startJobAt(ed: Editor, preview: Moves, i: number, frac: number, src?: JobSource): Promise<boolean> {
   if (!canRun()) return false;
+  if (machine.remote) return notify(t('„Start hier“ geht über einen anderen KizamuBeam noch nicht.'), true), false;
   const job = await makeJob(ed, false, src);
   if (nothingToDo(job) || (!src && !designOk(ed)) || !boundsOk(ed, job) || !airOk(job)) return false;
   if (!sameMoves(preview, job.moves, job.offset)) {
@@ -291,6 +307,7 @@ export async function startJobAt(ed: Editor, preview: Moves, i: number, frac: nu
 
 export async function frameJob(ed: Editor, contour: boolean, src?: JobSource) {
   if (!canRun()) return;
+  if (machine.remote) return void (await remoteFrame(ed, src, device.cutSelected, contour, notify));
   const job = await makeJob(ed, false, src);
   const lines = frameGCode(job, device, contour);
   if (!lines) return void nothingToDo(job);
@@ -390,7 +407,7 @@ function laserTab(ed: Editor): HTMLElement {
   const homeB = big('home', t('Home'), t('Referenzfahrt'), () => {
     if (device.limitSwitches === 'no' && !confirm(t('Für dieses Gerät ist angegeben, dass es keine Endschalter hat. Eine Referenzfahrt fährt dann bis zum Anschlag.\n\nTrotzdem referenzieren?'))) return;
     if (rotaryOn(device) && device.rotary.axis === 'Y' && !confirm(t('Die Drehachse steckt am Y-Anschluss. Eine Referenzfahrt kann sie endlos drehen lassen, weil es dort keinen Endschalter gibt.\n\nTrotzdem referenzieren?'))) return;
-    machine.send(fw().home);
+    machine.send((machine.remote ? machine.fw : fw()).home);
   });
   const originB = big('origin', t('Ursprung'), t('Zum Nullpunkt fahren'), () => machine.send('G0 X0 Y0'));
   const previewB = big('preview', t('Vorschau'), t('Vorschau mit Zeitschätzung (Alt+P)'), () => openPreview(ed));
@@ -497,6 +514,7 @@ function laserTab(ed: Editor): HTMLElement {
   let ports: PortInfo[] = [];
   const NET = '__net__';
   const NET_WS = '__ws__';
+  const REMOTE = '__remote__';
   const fillPorts = () => {
     portSel.textContent = '';
     const names = ports.map((p) => p.name);
@@ -508,11 +526,13 @@ function laserTab(ed: Editor): HTMLElement {
     if (!names.length) portSel.append(h('option', { value: '', disabled: true }, t('Keine serielle Schnittstelle gefunden')));
     portSel.append(h('option', { value: NET }, t('WLAN: {address}', { address: `${device.host}:${device.tcpPort}` })));
     portSel.append(h('option', { value: NET_WS }, t('WLAN (WebSocket): {address}', { address: `${device.host}:${device.wsPort}` })));
-    portSel.value = device.conn === 'tcp' ? NET : device.conn === 'ws' ? NET_WS : device.port || names[0] || NET;
+    if (device.conn === 'remote' || device.remoteFp) portSel.append(h('option', { value: REMOTE }, t('Anderer KizamuBeam: {address}', { address: `${device.host}:${device.remotePort}` })));
+    portSel.value = device.conn === 'tcp' ? NET : device.conn === 'ws' ? NET_WS : device.conn === 'remote' ? REMOTE : device.port || names[0] || NET;
   };
   const applyPortChoice = () => {
     if (portSel.value === NET) device.conn = 'tcp';
     else if (portSel.value === NET_WS) device.conn = 'ws';
+    else if (portSel.value === REMOTE) device.conn = 'remote';
     else if (portSel.value) ((device.conn = 'serial'), (device.port = portSel.value));
     deviceChanged();
   };
@@ -780,11 +800,13 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   const bh = num(t('Höhe (mm)'), () => bed.h, (v) => (bed.h = v), t('Arbeitsbereich Y'));
   sMaxRef.el = num(t('S-Wert für 100 %'), () => d.sMax, (v) => (d.sMax = v), t('GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1'));
   head(t('Verbindung|Gerät'));
-  rows.push(h('label', {}, t('Anschluss')), h('select', { onchange: (e: Event) => (d.conn = (e.target as HTMLSelectElement).value as Device['conn']) },
+  const connSel: HTMLSelectElement = h('select', { onchange: (e: Event) => (d.conn = (e.target as HTMLSelectElement).value as Device['conn']) },
     h('option', { value: 'serial', selected: d.conn === 'serial' }, t('USB (seriell)')),
     h('option', { value: 'tcp', selected: d.conn === 'tcp' }, t('WLAN (Telnet)')),
     h('option', { value: 'ws', selected: d.conn === 'ws' }, t('WLAN (WebSocket)')),
-  ));
+    h('option', { value: 'remote', selected: d.conn === 'remote' }, t('Anderer KizamuBeam (Netzwerk)')),
+  ) as HTMLSelectElement;
+  rows.push(h('label', {}, t('Anschluss')), connSel);
   // Schnittstelle frei eintragbar (z. B. COM3, /dev/ttyUSB0), erkannte Schnittstellen als Vorschlag
   const portList = h('datalist', { id: `ports-${Math.random().toString(36).slice(2)}` });
   const portIn = h('input', { type: 'text', value: d.port, placeholder: t('z. B. COM3 oder /dev/ttyUSB0'), oninput: (e: Event) => (d.port = (e.target as HTMLInputElement).value.trim()) });
@@ -804,6 +826,38 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   num(t('Telnet-Port'), () => d.tcpPort, (v) => (d.tcpPort = Math.round(v)));
   num(t('WebSocket-Port'), () => d.wsPort, (v) => (d.wsPort = Math.round(v)), t('FluidNC: 81; ist er nicht erreichbar, wird 80 versucht'));
   num(t('Web-Port'), () => d.httpPort, (v) => (d.httpPort = Math.round(v)), t('Weboberfläche von FluidNC (meist 80): zum Hochladen auf SD-Karte/Flash und für die Suche'));
+  // Remote KizamuBeam: host address is the network address above
+  num(t('Host-Port'), () => d.remotePort, (v) => (d.remotePort = Math.round(v)), t('Port eines anderen KizamuBeam im Host-Modus (Standard 47900)'));
+  const pairState = h('span', { class: 'note' });
+  const showPair = async () => {
+    const name = await pairedHost(d.remoteFp);
+    pairState.textContent = name ? t('Gekoppelt mit {host}', { host: name }) : t('Nicht gekoppelt');
+    forgetBtn.hidden = !name;
+  };
+  const forgetBtn = h('button', {
+    class: 'btn small', title: t('Den Schlüssel für diesen Host auf diesem Rechner löschen'),
+    onclick: async () => {
+      if (!confirm(t('Kopplung mit diesem Host auf diesem Rechner aufheben?'))) return;
+      await forgetHost(d.remoteFp).catch(() => {});
+      d.remoteFp = '';
+      void showPair();
+    },
+  }, t('Aufheben')) as HTMLButtonElement;
+  rows.push(h('label', { title: t('Laser an einem anderen Rechner mit KizamuBeam steuern. Dort unter Laser → Fernsteuerung den Host-Modus einschalten.') }, t('Kopplung')),
+    h('span', { class: 'conn-row' }, pairState,
+      h('button', {
+        class: 'btn small',
+        onclick: async () => {
+          const r = await openPairDialog(d.host, d.remotePort);
+          if (!r) return;
+          d.remoteFp = r.fingerprint;
+          d.conn = 'remote';
+          connSel.value = 'remote';
+          void showPair();
+        },
+      }, t('Koppeln …')),
+      forgetBtn));
+  void showPair();
   // Empfangspuffer für die Zeichenzählung; größer = flüssiger bei vielen kurzen Zeilen (Bildgravur)
   const bufNote = h('div', { class: 'note wide' });
   const bufSel = h('select', { onchange: (e: Event) => (d.rxBuffer = Number((e.target as HTMLSelectElement).value)) },

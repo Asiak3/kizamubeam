@@ -60,6 +60,7 @@
     "test:jig": "node scripts/run-ts.mjs scripts/jig-test.ts",
     "test:arcs": "node scripts/run-ts.mjs scripts/arcs-test.ts",
     "test:sync": "node scripts/run-ts.mjs scripts/sync-test.ts",
+    "test:remote": "node scripts/run-ts.mjs scripts/remote-test.ts",
     "test:relations": "node scripts/run-ts.mjs scripts/relations-test.ts",
     "test:sketch": "node scripts/run-ts.mjs scripts/sketch-test.ts",
     "test:grid": "node scripts/run-ts.mjs scripts/grid-test.ts",

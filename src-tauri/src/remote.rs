@@ -1081,7 +1081,7 @@ pub async fn remote_pair_finish(state: State<'_, Remote>, code: String) -> Resul
             "pair_wrong" => {
                 let left = r.get("left").and_then(Value::as_u64).unwrap_or(0);
                 *inner.pair_session.lock().unwrap() = Some(s);
-                Err(format!("Falscher Code, noch {left} Versuche."))
+                Err(if left == 1 { "Falscher Code, noch 1 Versuch.".to_string() } else { format!("Falscher Code, noch {left} Versuche.") })
             }
             "error" => Err(error_text(&r)),
             _ => Err("Unerwartete Antwort vom Host".into()),

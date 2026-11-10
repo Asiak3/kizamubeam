@@ -216,7 +216,7 @@ export function parseBundle(text: string): Bundle {
 // ---------- Geräte: Verbindung bleibt je Rechner ----------
 
 /** Felder eines Geräts, die zum Rechner gehören (USB-Anschluss, Adresse, Ports, Verbindungsart) */
-export const DEVICE_LOCAL_FIELDS = ['conn', 'port', 'host', 'tcpPort', 'wsPort', 'httpPort'] as const;
+export const DEVICE_LOCAL_FIELDS = ['conn', 'port', 'host', 'tcpPort', 'wsPort', 'httpPort', 'remotePort', 'remoteFp'] as const;
 
 /** Prüfsumme eines Geräts ohne die Verbindungsangaben: ein anderer Anschluss ist keine Änderung */
 export function deviceHash(d: unknown): string {
