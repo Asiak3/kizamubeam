@@ -17,7 +17,7 @@
 // jedes Rückgrat reicht nur so weit wie der Schlauch um seine Achsen (an den Enden um „Rückgrat verlängern“ länger,
 // damit z. B. die Beinplatte in den Rumpf reicht).
 import type { Pt, SubPath } from '../model';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 import { fitPolyline } from '../fit';
 import { packParts } from './build';
 import type { Generator, GenPart, Issue, Params, PlanSheet } from './types';
@@ -951,15 +951,15 @@ export const RIBS: Generator = {
         if (!s.ribs) out.push({ key: 'sections', level: 'warn', msg: t('Abschnitt „{name}“ hat keine Rippe mit Halt: Achse oder Ebene prüfen.', { name: s.name }) });
         if (s.bend) out.push({ key: 'sections', level: 'warn', msg: t('Abschnitt „{name}“: Rippen stoßen in der Biegung aneinander. Größeren Abstand wählen oder die Achse weniger stark biegen.', { name: s.name }) });
       }
-    if (L.lostRibs) out.push({ key: 'spacing', level: 'warn', msg: t('{n} Rippen haben keinen Halt am Rückgrat (zu klein oder neben dem Rückgrat) und fallen weg.', { n: L.lostRibs }) });
+    if (L.lostRibs) out.push({ key: 'spacing', level: 'warn', msg: tn('{n} Rippe hat keinen Halt am Rückgrat (zu klein oder neben dem Rückgrat) und fällt weg.', '{n} Rippen haben keinen Halt am Rückgrat (zu klein oder neben dem Rückgrat) und fallen weg.', L.lostRibs) });
     if (L.lostPieces)
       out.push(
         L.manual
-          ? { key: 'sections', level: 'warn', msg: t('{n} Stücke von Rippen erreichen kein Rückgrat und fallen weg. Für sie einen eigenen Abschnitt anlegen.', { n: L.lostPieces }) }
-          : { key: 'spineOffset', level: 'warn', msg: t('{n} Stücke von Rippen erreichen das Rückgrat nicht und fallen weg (z. B. Beine neben dem Rumpf). Dafür unter „Abschnitte“ eigene Achsen zeichnen.', { n: L.lostPieces }) },
+          ? { key: 'sections', level: 'warn', msg: tn('{n} Stück einer Rippe erreicht kein Rückgrat und fällt weg. Dafür einen eigenen Abschnitt anlegen.', '{n} Stücke von Rippen erreichen kein Rückgrat und fallen weg. Für sie einen eigenen Abschnitt anlegen.', L.lostPieces) }
+          : { key: 'spineOffset', level: 'warn', msg: tn('{n} Stück einer Rippe erreicht das Rückgrat nicht und fällt weg (z. B. ein Bein neben dem Rumpf). Dafür unter „Abschnitte“ eine eigene Achse zeichnen.', '{n} Stücke von Rippen erreichen das Rückgrat nicht und fallen weg (z. B. Beine neben dem Rumpf). Dafür unter „Abschnitte“ eigene Achsen zeichnen.', L.lostPieces) },
       );
     if (!L.manual && L.spine.length > 1) out.push({ key: 'spineInset', level: 'warn', msg: t('Das Rückgrat besteht aus {n} Stücken; jedes hält nur seine Rippen.', { n: L.spine.length }) });
-    if (L.open) out.push({ level: 'warn', msg: t('Das Modell hat Löcher im Netz; an {n} Stellen fehlt ein Stück Kontur. Am besten das Modell vorher reparieren (z. B. in Blender oder PrusaSlicer).', { n: L.open }) });
+    if (L.open) out.push({ level: 'warn', msg: tn('Das Modell hat Löcher im Netz; an {n} Stelle fehlt ein Stück Kontur. Am besten das Modell vorher reparieren (z. B. in Blender oder PrusaSlicer).', 'Das Modell hat Löcher im Netz; an {n} Stellen fehlt ein Stück Kontur. Am besten das Modell vorher reparieren (z. B. in Blender oder PrusaSlicer).', L.open) });
     return out;
   },
   generate(raw) {
@@ -1072,7 +1072,7 @@ export function ribsPlan(p: RibsParams, L: RibsLayout): PlanSheet {
       );
     if (cross.length) steps.push(t('Platte {s} von unten in die Schlitze der Rippen {r} schieben.', { s: key, r: ranges(cross) }));
   }
-  steps.push(t('Teile: {r} Rippen, {s} Platten, Materialdicke {t} mm.', { r: L.ribs.length, s: L.spine.length, t: fmt(th, 1) }));
+  steps.push(t('Teile: {list}, Materialdicke {t} mm.', { list: `${tn('{n} Rippe', '{n} Rippen', L.ribs.length)}, ${tn('{n} Platte', '{n} Platten', L.spine.length)}`, t: fmt(th, 1) }));
   return { title: t('Bauplan: {name}', { name: t('Rippenmodell {name}', { name: p.name || '' }).trim() }), lines, labels, steps: steps.map((s2, i) => (i < steps.length - 1 ? `${i + 1}. ${s2}` : s2)) };
 }
 

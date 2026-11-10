@@ -9,7 +9,7 @@ import { normalizeTemplate, TemplateInfo } from './templates';
 import type { ProjectParam } from './params';
 import { compareVersions } from './updates';
 import { AssetData, AssetError, parseAsset } from './assetFormat';
-import { localText, t } from './i18n';
+import { localText, t, tn } from './i18n';
 
 export { localText };
 import { version as APP_VERSION } from '../package.json';
@@ -183,10 +183,10 @@ export const packSummary = (p: Pack) => countSummary(p.devices.length, p.templat
 
 export function countSummary(devices: number, templates: number, materials: number, assets = 0): string {
   const parts: string[] = [];
-  if (devices) parts.push(devices === 1 ? t('1 Gerätevorlage') : t('{n} Gerätevorlagen', { n: devices }));
-  if (templates) parts.push(templates === 1 ? t('1 Vorlage') : t('{n} Vorlagen', { n: templates }));
-  if (materials) parts.push(materials === 1 ? t('1 Material') : t('{n} Materialien', { n: materials }));
-  if (assets) parts.push(assets === 1 ? t('1 Bibliotheks-Eintrag') : t('{n} Bibliotheks-Einträge', { n: assets }));
+  if (devices) parts.push(tn('{n} Gerätevorlage', '{n} Gerätevorlagen', devices));
+  if (templates) parts.push(tn('{n} Vorlage', '{n} Vorlagen', templates));
+  if (materials) parts.push(tn('{n} Material', '{n} Materialien', materials));
+  if (assets) parts.push(tn('{n} Bibliotheks-Eintrag', '{n} Bibliotheks-Einträge', assets));
   return parts.join(' · ');
 }
 

@@ -169,7 +169,7 @@ export function openSlotDialog(ed: Editor) {
       const r = applySlotResize(ed, st.th, st.tol, st.thNew);
       ed.hint = r.slots || r.gens
         ? [r.slots ? tn('{n} Schlitz angepasst', '{n} Schlitze angepasst', r.slots) : '', r.gens ? tn('{n} Generator-Bauteil angepasst', '{n} Generator-Bauteile angepasst', r.gens) : '']
-          .filter(Boolean).join(', ') + (r.skipped ? t(', {n} übersprungen.', { n: r.skipped }) : '.')
+          .filter(Boolean).join(', ') + (r.skipped ? tn(', {n} übersprungen.|one', ', {n} übersprungen.', r.skipped) : '.')
         : t('Nichts angepasst.');
       ed.emit('tool');
     }

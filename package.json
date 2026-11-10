@@ -16,6 +16,7 @@
     "vm:build": "cd vm && tauri build",
     "vm:headless": "cd vm/src-tauri && cargo run -- --headless",
     "i18n:check": "node scripts/i18n-check.mjs",
+    "test:i18n": "node scripts/run-ts.mjs scripts/i18n-plural-test.ts",
     "test:camera": "node scripts/run-ts.mjs scripts/camera-fine-tune-test.ts && node scripts/run-ts.mjs scripts/camera-image-test.ts && node scripts/run-ts.mjs scripts/camera-profile-test.ts && node scripts/camera-preview-test.mjs && node scripts/camera-ui-offline-test.mjs",
     "build:library": "node scripts/run-ts.mjs scripts/build-library.ts",
     "test:core": "node scripts/core-fixtures.mjs && cd src-tauri && cargo test -p kizamubeam-core",

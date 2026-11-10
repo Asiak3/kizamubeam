@@ -60,7 +60,7 @@ export class EditorPaths {
       const hit = subs.filter((_, i) => closeSubs([copySub(world[i])], tol, mode).closed);
       if (hit.length && closeSubs(hit, Infinity, mode).closed) this.touch(l.shape);
     }
-    this.hint = tn('{n} Pfad geschlossen', '{n} Pfade geschlossen', st.closed) + (st.open > st.closed ? t(', {n} offen geblieben.', { n: st.open - st.closed }) : '.');
+    this.hint = tn('{n} Pfad geschlossen', '{n} Pfade geschlossen', st.closed) + (st.open > st.closed ? tn(', {n} offen geblieben.|one', ', {n} offen geblieben.', st.open - st.closed) : '.');
     this.emit('doc');
     return st;
   }
@@ -242,7 +242,7 @@ export class EditorPaths {
         : mode === 'inverse'
           ? tn('{n} Ecke innen gerundet', '{n} Ecken innen gerundet', done)
           : tn('{n} Ecke gefast', '{n} Ecken gefast', done)) +
-      (limited ? tn(', {n} davon kleiner (Kanten zu kurz).', ', {n} davon kleiner (Kanten zu kurz).', limited) : '.');
+      (limited ? tn(', {n} davon kleiner (Kanten zu kurz).|one', ', {n} davon kleiner (Kanten zu kurz).', limited) : '.');
     this.emit('doc');
     this.emit('sel');
     return done;

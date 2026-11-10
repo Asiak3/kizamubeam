@@ -277,7 +277,7 @@ export async function openFontManager(ed: Editor) {
     }
     list.append(...rows);
     if (tab === 'google' && total > shown) {
-      const more = h('button', { class: 'btn small font-more' }, tn('{n} weitere anzeigen', '{n} weitere anzeigen', Math.min(PAGE, total - shown)));
+      const more = h('button', { class: 'btn small font-more' }, tn('{n} weitere anzeigen|one', '{n} weitere anzeigen', Math.min(PAGE, total - shown)));
       more.onclick = () => ((shown += PAGE), fill());
       list.append(more);
     }
@@ -376,7 +376,7 @@ export async function checkProjectFonts(ed: Editor) {
     ed.emit('tool');
   };
   if (!avail.length) {
-    hint(t('Schrift {fonts} nicht gefunden, Roboto verwendet.', { fonts: unknown.join(', ') }));
+    hint(tn('Schrift {fonts} nicht gefunden, Roboto verwendet.', 'Schriften {fonts} nicht gefunden, Roboto verwendet.', unknown.length, { fonts: unknown.join(', ') }));
     return;
   }
   const install = async () => {
@@ -391,7 +391,7 @@ export async function checkProjectFonts(ed: Editor) {
       }
     const parts = [];
     if (done.length) parts.push(tn('Schrift {fonts} von Google Fonts geladen.', 'Schriften {fonts} von Google Fonts geladen.', done.length, { fonts: done.join(', ') }));
-    if (failed.length || unknown.length) parts.push(t('Schrift {fonts} nicht gefunden, Roboto verwendet.', { fonts: [...failed, ...unknown].join(', ') }));
+    if (failed.length || unknown.length) parts.push(tn('Schrift {fonts} nicht gefunden, Roboto verwendet.', 'Schriften {fonts} nicht gefunden, Roboto verwendet.', failed.length + unknown.length, { fonts: [...failed, ...unknown].join(', ') }));
     hint(parts.join(' '));
   };
   if (autoInstallFonts()) return install();

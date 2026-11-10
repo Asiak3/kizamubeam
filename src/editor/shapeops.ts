@@ -37,7 +37,7 @@ export class EditorShapeOps {
       } else this.convertObjToPath(leaf);
     }
     this.hint = fallbacks.size
-      ? t('Schrift {fonts} nicht gefunden, Roboto verwendet.', { fonts: [...fallbacks].join(', ') })
+      ? tn('Schrift {fonts} nicht gefunden, Roboto verwendet.', 'Schriften {fonts} nicht gefunden, Roboto verwendet.', fallbacks.size, { fonts: [...fallbacks].join(', ') })
       : t('In Pfad umgewandelt.');
     this.emit('doc');
     this.emit('sel');

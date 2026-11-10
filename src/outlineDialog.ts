@@ -1,7 +1,7 @@
 import type { Editor } from './editor';
 import type { OutlinePreview } from './editor/outline';
 import { h } from './dom';
-import { t } from './i18n';
+import { t, tn } from './i18n';
 import { homeLayer, layerLabel, PALETTE } from './model';
 import { outlineHoleAt, outlineResult } from './outline';
 import { OUTLINE_JOIN_TOL } from './outlineNetwork';
@@ -51,10 +51,10 @@ export async function openOutlineDialog(ed: Editor): Promise<void> {
       preview.holes = valid ? session.plan.holes.map(hole => hole.subs) : [];
       apply.disabled = !valid || !preview.subs.length;
       if (valid) info.textContent = [
-        t('{n} Außenkonturen erkannt.', { n: session.plan.outer.length }),
-        preview.subs.length ? t('{chosen} von {total} Innenflächen als Löcher gewählt.', { chosen: selected.size, total: session.plan.holes.length })
+        tn('{n} Außenkontur erkannt.', '{n} Außenkonturen erkannt.', session.plan.outer.length),
+        preview.subs.length ? tn('{chosen} von {n} Innenfläche als Loch gewählt.', '{chosen} von {n} Innenflächen als Löcher gewählt.', session.plan.holes.length, { chosen: selected.size })
           : t('Keine geschlossene Fläche erkannt. Verbindungstoleranz prüfen.'),
-        session.plan.looseEnds ? t('{n} freie Linienenden verbleiben. Vorschau sorgfältig prüfen.', { n: session.plan.looseEnds }) : '',
+        session.plan.looseEnds ? tn('{n} freies Linienende verbleibt. Vorschau sorgfältig prüfen.', '{n} freie Linienenden verbleiben. Vorschau sorgfältig prüfen.', session.plan.looseEnds) : '',
       ].filter(Boolean).join(' ');
       ed.redraw();
     };

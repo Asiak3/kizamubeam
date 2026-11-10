@@ -386,7 +386,7 @@ export function computeJoint(picks: EdgePick[], o: JointOptions): JointResult {
       const phase = ((i + (o.swap ? 1 : 0)) % 2) as 0 | 1;
       edits.push({ pick: picks[i], pts: fingerProfile(g.len, pattern, n, phase, vMat, vGap, adj).map((q) => at(g, q.x, q.y)) });
     });
-    info = t('{n} Felder à {width} mm', { n, width: fmt(w) });
+    info = tn('{n} Feld à {width} mm', '{n} Felder à {width} mm', n, { width: fmt(w) });
     if (geoms.length > 1 && Math.abs(geoms[0].len - geoms[1].len) > 0.01)
       info += t('. Kanten unterschiedlich lang ({len} / {len2} mm): Muster liegt mittig auf {pattern} mm', { len: fmt(geoms[0].len), len2: fmt(geoms[1].len), pattern: fmt(pattern) });
   } else if (o.kind === 'lap') {
