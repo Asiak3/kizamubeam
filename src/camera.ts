@@ -471,6 +471,11 @@ export function cameraError(e: unknown): string {
   return t('Kamera-Fehler: {message}', { message: (e as Error)?.message ?? String(e) });
 }
 
+/** Address of a camera shared by a remote KizamuBeam host (issue #188): kizamubeam:<camera id on the host> */
+export const HOST_CAM = 'kizamubeam:';
+/** Fetches the latest JPEG of a host camera through the remote connection; set by remote.ts */
+export const hostCameraSource: { frame: ((cam: string) => Promise<ArrayBuffer>) | null } = { frame: null };
+
 /** Default addresses of common network cameras, offered in the camera dialog */
 export const NETCAM_EXAMPLES = ['http://127.0.0.1:8282/stream', 'http://192.168.4.1:81/stream'];
 
@@ -512,20 +517,32 @@ export class CameraStream {
     return this.net ? (this.net.image?.height ?? 0) : this.video.videoHeight;
   }
 
-  /** Open a network camera and wait for its first image */
+  /** Open a network camera (or a camera of a remote host) and wait for its first image */
   private async startNet(url: string) {
+    const hostCam = url.startsWith(HOST_CAM) ? url.slice(HOST_CAM.length) : '';
     if (!hasNative()) throw new Error(t('Netzwerk-Kameras gehen nur in der Desktop-App.'));
-    const id = await native<number>('netcam_open', { url });
+    // A host camera has no local handle (-1): its images come through the remote connection
+    const id = hostCam ? -1 : await native<number>('netcam_open', { url });
     const n: NonNullable<CameraStream['net']> = { id, url, image: null, seq: 0, error: '', frames: 0, timer: 0 };
     this.net = n;
     const pull = async () => {
       if (this.net !== n) return;
       try {
-        const buf = await native<ArrayBuffer>('netcam_frame', { id, since: n.seq });
+        let jpeg: ArrayBuffer | null = null;
+        let seq = n.seq + 1;
+        if (hostCam) {
+          if (!hostCameraSource.frame) throw new Error(t('Nicht mit dem Host verbunden.'));
+          jpeg = await hostCameraSource.frame(hostCam);
+        } else {
+          const buf = await native<ArrayBuffer>('netcam_frame', { id, since: n.seq });
+          if (buf.byteLength > 8) {
+            seq = Number(new DataView(buf).getBigUint64(0, true));
+            jpeg = buf.slice(8);
+          }
+        }
         n.error = '';
-        if (buf.byteLength > 8) {
-          const seq = Number(new DataView(buf).getBigUint64(0, true));
-          const img = await createImageBitmap(new Blob([buf.slice(8)], { type: 'image/jpeg' }));
+        if (jpeg) {
+          const img = await createImageBitmap(new Blob([jpeg], { type: 'image/jpeg' }));
           if (this.net !== n) return img.close();
           n.image?.close();
           n.image = img;
@@ -536,7 +553,8 @@ export class CameraStream {
       } catch (e) {
         n.error = String((e as Error)?.message ?? e);
       }
-      if (this.net === n) n.timer = window.setTimeout(pull, 40);
+      // Host cameras: a few images per second are enough and keep the network free for the job
+      if (this.net === n) n.timer = window.setTimeout(pull, hostCam ? 200 : 40);
     };
     pull();
     for (let i = 0; i < 200 && !n.image; i++) {
@@ -546,7 +564,7 @@ export class CameraStream {
     if (!n.image) {
       const err = n.error || t('Keine Antwort');
       this.stop();
-      throw new Error(t('Netzwerk-Kamera {url}: {error}', { url, error: err }));
+      throw new Error(hostCam ? t('Kamera des Hosts: {error}', { error: err }) : t('Netzwerk-Kamera {url}: {error}', { url, error: err }));
     }
   }
 
@@ -593,7 +611,7 @@ export class CameraStream {
       this.net = null;
       clearTimeout(n.timer);
       n.image?.close();
-      native('netcam_close', { id: n.id }).catch(() => {});
+      if (n.id >= 0) native('netcam_close', { id: n.id }).catch(() => {});
     }
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;

@@ -1,6 +1,7 @@
 // Verbindung zur Maschine (FluidNC/GRBL). Die eigentliche Kommunikation läuft im Rust-Kern (src-tauri/src/machine.rs);
 // hier liegen Zustand, Statusauswertung und die Befehle für die Oberfläche.
-import { Device, FIRMWARES, PreparedGCode } from './gcode';
+import { Device, Firmware, FIRMWARES, PreparedGCode } from './gcode';
+import type { RemoteJobInfo } from './remoteBundle';
 import { t, tBackend } from './i18n';
 import { configText, FluidFs, OVERRIDE, overrideSteps, parseConfigFile, runCmd } from './fluidnc';
 import { parseFluidConfig } from './setup';
@@ -159,6 +160,32 @@ export function parseStatus(line: string, prev: MachineStatus, wco: WorkOffset):
 
 type Unlisten = () => void;
 
+/** State of a remote host as its clients see it (sent by remoteHost.ts) */
+export interface RemoteHostState {
+  machine: { connected: boolean; where: string; device: string; fw: Firmware; bedW: number; bedH: number; running: boolean };
+  progress: Progress | null;
+  jobs: RemoteJobInfo[];
+  /** Host asks before a remote job starts */
+  confirm: boolean;
+}
+
+/** Connection through another KizamuBeam (Device.conn = 'remote') */
+export interface RemoteLink {
+  role: 'viewer' | 'operator';
+  /** Name of the host computer */
+  host: string;
+  state: RemoteHostState | null;
+}
+
+/** Commands of the machine boundary and their names on a remote host */
+const REMOTE_METHOD: Record<string, string> = {
+  machine_send: 'line',
+  machine_realtime: 'realtime',
+  machine_pause: 'pause',
+  machine_resume: 'resume',
+  machine_stop: 'stop',
+};
+
 class Machine {
   connected = false;
   connecting = false;
@@ -178,6 +205,8 @@ class Machine {
   fluid: FluidConfig | null = null;
   /** Job, der auf der Steuerung von SD-Karte oder Flash läuft (FluidNC meldet SD: im Status) */
   storedJob: { file: string; started: number; seen: boolean; aborted?: boolean } | null = null;
+  /** Set while connected through another KizamuBeam; then the host runs the laser */
+  remote: RemoteLink | null = null;
   private listeners = new Set<(e: MachineEvent) => void>();
   /** Läuft gerade eine Abfrage (query), gehen die Antworten an sie; quiet = nicht in die Konsole */
   private capture: { fn: (line: string) => void; quiet: boolean } | null = null;
@@ -199,9 +228,63 @@ class Machine {
     return !!this.progress;
   }
 
-  /** Ein Job läuft, gesendet von hier oder von SD-Karte/Flash der Steuerung */
+  /** Ein Job läuft, gesendet von hier oder von SD-Karte/Flash der Steuerung (or on the remote host) */
   get running() {
-    return !!this.progress || !!this.storedJob;
+    return !!this.progress || !!this.storedJob || !!this.remote?.state?.machine.running;
+  }
+
+  /** Command of the machine boundary, or the same request to the remote host */
+  private async call(cmd: string, args: Record<string, unknown> = {}) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    if (!this.remote) return invoke(cmd, args);
+    const method = REMOTE_METHOD[cmd];
+    if (!method) throw new Error(t('Über einen anderen KizamuBeam nicht möglich.'));
+    return invoke('remote_request', { method, params: args });
+  }
+
+  /** Request to the remote host (job_submit, job_start, frame, jobs …) */
+  async remoteRequest<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+    if (!this.remote) throw new Error(t('Nicht verbunden.'));
+    const { invoke } = await import('@tauri-apps/api/core');
+    try {
+      return await invoke<T>('remote_request', { method, params });
+    } catch (e) {
+      throw new Error(tBackend(String(e)));
+    }
+  }
+
+  /** Apply the host's state: firmware for commands, running job */
+  private applyRemoteState() {
+    const st = this.remote?.state;
+    if (!st) return;
+    this.fw = FIRMWARES[st.machine.fw] ?? FIRMWARES.fluidnc;
+    if (st.progress && !this.progress) this.progress = st.progress;
+    if (!st.machine.running && this.progress && !st.progress) {
+      this.progress = null;
+      this.jobTimes = null;
+      this.jobIsFrame = false;
+    }
+  }
+
+  private onRemoteEvent(e: string, d: unknown) {
+    const link = this.remote;
+    if (!link) return;
+    if (e === 'state') {
+      link.state = d as RemoteHostState;
+      this.applyRemoteState();
+      this.emit({ type: 'progress' });
+      this.emit({ type: 'connection' });
+    } else if (e === 'role') {
+      link.role = d === 'viewer' ? 'viewer' : 'operator';
+      this.log(link.role === 'viewer' ? t('Der Host hat diesem Rechner die Rolle „Zuschauer“ gegeben.') : t('Der Host hat diesem Rechner die Rolle „Bediener“ gegeben.'));
+      this.emit({ type: 'connection' });
+    } else if (e === 'machine_closed') {
+      this.log(t('Der Host hat die Verbindung zum Laser verloren.') + (d ? ` ${tBackend(String(d))}` : ''), 'error');
+    } else if (e === 'notice') {
+      this.log(String(d));
+    } else if (e === 'error') {
+      this.log(tBackend(String(d)), 'error');
+    }
   }
 
   async ports(): Promise<PortInfo[]> {
@@ -227,8 +310,10 @@ class Machine {
         this.emit({ type: 'progress' });
         if (!frame || !e.payload.ok) this.emit({ type: 'done', ok: e.payload.ok, message: tBackend(e.payload.message) });
       }),
+      await listen<{ e: string; d: unknown }>('remote-event', (e) => this.onRemoteEvent(e.payload.e, e.payload.d)),
       await listen<string>('machine-closed', (e) => {
         this.connected = false;
+        this.remote = null;
         this.progress = null;
         this.fluid = null;
         this.storedJob = null;
@@ -278,6 +363,7 @@ class Machine {
     try {
       await this.listen();
       const { invoke } = await import('@tauri-apps/api/core');
+      if (d.conn === 'remote') return await this.connectRemote(d);
       const netPort = d.conn === 'ws' ? d.wsPort : d.tcpPort;
       const where = d.conn === 'serial' ? d.port : `${d.conn === 'ws' ? 'ws://' : ''}${d.host}:${netPort}`;
       this.log(t('Verbinde mit {where} …', { where }));
@@ -302,10 +388,33 @@ class Machine {
     }
   }
 
+  /** Connect through another KizamuBeam (host); it computes and runs the jobs */
+  private async connectRemote(d: Device) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const addr = `${d.host}:${d.remotePort}`;
+    if (!d.remoteFp) throw new Error(t('Dieser Rechner ist mit dem Host noch nicht gekoppelt. Erst in den Geräteeinstellungen koppeln.'));
+    this.log(t('Verbinde mit {where} …', { where: addr }));
+    const name = await invoke<string>('sync_machine_name').catch(() => '');
+    const w = await invoke<{ role: string; host: string; state: RemoteHostState | null }>('remote_connect', { host: d.host, port: d.remotePort, fingerprint: d.remoteFp, name });
+    const hasState = w.state && typeof w.state === 'object' && 'machine' in w.state;
+    this.remote = { role: w.role === 'viewer' ? 'viewer' : 'operator', host: w.host, state: hasState ? w.state : null };
+    this.applyRemoteState();
+    this.connected = true;
+    this.where = `${w.host} (${addr})`;
+    this.log(t('Verbunden mit {where}.', { where: this.where }));
+    if (this.remote.role === 'viewer') this.log(t('Nur zuschauen: Der Host hat diesem Rechner die Rolle „Zuschauer“ gegeben.'));
+    if (this.remote.state && !this.remote.state.machine.connected) this.log(t('Der Host ist gerade nicht mit dem Laser verbunden.'), 'error');
+    // The host computes jobs with its own device; a different work area here makes the preview misleading
+    const hm = this.remote.state?.machine;
+    if (hm && (hm.bedW !== d.bedW || hm.bedH !== d.bedH || hm.fw !== d.fw))
+      this.log(t('Der Host arbeitet mit „{device}“ ({w} × {h} mm), dieses Gerät mit {lw} × {lh} mm. Laser → Fernsteuerung → Vom Host übernehmen gleicht es an.',
+        { device: hm.device, w: hm.bedW, h: hm.bedH, lw: d.bedW, lh: d.bedH }));
+  }
+
   async disconnect() {
     if (!isTauri()) return;
     const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('machine_disconnect');
+    await invoke(this.remote ? 'remote_disconnect' : 'machine_disconnect');
   }
 
   /** Werkstück-Nullpunkt (X, Y) in Maschinenkoordinaten, wie ihn die Steuerung zuletzt gemeldet hat; null = unbekannt */
@@ -316,12 +425,11 @@ class Machine {
   /** Eine Zeile senden (Konsole, Bewegen, Home …). Wird abgelehnt, solange ein Job läuft. */
   async send(line: string, quiet = false) {
     if (!this.connected) return this.log(t('Nicht verbunden.'), 'error');
-    const { invoke } = await import('@tauri-apps/api/core');
     if (!quiet) this.log(line, 'out');
     // Nullpunkt oder Koordinatensystem ändert sich: bis zur nächsten Meldung der Steuerung gilt er als unbekannt
     if (/G\s*(10|92|5[4-9])\b/i.test(line)) this.wco.known = false;
     try {
-      await invoke('machine_send', { line });
+      await this.call('machine_send', { line });
     } catch (e) {
       this.log(tBackend(String(e)), 'error');
     }
@@ -365,7 +473,7 @@ class Machine {
 
   /** FluidNC-Konfiguration ($CD) und ihren Dateinamen lesen */
   async readFluidConfig(): Promise<FluidConfig | null> {
-    if (!this.connected || this.busy) return this.fluid;
+    if (!this.connected || this.busy || this.remote) return this.fluid;
     const lines = await this.query(['$CD'], 6000, true);
     const values = parseFluidConfig(lines);
     if (!Object.keys(values).length) return this.fluid;
@@ -437,8 +545,11 @@ class Machine {
   /** Echtzeitbefehl: ? Status, ! Halt, ~ Weiter, 0x18 Reset, 0x85 Jog abbrechen, 0x90 … Overrides */
   async realtime(byte: number) {
     if (!this.connected) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('machine_realtime', { byte });
+    try {
+      await this.call('machine_realtime', { byte });
+    } catch (e) {
+      this.log(tBackend(String(e)), 'error');
+    }
   }
 
   /** Auftrag senden: fertige Zeilen oder G-Code, den der Rust-Kern schon vorbereitet hat (prepareGCode) */
@@ -453,6 +564,7 @@ class Machine {
   private async startJob(total: number, times: Float64Array | null, frame: boolean, call: { cmd: string; args: Record<string, unknown> }): Promise<boolean> {
     if (!this.connected) return this.log(t('Nicht verbunden.'), 'error'), false;
     if (this.busy) return this.log(t('Es läuft bereits ein Auftrag.'), 'error'), false;
+    if (this.remote) return this.log(t('Über einen anderen KizamuBeam laufen nur Aufträge, die der Host selbst berechnet (Start, Rahmen, Material- und Fokustest).'), 'error'), false;
     const { invoke } = await import('@tauri-apps/api/core');
     this.jobTimes = times;
     this.jobIsFrame = frame;
@@ -474,20 +586,21 @@ class Machine {
   /** Anhalten: GRBL-Familie per Echtzeitbefehl !, Marlin durch Zurückhalten weiterer Zeilen (im Rust-Kern) */
   async pause() {
     if (!this.connected) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('machine_pause');
+    await this.call('machine_pause').catch((e) => this.log(tBackend(String(e)), 'error'));
   }
   async resume() {
     if (!this.connected) return;
-    const { invoke } = await import('@tauri-apps/api/core');
-    await invoke('machine_resume');
+    await this.call('machine_resume').catch((e) => this.log(tBackend(String(e)), 'error'));
   }
   async stop() {
     if (!this.connected) return;
-    const { invoke } = await import('@tauri-apps/api/core');
     // Ein Job von SD/Flash endet mit dem Reset; Meldung kommt über den Status
     if (this.storedJob) ((this.storedJob.seen = true), (this.storedJob.aborted = true));
-    await invoke('machine_stop');
+    try {
+      await this.call('machine_stop');
+    } catch (e) {
+      return this.log(tBackend(String(e)), 'error');
+    }
     this.log(t('Gestoppt.'), 'info');
   }
 

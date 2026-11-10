@@ -4088,3 +4088,130 @@ input.jig-count {
 .outline-tool-window { position: fixed; top: 70px; left: auto; right: 16px; margin: 0; box-sizing: border-box; width: min(370px, calc(100vw - 16px)); z-index: 100; }
 .outline-tool-window h3 { cursor: move; touch-action: none; }
 .outline-choices { max-height: 140px; overflow: auto; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0; }
+
+/* Remote KizamuBeam (host mode, pairing, remote jobs) */
+.remote-status.error {
+  border-color: #d03030;
+}
+.remote-confirm {
+  width: min(520px, 95vw);
+  max-height: 92vh;
+  overflow: auto;
+  border-top: 4px solid var(--accent);
+}
+.remote-preview {
+  display: block;
+  margin: 0 auto 8px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.remote-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 2px 12px;
+  margin: 6px 0;
+}
+.remote-facts dt {
+  color: var(--muted);
+}
+.remote-facts dd {
+  margin: 0;
+}
+.remote-warnings {
+  margin: 6px 0;
+  padding-left: 18px;
+  color: #c06010;
+}
+.remote-pair {
+  width: min(440px, 92vw);
+}
+.remote-code {
+  margin: 12px 0;
+  text-align: center;
+  font: 600 40px ui-monospace, monospace;
+  letter-spacing: 4px;
+  user-select: text;
+}
+.remote-code-label,
+.remote-role {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+.remote-code-input {
+  width: 9em;
+  font: 600 20px ui-monospace, monospace;
+  letter-spacing: 3px;
+  text-align: center;
+}
+.remote-fp {
+  word-break: break-word;
+  font-family: ui-monospace, monospace;
+}
+.remote-clients {
+  width: 100%;
+  border-collapse: collapse;
+}
+.remote-clients th,
+.remote-clients td {
+  text-align: left;
+  padding: 3px 6px 3px 0;
+}
+.remote-jobs-dialog {
+  width: min(640px, 94vw);
+  max-height: 88vh;
+}
+.remote-jobs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.remote-job {
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.remote-job img {
+  width: 96px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+.remote-job-text .note {
+  margin: 2px 0 0;
+}
+.remote-job-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.remote-sync {
+  width: min(520px, 95vw);
+}
+.remote-discover {
+  width: min(520px, 95vw);
+}
+.remote-found {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0;
+}
+.remote-found-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.remote-found-row .grow {
+  flex: 1;
+  min-width: 0;
+}

@@ -104,8 +104,11 @@ export interface Device {
   /** Arbeitsbereich in mm */
   bedW: number;
   bedH: number;
-  /** Verbindung: USB-Seriell oder Netzwerk (Telnet, z. B. FluidNC Port 23, oder WebSocket, FluidNC Port 81) */
-  conn: 'serial' | 'tcp' | 'ws';
+  /**
+   * Verbindung: USB-Seriell oder Netzwerk (Telnet, z. B. FluidNC Port 23, oder WebSocket, FluidNC Port 81),
+   * or 'remote': another KizamuBeam on the network (host) runs the laser (see remote.ts)
+   */
+  conn: 'serial' | 'tcp' | 'ws' | 'remote';
   port: string;
   baud: number;
   host: string;
@@ -113,6 +116,9 @@ export interface Device {
   wsPort: number;
   /** Port der Weboberfläche (FluidNC: Dateien hochladen, Suche im Netzwerk) */
   httpPort: number;
+  /** Remote KizamuBeam: port of the host and fingerprint of its certificate from pairing (empty = not paired) */
+  remotePort: number;
+  remoteFp: string;
   /** Empfangspuffer der Steuerung in Bytes für die Zeichenzählung (GRBL 128 → 127; FluidNC hat mehr) */
   rxBuffer: number;
   /** Job vom Rechner senden oder bei FluidNC erst auf SD-Karte/Flash hochladen und dort starten */
@@ -169,6 +175,8 @@ export const DEFAULT_DEVICE: Device = {
   tcpPort: 23,
   wsPort: 81,
   httpPort: 80,
+  remotePort: 47900,
+  remoteFp: '',
   rxBuffer: 127,
   runFrom: 'stream',
   jobOutputs: [],

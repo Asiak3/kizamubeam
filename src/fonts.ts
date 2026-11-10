@@ -101,6 +101,47 @@ export function loadFont(family: string, bold: boolean, italic: boolean): Promis
   return p;
 }
 
+/** A font file sent along with a remote job (family and style as used in the project) */
+export interface FontFile {
+  family: string;
+  bold: boolean;
+  italic: boolean;
+  buf: ArrayBuffer;
+}
+
+/**
+ * Run fn with these font files in place of the installed ones (remote jobs compute with the sender's fonts).
+ * Afterwards the previous fonts are back and cached text outlines are rebuilt.
+ */
+export async function withFonts<T>(files: FontFile[], fn: () => Promise<T>): Promise<T> {
+  const saved = new Map<string, [Promise<LoadedFont> | undefined, LoadedFont | undefined]>();
+  for (const f of files) {
+    let font: opentype.Font;
+    try {
+      font = opentype.parse(f.buf);
+    } catch {
+      continue;
+    }
+    const key = fontKey(f.family, f.bold, f.italic);
+    if (!saved.has(key)) saved.set(key, [cache.get(key), ready.get(key)]);
+    const lf: LoadedFont = { font, fallback: false };
+    cache.set(key, Promise.resolve(lf));
+    ready.set(key, lf);
+  }
+  if (saved.size) fontListeners.forEach((cb) => cb());
+  try {
+    return await fn();
+  } finally {
+    for (const [key, [c, r]] of saved) {
+      if (c) cache.set(key, c);
+      else cache.delete(key);
+      if (r) ready.set(key, r);
+      else ready.delete(key);
+    }
+    if (saved.size) fontListeners.forEach((cb) => cb());
+  }
+}
+
 const fontListeners: (() => void)[] = [];
 /** Wird aufgerufen, sobald eine weitere Schrift geladen ist */
 export function onFontLoaded(cb: () => void) {

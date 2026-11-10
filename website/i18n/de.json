@@ -89,7 +89,8 @@
         "Print and Cut: Passermarken mitdrucken, mit schwachem Laserpunkt oder Kamera einmessen, Design passgenau auf den Druck legen",
         "Jig-Generator: Halteplatten mit passgenauen Aussparungen für Werkstücke aus Vektordatei, Foto oder Kamera, mit Nummern und Passermarken",
         "G-Code speichern oder direkt streamen – das Streaming läuft im Rust-Kern",
-        "Leistung und Geschwindigkeit während des Jobs nachsteuern; FluidNC: Job auf SD-Karte oder Flash laden und dort starten, config.yaml mit Sicherung bearbeiten, Steuerung im WLAN finden"
+        "Leistung und Geschwindigkeit während des Jobs nachsteuern; FluidNC: Job auf SD-Karte oder Flash laden und dort starten, config.yaml mit Sicherung bearbeiten, Steuerung im WLAN finden",
+        "Laser im Nebenraum: über den KizamuBeam am Laser im Heimnetz oder per VPN steuern – der Rechner dort berechnet und lasert den Auftrag, du startest, beobachtest (auch über die Kamera des Hosts) und stoppst vom Schreibtisch aus; Gerät, Materialien und Kameras lassen sich vom Host übernehmen, und den Host findet KizamuBeam im Heimnetz von selbst"
       ]
     },
     "gen": {

@@ -20,8 +20,9 @@ import { device, onDeviceChange } from './laser';
 import {
   bedToPixel, buildRemap, buildRemapRect, calibFits, calibrate, CameraCalib, cameraError, CameraMount, CameraSettings,
   CameraStream, coverRect, DEFAULT_CAMERA, footprint, headMarkRect, markPositionsIn, MarkSettings,
-  NETCAM_EXAMPLES, Rect, Remap, warp,
+  HOST_CAM, NETCAM_EXAMPLES, Rect, Remap, warp,
 } from './camera';
+import type { CameraFineTune, CameraImageAdjustments } from './cameraProfile';
 import { dec, t, tn } from './i18n';
 import { openWorkpieceDialog } from './workpieceDialog';
 
@@ -399,6 +400,107 @@ export function cameraPhoto(ed: Editor): { url: string; view: { x: number; y: nu
   return null;
 }
 
+// ---------- Sharing cameras with remote KizamuBeam clients (issue #188) ----------
+
+/** What a host passes on about a camera: everything a client needs to place the image, not the local source */
+export interface SharedCamera {
+  id: string;
+  name: string;
+  mount: CameraMount;
+  width: number;
+  height: number;
+  calib: CameraCalib | null;
+  fineTune?: CameraFineTune;
+  image?: CameraImageAdjustments;
+  calibrationInvalidated?: boolean;
+}
+
+const isHostCam = (s: CameraSettings) => !!s.url?.startsWith(HOST_CAM);
+
+/** Cameras of the current device that this computer can share as a host (not ones it gets from another host) */
+export function sharedCameras(): SharedCamera[] {
+  return devCams().cams.filter((s) => !isHostCam(s)).map((s) => ({
+    id: s.id, name: s.name, mount: s.mount, width: s.width, height: s.height, calib: s.calib,
+    fineTune: s.fineTune, image: s.image, calibrationInvalidated: s.calibrationInvalidated,
+  }));
+}
+
+/** Cameras opened only for remote clients; closed again when nobody asked for a while */
+const sharedStreams = new Map<string, { stream: CameraStream; ready: Promise<void>; timer: number }>();
+const SHARE_IDLE_MS = 20000;
+
+/**
+ * Latest raw image of a camera as JPEG for a remote client. Uses the camera when it is connected here,
+ * otherwise opens it in the background (the camera tab on this computer is not touched).
+ */
+export async function sharedCameraJpeg(id: string): Promise<Blob> {
+  const s = devCams().cams.find((c) => c.id === id);
+  if (!s || isHostCam(s)) throw new Error(t('Diese Kamera gibt es am Host nicht.'));
+  let stream = units.get(id)?.stream;
+  if (!stream?.open) {
+    let e = sharedStreams.get(id);
+    if (!e) {
+      const st = new CameraStream();
+      e = { stream: st, ready: st.start(s.cam, s.width, s.height, s.url ?? ''), timer: 0 };
+      sharedStreams.set(id, e);
+      e.ready.catch(() => sharedStreams.delete(id));
+    }
+    try {
+      await e.ready;
+    } catch (err) {
+      throw new Error(s.url ? String((err as Error)?.message ?? err) : cameraError(err));
+    }
+    const entry = e;
+    clearTimeout(entry.timer);
+    entry.timer = window.setTimeout(() => {
+      entry.stream.stop();
+      if (sharedStreams.get(id) === entry) sharedStreams.delete(id);
+    }, SHARE_IDLE_MS);
+    stream = entry.stream;
+  }
+  const c = stream.grab();
+  if (!c) throw new Error(t('Die Kamera liefert noch kein Bild.'));
+  return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error(t('Die Kamera liefert noch kein Bild.')))), 'image/jpeg', 0.85));
+}
+
+/**
+ * Take over the cameras of a host for the current device: calibration and image settings come from the host,
+ * the image through the remote connection. Cameras taken over earlier are updated; an untouched default
+ * camera is dropped. Returns how many were added and updated.
+ */
+export function importHostCameras(ed: Editor, list: SharedCamera[]): { added: number; updated: number } {
+  const d = devCams();
+  let added = 0,
+    updated = 0;
+  for (const c of list) {
+    const url = HOST_CAM + c.id;
+    const patch: Partial<CameraSettings> = {
+      name: c.name, mount: c.mount === 'head' ? 'head' : 'fixed', width: c.width, height: c.height, calib: c.calib ?? null,
+      fineTune: normalizeFineTune(c.fineTune), image: normalizeImageAdjustments(c.image), calibrationInvalidated: c.calibrationInvalidated === true,
+      url, cam: '', label: '',
+    };
+    const old = d.cams.find((s) => s.url === url);
+    if (old) {
+      const u = units.get(old.id);
+      Object.assign(old, patch);
+      u?.invalidate(ed);
+      updated++;
+    } else {
+      d.cams.push(fill(patch, d.cams.length));
+      added++;
+    }
+  }
+  if (added) {
+    const untouched = (s: CameraSettings) => !s.url && !s.cam && !s.label && !s.calib && !units.get(s.id)?.stream.open;
+    const keep = d.cams.filter((s) => !untouched(s));
+    if (keep.length && keep.length < d.cams.length) d.cams = keep;
+    d.cur = Math.max(0, d.cams.findIndex((s) => isHostCam(s)));
+  }
+  save();
+  changed();
+  return { added, updated };
+}
+
 /** Kamerabild auf dem Bett für die Werkstückerkennung */
 export interface CameraView {
   id: string;
@@ -487,6 +589,7 @@ export function cameraTab(ed: Editor): HTMLElement {
   const resSel = h('select', { title: t('Gewünschte Auflösung (die Kamera nimmt die nächstmögliche)') }) as HTMLSelectElement;
   /** option value of the network camera in the camera list */
   const NET = '__net__';
+  const HOST = '__host__';
   const urlList = h('datalist', { id: 'netcam-urls' }, ...NETCAM_EXAMPLES.map((u) => h('option', { value: u })));
   const urlIn = h('input', {
     type: 'url',
@@ -636,7 +739,9 @@ export function cameraTab(ed: Editor): HTMLElement {
     list.forEach((d, i) =>
       camSel.append(h('option', { value: d.deviceId, selected: !s.url && (d.deviceId === s.cam || (!!s.label && d.label === s.label)) }, d.label || t('Kamera {i}', { i: i + 1 }))),
     );
-    camSel.append(h('option', { value: NET, selected: !!s.url }, t('Netzwerk-Kamera (Adresse)')));
+    camSel.append(h('option', { value: NET, selected: !!s.url && !isHostCam(s) }, t('Netzwerk-Kamera (Adresse)')));
+    // Camera of a remote KizamuBeam host (taken over under Laser → Remote control)
+    if (isHostCam(s)) camSel.append(h('option', { value: HOST, selected: true }, t('Kamera des Hosts')));
   };
   RESOLUTIONS.forEach(([w, hh]) => resSel.append(h('option', { value: `${w}x${hh}` }, `${w} × ${hh}`)));
 
@@ -656,9 +761,10 @@ export function cameraTab(ed: Editor): HTMLElement {
     resSel.value = `${s.width}x${s.height}`;
     // network camera: address instead of resolution (the camera sends its own size)
     const net = !!s.url;
-    urlLbl.hidden = urlIn.hidden = !net;
+    if ((camSel.value === HOST) !== isHostCam(s)) void loadCams();
+    urlLbl.hidden = urlIn.hidden = !net || isHostCam(s);
     resLbl.hidden = resSel.hidden = net;
-    if (document.activeElement !== urlIn) urlIn.value = s.url ?? '';
+    if (document.activeElement !== urlIn) urlIn.value = isHostCam(s) ? '' : (s.url ?? '');
     show.checked = s.show;
     live.checked = s.live;
     opacity.value = String(s.opacity);
@@ -756,7 +862,9 @@ export function cameraTab(ed: Editor): HTMLElement {
   });
   camSel.addEventListener('change', async () => {
     const s = cfg();
+    if (camSel.value === HOST) return;
     if (camSel.value === NET) {
+      if (isHostCam(s)) s.url = '';
       s.url = s.url || urlIn.value.trim() || NETCAM_EXAMPLES[0];
     } else {
       s.url = '';

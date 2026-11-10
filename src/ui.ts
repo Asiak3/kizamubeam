@@ -44,6 +44,8 @@ import { openTestPhotoDialog } from './testphotoDialog';
 import { BoolBase } from './ops';
 import { agentStatus, openAgentDialog } from './agentui';
 import { startAgentBridge } from './agent';
+import { openRemoteHostDialog, openRemoteJobsDialog, remoteHostStatus, startRemoteHost } from './remoteHost';
+import { openHostSyncDialog } from './remote';
 import { buildObjectsPanel } from './objectsPanel';
 import { buildTabBar, closeTabAsk } from './tabsBar';
 import { buildHistoryPanel } from './historyPanel';
@@ -176,6 +178,7 @@ export function buildUI(ed: Editor) {
   buildPalette(ed);
   buildStatus(ed);
   startAgentBridge(ed);
+  void startRemoteHost(ed);
   buildTextEditor(ed);
   ed.onImport = () => importFile(ed);
   // 3D-Modelle aus der automatischen Sicherung kommen etwas später: 3D-Ansicht und Prüfung neu zeichnen
@@ -390,6 +393,12 @@ function buildMenu(ed: Editor) {
         [t('Materialtest auswerten …'), '', () => openTestPhotoDialog(ed)],
         [t('Fokustest …'), '', () => openFocusTestDialog(ed)],
         [t('Passung kalibrieren …'), '', () => openCalibrateDialog(ed)],
+      ] },
+      { sub: t('Fernsteuerung'), items: [
+        [t('Host-Modus …'), '', () => openRemoteHostDialog(ed)],
+        [t('Fernaufträge …'), '', () => openRemoteJobsDialog(ed)],
+        'sep',
+        [t('Vom Host übernehmen …'), '', () => void openHostSyncDialog(ed)],
       ] },
       { sub: t('Gerät'), items: [
         [t('Geräte …'), '', () => openDevicesDialog(ed)],
@@ -2011,6 +2020,7 @@ function buildStatus(ed: Editor) {
     h('label', { title: t('Füll-Layer gefüllt anzeigen (Alt+W)') }, filled, t('Gefüllt')),
     zoom,
     agentStatus(ed),
+    remoteHostStatus(ed),
   );
   const refresh = () => {
     const m = ed.toMachine(ed.cursor);

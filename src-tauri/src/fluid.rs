@@ -209,7 +209,7 @@ pub struct Found {
 }
 
 /// Eigene IPv4-Adresse im lokalen Netz (ohne Pakete zu senden: UDP „verbinden“ legt nur die Route fest)
-fn local_ipv4() -> Option<Ipv4Addr> {
+pub(crate) fn local_ipv4() -> Option<Ipv4Addr> {
     let s = UdpSocket::bind("0.0.0.0:0").ok()?;
     s.connect("192.0.2.1:80").ok()?;
     match s.local_addr().ok()?.ip() {
