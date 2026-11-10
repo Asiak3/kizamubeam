@@ -43,15 +43,22 @@ struct Done {
 impl Events for WindowEvents {
     fn line(&self, line: &str) {
         let _ = self.0.emit("machine-line", line);
+        crate::remote::machine_event("line", serde_json::json!(line));
     }
     fn progress(&self, sent: usize, acked: usize, total: usize, errors: usize) {
-        let _ = self.0.emit("machine-progress", Progress { sent, acked, total, errors });
+        let p = Progress { sent, acked, total, errors };
+        crate::remote::machine_event("progress", serde_json::to_value(&p).unwrap_or_default());
+        let _ = self.0.emit("machine-progress", p);
     }
     fn done(&self, ok: bool, message: &str) {
-        let _ = self.0.emit("machine-done", Done { ok, message: message.into() });
+        let d = Done { ok, message: message.into() };
+        crate::remote::machine_event("done", serde_json::to_value(&d).unwrap_or_default());
+        let _ = self.0.emit("machine-done", d);
     }
     fn closed(&self, reason: Option<String>) {
-        let _ = self.0.emit("machine-closed", reason.unwrap_or_default());
+        let reason = reason.unwrap_or_default();
+        crate::remote::machine_event("machine_closed", serde_json::json!(reason));
+        let _ = self.0.emit("machine-closed", reason);
     }
 }
 

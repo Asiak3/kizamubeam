@@ -6,6 +6,7 @@ mod machine;
 mod native;
 mod netcam;
 mod packs;
+mod remote;
 mod serial_transport;
 mod stream;
 mod sync;
@@ -160,6 +161,7 @@ pub fn run() {
         .manage(machine::Machine::default())
         .manage(agent::Agent::default())
         .manage(netcam::NetCams::default())
+        .manage(remote::Remote::default())
         .manage(updater::Pending::default())
         .manage(std::sync::Arc::new(native::Native::default()))
         .setup(|app| {
@@ -185,6 +187,7 @@ pub fn run() {
             }
 
             agent::start(app.handle(), &app.state::<agent::Agent>());
+            remote::start(app.handle(), &app.state::<remote::Remote>());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -228,6 +231,24 @@ pub fn run() {
             agent::agent_respond,
             agent::agent_write_file,
             agent::agent_machine_log,
+            remote::remote_host_info,
+            remote::remote_host_configure,
+            remote::remote_host_clients,
+            remote::remote_host_client_role,
+            remote::remote_host_client_remove,
+            remote::remote_pairing_role,
+            remote::remote_pairing_cancel,
+            remote::remote_respond,
+            remote::remote_host_state,
+            remote::remote_host_broadcast,
+            remote::remote_connect,
+            remote::remote_disconnect,
+            remote::remote_request,
+            remote::remote_pair_begin,
+            remote::remote_pair_finish,
+            remote::remote_pair_cancel,
+            remote::remote_paired,
+            remote::remote_forget,
             templates::template_list,
             templates::template_read,
             templates::template_write,
