@@ -29,7 +29,7 @@ test('bad endpoints, closed continuation and no-motion reject',()=>{
 });
 function editor(){
   const ed=Object.create(Editor.prototype) as Editor,obj:Obj={id:1,layer:0,m:[2,0,0,1,0,0],name:'retained',shape:{kind:'path',subs:[structuredClone(sub)]}};
-  Object.assign(ed,{doc:newDoc(),sel:[obj],nodeSets:new Map(),segmentSets:new Map(),nodeSel:new Set(),history:new History(),batching:false,
+  Object.assign(ed,{doc:newDoc(),sel:[obj],nodeSets:new Map(),segmentSets:new Map(),handleSets:new Map(),nodeSel:new Set(),history:new History(),batching:false,
     view:{zoom:1,ox:0,oy:0},freehandMode:'continue',freehandTolerance:0.1,drag:null,canvas:{style:{}},snapHit:null,alignGuides:[]});
   ed.doc.objs=[obj];ed.doc.layers[0]=defaultLayer(0);ed.emit=()=>{};ed.redraw=()=>{};return ed;
 }

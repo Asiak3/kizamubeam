@@ -303,6 +303,7 @@ function buildMenu(ed: Editor) {
         [t('Ausgewählte Formen verbinden'), 'Alt+J', () => ed.joinSel()],
         [t('Zerlegen'), 'Alt+B', () => ed.breakApartSel()],
         [t('Freihandpfad bearbeiten …'), '', () => openFreehandEditDialog(ed)],
+        [t('Lasso-Auswahl'), '', () => ed.setTool('lasso')],
         [t('Richtung umkehren'), '', () => ed.reverseSel()],
         [t('Ecken runden oder fasen …'), '', () => openCornerDialog(ed)],
         'sep',
@@ -793,10 +794,12 @@ function buildNumbar(ed: Editor) {
   // Knotenbearbeitung
   const nodeBtn = (label: string, title: string, f: () => void) => h('button', { class: 'toggle', title, onclick: f }, label);
   const nodeInfo = h('span', { class: 'muted' });
+  const nodeLassoButton=nodeBtn(t('Knoten-Lasso'),t('Lasso statt Rahmen für Knoten und Anfasser; Alt zieht auch direkt über einer Komponente'),()=>{ed.nodeLasso=!ed.nodeLasso;ed.emit('tool');});
   const nodeProps = h(
     'div',
     { class: 'field' },
     nodeInfo,
+    nodeLassoButton,
     nodeBtn(t('Gerade'), t('Segmente zwischen den ausgewählten Knoten in Geraden umwandeln (L)'), () => ed.setSegmentType(false)),
     nodeBtn(t('Kurve'), t('Segmente zwischen den ausgewählten Knoten in Kurven umwandeln (C)'), () => ed.setSegmentType(true)),
     nodeBtn(t('Ecke'), t('Ausgewählte Knoten zu Ecken machen, Anfasser entfernen (E)'), () => ed.setNodeType(false)),
@@ -874,6 +877,7 @@ function buildNumbar(ed: Editor) {
 
     nodeProps.hidden = sepNode.hidden = ed.tool !== 'node';
     pencilProps.hidden = ed.tool !== 'pencil';
+    nodeLassoButton.setAttribute('aria-pressed',String(ed.nodeLasso));nodeLassoButton.classList.toggle('active',ed.nodeLasso);
     const imgs = ed.selImages();
     imgProps.hidden = sepImg.hidden = !imgs.length;
     const canCrop = imgs.length === 1 && ed.sel.length > 1;
@@ -988,6 +992,7 @@ function buildBars(ed: Editor) {
     { id: 'join', cat: M, short: t('Verbinden|Pfade'), label: t('Ausgewählte Formen verbinden (Alt+J)'), run: () => ed.joinSel(), enabled: sel2 },
     { id: 'breakapart', cat: M, short: t('Zerlegen'), label: t('Zerlegen (Alt+B)'), run: () => ed.breakApartSel(), enabled: sel1 },
     { id: 'freehand-edit', cat: W, icon:'line', label:t('Freihandpfad bearbeiten …'), run:()=>openFreehandEditDialog(ed), enabled:sel1, on:()=>ed.tool==='freehand-edit' },
+    tool('lasso','select',t('Lasso-Auswahl')),
     { id: 'reverse', cat: M, short: t('Umkehren'), label: t('Richtung umkehren'), run: () => ed.reverseSel(), enabled: sel1 },
     { id: 'corners', cat: M, short: t('Ecken'), label: t('Ecken runden oder fasen …'), run: () => openCornerDialog(ed), enabled: sel1 },
     { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern (+)'), run: () => ed.zoomAt(1.25) },

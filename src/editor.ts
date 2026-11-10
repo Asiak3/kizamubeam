@@ -45,6 +45,7 @@ import { t } from './i18n';
 import { installOverlapPicker } from './overlapPicker';
 import { EditorFreehand } from './editor/freehand';
 import type { FreehandMode } from './freehandEdit';
+import { EditorSelection } from './editor/selection';
 import { DEFAULT_GRID, GridSettings } from './grid';
 import { EditorIsolation, IsolationState } from './editor/isolation';
 import { EditorVector, VectorPlan } from './editor/vector';
@@ -58,6 +59,8 @@ export class Editor {
   overlapHover: Obj | null = null;
   freehandMode:FreehandMode='continue';
   freehandTolerance=0.2;
+  handleSets=new Map<Obj,Set<string>>();
+  nodeLasso=false;
   doc: Doc = newDoc();
   sel: Obj[] = [];
   tool: Tool = 'select';
@@ -427,6 +430,7 @@ export class Editor {
     if (this.isolation) objs = objs.filter((o) => this.isolation!.ids.has(o.id) || !this.isolation!.known.has(o.id));
     for (const o of this.nodeSets.keys()) if (!objs.includes(o)) this.nodeSets.delete(o);
     for (const o of this.segmentSets.keys()) if (!objs.includes(o)) this.segmentSets.delete(o);
+    for (const o of this.handleSets.keys()) if (!objs.includes(o)) this.handleSets.delete(o);
     if (objs.length !== this.sel.length || objs.some((o, i) => o !== this.sel[i])) {
       this.pivot = null;
       this.rotateMode = false;
@@ -533,7 +537,7 @@ export class Editor {
 // Die Teile in src/editor/ sind Klassen ohne eigene Felder; ihre Methoden haben `this: Editor` und werden hier
 // in Editor.prototype kopiert. Neue Methoden kommen in den passenden Teil, neue Felder in die Klasse Editor oben.
 export interface Editor
-  extends EditorFreehand, EditorDocument,
+  extends EditorFreehand, EditorSelection, EditorDocument,
     EditorPointer,
     EditorKeyboard,
     EditorSnapping,
@@ -565,6 +569,7 @@ export interface Editor
 
 const PARTS = [
   EditorFreehand,
+  EditorSelection,
   EditorDocument,
   EditorPointer,
   EditorKeyboard,
