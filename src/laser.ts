@@ -165,7 +165,7 @@ function designOk(ed: Editor): boolean {
   if (device.cutSelected) xs = xs.filter((x) => x.objs.some((o) => ed.sel.includes(o)));
   if (!xs.length) return true;
   const lines = xs.slice(0, 6).map((x) => '• ' + x.msg);
-  if (xs.length > 6) lines.push(t('… und {n} weitere', { n: xs.length - 6 }));
+  if (xs.length > 6) lines.push(tn('… und {n} weitere|one', '… und {n} weitere', xs.length - 6));
   const ok = confirm(
     tn('Konstruktion prüfen hat {n} Problem gefunden:', 'Konstruktion prüfen hat {n} Probleme gefunden:', xs.length) +
       '\n\n' + lines.join('\n') + '\n\n' + t('Trotzdem starten? (Abbrechen zeigt die Stellen im Fenster Prüfung.)'),
@@ -564,7 +564,7 @@ function laserTab(ed: Editor): HTMLElement {
       const f = pr.total ? pr.acked / pr.total : 0;
       (bar.firstChild as HTMLElement).style.width = `${(f * 100).toFixed(1)}%`;
       const rest = machine.remaining();
-      progTxt.textContent = `${Math.floor(f * 100)} % · ${el(machine.jobStarted)}${rest !== null ? t(' · noch etwa {rest}', { rest: formatDuration(rest) }) : ''}${pr.errors ? tn(' · {n} Fehler', ' · {n} Fehler', pr.errors) : ''}`;
+      progTxt.textContent = `${Math.floor(f * 100)} % · ${el(machine.jobStarted)}${rest !== null ? t(' · noch etwa {rest}', { rest: formatDuration(rest) }) : ''}${pr.errors ? tn(' · {n} Fehler|one', ' · {n} Fehler', pr.errors) : ''}`;
     }
     // Nachsteuern: nur GRBL-Familie; Ov meldet die Steuerung nur ab und zu
     ovBox.hidden = !on || !fw().overrides;

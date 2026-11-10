@@ -2,7 +2,7 @@
 // Vorlage …“ (Vorlagen-Ordner) und das Ausfüllen mit Vorschau.
 import type { Editor } from './editor';
 import { h } from './dom';
-import { t } from './i18n';
+import { t, tn } from './i18n';
 import { buildSvg, openText, saveText } from './files';
 import { loadDoc } from './model';
 import { BuiltinTemplate, builtinTemplates } from './builtinTemplates';
@@ -422,7 +422,7 @@ export function openSeriesDialog(ed: Editor) {
   const filled = () => tb.rows.filter((r) => r.some((c) => c.trim()));
   const check_ = () => {
     const n = filled().length;
-    status.textContent = t('{n} Zeilen', { n });
+    status.textContent = tn('{n} Zeile', '{n} Zeilen', n);
     ok.disabled = n < 1 || !Object.keys(map).length;
     err.textContent = n >= 1 && !Object.keys(map).length ? t('Mindestens einem Parameter eine Spalte zuordnen.') : '';
   };

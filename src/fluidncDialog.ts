@@ -158,7 +158,7 @@ export async function openFluidConfig() {
     base = { ...c.values };
     file = c.file;
     edits.clear();
-    note.textContent = t('{n} Einträge aus {file}. Geänderte Felder sind markiert.', { n: Object.keys(base).length, file });
+    note.textContent = tn('{n} Eintrag aus {file}. Geänderte Felder sind markiert.', '{n} Einträge aus {file}. Geänderte Felder sind markiert.', Object.keys(base).length, { file });
     render();
   }
 
@@ -201,9 +201,9 @@ export async function openFluidConfig() {
     if (!cmds.length) return void (note.textContent = t('{what} stimmt mit der Steuerung überein.', { what }));
     const ch = diffConfig(base, values);
     const extra = Object.keys(base).filter((k) => values[k] === undefined).length;
-    const list = ch.slice(0, 30).map((c) => `${c.path}: ${c.from ?? '–'} → ${c.to}`).join('\n') + (ch.length > 30 ? '\n' + t('… und {n} weitere', { n: ch.length - 30 }) : '');
+    const list = ch.slice(0, 30).map((c) => `${c.path}: ${c.from ?? '–'} → ${c.to}`).join('\n') + (ch.length > 30 ? '\n' + tn('… und {n} weitere|one', '… und {n} weitere', ch.length - 30) : '');
     if (!confirm(t('{what} wiederherstellen? Diese Werte werden gesetzt und in {file} gespeichert:', { what, file }) + '\n\n' + list +
-      (extra ? '\n\n' + t('{n} Einträge gibt es nur in der Steuerung; sie bleiben, wie sie sind.', { n: extra }) : ''))) return;
+      (extra ? '\n\n' + tn('{n} Eintrag gibt es nur in der Steuerung; er bleibt, wie er ist.', '{n} Einträge gibt es nur in der Steuerung; sie bleiben, wie sie sind.', extra) : ''))) return;
     if (machine.fluid) addBackup(machine.fluid.text, file, t('vor dem Wiederherstellen'));
     const errors = await sendAll(cmds);
     await load();

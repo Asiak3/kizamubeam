@@ -54,7 +54,7 @@ export function openJigFillDialog(ed: Editor) {
   ed.setSel(design);
 
   const jigSel = h('select') as HTMLSelectElement;
-  jigs.forEach((j, i) => jigSel.append(h('option', { value: String(i), selected: j === jig }, t('Jig {n} Fächer', { n: j.layout.slots.length }) + (j.top.hidden ? ` (${t('ausgeblendet')})` : ''))));
+  jigs.forEach((j, i) => jigSel.append(h('option', { value: String(i), selected: j === jig }, tn('Jig {n} Fach', 'Jig {n} Fächer', j.layout.slots.length) + (j.top.hidden ? ` (${t('ausgeblendet')})` : ''))));
   const kindSel = h('select') as HTMLSelectElement;
   const range = h('input', { type: 'text', value: t('alle'), placeholder: t('z. B. 1-5, 8') }) as HTMLInputElement;
   const info = h('p', { class: 'note' });

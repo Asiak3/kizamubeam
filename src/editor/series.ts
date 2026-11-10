@@ -4,7 +4,7 @@
 import { cloneObjs, IDENT, mul, newId, Obj, translate } from '../model';
 import { boundsOf } from '../geom';
 import { coerce, conditionHolds, fillTemplate, ProjectParam, Scope, scopeOf, Value } from '../params';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 import type { Editor } from '../editor';
 import { SeriesTable, squareTable } from '../templates';
 
@@ -114,7 +114,7 @@ export class EditorSeries {
     const at = this.doc.page + 1;
     this.doc.pages.splice(at, 0, ...pages);
     this.doc.page = at;
-    this.hint = t('Serie mit {n} Zeilen angelegt ({pages} Seiten).', { n: sets.length, pages: pages.length });
+    this.hint = `${tn('Serie mit {n} Zeile angelegt', 'Serie mit {n} Zeilen angelegt', sets.length)} ${tn('({n} Seite).', '({n} Seiten).', pages.length)}`;
     this.emit('doc');
     this.emit('sel');
     return pages.length;

@@ -6,7 +6,7 @@
 // Welcher Querschnitt sie bildet, wählt „Querschnitt“: Mitte der Schicht, außen (Vereinigung von Unter- und
 // Oberkante: nichts fehlt, Stufen stehen über, zum Abschleifen) oder innen (Schnittmenge: nichts steht über).
 import type { Pt, SubPath } from '../model';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 import { fitPolyline } from '../fit';
 import { packParts } from './build';
 import type { Generator, GenPart, Issue, Params } from './types';
@@ -240,9 +240,9 @@ export const STACK: Generator = {
     else if (L.count > 150) out.push({ key: 'thickness', level: 'warn', msg: t('{n} Schichten: Das wird viel Arbeit beim Lasern und Verleimen.', { n: L.count }) });
     if (!L.layers.length) out.push({ key: 'size', level: 'error', msg: t('Keine Schicht enthält eine Fläche: Größe oder kleinste Fläche prüfen.') });
     else if (L.empty.length) out.push({ key: 'minArea', level: 'warn', msg: t('Leere Schichten (Lücke im Stapel): {list}', { list: L.empty.slice(0, 12).join(', ') + (L.empty.length > 12 ? ' …' : '') }) });
-    if (L.open) out.push({ level: 'warn', msg: t('Das Modell hat Löcher im Netz; an {n} Stellen fehlt ein Stück Kontur. Am besten das Modell vorher reparieren (z. B. in Blender oder PrusaSlicer).', { n: L.open }) });
+    if (L.open) out.push({ level: 'warn', msg: tn('Das Modell hat Löcher im Netz; an {n} Stelle fehlt ein Stück Kontur. Am besten das Modell vorher reparieren (z. B. in Blender oder PrusaSlicer).', 'Das Modell hat Löcher im Netz; an {n} Stellen fehlt ein Stück Kontur. Am besten das Modell vorher reparieren (z. B. in Blender oder PrusaSlicer).', L.open) });
     const multi = L.layers.filter((l) => l.islands > 1).length;
-    if (multi) out.push({ level: 'warn', msg: t('{n} Schichten bestehen aus mehreren Stücken: Die Stücke beim Verleimen nach der Schicht darunter ausrichten.', { n: multi }) });
+    if (multi) out.push({ level: 'warn', msg: tn('{n} Schicht besteht aus mehreren Stücken: Die Stücke beim Verleimen nach der Schicht darunter ausrichten.', '{n} Schichten bestehen aus mehreren Stücken: Die Stücke beim Verleimen nach der Schicht darunter ausrichten.', multi) });
     return out;
   },
   generate(raw) {

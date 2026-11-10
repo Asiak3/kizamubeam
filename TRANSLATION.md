@@ -13,7 +13,7 @@ There are four things that can be translated. They are independent of each other
 
 The app matters most. The other three are welcome too, but it's perfectly fine to translate only the app.
 
-Currently available: **German** (the original), **English** and **Italian**.
+Currently available: **German** (the original), **English**, **Italian** and **Spanish**.
 
 ## Before you start
 
@@ -95,14 +95,31 @@ it.json: 3945 Texte, 29 fehlen, 5 unbenutzt, 0 mit falschen Platzhaltern
 
 Don't translate the word inside the braces (`{n}`, `{name}`, `{error}`, …), and don't add or drop any. The check reports mismatches.
 
-**Singular and plural.** Countable texts come in two separate entries, one for exactly one and one for everything else:
+**Singular and plural.** Countable texts come in two separate entries: the first is the *singular* (“one”) form, the second the *plural* form:
 
 ```json
 "{n} neues Objekt. Orange gestrichelt: Vorschau.": "{n} nuovo oggetto. …",
 "{n} neue Objekte. Orange gestrichelt: Vorschau.": "{n} nuovi oggetti. …"
 ```
 
-At the moment only these two forms exist. If your language has more plural forms (Polish, Russian, Arabic, …), use the form that fits most numbers for the second entry, and mention it in your pull request so we can improve this.
+The app picks the form by the plural rules of *your* language, not by the German ones. Translate the first entry as your language's “one” form: in French it is also used for 0, in Russian also for 21, 31 and so on. Languages without a singular (e.g. Japanese, Chinese) always get the second entry.
+
+When German uses the same word for both, the singular key ends in `|one` so the two can be told apart. Translate it like any other text, without the `|one`:
+
+```json
+"{n} Fehler|one": "{n} error",
+"{n} Fehler": "{n} errors"
+```
+
+**More plural forms.** If your language has more than two forms (Polish, Russian, Czech, Arabic, …), add extra entries to your file: the key of the *plural* entry followed by `|few`, `|many`, `|two` or `|zero`, whichever categories your language uses ([overview of the categories per language](https://www.unicode.org/cldr/charts/latest/supplemental/language_plural_rules.html)):
+
+```json
+"{n} Objekt": "{n} obiekt",
+"{n} Objekte": "{n} obiektów",
+"{n} Objekte|few": "{n} obiekty"
+```
+
+Here the singular is used for 1, `|few` for 2–4, 22–24 …, and the plain plural entry for everything else (Polish “many”). These extra entries are optional: a missing one falls back to the plural entry. `npm run i18n:check` accepts them and checks their placeholders too, and `--write` keeps them.
 
 **Context after `|`.** When the same German word has two meanings, the key carries a hint after a vertical bar, e.g. `Verbindung|Gerät` (“connection, as in device”). The hint is not shown. Translate only the meaning, without the bar and hint.
 

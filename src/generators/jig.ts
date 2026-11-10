@@ -7,7 +7,7 @@
 // des Werkstücks und die Außenkontur der Platte um kerf/2 außerhalb.
 import ClipperLib from 'clipper-lib';
 import type { Pt, SubPath } from '../model';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 import { flattenSub, SCALE } from '../clip';
 import { fitPolyline } from '../fit';
 import { IDENT } from '../model';
@@ -307,7 +307,7 @@ export const JIG: Generator = {
     else if (!shapes.some((s) => s.c > 0)) out.push({ level: 'error', msg: t('Alle Werkstücke haben die Anzahl 0.') });
     if (shapes.length && p.plate === 'size') {
       const n = jigLayout(p, shapes).overflow;
-      if (n) out.push({ key: 'width', level: 'warn', msg: t('{n} Fächer passen nicht auf die Platte.', { n }) });
+      if (n) out.push({ key: 'width', level: 'warn', msg: tn('{n} Fach passt nicht auf die Platte.', '{n} Fächer passen nicht auf die Platte.', n) });
     }
     return out;
   },
@@ -326,6 +326,6 @@ export const JIG: Generator = {
   },
   label(raw: Params) {
     const lay = jigLayout(P(raw));
-    return t('Jig {n} Fächer', { n: lay.slots.length });
+    return tn('Jig {n} Fach', 'Jig {n} Fächer', lay.slots.length);
   },
 };

@@ -292,7 +292,7 @@ export function openPrintCutDialog(ed: Editor) {
     ed.emit('doc');
     save(st);
     render();
-    say(t('Design an {n} Marken ausgerichtet. Mit „Rahmen“ prüfen, dann den Job starten.', { n: pairs.length }));
+    say(tn('Design an {n} Marke ausgerichtet. Mit „Rahmen“ prüfen, dann den Job starten.', 'Design an {n} Marken ausgerichtet. Mit „Rahmen“ prüfen, dann den Job starten.', pairs.length));
   });
 
   const unwatch = machine.on((e) => {

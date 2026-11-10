@@ -95,20 +95,25 @@ export function setLangPref(p: LangPref): boolean {
  */
 export function t(de: string, vars?: Record<string, string | number>): string {
   // Fehlt eine Übersetzung, erst Englisch, dann Deutsch
-  const s = DICTS[lang]?.[de] || (lang !== 'de' && (en as Dict)[de]) || de.replace(/\|[^|]*$/, '');
-  return vars ? s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : s;
+  const s = DICTS[lang]?.[de] || (lang !== 'de' && (en as Dict)[de]) || stripContext(de);
+  return fill(s, vars);
 }
+
+const stripContext = (de: string) => de.replace(/\|[^|]*$/, '');
+const fill = (s: string, vars?: Record<string, string | number>) =>
+  vars ? s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m)) : s;
 
 /** Meldungen aus dem Rust-Teil (dort deutsch). Platzhalter wie in den Sprachdateien. */
 // i18n-keys-start (npm run i18n:check liest die Texte zwischen diesen Markierungen)
-const BACKEND_PATTERNS: [RegExp, string][] = [
+/** [pattern, text, singular text if the text counts {n}] */
+const BACKEND_PATTERNS: [RegExp, string, string?][] = [
   [/^Schrift „(.*)“ nicht gefunden$/, 'Schrift „{family}“ nicht gefunden'],
   [/^Schrift „(.*)“ liegt nur als Sammlung \(TTC\) vor$/, 'Schrift „{family}“ liegt nur als Sammlung (TTC) vor'],
   [/^(.*): Adresse nicht gefunden$/, '{host}: Adresse nicht gefunden'],
   [/^Unbekannte Verbindungsart „(.*)“$/, 'Unbekannte Verbindungsart „{kind}“'],
   [/^Senden fehlgeschlagen: (.*)$/s, 'Senden fehlgeschlagen: {error}'],
   [/^Lesen fehlgeschlagen: (.*)$/s, 'Lesen fehlgeschlagen: {error}'],
-  [/^Fertig nach (\d+:\d+) min, (\d+) Fehler$/, 'Fertig nach {time} min, {errors} Fehler'],
+  [/^Fertig nach (\d+:\d+) min, (\d+) Fehler$/, 'Fertig nach {time} min, {n} Fehler', 'Fertig nach {time} min, {n} Fehler|one'],
   [/^Fertig nach (\d+:\d+) min$/, 'Fertig nach {time} min'],
   [/^Port (\d+) nicht verfügbar: (.*)$/s, 'Port {port} nicht verfügbar: {error}'],
   [/^Hochladen fehlgeschlagen \(HTTP (\d+)\)(.*)$/s, 'Hochladen fehlgeschlagen (HTTP {status}){details}'],
@@ -136,18 +141,58 @@ const BACKEND_MESSAGES = [
 export function tBackend(msg: string): string {
   if (lang === 'de') return msg;
   if (BACKEND_MESSAGES.includes(msg)) return t(msg);
-  for (const [re, key] of BACKEND_PATTERNS) {
+  for (const [re, key, one] of BACKEND_PATTERNS) {
     const m = re.exec(msg);
     if (!m) continue;
     const names = [...key.matchAll(/\{(\w+)\}/g)].map((x) => x[1]);
-    return t(key, Object.fromEntries(names.map((n, i) => [n, m[i + 1]])));
+    const vars = Object.fromEntries(names.map((n, i) => [n, m[i + 1]]));
+    if (!one) return t(key, vars);
+    const { n, ...rest } = vars;
+    return tn(one, key, Number(n), rest);
   }
   return msg;
 }
 
-/** Einzahl/Mehrzahl: tn('{n} Bild', '{n} Bilder', n). {n} wird immer ersetzt. */
+/** Plural rules per language code, created on first use */
+const RULES = new Map<Lang, Intl.PluralRules | null>();
+function pluralRules(l: Lang): Intl.PluralRules | null {
+  if (!RULES.has(l)) {
+    let r: Intl.PluralRules | null = null;
+    try {
+      r = new Intl.PluralRules(l);
+    } catch {
+      /* unknown language code: fall back to n === 1 */
+    }
+    RULES.set(l, r);
+  }
+  return RULES.get(l)!;
+}
+
+/** Plural category of n in language l: 'one', 'other' and, depending on the language, 'zero', 'two', 'few' or 'many' */
+export function pluralCategory(n: number, l: Lang = lang): Intl.LDMLPluralRule {
+  return pluralRules(l)?.select(n) ?? (n === 1 ? 'one' : 'other');
+}
+
+/** Plural categories besides 'one' and 'other' that a language file may add as "<plural key>|<category>" */
+export const EXTRA_PLURAL_CATEGORIES = ['zero', 'two', 'few', 'many'] as const;
+
+/**
+ * Singular/plural: tn('{n} Bild', '{n} Bilder', n). {n} is always replaced, formatted for the UI language.
+ * The form follows the plural rules of the language the text is shown in (Intl.PluralRules): the
+ * translation of `one` is that language's "one" form (in French also for 0, in Russian also for 21),
+ * every other count takes the translation of `other`. Languages with more forms add them to their
+ * language file as "<other>|few", "<other>|many", "<other>|two" or "<other>|zero"; missing ones fall
+ * back to `other`. If the German singular and plural read the same, give the singular a context so
+ * the two keys differ: tn('{n} Fehler|one', '{n} Fehler', n).
+ */
 export function tn(one: string, other: string, n: number, vars?: Record<string, string | number>): string {
-  return t(n === 1 ? one : other, { n: n.toLocaleString(locale), ...vars });
+  const all = { n: n.toLocaleString(locale), ...vars };
+  // Language whose text is shown: the UI language if it has the plural form, else English, else German
+  const dict = DICTS[lang]?.[other] ? DICTS[lang]! : lang !== 'de' && (en as Dict)[other] ? (en as Dict) : null;
+  const l = dict === DICTS[lang] ? lang : dict ? 'en' : 'de';
+  const cat = pluralCategory(n, l);
+  if (cat === 'one') return fill((dict && (dict[one] || (en as Dict)[one])) || stripContext(one), all);
+  return fill(dict?.[`${other}|${cat}`] || dict?.[other] || stripContext(other), all);
 }
 
 /** Zahlenformat der Oberfläche */

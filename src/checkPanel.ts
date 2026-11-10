@@ -137,7 +137,7 @@ export function buildCheckPanel(ed: Editor) {
     lastKey = key;
     const errors = xs.filter((x) => x.level === 'error').length;
     summary.textContent = xs.length
-      ? [errors ? tn('{n} Fehler', '{n} Fehler', errors) : '', serious - errors ? tn('{n} Warnung', '{n} Warnungen', serious - errors) : '', xs.length - serious ? tn('{n} Hinweis', '{n} Hinweise', xs.length - serious) : '']
+      ? [errors ? tn('{n} Fehler|one', '{n} Fehler', errors) : '', serious - errors ? tn('{n} Warnung', '{n} Warnungen', serious - errors) : '', xs.length - serious ? tn('{n} Hinweis', '{n} Hinweise', xs.length - serious) : '']
           .filter(Boolean)
           .join(', ')
       : t('Keine Probleme gefunden.');

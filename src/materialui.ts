@@ -10,7 +10,7 @@ import {
 import { openMaterialTestDialog } from './materialtest';
 import { openTestPhotoDialog } from './testphotoDialog';
 import { openCalibrateDialog } from './calibrateDialog';
-import { dec, t } from './i18n';
+import { dec, t, tn } from './i18n';
 
 type EntryDraft = Omit<MaterialEntry, 'id'>;
 
@@ -107,9 +107,10 @@ export function materialTab(ed: Editor): HTMLElement {
     try {
       const list = parseLibrary(f[1]);
       const r = library.merge(list);
-      alert(r.replaced
-        ? t('{file}: {added} Einträge hinzugefügt, {replaced} ersetzt.', { file: f[0], added: r.added, replaced: r.replaced })
-        : t('{file}: {added} Einträge hinzugefügt.', { file: f[0], added: r.added }));
+      alert(
+        tn('{file}: {n} Eintrag hinzugefügt', '{file}: {n} Einträge hinzugefügt', r.added, { file: f[0] }) +
+          (r.replaced ? tn(', {n} ersetzt.|one', ', {n} ersetzt.', r.replaced) : '.'),
+      );
     } catch (e) {
       alert(t('{file} konnte nicht gelesen werden: {message}', { file: f[0], message: (e as Error).message }));
     }

@@ -904,7 +904,7 @@ function buildNumbar(ed: Editor) {
     }
     const nn = ed.nodeSelCount;
     const ns = ed.nodeTargets().reduce((n, o) => n + ed.segmentSelection(o).size, 0);
-    nodeInfo.textContent = t('{nodes} Knoten · {segments} Segmente · {objects} Objekte', { nodes: nn, segments: ns, objects: ed.nodeTargets().length });
+    nodeInfo.textContent = [tn('{n} Knoten|one', '{n} Knoten', nn), tn('{n} Segment', '{n} Segmente', ns), tn('{n} Objekt', '{n} Objekte', ed.nodeTargets().length)].join(' · ');
     nodeProps.classList.toggle('group-disabled', ed.tool === 'node' && !ed.sel.length);
 
     const rect = ed.sel.find((o) => o.shape.kind === 'rect');
@@ -1603,7 +1603,7 @@ function isEditingIn(root: HTMLElement): boolean {
 function layerSummary(L: Layer): string {
   const parts: string[] = [];
   if (L.kerf) parts.push(t('Kerf {kerf} mm', { kerf: fmtNum(L.kerf) }));
-  if (L.mode === 'line' && L.tabs.enabled) parts.push(L.tabs.useCount ? t('{count} Stege je Form', { count: L.tabs.count }) : t('Stege alle {spacing} mm', { spacing: fmtNum(L.tabs.spacing) }));
+  if (L.mode === 'line' && L.tabs.enabled) parts.push(L.tabs.useCount ? tn('{n} Steg je Form', '{n} Stege je Form', L.tabs.count) : t('Stege alle {spacing} mm', { spacing: fmtNum(L.tabs.spacing) }));
   if (L.mode === 'fill' && L.fillStyle === 'offset') parts.push(t('Kontur folgend'));
   else if (L.mode === 'fill') {
     if (L.angle) parts.push(t('Winkel {angle}°', { angle: fmtNum(L.angle) }));
@@ -1919,8 +1919,8 @@ function openTraceDialog(ed: Editor) {
       ed.setPreview(subs);
       const nodes = subs.reduce((n, sp) => n + sp.nodes.length, 0);
       info.textContent = st.centerline
-        ? t('{lines} Linien, {nodes} Knoten ({ms} ms). Orange gestrichelt: Vorschau.', { lines: subs.length, nodes, ms: Math.round(performance.now() - t0) })
-        : t('{contours} Konturen, {nodes} Knoten ({ms} ms). Orange gestrichelt: Vorschau.', { contours: subs.length, nodes, ms: Math.round(performance.now() - t0) });
+        ? `${tn('{n} Linie', '{n} Linien', subs.length)}, ${tn('{n} Knoten|one', '{n} Knoten', nodes)}${t(' ({ms} ms). Orange gestrichelt: Vorschau.', { ms: Math.round(performance.now() - t0) })}`
+        : `${tn('{n} Kontur', '{n} Konturen', subs.length)}, ${tn('{n} Knoten|one', '{n} Knoten', nodes)}${t(' ({ms} ms). Orange gestrichelt: Vorschau.', { ms: Math.round(performance.now() - t0) })}`;
     }, 120);
   };
   const sT = slider(t('Schwellwert'), 0, 255, 1, st.threshold, (v) => ((st.threshold = v), preview()));

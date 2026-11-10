@@ -10,7 +10,7 @@
 //     ausgedünnt; der längste Weg darauf ist die Hauptachse. Dünne Stücke an ihren Enden (Schwanz, Hals) werden
 //     eigene Abschnitte mit gebogener Achse.
 // Ganz automatisch für jedes Netz ist das nicht zuverlässig; der Vorschlag ist ein Startpunkt zum Korrigieren.
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 import type { Mesh } from './mesh';
 import type { V3 } from './slice';
 import { ribsLayout, worldMesh, type Section, type View } from '../generators/ribs';
@@ -487,6 +487,6 @@ export function suggestSections(raw: Mesh, p: Params): Suggestion {
     }
   const nLegs = secs.filter((x) => legSecs.has(x)).length;
   const found = secs.filter((x) => !legSecs.has(x)).map((x) => x.name);
-  if (nLegs) found.push(t('{n} Beine', { n: nLegs }));
+  if (nLegs) found.push(tn('{n} Bein', '{n} Beine', nLegs));
   return { sections: secs, found: found.join(', ') };
 }
