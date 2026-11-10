@@ -2,7 +2,7 @@
 import { strict as assert } from 'node:assert';
 import { SubPath } from '../src/model';
 import {
-  breakApart, breakAtNode, closeSubs, cutParams, extract, joinSubs, pointAt, reverseSub, setStart, trimSpan, trimSub,
+  breakApart, breakAtNode, closeSubs, cutParams, extract, joinSubs, pointAt, reverseSub, setStart, splitAt, trimSpan, trimSub,
 } from '../src/pathtools';
 import { segments } from '../src/curves';
 
@@ -110,6 +110,33 @@ test('Startpunkt: offene Linie nur an den Enden', () => {
   assert.ok(!setStart(sp, 1));
   assert.ok(setStart(sp, 2));
   assert.equal(sp.nodes[0].x, 20);
+});
+
+test('Start point on an edge: splitAt inserts a node and setStart begins there', () => {
+  const sp = line([[0, 0], [10, 0], [10, 5], [0, 5]], true);
+  const i = splitAt(sp, 1.4);
+  assert.equal(i, 2);
+  assert.equal(sp.nodes.length, 5);
+  assert.ok(setStart(sp, i));
+  assert.deepEqual(sp.nodes.map((n) => [+n.x.toFixed(9), +n.y.toFixed(9)]), [[10, 2], [10, 5], [0, 5], [0, 0], [10, 0]]);
+  // close to an existing node: no extra node
+  assert.equal(splitAt(sp, 1 + 1e-9), 1);
+  assert.equal(sp.nodes.length, 5);
+  // closing segment (last node back to the first)
+  const sq = line([[0, 0], [10, 0], [10, 10], [0, 10]], true);
+  assert.equal(splitAt(sq, 3.5), 4);
+  assert.deepEqual([sq.nodes[4].x, sq.nodes[4].y], [0, 5]);
+});
+
+test('Start point on an edge keeps the curve shape', () => {
+  const sp: SubPath = { closed: true, nodes: [{ x: 0, y: 0, cout: { x: 0, y: 10 } }, { x: 20, y: 0, cin: { x: 20, y: 10 } }, { x: 10, y: -10 }] };
+  const before = [0.1, 0.3, 0.5, 0.7, 0.9].map((u) => pointAt(sp, u));
+  const i = splitAt(sp, 0.5);
+  assert.equal(i, 1);
+  assert.ok(Math.abs(sp.nodes[1].x - 10) < 1e-9 && Math.abs(sp.nodes[1].y - 7.5) < 1e-9);
+  // the first half is now segment 0, the second half segment 1
+  const after = [0.2, 0.6, 1, 1.4, 1.8].map((u) => pointAt(sp, u));
+  before.forEach((p, k) => assert.ok(Math.hypot(p.x - after[k].x, p.y - after[k].y) < 1e-9));
 });
 
 test('Richtung umkehren erhält die Kurvenform', () => {

@@ -7,7 +7,7 @@ import { bezierPt, Box, segments, shapeSubs, textOutline } from '../geom';
 import { dec, t, tn } from '../i18n';
 import {
   breakApart, breakAtNode, CLOSE_TOL, copySub, CloseStats, closeSubs, cutParams, extract, JOIN_TOL, joinSubs, nearestParam, pointAt,
-  reverseSub, setStart, trimSpan, trimSub,
+  reverseSub, setStart, splitAt, trimSpan, trimSub,
 } from '../pathtools';
 import { cornerSub, CornerMode, isCorner } from '../corners';
 import { shapeCenters, shownMark } from '../arcs';
@@ -286,19 +286,42 @@ export class EditorPaths {
       );
       if (this.startHover && this.sel.includes(o)) break;
     }
+    // No node nearby: a point on an edge of a closed contour (open contours can only start at an end)
+    if (!this.startHover) {
+      const wp = this.toWorld(sx, sy);
+      const tol = 7 / this.view.zoom;
+      let edge: { o: Obj; sub: number; u: number; d: number } | null = null;
+      for (const o of cands) {
+        this.worldSubs(o).forEach((sp, si) => {
+          if (!sp.closed || sp.nodes.length < 2) return;
+          const b = subsBox([sp]);
+          if (wp.x < b.x - tol || wp.x > b.x + b.w + tol || wp.y < b.y - tol || wp.y > b.y + b.h + tol) return;
+          const r = nearestParam(sp, wp);
+          if (r.d < tol && (!edge || r.d < edge.d)) edge = { o, sub: si, u: r.u, d: r.d };
+        });
+        if (edge && this.sel.includes(o)) break;
+      }
+      const e = edge as { o: Obj; sub: number; u: number } | null;
+      if (e) this.startHover = { obj: e.o, m: e.o.m, sub: e.sub, idx: -1, u: e.u, pt: pointAt(this.worldSubs(e.o)[e.sub], e.u) };
+    }
     const h = this.startHover as Editor['startHover'];
     this.canvas.style.cursor = h ? 'pointer' : 'crosshair';
-    if (!h !== !prev || (h && prev && (h.obj !== prev.obj || h.sub !== prev.sub || h.idx !== prev.idx))) this.redraw();
+    const moved = (a: NonNullable<Editor['startHover']>, b: NonNullable<Editor['startHover']>) =>
+      a.obj !== b.obj || a.sub !== b.sub || a.idx !== b.idx || a.pt?.x !== b.pt?.x || a.pt?.y !== b.pt?.y;
+    if (!h !== !prev || (h && prev && moved(h, prev))) this.redraw();
   }
 
   /**
    * Startpunkt auf einen Knoten legen. mode 'reverse' kehrt dabei die Richtung um, 'reset' gibt Startpunkt
    * und Richtung wieder der Optimierung frei. Grundformen werden zu Pfaden.
+   * With u (path parameter of an edge) a new node is inserted there first and becomes the start point;
+   * this only works on closed contours.
    */
-  setStartPoint(this: Editor, o: Obj, sub: number, idx: number, mode: 'set' | 'reverse' | 'reset' = 'set'): boolean {
+  setStartPoint(this: Editor, o: Obj, sub: number, idx: number, mode: 'set' | 'reverse' | 'reset' = 'set', u?: number): boolean {
     const sp0 = shapeSubs(o.shape)[sub];
     if (!sp0) return false;
-    if (mode !== 'reset' && !sp0.closed && idx !== 0 && idx !== sp0.nodes.length - 1) {
+    const onEdge = u !== undefined && mode !== 'reset';
+    if (mode !== 'reset' && !sp0.closed && (onEdge || (idx !== 0 && idx !== sp0.nodes.length - 1))) {
       this.hint = t('Offene Pfade beginnen an einem ihrer Enden.');
       this.emit('tool');
       return false;
@@ -306,6 +329,7 @@ export class EditorPaths {
     this.snapshot(t('Startpunkt setzen'));
     this.convertObjToPath(o);
     const sp = (o.shape as { subs: SubPath[] }).subs[sub];
+    if (onEdge) idx = splitAt(sp, u);
     if (mode === 'reset') {
       delete sp.start;
       this.hint = t('Startpunkt und Richtung wählt wieder die Optimierung.');
@@ -445,8 +469,24 @@ export class EditorPaths {
     return true;
   }
 
-  /** Für Agenten: Startpunkt auf den Knoten von o legen, der Weltpunkt p am nächsten liegt */
-  startAtPoint(this: Editor, o: Obj, p: Pt, mode: 'set' | 'reverse' | 'reset'): boolean {
+  /**
+   * Für Agenten: Startpunkt auf den Knoten von o legen, der Weltpunkt p am nächsten liegt.
+   * onEdge: use the nearest point on an edge of a closed contour instead and insert a node there.
+   */
+  startAtPoint(this: Editor, o: Obj, p: Pt, mode: 'set' | 'reverse' | 'reset', onEdge = false): boolean {
+    if (onEdge && mode !== 'reset') {
+      let e = { sub: -1, u: 0, d: Infinity };
+      transformSubs(shapeSubs(o.shape), o.m).forEach((sp, si) => {
+        if (!sp.closed || sp.nodes.length < 2) return;
+        const r = nearestParam(sp, p);
+        if (r.d < e.d) e = { sub: si, u: r.u, d: r.d };
+      });
+      if (e.sub < 0) {
+        this.hint = t('Offene Pfade beginnen an einem ihrer Enden.');
+        return false;
+      }
+      return this.setStartPoint(o, e.sub, -1, mode, e.u);
+    }
     let best = { sub: -1, idx: -1, d: Infinity };
     shapeSubs(o.shape).forEach((sp, si) =>
       sp.nodes.forEach((n, ni) => {
@@ -518,6 +558,22 @@ export class EditorPaths {
           ctx.lineWidth = px;
           ctx.fillRect(q.x - r, q.y - r, 2 * r, 2 * r);
           ctx.strokeRect(q.x - r, q.y - r, 2 * r, 2 * r);
+        }
+        // Edge under the pointer: a new start node would be inserted here
+        const hv = this.startHover;
+        if (hv?.obj === o && hv.sub === si && hv.pt) {
+          const r = 4.5 * px;
+          ctx.fillStyle = ctx.strokeStyle = SNAP_COLOR;
+          ctx.lineWidth = px;
+          ctx.beginPath();
+          ctx.arc(hv.pt.x, hv.pt.y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(hv.pt.x - r * 1.8, hv.pt.y);
+          ctx.lineTo(hv.pt.x + r * 1.8, hv.pt.y);
+          ctx.moveTo(hv.pt.x, hv.pt.y - r * 1.8);
+          ctx.lineTo(hv.pt.x, hv.pt.y + r * 1.8);
+          ctx.stroke();
         }
         // Richtung: erstes Stück des ersten Segments
         const sg = segments(sp)[0];

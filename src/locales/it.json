@@ -416,7 +416,6 @@
   "Klicken, um Text zu setzen, Ziehen für einen Textrahmen mit Zeilenumbruch, oder vorhandenen Text anklicken.": "Fai clic per posizionare il testo, trascina per una casella di testo con ritorno a capo automatico oppure fai clic su un testo esistente.",
   "Verbindung: erste gerade Kante anklicken (Zinken, Zapfen oder Schlitze). Esc hebt die Wahl auf.": "Giunzione: fai clic sul primo bordo rettilineo (dita, linguette o asole). Esc annulla la scelta.",
   "Trimmen: Abschnitt bis zu den nächsten Schnittpunkten anklicken (rot) zum Entfernen. Shift: Stück auf aktuellem Layer behalten, Ctrl: nicht verbinden.": "Ritaglia: fai clic su una sezione tra le intersezioni (rossa) per rimuoverla. Maiusc: mantieni l'elemento sul livello corrente, Ctrl: non unire.",
-  "Startpunkt: Knoten anklicken, dort beginnt der Schnitt. Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Punto iniziale: fai clic su un nodo per iniziare il taglio da lì. Maiusc+clic: inverti la direzione, Ctrl+clic: ripristina (decide l'ottimizzazione).",
   "QR-Code eingefügt. Doppelklick öffnet ihn zum Bearbeiten.": "Codice QR inserito. Fai doppio clic per modificarlo.",
   "QR-Code ändern": "Modifica codice QR",
   "Variabler Text: weiter mit Nummer {n}.": "Testo variabile: avanzato al numero {n}.",
@@ -1319,7 +1318,6 @@
   "Ellipse (Ctrl+E)": "Ellisse (Ctrl+E)",
   "Text (Ctrl+T)": "Testo (Ctrl+T)",
   "Formen trimmen (Ctrl+K): Abschnitte bis zum nächsten Schnittpunkt anklicken und entfernen": "Ritaglia forme (Ctrl+K): fai clic sulle sezioni fino alla successiva intersezione per rimuoverle",
-  "Startpunkt setzen: Knoten anklicken, an dem der Schnitt beginnt (Shift: Richtung umkehren)": "Imposta punto iniziale: fai clic sul nodo in cui inizia il taglio (Maiusc: inverti direzione)",
   "Verbindung: Fingerzinken, Zapfen, Überblattung, Schnapp-, Haken-, Keil- oder T-Slot-Verbindung auf gerade Kanten anwenden": "Giunzione: applica una giunzione a dita, tenone, mezzo legno, scatto, gancio, cuneo o asola a T ai bordi rettilinei",
   "Var. Text": "Testo var.",
   " (Originale bleiben)": " (originali mantenuti)",
@@ -4100,5 +4098,7 @@
   "gekoppelt": "associato",
   "andere Version": "versione diversa",
   "Host und dieser Rechner verwenden verschiedene Protokollversionen. Bitte beide KizamuBeam auf dieselbe Version bringen.": "L'host e questo computer usano versioni di protocollo diverse. Porta entrambe le installazioni di KizamuBeam alla stessa versione.",
-  "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visibile nella rete come “{name}”; gli altri computer lo trovano con “Cerca host …”."
+  "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visibile nella rete come “{name}”; gli altri computer lo trovano con “Cerca host …”.",
+  "Startpunkt: Knoten oder Kante anklicken, dort beginnt der Schnitt (auf einer Kante geschlossener Konturen entsteht ein neuer Knoten). Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Punto iniziale: fai clic su un nodo o su un lato per iniziare il taglio da lì (sul lato di un contorno chiuso viene creato un nuovo nodo). Maiusc+clic: inverti la direzione, Ctrl+clic: ripristina (decide l'ottimizzazione).",
+  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Imposta punto iniziale: fai clic sul nodo o sul lato in cui inizia il taglio (Maiusc: inverti direzione)"
 }

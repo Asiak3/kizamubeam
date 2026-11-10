@@ -451,7 +451,6 @@
   "Klicken, um Text zu setzen, Ziehen für einen Textrahmen mit Zeilenumbruch, oder vorhandenen Text anklicken.": "Click to place text, drag for a text box with word wrap, or click existing text.",
   "Verbindung: erste gerade Kante anklicken (Zinken, Zapfen oder Schlitze). Esc hebt die Wahl auf.": "Joint: click the first straight edge (fingers, tabs or slots). Esc clears the choice.",
   "Trimmen: Abschnitt bis zu den nächsten Schnittpunkten anklicken (rot) zum Entfernen. Shift: Stück auf aktuellem Layer behalten, Ctrl: nicht verbinden.": "Trim: click a section between intersections (red) to remove it. Shift: keep the piece on the current layer, Ctrl: don't join.",
-  "Startpunkt: Knoten anklicken, dort beginnt der Schnitt. Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Start point: click a node to start the cut there. Shift+click: reverse direction, Ctrl+click: reset (optimization decides).",
   "QR-Code eingefügt. Doppelklick öffnet ihn zum Bearbeiten.": "QR code inserted. Double-click to edit it.",
   "QR-Code ändern": "Edit QR code",
   "Variabler Text: weiter mit Nummer {n}.": "Variable text: advanced to number {n}.",
@@ -1354,7 +1353,6 @@
   "Ellipse (Ctrl+E)": "Ellipse (Ctrl+E)",
   "Text (Ctrl+T)": "Text (Ctrl+T)",
   "Formen trimmen (Ctrl+K): Abschnitte bis zum nächsten Schnittpunkt anklicken und entfernen": "Trim shapes (Ctrl+K): click sections up to the next intersection to remove them",
-  "Startpunkt setzen: Knoten anklicken, an dem der Schnitt beginnt (Shift: Richtung umkehren)": "Set start point: click the node where the cut begins (Shift: reverse direction)",
   "Verbindung: Fingerzinken, Zapfen, Überblattung, Schnapp-, Haken-, Keil- oder T-Slot-Verbindung auf gerade Kanten anwenden": "Joint: apply a finger, tenon, lap, snap, hook, wedge or T-slot joint to straight edges",
   "Var. Text": "Var. text",
   " (Originale bleiben)": " (originals kept)",
@@ -4161,5 +4159,7 @@
   "gekoppelt": "paired",
   "andere Version": "different version",
   "Host und dieser Rechner verwenden verschiedene Protokollversionen. Bitte beide KizamuBeam auf dieselbe Version bringen.": "The host and this computer use different protocol versions. Please bring both KizamuBeam installations to the same version.",
-  "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visible on the network as “{name}”; other computers find it with “Find host …”."
+  "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visible on the network as “{name}”; other computers find it with “Find host …”.",
+  "Startpunkt: Knoten oder Kante anklicken, dort beginnt der Schnitt (auf einer Kante geschlossener Konturen entsteht ein neuer Knoten). Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Start point: click a node or an edge to start the cut there (an edge of a closed contour gets a new node). Shift+click: reverse direction, Ctrl+click: reset (optimization decides).",
+  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Set start point: click the node or edge where the cut begins (Shift: reverse direction)"
 }
