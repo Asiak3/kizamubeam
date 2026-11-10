@@ -302,6 +302,7 @@ function buildMenu(ed: Editor) {
         [t('Pfade mit Toleranz schließen …'), '', () => openCloseDialog(ed)],
         [t('Ausgewählte Formen verbinden'), 'Alt+J', () => ed.joinSel()],
         [t('Zerlegen'), 'Alt+B', () => ed.breakApartSel()],
+        [t('Freihandpfad bearbeiten …'), '', () => openFreehandEditDialog(ed)],
         [t('Richtung umkehren'), '', () => ed.reverseSel()],
         [t('Ecken runden oder fasen …'), '', () => openCornerDialog(ed)],
         'sep',
@@ -986,6 +987,7 @@ function buildBars(ed: Editor) {
     { id: 'closepath', cat: M, short: t('Schließen|Pfad'), label: t('Pfad schließen'), run: () => ed.closeSel(), enabled: sel1 },
     { id: 'join', cat: M, short: t('Verbinden|Pfade'), label: t('Ausgewählte Formen verbinden (Alt+J)'), run: () => ed.joinSel(), enabled: sel2 },
     { id: 'breakapart', cat: M, short: t('Zerlegen'), label: t('Zerlegen (Alt+B)'), run: () => ed.breakApartSel(), enabled: sel1 },
+    { id: 'freehand-edit', cat: W, icon:'line', label:t('Freihandpfad bearbeiten …'), run:()=>openFreehandEditDialog(ed), enabled:sel1, on:()=>ed.tool==='freehand-edit' },
     { id: 'reverse', cat: M, short: t('Umkehren'), label: t('Richtung umkehren'), run: () => ed.reverseSel(), enabled: sel1 },
     { id: 'corners', cat: M, short: t('Ecken'), label: t('Ecken runden oder fasen …'), run: () => openCornerDialog(ed), enabled: sel1 },
     { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern (+)'), run: () => ed.zoomAt(1.25) },
@@ -2077,3 +2079,4 @@ function buildTextEditor(ed: Editor) {
   ta.addEventListener('blur', () => setTimeout(() => document.activeElement !== ta && close(), 0));
 }
 import { openOverlapSettings } from './overlapPicker';
+import { openFreehandEditDialog } from './freehandEditDialog';

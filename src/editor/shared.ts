@@ -4,7 +4,7 @@ import { Box, worldPath } from '../geom';
 import { SnapSet } from '../snap';
 import { t } from '../i18n';
 
-export type Tool = 'select' | 'node' | 'line' | 'pencil' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure' | 'sketch';
+export type Tool = 'freehand-edit' | 'select' | 'node' | 'line' | 'pencil' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure' | 'sketch';
 
 export const RULER = 22; // px
 
@@ -26,6 +26,7 @@ export const CANVAS_THEMES = {
 export const HANDLE_OFF = 9; // Abstand der Griffe vom Auswahlrahmen in px
 
 export type Drag =
+  | import('./freehand').FreehandStroke
   | { type: 'pan'; sx: number; sy: number; ox: number; oy: number }
   | {
       type: 'move'; start: Pt; orig: Mat[]; moved: boolean; toggleRotate: boolean; sx: number; sy: number;
@@ -95,6 +96,7 @@ export const HINGE_HINT_FIRST = t('Scharnier: Oberkante der Rückwand anklicken 
 export const HINGE_HINT_SECOND = t('Scharnier: jetzt die Hinterkante des Deckels anklicken. Erneuter Klick hebt die Wahl auf.');
 
 export const TOOL_HINTS: Record<Tool, string> = {
+  'freehand-edit': t('Freihand: am Endknoten fortsetzen oder zwischen vorhandenen Knoten neu zeichnen. Esc bricht ab.'),
   select: t('Drehen: knapp außerhalb einer Ecke ziehen oder Auswahl nochmals anklicken. Rahmen nach rechts: umschließend, nach links: kreuzend.'),
   node: t('Klick/Rahmen wählt Knoten, Shift ergänzt. Entf löschen, L Gerade, C Kurve, E Ecke, S glatt, I einfügen (oder Doppelklick auf Kante), B aufbrechen, T trimmen.'),
   line: t('Klicken für Ecken, Ziehen für Kurven. Startpunkt anklicken schließt, Doppelklick/Enter/Rechtsklick beendet.'),
