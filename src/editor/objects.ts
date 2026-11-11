@@ -91,6 +91,50 @@ export class EditorObjects {
     this.emit('doc');
     this.emit('sel');
   }
+  /** True if the selection can move in this stacking direction (something to pass on the same layer). */
+  canRestack(this: Editor, dir: 'forward' | 'backward' | 'front' | 'back'): boolean {
+    const objs = this.doc.objs;
+    const up = dir === 'forward' || dir === 'front';
+    return objs.some((o, k) => this.sel.includes(o) && objs.some((p, j) => (up ? j > k : j < k) && !this.sel.includes(p) && homeLayer(p) === homeLayer(o)));
+  }
+  /**
+   * Change the stacking order of the selected top-level objects. forward/backward step past the next
+   * unselected object on the same layer (the Objects window lists each layer on its own); front/back
+   * move to the very top or bottom of the page. The relative order within the selection is kept.
+   */
+  restack(this: Editor, dir: 'forward' | 'backward' | 'front' | 'back') {
+    if (!this.canRestack(dir)) return;
+    this.snapshot(t('Reihenfolge ändern'));
+    const sel = new Set(this.sel);
+    let objs = [...this.doc.objs];
+    if (dir === 'front' || dir === 'back') {
+      const moving = objs.filter((o) => sel.has(o));
+      const rest = objs.filter((o) => !sel.has(o));
+      objs = dir === 'front' ? [...rest, ...moving] : [...moving, ...rest];
+    } else {
+      const up = dir === 'forward';
+      // Walk from the far end so neighbouring selected objects move together without overtaking each other.
+      const order = objs.map((_, k) => k);
+      if (up) order.reverse();
+      for (const start of order) {
+        const o = this.doc.objs[start];
+        if (!sel.has(o)) continue;
+        const k = objs.indexOf(o);
+        const L = homeLayer(o);
+        let j = k + (up ? 1 : -1);
+        while (j >= 0 && j < objs.length && (sel.has(objs[j]) || homeLayer(objs[j]) !== L)) {
+          if (sel.has(objs[j]) && homeLayer(objs[j]) === L) { j = -2; break; }
+          j += up ? 1 : -1;
+        }
+        if (j < 0 || j >= objs.length) continue;
+        objs.splice(k, 1);
+        objs.splice(j, 0, o);
+      }
+    }
+    this.doc.objs = objs;
+    this.emit('doc');
+    this.emit('sel');
+  }
   /** Layer i in der Ausgabereihenfolge vor (before) oder hinter ref setzen */
   placeLayer(this: Editor, i: number, ref: number, before: boolean) {
     if (i === ref) return;

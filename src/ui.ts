@@ -151,7 +151,12 @@ export function buildUI(ed: Editor) {
   buildBars(ed);
   buildNumbar(ed);
   buildLayers(ed);
-  buildObjectsPanel(ed);
+  const contextCallbacks = {
+    adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
+    saveBitmap: () => saveProcessedBitmap(ed),
+    library: () => openAddSelectionDialog(ed), preview: () => openPreview(ed), objects: () => showWindow('objects'),
+  };
+  buildObjectsPanel(ed, contextCallbacks);
   buildHistoryPanel(ed);
   buildLibraryPanel(ed);
   buildParamsPanel(ed);
@@ -170,11 +175,7 @@ export function buildUI(ed: Editor) {
     h('button', { type: 'button', class: 'btn', onclick: () => ed.leaveIsolation() }, t('Isolation verlassen')));
   document.body.append(isolationBadge);
   ed.on(() => { isolationBadge.hidden = !ed.isolation; });
-  installEditorContext(ed, {
-    adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
-    saveBitmap: () => saveProcessedBitmap(ed),
-    library: () => openAddSelectionDialog(ed), preview: () => openPreview(ed), objects: () => showWindow('objects'),
-  });
+  installEditorContext(ed, contextCallbacks);
   buildPalette(ed);
   buildStatus(ed);
   startAgentBridge(ed);
@@ -357,6 +358,9 @@ function buildMenu(ed: Editor) {
         [t('Horizontal verteilen'), '', () => ed.distribute(true)],
         [t('Vertikal verteilen'), '', () => ed.distribute(false)],
       ] },
+      { sub: t('Reihenfolge'), items: ([['front', t('Ganz nach vorne')], ['forward', t('Eine Ebene nach vorne')],
+        ['backward', t('Eine Ebene nach hinten')], ['back', t('Ganz nach hinten')]] as const).map(([dir, label]): MenuItem =>
+        [label, '', () => ed.restack(dir), undefined, () => ed.canRestack(dir)]) },
       { sub: t('Beziehungen'), items: [
         ...REL_MODES.map((m): MenuItem => [REL_LABELS[m], '', () => ed.startRelation(m), () => ed.tool === 'relate' && ed.relMode === m]),
       ] },
