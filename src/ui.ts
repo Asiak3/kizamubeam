@@ -41,7 +41,7 @@ import { maybeOfferSetup, openSetupWizard } from './setupWizard';
 import { maybeCheckForUpdates, openUpdateDialog } from './updateDialog';
 import { openPacksDialog } from './packsDialog';
 import { openGridDialog } from './gridDialog';
-import { buildLaser, frameJob, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob } from './laser';
+import { buildLaser, frameJob, isPositionPick, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob, togglePositionPick } from './laser';
 import { openLayerDialog } from './layerdialog';
 import { openMaterialTestDialog } from './materialtest';
 import { openTestPhotoDialog } from './testphotoDialog';
@@ -1121,6 +1121,7 @@ function buildBars(ed: Editor) {
     { id: 'start', cat: L, icon: 'play', label: t('Job starten'), run: () => startJob(ed) },
     { id: 'frame', cat: L, icon: 'frame', label: t('Rahmen: Rechteck um den Job abfahren'), run: () => frameJob(ed, false) },
     { id: 'contour', cat: L, icon: 'contour', label: t('Kontur-Rahmen: Umriss des Jobs abfahren'), run: () => frameJob(ed, true) },
+    { id: 'laserpos', cat: L, icon: 'target', label: t('Laser positionieren: Klick auf die Arbeitsfläche fährt den Laser dorthin'), run: () => togglePositionPick(ed), on: () => isPositionPick(ed) },
     { id: 'gcode', cat: L, icon: 'gcode', label: t('G-Code speichern'), run: () => saveGCode(ed) },
     { id: 'setup', cat: L, icon: 'setup', short: t('Einrichten'), label: t('Laser einrichten: Schritt für Schritt von der Verbindung bis zum ersten Testauftrag'), run: () => openSetupWizard(ed) },
     { id: 'materialtest', cat: L, icon: 'mattest', short: t('Test'), label: t('Materialtest …'), run: () => openMaterialTestDialog(ed) },
@@ -1164,7 +1165,7 @@ function buildBars(ed: Editor) {
       ],
       tools: [
         'tool:select', 'tool:node', 'vectorfit', 'shape-builder', 'isolate', SEP, 'tool:line', 'tool:pencil', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
-        'grp:bool', 'outline' ,'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure',
+        'grp:bool', 'outline' ,'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure', 'laserpos',
       ],
     },
     // Gespeicherte Leisten von vor den Knopfgruppen: die alten Standardfolgen durch die Gruppe ersetzen

@@ -160,6 +160,19 @@ export interface Device {
   zAxis: boolean;
   /** Z+ fährt Richtung Material (z. B. Tisch hebt sich); Standard: Z+ fährt den Kopf nach oben */
   zFlip: boolean;
+  /**
+   * Rotpunkt-Zeiger (Issue #213): Lage des Strahls gegenüber dem Zeigerpunkt in mm, aus der Kalibrierung
+   * (Position Strahl auf Kreuz minus Position Zeiger auf Kreuz, also A−B wie in LightBurn). Nur wenn
+   * enabled: Positionieren und die Startreferenz (Aktuell/Benutzer) verschieben sich um diesen Versatz,
+   * Geometrie, Schnitt und G-Code-Export bleiben Werkzeuglaser.
+   */
+  pointerOffset: { x: number; y: number; enabled: boolean };
+  /**
+   * Framing-Vorschau im Laser-Panel: 'pointer' (Default) fährt den Kopf so, dass der Rotpunkt den
+   * Jobbereich abfährt (kompensiert, zeigt den echten Laserbereich); 'tool' fährt den Werkzeuglaser
+   * (LightBurn-Verhalten, zugleich Kollisionsprüfung Kopf gegen Material/Spannpratzen).
+   */
+  frameView: 'pointer' | 'tool';
 }
 
 export const DEFAULT_DEVICE: Device = {
@@ -202,6 +215,8 @@ export const DEFAULT_DEVICE: Device = {
   rotary: DEFAULT_ROTARY,
   zAxis: false,
   zFlip: false,
+  pointerOffset: { x: 0, y: 0, enabled: false },
+  frameView: 'pointer',
 };
 
 /**
@@ -282,7 +297,7 @@ export function loadDevices(): DeviceStore {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const st = JSON.parse(raw) as DeviceStore;
-      st.devices = st.devices.map((d) => ({ ...DEFAULT_DEVICE, ...d, rotary: { ...DEFAULT_ROTARY, ...d.rotary } }));
+      st.devices = st.devices.map((d) => ({ ...DEFAULT_DEVICE, ...d, rotary: { ...DEFAULT_ROTARY, ...d.rotary }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset, ...d.pointerOffset } }));
       if (st.devices.length) {
         if (!st.devices.some((d) => d.id === st.current)) st.current = st.devices[0].id;
         return st;
@@ -290,7 +305,7 @@ export function loadDevices(): DeviceStore {
     }
     // Früher gab es nur ein Gerät
     const old = localStorage.getItem(OLD_KEY);
-    if (old) return { devices: [{ ...DEFAULT_DEVICE, ...JSON.parse(old), id: 'standard', rotary: { ...DEFAULT_ROTARY } }], current: 'standard' };
+    if (old) return { devices: [{ ...DEFAULT_DEVICE, ...JSON.parse(old), id: 'standard', rotary: { ...DEFAULT_ROTARY }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset } }], current: 'standard' };
   } catch {
     /* Standardwerte */
   }
@@ -312,6 +327,28 @@ export const rotaryCirc = (r: Rotary) => Math.PI * (r.kind === 'chuck' ? r.objec
 
 /** Ist die Drehachse eingeschaltet und vollständig eingestellt? */
 export const rotaryOn = (d: Device) => !!d.rotary?.enabled && d.rotary.perRev > 0 && rotaryCirc(d.rotary) > 0;
+
+/**
+ * Zeigerversatz für die Positionierung (Issue #213): wohin sich die Startreferenz verschiebt, wenn der
+ * Rotpunkt das Ziel markiert. Konvention wie LightBurn (Offset = A−B): Der Zeigerpunkt liegt um den Offset
+ * versetzt zum Kopf, also steht der Kopf beim Zielen um −Offset und fährt beim Start um +Offset zurück,
+ * sodass der Strahl trifft. Mit Drehachse wirkt nur X (Y ist dann Umfangsrichtung, physikalisch ohne Zeiger).
+ */
+export function pointerShift(d: Device): Pt {
+  const o = d.pointerOffset;
+  if (!o?.enabled) return { x: 0, y: 0 };
+  const x = Number.isFinite(o.x) ? o.x : 0;
+  const y = rotaryOn(d) || !Number.isFinite(o.y) ? 0 : (o.y as number);
+  return { x, y };
+}
+
+/**
+ * Wirksamer Versatz fürs Positionieren (#213, Follow-up): In Stellung 'tool' fährt der Kopf
+ * direkt ans Ziel. Sonst markiert der Rotpunkt das Ziel und der Kopf steht um −Offset.
+ */
+export function posShift(d: Device): Pt {
+  return d.frameView === 'tool' ? { x: 0, y: 0 } : pointerShift(d);
+}
 
 /** Achsweg je mm auf der Objektoberfläche, negativ bei umgekehrter Drehrichtung */
 export const rotaryScale = (r: Rotary) => (r.perRev / rotaryCirc(r)) * (r.mirror ? -1 : 1);
@@ -1525,7 +1562,12 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   // Auch für die Vorschau: so ergibt sich dieselbe Reihenfolge wie beim Lasern (sie hängt vom Startpunkt ab)
   if (jb && device.startFrom !== 'absolute') {
     const a = anchorOf(jb, device.jobOrigin);
-    const target = device.startFrom === 'current' && inp.position ? inp.position : { x: 0, y: 0 };
+    const base = device.startFrom === 'current' && inp.position ? inp.position : { x: 0, y: 0 };
+    // Zeigerversatz (#213): gezielt wurde mit dem Rotpunkt, der Kopf steht um −Offset; beim Start fährt er
+    // um +Offset zurück, sodass der Strahl trifft. Nur die Startreferenz verschiebt sich — Geometrie,
+    // Schnitt und Export bleiben Werkzeuglaser (reine Verschiebung, keine Verzerrung).
+    const po = pointerShift(device);
+    const target = { x: base.x + po.x, y: base.y + po.y };
     offset = { x: target.x - a.x, y: target.y - a.y };
   }
   const toOut = mul([1, 0, 0, 1, offset.x, offset.y], toBed);
@@ -1943,6 +1985,13 @@ export function frameGCode(job: Job, d: Device, contour: boolean): string[] | nu
     contour && job.hull.length >= 3
       ? job.hull
       : [{ x: b.x0, y: b.y0 }, { x: b.x1, y: b.y0 }, { x: b.x1, y: b.y1 }, { x: b.x0, y: b.y1 }];
+  // Zeigerversatz (#213): In der Rotpunkt-Vorschau (Default) fährt der Kopf um −Offset, sodass der
+  // Rotpunkt den Jobbereich abfährt (zeigt den echten Laserbereich). 'tool' fährt den Werkzeuglaser
+  // (LightBurn-Verhalten, zugleich Kollisionsprüfung Kopf gegen Material/Spannpratzen).
+  if (d.frameView !== 'tool') {
+    const po = pointerShift(d);
+    if (po.x || po.y) pts = pts.map((p) => ({ x: p.x - po.x, y: p.y - po.y }));
+  }
   pts = [...pts, pts[0]];
   const fw = FIRMWARES[d.fw];
   const s = d.frameLaser ? sValue(d.framePower / 100, d) : 0;

@@ -984,7 +984,7 @@ label.check {
 }
 .conn-row .btn {
   display: inline-flex;
-  align-items: center;
+  align-items: center;  align-items: center;
   gap: 4px;
 }
 .conn-row .btn svg,
@@ -1026,6 +1026,24 @@ label.check {
 .origin-grid button.cur {
   background: var(--accent);
   border-color: var(--accent);
+}
+/* Zeigerversatz (#213): Framing-Umschalter direkt unter Rahmen/Kontur */
+.frame-view {
+  margin-top: 4px;
+}
+.frame-view .btn.cur {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+/* Zeigerversatz (#213): Schema im Einstellungsdialog */
+.pointer-diagram {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+.pointer-diagram svg {
+  max-width: 100%;
+  height: auto;
 }
 .origin-grid.disabled {
   opacity: 0.4;

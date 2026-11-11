@@ -7,7 +7,7 @@ import { saveText } from './files';
 import { native } from './native';
 import {
   anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, formatDuration, frameGCode, Job, jogLines, jogToLines, loadDevices, Moves, newDevice,
-  prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, sameMoves, saveDevices, StartFrom, startHere,
+  posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, sameMoves, saveDevices, StartFrom, startHere,
 } from './gcode';
 import { isTauri, machine, PortInfo } from './machine';
 import type { PreparedGCode } from './gcode';
@@ -34,6 +34,46 @@ function deviceChanged() {
 /** Wird bei jedem Geräte- oder Einstellungswechsel aufgerufen; liefert eine Abmeldefunktion */
 export const onDeviceChange = (f: () => void) => (deviceListeners.add(f), () => deviceListeners.delete(f));
 const fw = () => FIRMWARES[device.fw];
+
+// Die Klickfahrt teilen sich das Verschieben-Tab und der Toolbar-Knopf (linke Leiste,
+// LightBurn-Vorbild): ein Zustand je Editor, die Geschwindigkeit liefert das Verschieben-Tab.
+const posPickSpeed = new WeakMap<Editor, () => number>();
+const posPickActive = new WeakSet<Editor>();
+const posPickListeners = new WeakMap<Editor, Set<() => void>>();
+function emitPosPick(ed: Editor) {
+  posPickListeners.get(ed)?.forEach((f) => f());
+  ed.emit('tool');
+}
+/** Klickfahrt-Ziel anfahren: je nach Zeiger-Modus landet Rotpunkt oder Werkzeug am Ziel. */
+export function positionGoTo(ed: Editor, p: { x: number; y: number }) {
+  if (!machine.connected) return notify(t('Nicht verbunden.'), true);
+  if (machine.running) return notify(t('Während eines Jobs nicht möglich.'), true);
+  const bed = ed.doc.bed;
+  if (p.x < 0 || p.y < 0 || p.x > bed.w || p.y > bed.h) return notify(t('Die Position liegt außerhalb des Arbeitsbereichs.'), true);
+  // Werkstückkoordinaten wie die Laserkopf-Anzeige (y nach oben); mit Drehachse nur X.
+  // Ob der Kopf das Ziel erreicht, meldet die Steuerung (der Zeiger reicht ggf. über den Kopf-Fahrweg hinaus).
+  const po = posShift(device);
+  const tx = p.x - po.x, ty = rotaryOn(device) ? null : bed.h - p.y - po.y;
+  const f = posPickSpeed.get(ed)?.() ?? 3000;
+  for (const l of jogToLines(device, tx, ty, f)) machine.send(l);
+}
+/** Klickfahrt umschalten (Verschieben-Tab und Toolbar nutzen denselben Zustand) */
+export function togglePositionPick(ed: Editor) {
+  if (posPickActive.has(ed) && ed.pickHandler) return ed.endPick();
+  posPickActive.add(ed);
+  ed.startPick(
+    (p) => positionGoTo(ed, p),
+    () => {
+      posPickActive.delete(ed);
+      emitPosPick(ed);
+    },
+    t('Klick auf die Arbeitsfläche fährt den Laser dorthin. Esc beendet.'),
+  );
+  emitPosPick(ed);
+  if (rotaryOn(device)) notify(t('Mit Drehachse fährt der Klick nur in X.'));
+}
+/** Läuft die Klickfahrt für diesen Editor? (Toolbar- und Button-Zustand) */
+export const isPositionPick = (ed: Editor) => posPickActive.has(ed) && !!ed.pickHandler;
 /** Startmodus des gewählten Geräts ändern (z. B. Print and Cut braucht absolute Koordinaten) */
 export function setStartFrom(v: StartFrom) {
   device.startFrom = v;
@@ -384,6 +424,30 @@ function stateText(): [string, string] {
   return [label, s === 'Alarm' || s === 'Door' ? 'error' : s === 'Idle' || !s ? 'ok' : 'busy'];
 }
 
+// Zeiger-Modus (#213, Follow-up): Framing und Klickfahrt gemeinsam — Rotpunkt (kompensiert,
+// Default) oder Werkzeug (LightBurn-Verhalten + Kollisionsprüfung). Eine Zeile je Panel (Laser
+// und Verschieben), beide zeigen denselben Stand. Sichtbar nur mit aktivem Offset.
+function buildFrameViewRow() {
+  const pointerB = h('button', {
+    class: 'btn small', title: t('Framing und Positionieren mit dem Rotpunkt (kompensiert, zeigt den echten Laserbereich)'),
+    onclick: () => ((device.frameView = 'pointer'), deviceChanged()),
+  }, t('Rotpunkt')) as HTMLButtonElement;
+  const toolB = h('button', {
+    class: 'btn small', title: t('Framing und Positionieren mit dem Werkzeuglaser (wie LightBurn, zugleich Prüfung, ob der Kopf nirgends anstößt)'),
+    onclick: () => ((device.frameView = 'tool'), deviceChanged()),
+  }, t('Werkzeug')) as HTMLButtonElement;
+  const row = h('div', { class: 'conn-row frame-view' },
+    h('label', {}, t('Positionieren mit')), pointerB, toolB);
+  const update = () => {
+    pointerB.classList.toggle('cur', device.frameView !== 'tool');
+    toolB.classList.toggle('cur', device.frameView === 'tool');
+    row.hidden = !device.pointerOffset?.enabled;
+  };
+  deviceListeners.add(update);
+  update();
+  return { row, pointerB, toolB };
+}
+
 function laserTab(ed: Editor): HTMLElement {
   const root = h('div', { class: 'laser-tab' });
   const big = (icon: string, label: string, title: string, onclick: () => void) =>
@@ -446,6 +510,7 @@ function laserTab(ed: Editor): HTMLElement {
     title: t('Air Assist sofort ein- oder ausschalten, auch während des Jobs'),
     onclick: () => machine.realtime(device.airCmd === 'M7' ? TOGGLE_MIST : TOGGLE_FLOOD),
   }, t('Air Assist')) as HTMLButtonElement;
+  const { row: frameViewRow, pointerB: framePointerB, toolB: frameToolB } = buildFrameViewRow();
   const outRow = h('div', { class: 'ov-row' });
   // Zu, solange nichts läuft (spart Platz); beim Start eines Jobs geht es von selbst auf
   const ovBox = h('details', { class: 'ov-box' },
@@ -483,6 +548,7 @@ function laserTab(ed: Editor): HTMLElement {
     pinTxt,
     h('div', { class: 'conn-row' }, portSel, refreshBtn, connBtn),
     h('div', { class: 'laser-grid' }, startB, pauseB, stopB, frameB, contourB, homeB, originB, previewB, saveB),
+    frameViewRow,
     bar,
     progTxt,
     ovBox,
@@ -603,6 +669,9 @@ function laserTab(ed: Editor): HTMLElement {
     startFrom.value = device.startFrom;
     originBtns.forEach((b, k) => b.classList.toggle('cur', k === device.jobOrigin));
     originGrid.classList.toggle('disabled', device.startFrom === 'absolute');
+    framePointerB.classList.toggle('cur', device.frameView !== 'tool');
+    frameToolB.classList.toggle('cur', device.frameView === 'tool');
+    frameViewRow.hidden = !device.pointerOffset?.enabled;
   };
   machine.on((e) => {
     if (e.type === 'done') notify(e.message, !e.ok);
@@ -652,26 +721,21 @@ function moveTab(ed: Editor): HTMLElement {
     if (!b) return notify(t('Keine Auswahl.'), true);
     const box = { x0: b.x, y0: ed.doc.bed.h - b.y - b.h, x1: b.x + b.w, y1: ed.doc.bed.h - b.y };
     const a = anchorOf(box, device.jobOrigin);
-    machine.send(`G0 X${a.x.toFixed(3)} Y${a.y.toFixed(3)}`);
+    // Zeiger-Modus (#213): Je nach Stellung landet Rotpunkt oder Werkzeug auf der Auswahl.
+    const po = posShift(device);
+    machine.send(`G0 X${(a.x - po.x).toFixed(3)} Y${(a.y - po.y).toFixed(3)}`);
   };
-  // Laser zur Klickposition: solange aktiv, fährt jeder Klick auf die Arbeitsfläche den Laser dorthin (Esc beendet)
-  const goTo = (p: { x: number; y: number }) => {
-    if (!machine.connected) return notify(t('Nicht verbunden.'), true);
-    if (machine.running) return notify(t('Während eines Jobs nicht möglich.'), true);
-    const bed = ed.doc.bed;
-    if (p.x < 0 || p.y < 0 || p.x > bed.w || p.y > bed.h) return notify(t('Die Position liegt außerhalb des Arbeitsbereichs.'), true);
-    // Werkstückkoordinaten wie die Laserkopf-Anzeige (y nach oben); mit Drehachse nur X
-    for (const l of jogToLines(device, p.x, rotaryOn(device) ? null : bed.h - p.y, st.speed)) machine.send(l);
-  };
+  // Laser zur Klickposition: teilt sich den Zustand mit dem Toolbar-Knopf (linke Leiste).
+  posPickSpeed.set(ed, () => st.speed);
   const clickB = h('button', {
     class: 'btn', title: t('Danach fährt jeder Klick auf die Arbeitsfläche den Laser dorthin (Esc beendet)'),
-    onclick: () => {
-      if (ed.pickHandler === goTo) return ed.endPick();
-      ed.startPick(goTo, () => clickB.classList.remove('on'), t('Klick auf die Arbeitsfläche fährt den Laser dorthin. Esc beendet.'));
-      clickB.classList.add('on');
-      if (rotaryOn(device)) notify(t('Mit Drehachse fährt der Klick nur in X.'));
-    },
+    onclick: () => togglePositionPick(ed),
   }, t('Laser zur Klickposition')) as HTMLButtonElement;
+  const syncClickB = () => clickB.classList.toggle('on', isPositionPick(ed));
+  if (!posPickListeners.get(ed)) posPickListeners.set(ed, new Set());
+  posPickListeners.get(ed)!.add(syncClickB);
+  syncClickB();
+  const modeRow = buildFrameViewRow().row;
   const setO = h('button', { class: 'btn', title: t('Werkstück-Nullpunkt an die aktuelle Position legen'), onclick: () => machine.send(fw().setOrigin) }, t('Ursprung hier setzen')) as HTMLButtonElement;
   const clearO = h('button', { class: 'btn', title: t('Werkstück-Nullpunkt auf den Maschinen-Nullpunkt zurücksetzen'), onclick: () => fw().clearOrigin && machine.send(fw().clearOrigin!) }, t('Ursprung löschen')) as HTMLButtonElement;
   const unlock = h('button', { class: 'btn', title: t('Alarm aufheben'), onclick: () => fw().unlock && machine.send(fw().unlock!) }, t('Entsperren')) as HTMLButtonElement;
@@ -690,6 +754,7 @@ function moveTab(ed: Editor): HTMLElement {
       clickB,
       unlock,
     ),
+    modeRow,
   );
   const refresh = () => {
     const s = machine.status;
@@ -697,6 +762,9 @@ function moveTab(ed: Editor): HTMLElement {
       ? t('Position X {x}  Y {y} mm', { x: s.wpos[0].toFixed(2), y: s.wpos[1].toFixed(2) }) + (s.mpos && (Math.abs(s.mpos[0] - s.wpos[0]) > 1e-3 || Math.abs(s.mpos[1] - s.wpos[1]) > 1e-3) ? t(' (Maschine {x} / {y})', { x: s.mpos[0].toFixed(2), y: s.mpos[1].toFixed(2) }) : '')
       : t('Nicht verbunden');
     root.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = !machine.connected || machine.running));
+    // Der Zeiger-Modus ist kein Fahrbefehl und bleibt immer verstellbar.
+    modeRow.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = false));
+    syncClickB();
     if (!fw().clearOrigin) clearO.disabled = true;
     if (!fw().unlock) unlock.disabled = true;
   };
@@ -906,6 +974,54 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   num(t('Geschwindigkeit (mm/min)'), () => d.frameSpeed, (v) => (d.frameSpeed = v));
   bool(t('Mit Laser (schwach)'), () => d.frameLaser, (v) => (d.frameLaser = v), t('Rahmen mit niedriger Leistung sichtbar machen'));
   num(t('Leistung (%)'), () => d.framePower, (v) => (d.framePower = Math.min(100, v)));
+  // Rotpunkt-Zeiger (Issue #213): Versatz je Gerät, mit visueller Darstellung statt Vorzeichenrätsel
+  head(t('Rotpunkt-Zeiger (Pointer-Offset)'));
+  if (!d.pointerOffset) d.pointerOffset = { x: 0, y: 0, enabled: false }; // Altgeräte aus localStorage/Presets ohne Feld
+  const poDiagram = h('div', { class: 'wide pointer-diagram' });
+  const poSentence = h('div', { class: 'note wide' });
+  const poRotNote = h('div', { class: 'note wide' });
+  const poFmt = (v: number) => `${v < 0 ? '' : '+'}${v.toFixed(1)}`;
+  const updatePointer = () => {
+    const o = d.pointerOffset;
+    const s = 4, cx = 110, cy = 60; // px pro mm; Zeigerpunkt in der Mitte
+    const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+    const bx = clamp(cx + o.x * s, 14, 206), by = clamp(cy - o.y * s, 14, 106); // +Y = hinten/oben
+    poDiagram.innerHTML =
+      `<svg viewBox="0 0 220 120" width="220" height="120" role="img">` +
+      `<rect x="4" y="4" width="212" height="112" fill="none" stroke="currentColor" stroke-opacity="0.3" rx="4"/>` +
+      `<text x="10" y="18" font-size="9" fill="currentColor" fill-opacity="0.6">+Y ↑ · +X →</text>` +
+      `<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="currentColor" stroke-dasharray="4 3"/>` +
+      `<circle cx="${cx}" cy="${cy}" r="5" fill="#4da3ff"/>` +
+      `<text x="${cx + 9}" y="${cy + 4}" font-size="10" fill="#4da3ff">${t('Zeiger')}</text>` +
+      `<g stroke="#ff5252" stroke-width="2"><line x1="${bx - 6}" y1="${by}" x2="${bx + 6}" y2="${by}"/><line x1="${bx}" y1="${by - 6}" x2="${bx}" y2="${by + 6}"/></g>` +
+      `<text x="${bx + 9}" y="${by + 4}" font-size="10" fill="#ff5252">${t('Strahl')}</text></svg>`;
+    poSentence.textContent =
+      (o.enabled ? '' : t('Derzeit ausgeschaltet. ')) +
+      t('Der Strahl trifft {x} mm in X und {y} mm in Y vom Zeigerpunkt entfernt.', { x: poFmt(o.x), y: poFmt(o.y) });
+    poRotNote.textContent = rotaryOn(d) ? t('Mit Drehachse wirkt nur X; Y ist abgeschaltet.') : '';
+    poRotNote.hidden = !rotaryOn(d);
+  };
+  const poEnabled = h('input', {
+    type: 'checkbox', checked: d.pointerOffset.enabled,
+    onchange: (e: Event) => ((d.pointerOffset.enabled = (e.target as HTMLInputElement).checked), updatePointer()),
+  });
+  rows.push(h('label', { title: t('Versatz aktivieren: Positionieren und Startreferenz (Aktuell/Benutzer) verschieben sich um den Offset') }, t('Zeigerversatz einschalten')), h('span', {}, poEnabled));
+  const poNum = (label: string, title: string, get: () => number, set: (v: number) => void) => {
+    const max = Math.max(bed.w, bed.h, 1);
+    const el = numInput('', (v) => {
+      if (!Number.isFinite(v)) return;
+      set(Math.max(-max, Math.min(max, v)));
+      el.value = get().toFixed(2);
+      updatePointer();
+    }, title);
+    el.value = get().toFixed(2);
+    rows.push(h('label', { title }, label), el);
+  };
+  poNum(t('Versatz X (mm)'), t('Lage des Strahls gegenüber dem Zeigerpunkt in X, aus der Kalibrierung (Position Strahl minus Position Zeiger)'), () => d.pointerOffset.x, (v) => (d.pointerOffset.x = v));
+  poNum(t('Versatz Y (mm)'), t('Lage des Strahls gegenüber dem Zeigerpunkt in Y (mit Drehachse ohne Wirkung)'), () => d.pointerOffset.y, (v) => (d.pointerOffset.y = v));
+  rows.push(poDiagram, poSentence, poRotNote);
+  rows.push(h('div', { class: 'note wide' }, t('Nur für Positionieren, Startreferenz (Aktuelle Position/Benutzer-Ursprung) und Rotpunkt-Framing. Geometrie, Schnitt und G-Code-Export bleiben Werkzeuglaser.')));
+  updatePointer();
   head(t('Air Assist'));
   rows.push(h('label', { title: t('Wird auf Layern mit „Air Assist“ vor dem Lasern gesendet, ausgeschaltet wird mit M9') }, t('Einschalten mit')), h('select', { onchange: (e: Event) => (d.airCmd = (e.target as HTMLSelectElement).value as Device['airCmd']) },
     h('option', { value: 'M8', selected: d.airCmd !== 'M7' }, t('M8 (Flood, üblich)')),
