@@ -959,7 +959,7 @@
   "Haken in die andere Richtung": "Hook in the other direction",
   "Kante 1 bekommt die Zinken, Zapfen bzw. Überblattungs-Schlitze, Kante 2 das Gegenstück. Bei Zapfen (auch Schnapp- und Hakenzapfen) wird eine einzelne gezeichnete Linie durch die Schlitze ersetzt.": "Edge 1 gets the fingers, tenons or lap slots, edge 2 the counterpart. For tenons (including snap and hook tenons) a single drawn line is replaced by the slots.",
   "Nur eine Kante gewählt: Zinken, Zapfen bzw. Schlitze ohne Gegenstück.": "Only one edge selected: fingers, tenons or slots without counterpart.",
-  "Verbindung": "Joint",
+  "Verbindung": "Connection",
   "Keine Kante gewählt.": "No edge selected.",
   "Zweimal dieselbe Kante gewählt.": "Same edge selected twice.",
   "Materialdicke muss größer als 0 sein.": "Material thickness must be greater than 0.",
@@ -1092,7 +1092,6 @@
   "Arbeitsbereich Y": "Work area Y",
   "S-Wert für 100 %": "S value for 100 %",
   "GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1": "GRBL $30 or FluidNC speed_map (usually 1000), Marlin usually 255, Smoothieware 1",
-  "Verbindung|Gerät": "Connection",
   "Anschluss": "Connection",
   "USB (seriell)": "USB (serial)",
   "WLAN (Telnet)": "Wi-Fi (Telnet)",
@@ -4564,5 +4563,13 @@
   "Framing und Positionieren mit dem Rotpunkt (kompensiert, zeigt den echten Laserbereich)": "Framing and positioning with the red dot (compensated, shows the actual laser area)",
   "Framing und Positionieren mit dem Werkzeuglaser (wie LightBurn, zugleich Prüfung, ob der Kopf nirgends anstößt)": "Framing and positioning with the tool laser (like LightBurn, also checks that the head does not collide)",
   "Positionieren mit": "Position with",
-  "Laser positionieren: Klick auf die Arbeitsfläche fährt den Laser dorthin": "Position laser: click on the work area moves the laser there"
+  "Laser positionieren: Klick auf die Arbeitsfläche fährt den Laser dorthin": "Position laser: click on the work area moves the laser there",
+  "Allgemein": "General",
+  "Bewegung": "Motion",
+  "Rahmen & Zeiger": "Framing & pointer",
+  "Achsen": "Axes",
+  "Air & Ausgänge": "Air & outputs",
+  "G-Code": "G-Code",
+  "Startreferenz und Job-Ursprung stehen im Laser-Fenster.": "Start reference and job origin live in the Laser window.",
+  "Gerätevorlagen für neue Geräte stehen im Dialog „Geräte …“.": "Device templates for new devices live in the “Devices …” dialog."
 }

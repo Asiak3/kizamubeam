@@ -1143,6 +1143,17 @@ label.check {
   display: none;
 }
 
+/* Geräteeinstellungen in Tabs (FR #235) */
+.dtab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 8px;
+}
+.dtab-bar .btn.cur {
+  background: var(--accent);
+  border-color: var(--accent);
+}
 /* Vorschau */
 .preview-dialog {
   width: min(1200px, 92vw);

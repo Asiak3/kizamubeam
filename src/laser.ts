@@ -830,12 +830,21 @@ function consoleTab(): HTMLElement {
 
 // ---------- Geräteeinstellungen ----------
 
+// Merkt sich den zuletzt geöffneten Tab des Einstellungsdialogs (nur UI-Zustand).
+let lastDeviceTab = 0;
+
 /** Einstellungen eines Geräts bearbeiten (ohne Angabe: das gewählte) */
 export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: () => void) {
   const d = { ...target };
   const bed = { w: d.bedW, h: d.bedH };
   const isCurrent = target === device;
-  const rows: (HTMLElement | string)[] = [];
+  // FR #235: Tabs statt Scroll-Liste — gleiche Felder, gleiche Speicherung, nur sortiert.
+  const tabs: { label: string; rows: (HTMLElement | string)[] }[] = [];
+  let rows: (HTMLElement | string)[] = [];
+  const newTab = (label: string) => {
+    rows = [];
+    tabs.push({ label, rows });
+  };
   const num = (label: string, get: () => number, set: (v: number) => void, title?: string) => {
     const el = numInput('', (v) => v > 0 && set(v), title);
     el.value = String(get());
@@ -851,7 +860,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     rows.push(h('label', { title }, label), h('span', {}, el));
   };
   const head = (t: string) => rows.push(h('div', { class: 'sub' }, t));
-  head(t('Gerät'));
+  newTab(t('Allgemein'));
   text(t('Name'), () => d.name, (v) => (d.name = v));
   const sMaxRef: { el?: HTMLInputElement } = {};
   const fwSel = h('select', {
@@ -867,7 +876,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   const bw = num(t('Breite (mm)'), () => bed.w, (v) => (bed.w = v), t('Arbeitsbereich X'));
   const bh = num(t('Höhe (mm)'), () => bed.h, (v) => (bed.h = v), t('Arbeitsbereich Y'));
   sMaxRef.el = num(t('S-Wert für 100 %'), () => d.sMax, (v) => (d.sMax = v), t('GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1'));
-  head(t('Verbindung|Gerät'));
+  newTab(t('Verbindung'));
   const connSel: HTMLSelectElement = h('select', { onchange: (e: Event) => (d.conn = (e.target as HTMLSelectElement).value as Device['conn']) },
     h('option', { value: 'serial', selected: d.conn === 'serial' }, t('USB (seriell)')),
     h('option', { value: 'tcp', selected: d.conn === 'tcp' }, t('WLAN (Telnet)')),
@@ -966,10 +975,13 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     h('option', { value: 'yes', selected: d.limitSwitches === 'yes' }, t('Vorhanden')),
     h('option', { value: 'no', selected: d.limitSwitches === 'no' }, t('Keine')),
   ));
+  newTab(t('Bewegung'));
   head(t('Bewegung (für die Zeitschätzung)'));
   const rapid = num(t('Eilgang (mm/min)'), () => d.rapid, (v) => (d.rapid = v));
   const accel = num(t('Beschleunigung (mm/s²)'), () => d.accel, (v) => (d.accel = v));
   bool(t('Nach dem Job zurück zum Start'), () => d.returnHome, (v) => (d.returnHome = v));
+  rows.push(h('div', { class: 'note wide' }, t('Startreferenz und Job-Ursprung stehen im Laser-Fenster.')));
+  newTab(t('Rahmen & Zeiger'));
   head(t('Rahmen'));
   num(t('Geschwindigkeit (mm/min)'), () => d.frameSpeed, (v) => (d.frameSpeed = v));
   bool(t('Mit Laser (schwach)'), () => d.frameLaser, (v) => (d.frameLaser = v), t('Rahmen mit niedriger Leistung sichtbar machen'));
@@ -1022,21 +1034,17 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   rows.push(poDiagram, poSentence, poRotNote);
   rows.push(h('div', { class: 'note wide' }, t('Nur für Positionieren, Startreferenz (Aktuelle Position/Benutzer-Ursprung) und Rotpunkt-Framing. Geometrie, Schnitt und G-Code-Export bleiben Werkzeuglaser.')));
   updatePointer();
+  newTab(t('Achsen'));
+  head(t('Z-Achse'));
+  bool(t('Motorische Z-Achse vorhanden'), () => d.zAxis, (v) => (d.zAxis = v), t('Layer dürfen den Fokus verschieben (Z-Versatz, tiefer je Durchgang). Z fährt relativ zur Höhe beim Start und am Ende zurück.'));
+  bool(t('Z+ fährt Richtung Material'), () => d.zFlip, (v) => (d.zFlip = v), t('Einschalten, wenn bei dieser Maschine positive Z-Werte den Tisch anheben oder den Kopf absenken'));
+  rows.push(h('label', {}, t('Drehachse')), h('span', {}, h('button', { class: 'btn small', onclick: () => openRotaryDialog() }, t('Drehachse (Rotary) …'))));
+  newTab(t('Air & Ausgänge'));
   head(t('Air Assist'));
   rows.push(h('label', { title: t('Wird auf Layern mit „Air Assist“ vor dem Lasern gesendet, ausgeschaltet wird mit M9') }, t('Einschalten mit')), h('select', { onchange: (e: Event) => (d.airCmd = (e.target as HTMLSelectElement).value as Device['airCmd']) },
     h('option', { value: 'M8', selected: d.airCmd !== 'M7' }, t('M8 (Flood, üblich)')),
     h('option', { value: 'M7', selected: d.airCmd === 'M7' }, 'M7 (Mist)'),
   ));
-  head(t('Z-Achse'));
-  bool(t('Motorische Z-Achse vorhanden'), () => d.zAxis, (v) => (d.zAxis = v), t('Layer dürfen den Fokus verschieben (Z-Versatz, tiefer je Durchgang). Z fährt relativ zur Höhe beim Start und am Ende zurück.'));
-  bool(t('Z+ fährt Richtung Material'), () => d.zFlip, (v) => (d.zFlip = v), t('Einschalten, wenn bei dieser Maschine positive Z-Werte den Tisch anheben oder den Kopf absenken'));
-  head('FluidNC');
-  rows.push(h('label', { title: t('Bei WLAN-Aussetzern läuft ein Job von SD-Karte oder Flash weiter; er wird vor dem Start über die Weboberfläche hochgeladen') }, t('Job ausführen')),
-    h('select', { onchange: (e: Event) => (d.runFrom = (e.target as HTMLSelectElement).value as Device['runFrom']) },
-      h('option', { value: 'stream', selected: d.runFrom === 'stream' }, t('Vom Rechner senden')),
-      h('option', { value: 'sd', selected: d.runFrom === 'sd' }, t('Auf SD-Karte laden und dort starten')),
-      h('option', { value: 'localfs', selected: d.runFrom === 'localfs' }, t('Im Flash speichern und dort starten')),
-    ));
   const outsIn = h('input', {
     type: 'text', value: d.jobOutputs.join(', '), placeholder: t('z. B. 0, 1'),
     onchange: (e: Event) => {
@@ -1046,6 +1054,14 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     },
   }) as HTMLInputElement;
   rows.push(h('label', { title: t('Digitale Ausgänge (user_outputs, M64/M65 P…), die während jedes Jobs an sind, z. B. Absaugung') }, t('Ausgänge im Job')), outsIn);
+  newTab(t('G-Code'));
+  head('FluidNC');
+  rows.push(h('label', { title: t('Bei WLAN-Aussetzern läuft ein Job von SD-Karte oder Flash weiter; er wird vor dem Start über die Weboberfläche hochgeladen') }, t('Job ausführen')),
+    h('select', { onchange: (e: Event) => (d.runFrom = (e.target as HTMLSelectElement).value as Device['runFrom']) },
+      h('option', { value: 'stream', selected: d.runFrom === 'stream' }, t('Vom Rechner senden')),
+      h('option', { value: 'sd', selected: d.runFrom === 'sd' }, t('Auf SD-Karte laden und dort starten')),
+      h('option', { value: 'localfs', selected: d.runFrom === 'localfs' }, t('Im Flash speichern und dort starten')),
+    ));
   rows.push(h('label', {}, ''), h('span', { class: 'conn-row' },
     h('button', { class: 'btn small', title: t('config.yaml der verbundenen Steuerung lesen und ändern'), onclick: () => import('./fluidncDialog').then((m) => m.openFluidConfig()) }, t('Konfiguration …')),
     h('button', { class: 'btn small', title: t('Dateien auf SD-Karte und Flash'), onclick: () => import('./fluidncDialog').then((m) => m.openFluidFiles(ed)) }, t('Dateien …')),
@@ -1059,6 +1075,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   script(t('Vor dem Job'), t('Wird nach G21, G90 und dem Laser-Modus gesendet, vor der ersten Bewegung'), () => d.startScript, (v) => (d.startScript = v));
   script(t('Nach dem Job'), t('Wird nach dem Ausschalten des Lasers (M5) gesendet, vor dem Programmende'), () => d.endScript, (v) => (d.endScript = v));
   rows.push(h('div', { class: 'note wide' }, t('Gilt für Jobs und gespeicherten G-Code, nicht für Rahmenfahrten. Die Zeilen werden unverändert gesendet.')));
+  newTab(t('Erweitert'));
   head(t('KI-Agenten'));
   const limit = (label: string, title: string, get: () => number, set: (v: number) => void) => {
     const el = numInput('', (v) => {
@@ -1072,6 +1089,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     () => d.agentMaxPower, (v) => (d.agentMaxPower = Math.max(0, Math.min(100, v))));
   limit(t('Kleinste Geschwindigkeit (mm/min)'), t('Jobs, die ein KI-Agent anfordert, dürfen nirgends langsamer sein (0 = keine Grenze)'),
     () => d.agentMinSpeed, (v) => (d.agentMinSpeed = Math.max(0, v)));
+  rows.push(h('div', { class: 'note wide' }, t('Gerätevorlagen für neue Geräte stehen im Dialog „Geräte …“.')));
   const readNote = h('div', { class: 'note' });
   // Lesen nur vom verbundenen Gerät und nur bei FluidNC und GRBL-artigen Steuerungen
   const canRead = () => isCurrent && machine.connected && !machine.running && FIRMWARES[d.fw].read !== null;
@@ -1115,11 +1133,26 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
       }, 2500);
     },
   }, t('Von der Maschine lesen'));
+  // „Von der Maschine lesen“ gehört zu Allgemein (erster Tab), nicht ans Ende.
+  tabs[0].rows.push(
+    h('label', {}, ''),
+    h('span', { class: 'conn-row' }, readBtn),
+    readNote,
+  );
+  let activeTab = lastDeviceTab < tabs.length ? lastDeviceTab : 0;
+  const selectTab = (i: number) => {
+    activeTab = lastDeviceTab = i;
+    tabBtns.forEach((b, k) => b.classList.toggle('cur', k === i));
+    panels.forEach((p, k) => (p.hidden = k !== i));
+  };
+  const tabBtns = tabs.map((tb, i) =>
+    h('button', { class: 'btn small' + (i === activeTab ? ' cur' : ''), onclick: () => selectTab(i) }, tb.label),
+  );
+  const panels = tabs.map((tb, i) => h('div', { class: 'form', hidden: i !== activeTab }, ...tb.rows));
   const dlg = h('dialog', { class: 'device-dialog' },
     h('h3', {}, t('Geräteeinstellungen: {name}', { name: target.name })),
-    h('div', { class: 'form' }, ...rows),
-    h('div', { class: 'conn-row' }, readBtn),
-    readNote,
+    h('div', { class: 'dtab-bar' }, ...tabBtns),
+    ...panels,
     h('div', { class: 'dialog-buttons' },
       h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen')),
       h('button', {

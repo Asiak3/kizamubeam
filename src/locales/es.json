@@ -1172,7 +1172,7 @@
   "Hakenverbindung": "Unión de gancho",
   "Keilzapfen": "Espiga con cuña",
   "T-Slot": "T-slot",
-  "Verbindung": "Unión",
+  "Verbindung": "Conexión",
   "Endschalter X": "Final de carrera X",
   "Endschalter Y": "Final de carrera Y",
   "Endschalter Z": "Final de carrera Z",
@@ -2221,7 +2221,6 @@
   "Arbeitsbereich Y": "Área de trabajo Y",
   "S-Wert für 100 %": "Valor S para el 100 %",
   "GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1": "GRBL $30 o speed_map de FluidNC (normalmente 1000), Marlin normalmente 255, Smoothieware 1",
-  "Verbindung|Gerät": "Conexión",
   "Anschluss": "Conexión",
   "USB (seriell)": "USB (serie)",
   "WLAN (Telnet)": "Wi-Fi (Telnet)",
@@ -4333,5 +4332,13 @@
   "Framing und Positionieren mit dem Rotpunkt (kompensiert, zeigt den echten Laserbereich)": "Encuadre y posicionamiento con el punto rojo (compensado, muestra el área real del láser)",
   "Framing und Positionieren mit dem Werkzeuglaser (wie LightBurn, zugleich Prüfung, ob der Kopf nirgends anstößt)": "Encuadre y posicionamiento con el láser de herramienta (como LightBurn, comprueba además que el cabezal no choque)",
   "Positionieren mit": "Posicionar con",
-  "Laser positionieren: Klick auf die Arbeitsfläche fährt den Laser dorthin": "Posicionar el láser: clic en el área de trabajo mueve el láser allí"
+  "Laser positionieren: Klick auf die Arbeitsfläche fährt den Laser dorthin": "Posicionar el láser: clic en el área de trabajo mueve el láser allí",
+  "Allgemein": "General",
+  "Bewegung": "Movimiento",
+  "Rahmen & Zeiger": "Encuadre y puntero",
+  "Achsen": "Ejes",
+  "Air & Ausgänge": "Aire y salidas",
+  "G-Code": "G-Code",
+  "Startreferenz und Job-Ursprung stehen im Laser-Fenster.": "La referencia inicial y el origen del trabajo están en la ventana Láser.",
+  "Gerätevorlagen für neue Geräte stehen im Dialog „Geräte …“.": "Las plantillas de dispositivo para equipos nuevos están en el diálogo «Dispositivos …»."
 }

@@ -638,7 +638,7 @@
   "Haken in die andere Richtung": "Gancio nell'altra direzione",
   "Kante 1 bekommt die Zinken, Zapfen bzw. Überblattungs-Schlitze, Kante 2 das Gegenstück. Bei Zapfen (auch Schnapp- und Hakenzapfen) wird eine einzelne gezeichnete Linie durch die Schlitze ersetzt.": "Il bordo 1 riceve dita, tenoni o asole a mezzo legno; il bordo 2 riceve la controparte. Per i tenoni (compresi tenoni a scatto e a gancio), una singola linea disegnata viene sostituita dalle asole.",
   "Nur eine Kante gewählt: Zinken, Zapfen bzw. Schlitze ohne Gegenstück.": "Selezionato un solo bordo: dita, tenoni o asole senza controparte.",
-  "Verbindung": "Giunzione",
+  "Verbindung": "Connessione",
   "Keine Kante gewählt.": "Nessun bordo selezionato.",
   "Zweimal dieselbe Kante gewählt.": "Lo stesso bordo è stato selezionato due volte.",
   "Materialdicke muss größer als 0 sein.": "Lo spessore del materiale deve essere maggiore di 0.",
@@ -771,7 +771,6 @@
   "Arbeitsbereich Y": "Area di lavoro Y",
   "S-Wert für 100 %": "Valore S per 100 %",
   "GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1": "GRBL $30 o speed_map di FluidNC (solitamente 1000), Marlin solitamente 255, Smoothieware 1",
-  "Verbindung|Gerät": "Connessione",
   "Anschluss": "Connessione",
   "USB (seriell)": "USB (seriale)",
   "WLAN (Telnet)": "Wi-Fi (Telnet)",
@@ -4448,5 +4447,13 @@
   "Framing und Positionieren mit dem Rotpunkt (kompensiert, zeigt den echten Laserbereich)": "Inquadratura e posizionamento con il punto rosso (compensato, mostra l'area laser reale)",
   "Framing und Positionieren mit dem Werkzeuglaser (wie LightBurn, zugleich Prüfung, ob der Kopf nirgends anstößt)": "Inquadratura e posizionamento con il laser utensile (come LightBurn, verifica anche che la testa non urti)",
   "Positionieren mit": "Posiziona con",
-  "Laser positionieren: Klick auf die Arbeitsfläche fährt den Laser dorthin": "Posiziona il laser: un clic sull'area di lavoro sposta il laser lì"
+  "Laser positionieren: Klick auf die Arbeitsfläche fährt den Laser dorthin": "Posiziona il laser: un clic sull'area di lavoro sposta il laser lì",
+  "Allgemein": "Generale",
+  "Bewegung": "Movimento",
+  "Rahmen & Zeiger": "Riquadro e puntatore",
+  "Achsen": "Assi",
+  "Air & Ausgänge": "Aria e uscite",
+  "G-Code": "G-Code",
+  "Startreferenz und Job-Ursprung stehen im Laser-Fenster.": "Il riferimento iniziale e l'origine del lavoro sono nella finestra Laser.",
+  "Gerätevorlagen für neue Geräte stehen im Dialog „Geräte …“.": "I modelli di dispositivo per i nuovi dispositivi sono nella finestra «Dispositivi …»."
 }
