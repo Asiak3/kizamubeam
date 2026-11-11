@@ -4028,4 +4028,12 @@
   "Objekte dieses Layers auswählen": "Seleccionar los objetos de esta capa",
   "Zu dieser Seite wechseln": "Ir a esta página",
   "Ausblenden": "Ocultar"
+  "Fügt das Teil hinzu und lässt den Dialog offen, um das nächste mit anderen Maßen einzustellen.": "Añade la pieza y deja el diálogo abierto para preparar la siguiente con otras medidas.",
+  "Fügt ein neues Teil mit diesen Werten hinzu; das bearbeitete Teil bleibt unverändert.": "Añade una pieza nueva con estos valores; la pieza editada no cambia.",
+  "Auf der Seite war kein Platz mehr: neue Seite „{page}“.": "No quedaba sitio en la página: nueva página «{page}».",
+  "Größer als der Arbeitsbereich: liegt in seiner Mitte.": "Más grande que el área de trabajo: colocada en su centro.",
+  "Größer als der Arbeitsbereich": "Más grande que el área de trabajo",
+  "Das Teil passt mit Randabstand nicht auf eine leere Seite. Es wird keine neue Seite angelegt.": "La pieza no cabe en una página vacía con el margen al borde. No se creará ninguna página nueva.",
+  "Zurück zur Bearbeitung": "Volver a editar",
+  "Trotzdem erstellen": "Crear igualmente"
 }

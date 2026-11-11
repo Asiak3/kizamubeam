@@ -4144,4 +4144,12 @@
   "Gruppe aufklappen": "Espandi gruppo",
   "Objekte dieses Layers auswählen": "Seleziona gli oggetti di questo livello",
   "Zu dieser Seite wechseln": "Vai a questa pagina"
+  "Fügt das Teil hinzu und lässt den Dialog offen, um das nächste mit anderen Maßen einzustellen.": "Aggiunge il pezzo e lascia aperta la finestra, per impostare il successivo con altre misure.",
+  "Fügt ein neues Teil mit diesen Werten hinzu; das bearbeitete Teil bleibt unverändert.": "Aggiunge un nuovo pezzo con questi valori; il pezzo modificato resta invariato.",
+  "Auf der Seite war kein Platz mehr: neue Seite „{page}“.": "Non c’era più spazio sulla pagina: nuova pagina «{page}».",
+  "Größer als der Arbeitsbereich: liegt in seiner Mitte.": "Più grande dell’area di lavoro: posizionato al centro.",
+  "Größer als der Arbeitsbereich": "Più grande dell’area di lavoro",
+  "Das Teil passt mit Randabstand nicht auf eine leere Seite. Es wird keine neue Seite angelegt.": "Il pezzo non entra in una pagina vuota con il margine dal bordo. Non verrà creata una nuova pagina.",
+  "Zurück zur Bearbeitung": "Torna alla modifica",
+  "Trotzdem erstellen": "Crea comunque"
 }
