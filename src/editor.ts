@@ -23,7 +23,7 @@ import { EditorKeyboard } from './editor/keyboard';
 import { EditorNodes } from './editor/nodes';
 import { EditorObjects } from './editor/objects';
 import { EditorPaths } from './editor/paths';
-import { EditorPointer } from './editor/pointer';
+import { EditorPointer, loadRightPan } from './editor/pointer';
 import { EditorRender } from './editor/render';
 import { EditorShapeOps } from './editor/shapeops';
 import { EditorSnapping } from './editor/snapping';
@@ -127,6 +127,8 @@ export class Editor {
   pencilTolerance = 0.2;
   pencilClosed = false;
   suppressContextMenu = false;
+  /** Drag with the right mouse button pans the view (opt-in, Edit → Settings → Mouse and keyboard) */
+  rightPan = loadRightPan();
   onCanvasContext: ((event: MouseEvent) => void) | null = null;
   hint = '';
 
@@ -290,6 +292,8 @@ export class Editor {
     installPinchGestures(canvas, (factor, x, y) => this.zoomAt(factor, x, y));
     canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      // Right button still held with right-drag panning: click or drag is decided on release
+      if (this.drag?.type === 'right') { this.drag.context = true; return; }
       if (this.suppressContextMenu) { this.suppressContextMenu = false; return; }
       this.onCanvasContext?.(e);
     });

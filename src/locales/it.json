@@ -4151,5 +4151,9 @@
   "Größer als der Arbeitsbereich": "Più grande dell’area di lavoro",
   "Das Teil passt mit Randabstand nicht auf eine leere Seite. Es wird keine neue Seite angelegt.": "Il pezzo non entra in una pagina vuota con il margine dal bordo. Non verrà creata una nuova pagina.",
   "Zurück zur Bearbeitung": "Torna alla modifica",
-  "Trotzdem erstellen": "Crea comunque"
+  "Trotzdem erstellen": "Crea comunque",
+  "Mit gedrückter rechter Maustaste verschieben": "Trascina con il pulsante destro",
+  "Rechtsklick Ziehen Mitteltaste Leertaste": "clic destro trascinare pulsante centrale spazio spostare",
+  "Mitteltaste und Leertaste + Ziehen verschieben immer. Ein Rechtsklick ohne Bewegung öffnet weiter das Kontextmenü bzw. beendet die Linie.": "Il pulsante centrale e Spazio + trascinamento spostano sempre la vista. Un clic destro senza movimento apre ancora il menu contestuale o termina la linea.",
+  "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Spazio + trascinamento, pulsante centrale, trascinamento con il destro"
 }

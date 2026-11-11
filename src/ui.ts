@@ -64,6 +64,7 @@ import { buildView3dPanel } from './view3d/panel';
 import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { installSketchPanel } from './sketchPanel';
 import { isSketchObj } from './editor/sketch';
+import { loadRightPan } from './editor/pointer';
 import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, showWindow, windowList } from './dock';
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
 import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
@@ -579,7 +580,7 @@ function helpRows(): [string, string][] {
     [t('Pfeiltasten'), t('1 mm verschieben (Shift 10 mm, Alt 0,1 mm)')],
     [t('. und ,'), t('90° drehen')],
     ['L R T B C E', t('Ausrichten (mehrere Objekte gewählt)')],
-    [t('Leertaste + Ziehen, Mitteltaste'), t('Ansicht verschieben')],
+    [loadRightPan() ? t('Leertaste + Ziehen, Mitteltaste, rechte Maustaste') : t('Leertaste + Ziehen, Mitteltaste'), t('Ansicht verschieben')],
     [t('Mausrad'), t('Zoomen')],
     [t('Knoten: D I L C E S'), t('Löschen, Einfügen, Gerade, Kurve, Ecke, Glatt')],
     ['Alt+W', t('Drahtgitter / Gefüllt')],

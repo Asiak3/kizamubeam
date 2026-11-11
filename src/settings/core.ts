@@ -167,6 +167,12 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
     prepare: () => void (overlap = loadOverlapSettings()),
     fields: [
       {
+        kind: 'toggle', id: 'input.rightPan', group: t('Ansicht verschieben'), label: t('Mit gedrückter rechter Maustaste verschieben'), def: false,
+        keywords: t('Rechtsklick Ziehen Mitteltaste Leertaste'),
+        hint: t('Mitteltaste und Leertaste + Ziehen verschieben immer. Ein Rechtsklick ohne Bewegung öffnet weiter das Kontextmenü bzw. beendet die Linie.'),
+        get: () => ed.rightPan, set: (v) => ed.setRightPan(v),
+      },
+      {
         kind: 'select', id: 'input.overlapTrigger', group: t('Überlappungsauswahl'), label: t('Überlappungsauswahl'), def: 'right', keywords: t('Objekt unter dem Mauszeiger auswählen Rechtsklick Linksklick'),
         hint: t('Kurzer Klick und Ziehen bleiben unverändert. Die Liste ändert die Auswahl erst beim Bestätigen.'),
         options: () => [['right', t('Langer Rechtsklick')], ['left', t('Langer Linksklick')], ['off', t('Deaktiviert')]],
