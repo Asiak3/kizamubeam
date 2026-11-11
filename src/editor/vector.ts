@@ -1,0 +1,78 @@
+import type { Editor } from '../editor';
+import { IDENT, inv, newId, Obj, Pt, SubPath } from '../model';
+import { shapeSubs } from '../geom';
+import { transformSubs } from '../importers';
+import { fitPoints, FitOptions, MAX_VECTOR_SAMPLES, refitSubpath } from '../vectorFit';
+import { t } from '../i18n';
+import { vectorError } from '../vectorMessages';
+
+// Property ordering must not turn an unchanged preview into an Undo step.
+const canonical = (value: unknown) => JSON.stringify(value, (_key, v) => v && typeof v === 'object' && !Array.isArray(v)
+  ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, v[key]])) : v);
+
+export interface VectorPlan { obj: Obj; before: string; matrix: string; subs: SubPath[] }
+
+export class EditorVector {
+  previewVectorFit(this: Editor, options: FitOptions): { before: number; after: number } {
+    this.vectorPreview = null;
+    const targets = this.nodeTargets();
+    if (!targets.length) throw new Error(t('Zuerst bearbeitbare Pfade oder Grundformen auswählen. Text/Generatoren ausdrücklich umwandeln und Gruppen auflösen.'));
+    const plan: VectorPlan[] = [];
+    let before = 0, after = 0;
+    for (const obj of targets) {
+      const world = transformSubs(shapeSubs(obj.shape), obj.m);
+      const subs = world.map((sp) => refitSubpath(sp, options));
+      before += world.reduce((n, s) => n + s.nodes.length, 0);
+      after += subs.reduce((n, s) => n + s.nodes.length, 0);
+      if (before > MAX_VECTOR_SAMPLES || after > MAX_VECTOR_SAMPLES) throw new Error(t('Auswahl überschreitet 16.384 Knoten; weniger Pfade auswählen.'));
+      plan.push({ obj, before: canonical(obj.shape), matrix: JSON.stringify(obj.m), subs });
+    }
+    this.vectorPreview = plan;
+    this.redraw();
+    return { before, after };
+  }
+
+  applyVectorFit(this: Editor): boolean {
+    const plan = this.vectorPreview;
+    if (!plan?.length) return false;
+    if (plan.some((p) => !this.nodeTargets().includes(p.obj) || canonical(p.obj.shape) !== p.before || JSON.stringify(p.obj.m) !== p.matrix))
+      throw new Error(t('Auswahl oder Quelle geändert. Vorschau vor dem Übernehmen aktualisieren.'));
+    const results = plan.map((p) => {
+      const subs = transformSubs(p.subs, inv(p.obj.m));
+      return { p, shape: p.obj.shape.kind === 'path' ? { ...p.obj.shape, subs } : { kind: 'path' as const, subs } };
+    });
+    if (results.every(({ p, shape }) => p.before === canonical(shape))) {
+      this.vectorPreview = null; this.redraw(); return false;
+    }
+    this.snapshot(t('Pfade vereinfachen / glätten'));
+    for (const { p, shape } of results) { p.obj.shape = shape; this.touch(p.obj.shape); }
+    this.vectorPreview = null;
+    this.clearNodeSel();
+    this.nodeHover = this.segHover = null;
+    this.emit('doc');
+    return true;
+  }
+
+  finishPencil(this: Editor, points: Pt[], closed: boolean) {
+    try {
+      if (points.length < 2 || points.every((p) => Math.hypot(p.x - points[0].x, p.y - points[0].y) < 0.01)) {
+        this.hint = t('Kein Freihandpfad erstellt: zum Zeichnen ziehen, nicht nur klicken.'); this.emit('tool'); return;
+      }
+      if (this.layer(this.currentLayer).locked || !this.layer(this.currentLayer).show) throw new Error(t('Eine sichtbare, entsperrte Ebene wählen.'));
+      const sub = fitPoints(points, closed, { tolerance: this.pencilTolerance, curves: true, preserveCorners: true });
+      if (sub.nodes.length < (closed ? 3 : 2)) {
+        this.hint = t('Kein Freihandpfad erstellt: für einen geschlossenen Pfad eine Fläche zeichnen oder „Geschlossener Pfad“ ausschalten.'); this.emit('tool'); return;
+      }
+      this.snapshot(t('Freihandpfad zeichnen'));
+      const obj: Obj = { id: newId(), m: [...IDENT], layer: this.currentLayer, shape: { kind: 'path', subs: [sub] } };
+      this.doc.objs.push(obj);
+      this.setSel([obj]);
+      this.hint = t('Freihandpfad erstellt: {n} Knoten. Rückgängig mit Ctrl+Z.', { n: sub.nodes.length });
+      this.emit('doc');
+      this.emit('tool');
+    } catch (error) {
+      this.hint = vectorError(error);
+      this.emit('tool');
+    }
+  }
+}

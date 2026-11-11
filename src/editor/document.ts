@@ -48,6 +48,13 @@ export class EditorDocument {
     return JSON.stringify({ doc: this.doc, sel: this.sel.map((o) => o.id) });
   }
   load(this: Editor, json: string) {
+    this.isolation = null; this.builderSession = null;
+    if (this.tool === 'builder') { this.tool = 'select'; this.hint = ''; }
+    // Component references cannot survive document replacement (Undo/Redo).
+    this.nodeSets.clear(); this.segmentSets.clear(); this.handleSets.clear(); this.nodeSel.clear();
+    this.nodeSelObj = this.nodeEditObj = null;
+    this.nodeHover = this.segHover = null; this.vectorPreview = null;
+    this.drag = null;
     const st = JSON.parse(json);
     this.doc = loadDoc(st.doc);
     bumpIds(allObjs(this.doc));
@@ -219,6 +226,8 @@ export class EditorDocument {
 
   /** Beim Wechsel der Seite: Auswahl und alles, was auf Objekte der alten Seite zeigt, verwerfen */
   clearPageState(this: Editor) {
+    this.isolation = null; this.builderSession = null;
+    if (this.tool === 'builder') { this.tool = 'select'; this.hint = ''; }
     if (this.drag) this.cancelDrag();
     if (this.draft) this.finishLine();
     this.sel = [];
@@ -226,6 +235,7 @@ export class EditorDocument {
     this.rotateMode = false;
     this.nodeSel.clear();
     this.nodeSelObj = null;
+    this.nodeSets.clear(); this.segmentSets.clear(); this.handleSets.clear(); this.nodeEditObj = null; this.vectorPreview = null;
     this.nodeHover = this.segHover = null;
     this.jointPicks = [];
     this.jointHover = null;

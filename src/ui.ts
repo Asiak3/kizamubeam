@@ -17,11 +17,19 @@ import { $, evalExpr, f2, h, iconBtn, numInput, sep, setVal } from './dom';
 import { openCircularArrayDialog, openGridArrayDialog } from './arrayDialogs';
 import { openNestDialog } from './nestDialog';
 import { openWorkpieceDialog } from './workpieceDialog';
+import { cameraOverlaysVisible, toggleCameraOverlays } from './cameraOverlayVisibility';
 import { openBackgroundDialog } from './bgDialog';
 import { openJointDialog } from './jointDialog';
 import { openHingeDialog } from './hingeDialog';
 import { openSlotDialog } from './slotDialog';
+import { openSlotPlacementDialog } from './slotPlacementDialog';
+import { isSlotGenerator } from './slotPlacement';
+import { isContourOffsetGenerator } from './contourOffset';
+import { openContourOffsetDialog } from './contourOffsetDialog';
 import { openWarpDialog } from './warpDialog';
+import { openVectorFitDialog } from './vectorDialog';
+import { canEnterIsolation, installEditorContext } from './editorContext';
+import { commandKey, commandMatches } from './commandKeys';
 import { openQrDialog, openVarTextDialog } from './qrDialog';
 import { openBarcodeDialog } from './barcodeDialog';
 import { LINEAR_NAMES } from './barcode1d';
@@ -56,7 +64,8 @@ import { buildView3dPanel } from './view3d/panel';
 import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { installSketchPanel } from './sketchPanel';
 import { isSketchObj } from './editor/sketch';
-import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, windowList } from './dock';
+import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, showWindow, windowList } from './dock';
+import { openOutlineDialog } from './outlineDialog';
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
 import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
 import { dec, LangPref, langPref, LANGUAGES, setLangPref, t, tn } from './i18n';
@@ -157,6 +166,16 @@ export function buildUI(ed: Editor) {
   initSync(ed);
   initDock();
   buildMenu(ed);
+  installEditorContext(ed, {
+    adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
+    saveBitmap: () => saveProcessedBitmap(ed), vectorFit: () => openVectorFitDialog(ed), builder: () => beginShapeBuilder(ed),
+    library: () => openAddSelectionDialog(ed), preview: () => openPreview(ed), objects: () => showWindow('objects'),
+  });
+  const isolationBadge = h('div', { class: 'editor-isolation-badge', hidden: true },
+    h('span', {}, t('Isolation aktiv – kein Ausgabefilter')),
+    h('button', { type: 'button', class: 'btn', onclick: () => ed.leaveIsolation() }, t('Isolation verlassen')));
+  document.body.append(isolationBadge);
+  ed.on(() => { isolationBadge.hidden = !ed.isolation; });
   buildPalette(ed);
   buildStatus(ed);
   startAgentBridge(ed);
@@ -166,7 +185,7 @@ export function buildUI(ed: Editor) {
   onMeshReady(() => ed.emit('doc'));
   ed.onGridArray = () => openGridArrayDialog(ed);
   ed.onBarcodeEdit = (o) => editBarcode(ed, o);
-  ed.onGenEdit = (o) => (isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
+  ed.onGenEdit = (o) => (o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
   installSketchPanel(ed);
   ed.onGenGuard = askGenConvert;
   ed.onJointDialog = () => openJointDialog(ed);
@@ -176,11 +195,18 @@ export function buildUI(ed: Editor) {
   window.addEventListener('keydown', (e) => {
     const el = e.target as HTMLElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
-    if (e.altKey && !e.ctrlKey && e.key.toLowerCase() === 't' && ed.selImages().length) {
+    if (!e.defaultPrevented && commandMatches('trace', e) && ed.selImages().length) {
       e.preventDefault();
       openTraceDialog(ed);
     }
   });
+}
+
+async function beginShapeBuilder(ed: Editor): Promise<void> {
+  if (ed.tool === 'builder' && ed.builderSession) return;
+  if (!ed.sel.length) return;
+  if (!confirm(t('Formerstellung als lokalen Test starten? Die erste Bearbeitung erstellt unabhängige Pfade und setzt die erhaltenen Originale auf „Nicht lasern“. Parametrische Originale bleiben editierbar; Ergebnisse aktualisieren sich nicht automatisch. Offene Linien und Lückenerkennung sind noch nicht unterstützt.'))) return;
+  await ed.startShapeBuilder();
 }
 
 // ---------- Sprache ----------
@@ -204,8 +230,8 @@ function translateStatic() {
 
 // ---------- Menü ----------
 
-/** checked: Häkchen vor dem Eintrag (z. B. sichtbare Fenster); sub: Untermenü */
-type MenuItem = [label: string, key: string, action: () => void, checked?: () => boolean] | { sub: string; items: MenuItem[] } | 'sep';
+/** checked: Häkchen; enabled/visible: beim Öffnen prüfen; sub: Untermenü */
+type MenuItem = [label: string, key: string, action: () => void, checked?: () => boolean, enabled?: () => boolean, visible?: () => boolean] | { sub: string; items: MenuItem[] } | 'sep';
 
 function buildMenu(ed: Editor) {
   const menus: [string, MenuItem[]][] = [
@@ -232,20 +258,22 @@ function buildMenu(ed: Editor) {
       [t('Schriften …'), '', () => openFontManager(ed)],
       [t('Erweiterungen …'), '', () => openPacksDialog()],
       [t('Einstellungen übertragen …'), '', () => openSyncDialog(ed)],
+      [t('Überlappungsauswahl einstellen …'), '', () => openOverlapSettings()],
       [t('KI-Agenten (MCP) …'), '', () => openAgentDialog(ed)],
     ]],
     [t('Bearbeiten'), [
       [t('Rückgängig'), 'Ctrl+Z', () => ed.doUndo()],
       [t('Wiederholen'), 'Ctrl+Y', () => ed.doRedo()],
       'sep',
-      [t('Ausschneiden'), 'Ctrl+X', () => ed.cut()],
-      [t('Kopieren'), 'Ctrl+C', () => ed.copy()],
-      [t('Einfügen'), 'Ctrl+V', () => ed.paste()],
-      [t('Duplizieren'), 'Ctrl+D', () => ed.duplicate()],
+      [t('Ausschneiden'), commandKey('cut'), () => ed.cut()],
+      [t('Kopieren'), commandKey('copy'), () => ed.copy()],
+      [t('Einfügen'), commandKey('paste'), () => ed.paste()],
+      [t('An Originalposition einfügen'), commandKey('paste-in-place'), () => ed.paste(0)],
+      [t('Duplizieren'), commandKey('duplicate'), () => ed.duplicate()],
       [t('Löschen'), t('Entf'), () => ed.deleteSel()],
       'sep',
-      [t('Alles auswählen'), 'Ctrl+A', () => ed.selectAll()],
-      [t('In Pfad umwandeln'), 'Ctrl+Shift+C', () => ed.convertSelToPath()],
+      [t('Alles auswählen'), commandKey('selectall'), () => ed.selectAll()],
+      [t('In Pfad umwandeln'), commandKey('tolines'), () => ed.convertSelToPath()],
       'sep',
       [t('Sichtbar, wenn …'), '', () => openShowIfDialog(ed, ed.sel)],
       [t('Zur Bibliothek hinzufügen …'), '', () => openAddSelectionDialog(ed)],
@@ -257,6 +285,13 @@ function buildMenu(ed: Editor) {
       [t('Knoten bearbeiten'), 'Ctrl+`', () => ed.setTool('node')],
       'sep',
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
+      [t('Freihand / Bleistift'), '', () => ed.setTool('pencil')],
+      [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
+      [t('Formerstellung …'), '', () => beginShapeBuilder(ed)],
+      [t('Außenkontur und Inseln ableiten …'), '', () => void openOutlineDialog(ed)],
+      [t('Schlitze / Ausklinkungen platzieren …'), '', () => openSlotPlacementDialog(ed)],
+      [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
+      [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
       [t('Rechteck'), 'Ctrl+R', () => ed.setTool('rect')],
       [t('Ellipse'), 'Ctrl+E', () => ed.setTool('ellipse')],
       [t('Polygon'), '', () => ed.setTool('polygon')],
@@ -273,12 +308,16 @@ function buildMenu(ed: Editor) {
         [t('Boolesche Optionen …'), '', () => openBooleanDialog(ed)],
       ] },
       [t('Offset …'), 'Alt+O', () => openOffsetDialog(ed)],
+      [t('Lokaler Konturversatz …'), '', () => openContourOffsetDialog(ed)],
       [t('Verformen …'), '', () => openWarpDialog(ed)],
       { sub: t('Pfad'), items: [
         [t('Pfad schließen'), '', () => ed.closeSel()],
         [t('Pfade mit Toleranz schließen …'), '', () => openCloseDialog(ed)],
         [t('Ausgewählte Formen verbinden'), 'Alt+J', () => ed.joinSel()],
         [t('Zerlegen'), 'Alt+B', () => ed.breakApartSel()],
+        [t('Pfadinseln trennen …'), '', () => openPathIslandsDialog(ed)],
+        [t('Freihandpfad bearbeiten …'), '', () => openFreehandEditDialog(ed)],
+        [t('Lasso-Auswahl'), '', () => ed.setTool('lasso')],
         [t('Richtung umkehren'), '', () => ed.reverseSel()],
         [t('Ecken runden oder fasen …'), '', () => openCornerDialog(ed)],
         'sep',
@@ -308,8 +347,8 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Anordnen'), [
-      [t('Gruppieren'), 'Ctrl+G', () => ed.group()],
-      [t('Gruppierung aufheben'), 'Ctrl+U', () => ed.ungroup()],
+      [t('Gruppieren'), commandKey('group'), () => ed.group()],
+      [t('Gruppierung aufheben'), commandKey('ungroup'), () => ed.ungroup()],
       'sep',
       { sub: t('Spiegeln und drehen'), items: [
         [t('Horizontal spiegeln'), 'Ctrl+Shift+H', () => ed.mirror(true)],
@@ -377,6 +416,7 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Ansicht'), [
+      [t('Alle Kameraüberlagerungen anzeigen'), '', () => toggleCameraOverlays(ed), cameraOverlaysVisible],
       [t('Ganze Seite'), 'Ctrl+0', () => ed.zoomPage()],
       [t('Auf Auswahl zoomen'), '', () => ed.zoomSelection()],
       [t('Vergrößern'), '+', () => ed.zoomAt(1.25)],
@@ -434,7 +474,7 @@ function buildMenu(ed: Editor) {
     openMenu = null;
   };
   // Einträge (auch Untermenüs, die beim Überfahren aufklappen) in eine Liste füllen;
-  // Häkchen werden beim Öffnen des Hauptmenüs aktualisiert
+  // Häkchen und Verfügbarkeit werden beim Öffnen des Hauptmenüs aktualisiert
   const fill = (list: HTMLElement, items: MenuItem[], checks: (() => void)[]) => {
     let hasChecks = false;
     for (const it of items) {
@@ -450,7 +490,11 @@ function buildMenu(ed: Editor) {
         });
         list.append(sub);
       } else {
-        const b = h('button', { onclick: () => (close(), it[2]()) }, h('span', {}, it[0]), it[1] ? h('kbd', {}, it[1]) : null);
+        const enabled = it[4];
+        const b = h('button', { onclick: () => { if (!enabled || enabled()) { close(); it[2](); } } }, h('span', {}, it[0]), it[1] ? h('kbd', {}, it[1]) : null);
+        if (enabled) checks.push(() => { b.disabled = !enabled(); });
+        const visible = it[5];
+        if (visible) checks.push(() => { b.hidden = !visible(); });
         const checked = it[3];
         if (checked) {
           const mark = h('span', { class: 'check-mark' });
@@ -761,10 +805,12 @@ function buildNumbar(ed: Editor) {
   // Knotenbearbeitung
   const nodeBtn = (label: string, title: string, f: () => void) => h('button', { class: 'toggle', title, onclick: f }, label);
   const nodeInfo = h('span', { class: 'muted' });
+  const nodeLassoButton=nodeBtn(t('Knoten-Lasso'),t('Lasso statt Rahmen für Knoten und Anfasser; Alt zieht auch direkt über einer Komponente'),()=>{ed.nodeLasso=!ed.nodeLasso;ed.emit('tool');});
   const nodeProps = h(
     'div',
     { class: 'field' },
     nodeInfo,
+    nodeLassoButton,
     nodeBtn(t('Gerade'), t('Segmente zwischen den ausgewählten Knoten in Geraden umwandeln (L)'), () => ed.setSegmentType(false)),
     nodeBtn(t('Kurve'), t('Segmente zwischen den ausgewählten Knoten in Kurven umwandeln (C)'), () => ed.setSegmentType(true)),
     nodeBtn(t('Ecke'), t('Ausgewählte Knoten zu Ecken machen, Anfasser entfernen (E)'), () => ed.setNodeType(false)),
@@ -773,6 +819,17 @@ function buildNumbar(ed: Editor) {
     nodeBtn(t('Ecken …'), t('Ausgewählte Ecken runden, innen runden oder fasen'), () => openCornerDialog(ed)),
   );
   const sepNode = sep();
+  const pencilTolerance = h('input', { type: 'number', min: 0.001, max: 100, step: 0.01, value: String(ed.pencilTolerance),
+    'aria-label': t('Freihandtoleranz in Millimetern'), style: 'width: 7ch' });
+  pencilTolerance.addEventListener('change', () => {
+    const v = pencilTolerance.valueAsNumber;
+    if (Number.isFinite(v) && v >= 0.001 && v <= 100) ed.pencilTolerance = v;
+    else pencilTolerance.value = String(ed.pencilTolerance);
+  });
+  const pencilClosed = h('input', { type: 'checkbox' });
+  pencilClosed.addEventListener('change', () => { ed.pencilClosed = pencilClosed.checked; });
+  const pencilProps = h('span', { class: 'field' }, h('label', {}, t('Anpassungstoleranz (mm)'), pencilTolerance),
+    h('label', { class: 'check' }, pencilClosed, t('Geschlossener Pfad')));
 
   // Bilder
   const imgInfo = h('span', { class: 'muted' });
@@ -811,7 +868,7 @@ function buildNumbar(ed: Editor) {
   const sepGen = sep();
 
   const sepShape = sep();
-  bar.append(geo, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps, sep(), textProps);
+  bar.append(geo, pencilProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps, sep(), textProps);
 
   const refresh = () => {
     const b = ed.selBounds();
@@ -827,6 +884,8 @@ function buildNumbar(ed: Editor) {
     } else [fx, fy, fw, fh, fwp, fhp, fr].forEach((f) => setVal(f, ''));
 
     nodeProps.hidden = sepNode.hidden = ed.tool !== 'node';
+    nodeLassoButton.setAttribute('aria-pressed',String(ed.nodeLasso));nodeLassoButton.classList.toggle('active',ed.nodeLasso);
+    pencilProps.hidden = ed.tool !== 'pencil';
     const imgs = ed.selImages();
     imgProps.hidden = sepImg.hidden = !imgs.length;
     const canCrop = imgs.length === 1 && ed.sel.length > 1;
@@ -852,7 +911,8 @@ function buildNumbar(ed: Editor) {
       genIcon.innerHTML = ICONS[getGenerator(gs.gen)?.icon ?? 'gear'] ?? ICONS.gear;
     }
     const nn = ed.nodeSelCount;
-    nodeInfo.textContent = nn ? t('{n} Knoten', { n: nn }) : t('Knoten');
+    const ns = ed.nodeTargets().reduce((n, o) => n + ed.segmentSelection(o).size, 0);
+    nodeInfo.textContent = t('{nodes} Knoten · {segments} Segmente · {objects} Objekte', { nodes: nn, segments: ns, objects: ed.nodeTargets().length });
     nodeProps.classList.toggle('group-disabled', ed.tool === 'node' && !ed.sel.length);
 
     const rect = ed.sel.find((o) => o.shape.kind === 'rect');
@@ -939,12 +999,17 @@ function buildBars(ed: Editor) {
     { id: 'closepath', cat: M, short: t('Schließen|Pfad'), label: t('Pfad schließen'), run: () => ed.closeSel(), enabled: sel1 },
     { id: 'join', cat: M, short: t('Verbinden|Pfade'), label: t('Ausgewählte Formen verbinden (Alt+J)'), run: () => ed.joinSel(), enabled: sel2 },
     { id: 'breakapart', cat: M, short: t('Zerlegen'), label: t('Zerlegen (Alt+B)'), run: () => ed.breakApartSel(), enabled: sel1 },
+    { id: 'path-islands', cat: M, label: t('Pfadinseln trennen …'), run: () => openPathIslandsDialog(ed), enabled: sel1 },
+    { id: 'freehand-edit', cat: W, icon:'line', label:t('Freihandpfad bearbeiten …'), run:()=>openFreehandEditDialog(ed), enabled:sel1, on:()=>ed.tool==='freehand-edit' },
+    tool('lasso','select',t('Lasso-Auswahl')),
     { id: 'reverse', cat: M, short: t('Umkehren'), label: t('Richtung umkehren'), run: () => ed.reverseSel(), enabled: sel1 },
     { id: 'corners', cat: M, short: t('Ecken'), label: t('Ecken runden oder fasen …'), run: () => openCornerDialog(ed), enabled: sel1 },
     { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern (+)'), run: () => ed.zoomAt(1.25) },
     { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern (-)'), run: () => ed.zoomAt(0.8) },
     { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite (Ctrl+0)'), run: () => ed.zoomPage() },
     { id: 'grid', cat: V, icon: 'grid', label: t('Gitter ein-/ausblenden'), run: () => ed.setGrid({ show: !ed.grid.show }), on: () => ed.grid.show },
+    { id: 'camera-overlays', cat: V, icon: 'cameraOverlay', label: t('Alle Kameraüberlagerungen anzeigen'), run: () => toggleCameraOverlays(ed), on: cameraOverlaysVisible,
+      dyn: () => ({ icon: cameraOverlaysVisible() ? 'cameraOverlay' : 'cameraOverlayOff' }) },
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
     { id: 'zoomsel', cat: V, icon: 'zoomsel', label: t('Auf Auswahl zoomen'), run: () => ed.zoomSelection(), enabled: sel1 },
     { id: 'view3d', cat: V, icon: 'view3d', label: t('3D-Ansicht: Baugruppen zusammengesteckt ansehen'), run: () => toggleWindow('view3d') },
@@ -970,6 +1035,11 @@ function buildBars(ed: Editor) {
     tool('select', 'select', t('Auswählen (Esc)')),
     tool('node', 'node', t('Knoten bearbeiten (Ctrl+`)')),
     tool('line', 'line', t('Linien zeichnen (Ctrl+L)')),
+    tool('pencil', 'pencil', t('Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad')),
+    { id: 'vectorfit', cat: W, icon: 'vectorfit', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.nodeTargets().length > 0 },
+    { id: 'shape-builder', cat: W, icon: 'shapeBuilder', label: t('Formerstellung …'), run: () => beginShapeBuilder(ed), enabled: sel1, on: () => ed.tool === 'builder' },
+    { id: 'isolate', cat: W, icon: 'isolate', label: t('Auswahl isolieren / Isolation verlassen'), run: () => { if (ed.isolation) ed.leaveIsolation(); else ed.isolateSelection(); }, enabled: () => !!ed.isolation || canEnterIsolation(ed), on: () => !!ed.isolation,
+      dyn: () => ed.isolation ? { icon: 'isolateExit', label: t('Isolation verlassen') } : { icon: 'isolate', label: t('Auswahl isolieren') } },
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
     tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),
     tool('polygon', 'polygon', t('Polygon')),
@@ -1016,6 +1086,7 @@ function buildBars(ed: Editor) {
     },
     { id: 'intersect', cat: M, icon: 'intersect', label: t('Schnittmenge (Alt+*): nur die gemeinsame Fläche behalten'), run: () => ed.booleanSel('intersect'), enabled: sel2 },
     { id: 'boolopts', cat: M, icon: 'settings', small: true, label: t('Boolesche Optionen: Basis und Originale behalten'), run: () => openBooleanDialog(ed) },
+    { id: 'outline', cat: M, icon: 'union', label: t('Außenkontur und Inseln ableiten …'), run: () => void openOutlineDialog(ed), enabled: sel1 },
     { id: 'offset', cat: M, icon: 'offset', label: t('Offset (Alt+O)'), run: () => openOffsetDialog(ed), enabled: sel1 },
     { id: 'warp', cat: M, icon: 'warp', label: t('Verformen: Formen, Text und Bilder biegen, wölben oder perspektivisch verzerren'), run: () => openWarpDialog(ed), enabled: sel1 },
     { id: 'gridarray', cat: M, icon: 'gridArray', label: t('Rasterarray: Auswahl in Spalten und Zeilen kopieren (Ctrl+Shift+A)'), run: () => openGridArrayDialog(ed), enabled: sel1 },
@@ -1043,6 +1114,8 @@ function buildBars(ed: Editor) {
     { id: 'devices', cat: L, short: t('Geräte'), label: t('Geräte …'), run: () => openDevicesDialog(ed) },
     { id: 'rotary', cat: L, icon: 'rotary', short: t('Rotary'), label: t('Drehachse (Rotary) …'), run: () => openRotaryDialog() },
     { id: 'slots', cat: M, icon: 'slots', label: t('Schlitze an Materialdicke anpassen …'), run: () => openSlotDialog(ed) },
+    { id: 'slotplace', cat: M, icon: 'slots', label: t('Schlitze / Ausklinkungen platzieren …'), run: () => openSlotPlacementDialog(ed), enabled: () => n() === 1 },
+    { id: 'contouroffset', cat: M, icon: 'offset', label: t('Lokaler Konturversatz …'), run: () => openContourOffsetDialog(ed), enabled: () => n() > 0 },
     { id: 'jigfill', cat: A, icon: 'jigfill', label: t('Auf Jig-Fächer legen: gewähltes Design in jedes Fach eines Jigs kopieren, auf Wunsch mit Seriennummer je Fach'), run: () => openJigFillDialog(ed), enabled: sel1 },
     { id: 'workpiece', cat: A, icon: 'workpiece', label: t('Auf Werkstücke übertragen (Kamera) …'), run: () => openWorkpieceDialog(ed), enabled: sel1 },
     { id: 'bgremove', cat: I, icon: 'bgremove', label: t('Hintergrund entfernen …'), run: () => openBackgroundDialog(ed), enabled: () => ed.selImages().length > 0 },
@@ -1068,11 +1141,11 @@ function buildBars(ed: Editor) {
     {
       main: [
         'new', 'open', 'save', 'import', 'export', SEP, 'undo', 'redo', SEP, 'cut', 'copy', 'paste', 'delete', SEP,
-        'grp:zoom', 'view3d', SEP, 'check', 'preview', SEP,
+        'grp:zoom', 'view3d', 'camera-overlays', SEP, 'check', 'preview', SEP,
         'group', 'ungroup', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
+        'tool:select', 'tool:node', 'vectorfit', 'shape-builder', 'isolate', SEP, 'tool:line', 'tool:pencil', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
         'grp:bool', 'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure',
       ],
     },
@@ -1518,7 +1591,10 @@ function buildLayers(ed: Editor) {
     pending = true;
     requestAnimationFrame(() => {
       pending = false;
-      if (!root.contains(document.activeElement)) render();
+      // Eingabefelder beim Bearbeiten erhalten, aber fokussierte Aktionsbuttons
+      // (z. B. Layer nach oben/unten) dürfen die Aktualisierung nicht blockieren.
+      const focused = document.activeElement;
+      if (!root.contains(focused) || !focused?.matches('input,select,textarea,[contenteditable="true"]')) render();
     });
   };
   root.addEventListener('focusout', () => setTimeout(schedule, 0));
@@ -2009,3 +2085,6 @@ function buildTextEditor(ed: Editor) {
   }, true);
   ta.addEventListener('blur', () => setTimeout(() => document.activeElement !== ta && close(), 0));
 }
+import { openPathIslandsDialog } from './pathIslandsDialog';
+import { openFreehandEditDialog } from './freehandEditDialog';
+import { openOverlapSettings } from './overlapPicker';

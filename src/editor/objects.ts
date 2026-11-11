@@ -1,5 +1,5 @@
 // Editor: Objekte-Fenster: Name, Sichtbarkeit, Sperre, Reihenfolge, Gruppen, Ausrichten, Layer.
-import { IDENT, isOff, Layer, mul, newId, Obj, setLayerDeep, translate, visibleLeaves, homeLayer } from '../model';
+import { IDENT, isOff, Layer, mul, newId, Obj, setLayerDeep, translate, visibleLeaves, homeLayer, defaultLayer } from '../model';
 import { Box, boundsOf } from '../geom';
 import type { Editor } from '../editor';
 import { t, tn } from '../i18n';
@@ -10,15 +10,16 @@ export class EditorObjects {
     if (top.locked) return true;
     let any = false;
     for (const [l] of visibleLeaves([top])) {
-      if (!this.layer(l.layer).locked) return false;
+      if (!(this.doc.layers[l.layer] ?? defaultLayer(l.layer)).locked) return false;
       any = true;
     }
     return any;
   }
   /** Auf der Arbeitsfläche auswählbar: nicht gesperrt und etwas davon ist zu sehen */
   selectable(this: Editor, top: Obj): boolean {
+    if (this.isolation && !this.isolation.ids.has(top.id)) return false;
     if (isOff(top) || this.isLocked(top)) return false;
-    for (const [l] of visibleLeaves([top])) if (this.layer(l.layer).show) return true;
+    for (const [l] of visibleLeaves([top])) if ((this.doc.layers[l.layer] ?? defaultLayer(l.layer)).show) return true;
     return false;
   }
   /** Name, Sichtbarkeit oder Sperre eines Objekts (auch in Gruppen) ändern */

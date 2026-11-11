@@ -7,6 +7,8 @@ import { t } from '../i18n';
 import type { Editor } from '../editor';
 import { genLeaves, isMarkGroup } from './generators';
 import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, RULER, SNAP_PX, TOOL_HINTS } from './shared';
+import { MAX_VECTOR_SAMPLES } from '../vectorFit';
+import { canvasWheelFactor, pinchGestureActive } from '../canvasZoom';
 
 const ROTATE_CURSOR =
   `url("data:image/svg+xml,${encodeURIComponent(
@@ -35,6 +37,8 @@ export class EditorPointer {
   }
 
   onDown(this: Editor, e: PointerEvent) {
+    // A second pointer must not replace an in-progress freehand stroke.
+    if (this.drag?.type === 'pencil' || this.drag?.type === 'freehand-edit' || this.drag?.type === 'lasso') return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     this.canvas.setPointerCapture(e.pointerId);
@@ -44,6 +48,9 @@ export class EditorPointer {
       return;
     }
     if (e.button === 2) {
+      if (this.outlinePreview) { this.suppressContextMenu = true; return; }
+      this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || this.tool === 'builder' || !!this.pickHandler || !!this.drag;
+      if (this.tool === 'builder') this.setTool('select');
       if (this.draft) this.finishLine();
       if (this.sketchEdit && this.sketchEdit.draft.length) {
         this.sketchEdit.draft = [];
@@ -53,6 +60,10 @@ export class EditorPointer {
       return;
     }
     if (e.button !== 0) return;
+    if (this.outlinePreview) {
+      if (sx >= RULER && sy >= RULER) this.outlinePreview.pick(wp);
+      return;
+    }
     // Punktabfrage (z. B. Laser zur Klickposition): Klick geht nur an sie, nicht ans Werkzeug
     if (this.pickHandler && (sx >= RULER || sy >= RULER)) {
       this.pickHandler(wp);
@@ -70,6 +81,14 @@ export class EditorPointer {
       return;
     }
     switch (this.tool) {
+      case 'freehand-edit': this.beginFreehandEdit(wp, e.pointerId); return;
+      case 'lasso': this.beginLasso(wp, e, false); return;
+      case 'builder':
+        if (!this.builderSession) return;
+        this.builderSession.picked.clear(); this.builderSession.erase = e.altKey;
+        this.builderStroke(wp, wp);
+        this.drag = { type: 'builder', last: wp, pointerId: e.pointerId };
+        return;
       case 'select': {
         if (this.hitPivot(sx, sy)) {
           this.drag = { type: 'pivot' };
@@ -148,6 +167,12 @@ export class EditorPointer {
         this.redraw();
         return;
       }
+      case 'pencil':
+        e.preventDefault();
+        this.clearSnap();
+        this.drag = { type: 'pencil', points: [wp], pointerId: e.pointerId, overflow: false };
+        this.redraw();
+        return;
       case 'text': {
         e.preventDefault(); // Fokus bleibt im Texteingabefeld
         const o = this.hitTest(wp);
@@ -198,12 +223,12 @@ export class EditorPointer {
         return;
       }
       case 'node': {
+        if(this.nodeLasso && e.altKey){this.beginLasso(wp,e,true);return;}
+        this.updateNodeHover(sx, sy);
         const target = this.nodeTarget();
         const add = e.shiftKey || e.ctrlKey || e.metaKey;
         if (target && this.nodeHover) {
           const h = this.nodeHover;
-          if (target.shape.kind !== 'path') this.convertObjToPath(target);
-          const subs = (target.shape as { subs: SubPath[] }).subs;
           const sel = this.nodeSelection(target);
           const key = `${h.sub}:${h.idx}`;
           if (h.which === 'p') {
@@ -215,52 +240,45 @@ export class EditorPointer {
               }
               sel.add(key);
             } else if (!sel.has(key)) {
-              sel.clear();
+              this.clearNodeSel();
+              this.nodeSets.set(target, sel); sel.clear();
               sel.add(key);
             }
             this.emit('sel');
           }
-          const group = h.which === 'p' ? this.selectedNodes(target).map(({ sub, idx }) => ({ sub, idx, orig: clone(subs[sub].nodes[idx]) })) : [];
-          const orig = clone(subs[h.sub].nodes[h.idx]);
-          const op = h.which === 'p' ? orig : orig[h.which]!;
-          // Fangpunkte: andere Objekte und die ruhenden Knoten des Ziels
-          const snapSet = this.buildSnap([target]);
-          const moving = new Set(h.which === 'p' ? group.map((g) => `${g.sub}:${g.idx}`) : []);
-          subs.forEach((sp, si) =>
-            sp.nodes.forEach((n, ni) => {
-              if (moving.has(`${si}:${ni}`) || (si === h.sub && ni === h.idx)) return;
-              const q = apply(target.m, n.x, n.y);
-              snapSet.addPoint(q.x, q.y, 'node');
-            }),
-          );
-          this.snapshot(t('Knoten verschieben'));
-          this.drag = {
-            type: 'node', obj: target, sub: h.sub, idx: h.idx,
-            which: h.which, start: wp, orig, moved: false, group, origWorld: apply(target.m, op.x, op.y), snapSet,
-          };
+          if(h.which!=='p') {
+            const key=`${h.sub}:${h.idx}:${h.which}`,picked=this.handleSelection(target);
+            if(add){if(picked.has(key))picked.delete(key);else picked.add(key);this.emit('sel');return;}
+            if(!picked.has(key)){this.clearNodeSel();this.handleSelection(target).add(key);}
+            this.emit('sel');
+          }
+          this.startComponentDrag(target, h.sub, h.idx, h.which, wp);
           return;
         }
         if (target && this.segHover) {
-          // Klick auf eine Kante wählt ihre beiden Endknoten
+          // Segments have independent selection/deletion semantics.
           const sg = segments(shapeSubs(target.shape)[this.segHover.sub])[this.segHover.seg];
-          const sel = this.nodeSelection(target);
-          if (!add) sel.clear();
-          sel.add(`${this.segHover.sub}:${sg.ia}`);
-          sel.add(`${this.segHover.sub}:${sg.ib}`);
+          const h = this.segHover, key = `${h.sub}:${h.seg}`;
+          const sel = this.segmentSelection(target);
+          if (add && sel.has(key)) { sel.delete(key); this.emit('sel'); return; }
+          if (!add && !sel.has(key)) { this.clearNodeSel(); this.segmentSets.set(target, sel); sel.clear(); }
+          sel.add(key);
           this.emit('sel');
+          this.startComponentDrag(target, h.sub, sg.ia, 'p', wp);
           return;
         }
         const hit = this.hitTest(wp);
-        if (target && (!hit || hit === target)) {
+        if(this.nodeLasso && target && (!hit||this.nodeTargets().includes(hit))){this.beginLasso(wp,e,true);return;}
+        if (target && (!hit || this.nodeTargets().includes(hit))) {
           // Rahmen zum Auswählen von Knoten
           this.drag = {
-            type: 'nodebox', start: wp, end: wp, obj: target, base: new Set(this.nodeSelection(target)),
+            type: 'nodebox', start: wp, end: wp, obj: target, base: new Map(this.nodeTargets().map((o) => [o, new Set(this.nodeSelection(o))])),
             mode: e.shiftKey ? 'add' : e.ctrlKey || e.metaKey ? 'toggle' : 'set', onTarget: hit === target,
           };
           return;
         }
         const o = this.hitTest(wp);
-        this.setSel(o ? [o] : []);
+        this.setSel(o ? add ? [...this.sel.filter((x) => x !== o), o] : [o] : []);
         if (o && genLeaves([o]).length) {
           void this.guardGen([o], t('Knoten bearbeiten')).then((ok) => {
             if (!ok) return;
@@ -279,11 +297,17 @@ export class EditorPointer {
   }
 
   onMove(this: Editor, e: PointerEvent) {
+    if((this.drag?.type==='freehand-edit'||this.drag?.type==='lasso') && this.drag.pointerId!==e.pointerId)return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     this.cursor = wp;
     const d = this.drag;
     this.emit('view');
+    if (!d && this.outlinePreview) {
+      this.canvas.style.cursor = 'crosshair';
+      this.outlinePreview.move(wp);
+      return;
+    }
     if (!d && this.pickHandler) {
       this.canvas.style.cursor = 'crosshair';
       return;
@@ -326,7 +350,8 @@ export class EditorPointer {
                     ? 'row-resize'
                     : 'col-resize'
                   : 'default';
-      } else if (this.tool === 'node') this.updateNodeHover(sx, sy);
+      } else if (this.tool === 'builder') this.builderHover(wp.x, wp.y);
+      else if (this.tool === 'node') this.updateNodeHover(sx, sy);
       else if (this.tool === 'joint') this.updateJointHover(sx, sy);
       else if (this.tool === 'relate') this.updateRelHover(sx, sy);
       else if (this.tool === 'trim') this.updateTrimHover(sx, sy);
@@ -334,6 +359,25 @@ export class EditorPointer {
       return;
     }
     switch (d.type) {
+      case 'freehand-edit': this.sampleFreehandEdit(wp,e.pointerId); return;
+      case 'lasso':
+        if(Math.hypot(wp.x-d.points.at(-1)!.x,wp.y-d.points.at(-1)!.y)*this.view.zoom>=2){if(d.points.length<4096)d.points.push(wp);else d.overflow=true;}
+        this.redraw();return;
+      case 'builder':
+        if (d.pointerId !== e.pointerId) return;
+        this.builderStroke(d.last, wp); d.last = wp; return;
+      case 'pencil': {
+        if (e.pointerId !== d.pointerId || d.overflow) return;
+        const samples = e.getCoalescedEvents?.() ?? [];
+        for (const sample of [...samples, e]) {
+          const p = this.evPt(sample), world = this.toWorld(p.sx, p.sy), last = d.points[d.points.length - 1];
+          if (!Number.isFinite(world.x) || !Number.isFinite(world.y)) continue;
+          if (Math.hypot(world.x - last.x, world.y - last.y) * this.view.zoom < 1) continue;
+          if (d.points.length >= MAX_VECTOR_SAMPLES) { d.overflow = true; this.hint = t('Strich zu lang. Loslassen und einen kürzeren Strich zeichnen.'); this.emit('tool'); break; }
+          d.points.push(world);
+        }
+        this.redraw(); return;
+      }
       case 'pan':
         this.view.ox = d.ox + sx - d.sx;
         this.view.oy = d.oy + sy - d.sy;
@@ -491,6 +535,11 @@ export class EditorPointer {
       }
       case 'node': {
         const o = d.obj;
+        if (!d.moved) {
+          if (Math.hypot(wp.x - d.start.x, wp.y - d.start.y) * this.view.zoom < 1) return;
+          this.snapshot(t('Pfadkomponenten verschieben'));
+          for (const s of d.shapes) this.convertObjToPath(s.obj);
+        }
         const im = inv(o.m);
         const tgt = this.snapPt({ x: d.origWorld.x + wp.x - d.start.x, y: d.origWorld.y + wp.y - d.start.y }, e, { set: d.snapSet });
         const a = apply(im, d.origWorld.x, d.origWorld.y),
@@ -503,13 +552,17 @@ export class EditorPointer {
         const sh = (p?: Pt) => (p ? { x: p.x + dx, y: p.y + dy } : undefined);
         if (d.which === 'p' && d.group.length) {
           for (const g of d.group) {
-            const m = subs[g.sub].nodes[g.idx];
-            m.x = g.orig.x + dx;
-            m.y = g.orig.y + dy;
-            m.cin = sh(g.orig.cin);
-            m.cout = sh(g.orig.cout);
+            const matrix = inv(g.obj.m), p0 = apply(matrix, 0, 0), p1 = apply(matrix, tgt.x - d.origWorld.x, tgt.y - d.origWorld.y);
+            const gx = p1.x - p0.x, gy = p1.y - p0.y;
+            const shift = (p?: Pt) => p && ({ x: p.x + gx, y: p.y + gy });
+            const m = (g.obj.shape as { subs: SubPath[] }).subs[g.sub].nodes[g.idx];
+            m.x = g.orig.x + gx;
+            m.y = g.orig.y + gy;
+            m.cin = shift(g.orig.cin);
+            m.cout = shift(g.orig.cout);
             if (!m.cin) delete m.cin;
             if (!m.cout) delete m.cout;
+            this.touch(g.obj.shape);
           }
         } else if (d.which === 'p') {
           n.x = d.orig.x + dx;
@@ -518,6 +571,14 @@ export class EditorPointer {
           n.cout = sh(d.orig.cout);
           if (!n.cin) delete n.cin;
           if (!n.cout) delete n.cout;
+        } else if(d.handles.length) {
+          const delta={x:tgt.x-d.origWorld.x,y:tgt.y-d.origWorld.y};
+          for(const h of d.handles) {
+            const matrix=inv(h.obj.m),zero=apply(matrix,0,0),move=apply(matrix,delta.x,delta.y);
+            const node=(h.obj.shape as {subs:SubPath[]}).subs[h.sub].nodes[h.idx],p=h.orig[h.which]!;
+            node[h.which]={x:p.x+move.x-zero.x,y:p.y+move.y-zero.y};
+            node.smooth=false;this.touch(h.obj.shape);
+          }
         } else {
           const h = sh(d.orig[d.which])!;
           n[d.which] = h;
@@ -538,6 +599,10 @@ export class EditorPointer {
   }
 
   onUp(this: Editor, e: PointerEvent) {
+    if((this.drag?.type==='freehand-edit'||this.drag?.type==='lasso') && this.drag.pointerId!==e.pointerId)return;
+    // Ignore unrelated releases before clearing the active drag. In particular,
+    // a second touch/pen can otherwise make a Pencil stroke silently disappear.
+    if (this.drag && 'pointerId' in this.drag && this.drag.pointerId !== e.pointerId) return;
     if (this.tool === 'sketch') this.sketchUp();
     const d = this.drag;
     this.drag = null;
@@ -546,6 +611,20 @@ export class EditorPointer {
     this.alignGuides = [];
     this.redraw();
     switch (d.type) {
+      case 'builder': {
+        if (d.pointerId !== e.pointerId) return;
+        const p = this.evPt(e), end = this.toWorld(p.sx, p.sy);
+        this.builderStroke(d.last, end); this.commitShapeBuilder(); return;
+      }
+      case 'pencil': {
+        if (e.pointerId !== d.pointerId || d.overflow) return;
+        const p = this.evPt(e), end = this.toWorld(p.sx, p.sy);
+        if (Number.isFinite(end.x) && Number.isFinite(end.y) && d.points.length < MAX_VECTOR_SAMPLES) d.points.push(end);
+        this.finishPencil(d.points, this.pencilClosed);
+        return;
+      }
+      case 'freehand-edit': {const {sx,sy}=this.evPt(e);this.finishFreehandEdit(d,this.toWorld(sx,sy));return;}
+      case 'lasso': {const {sx,sy}=this.evPt(e);if(d.points.length<4096)d.points.push(this.toWorld(sx,sy));this.finishLasso(d);return;}
       case 'guide': {
         if (d.idx === null || !d.moved) return;
         const { sx, sy } = this.evPt(e);
@@ -614,32 +693,30 @@ export class EditorPointer {
       case 'pivot':
         return;
       case 'node':
-        if (!d.moved) this.dropSnapshot();
+        if (d.moved && d.shapes.every((s) => JSON.stringify(s.obj.shape) === JSON.stringify(s.shape))) {
+          this.dropSnapshot(); this.history.restoreRedo(d.redo);
+        }
         this.emit('doc');
         return;
       case 'nodebox': {
         const r = normBox(d.start, d.end);
-        const sel = this.nodeSelection(d.obj);
         if (r.w * this.view.zoom < 3 && r.h * this.view.zoom < 3) {
           // einfacher Klick: Knotenauswahl aufheben, im Leeren auch das Objekt abwählen
           if (d.mode === 'set') {
-            if (!sel.size && !d.onTarget) this.setSel([]);
-            sel.clear();
+            this.clearNodeSel();
           }
           this.emit('sel');
           return;
         }
-        const hits: string[] = [];
-        shapeSubs(d.obj.shape).forEach((sp, si) =>
-          sp.nodes.forEach((n, ni) => {
-            const p = apply(d.obj.m, n.x, n.y);
-            if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) hits.push(`${si}:${ni}`);
-          }),
-        );
-        if (d.mode === 'set') sel.clear();
-        for (const k of hits) {
-          if (d.mode === 'toggle' && d.base.has(k)) sel.delete(k);
-          else sel.add(k);
+        if (d.mode === 'set') this.clearNodeSel();
+        for (const obj of this.nodeTargets()) {
+          const sel = this.nodeSelection(obj);
+          shapeSubs(obj.shape).forEach((sp, si) => sp.nodes.forEach((n, ni) => {
+            const p = apply(obj.m, n.x, n.y), key = `${si}:${ni}`;
+            if (p.x < r.x || p.x > r.x + r.w || p.y < r.y || p.y > r.y + r.h) return;
+            if (d.mode === 'toggle' && d.base.get(obj)?.has(key)) sel.delete(key);
+            else sel.add(key);
+          }));
         }
         this.emit('sel');
         return;
@@ -649,6 +726,8 @@ export class EditorPointer {
   }
 
   onDouble(this: Editor, e: MouseEvent) {
+    if (this.outlinePreview) return;
+    if (this.tool === 'builder') return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     if (this.tool === 'sketch') {
@@ -691,8 +770,9 @@ export class EditorPointer {
 
   onWheel(this: Editor, e: WheelEvent) {
     e.preventDefault();
+    if (e.ctrlKey && pinchGestureActive(this.canvas)) return;
     const { sx, sy } = this.evPt(e);
-    if (e.ctrlKey || Math.abs(e.deltaY) > 0 || e.deltaMode) this.zoomAt(Math.pow(1.0015, -e.deltaY * (e.deltaMode ? 30 : 1)), sx, sy);
+    if (e.deltaY) this.zoomAt(canvasWheelFactor(e, Math.log(1.0015)), sx, sy);
   }
 
   newShape(this: Editor): Shape {
@@ -722,7 +802,13 @@ export class EditorPointer {
   }
 
   /** Laufendes Ziehen abbrechen und den Ausgangszustand wiederherstellen */
+  cancelPointerDrag(this: Editor, e: PointerEvent) {
+    if (!this.drag || ('pointerId' in this.drag && this.drag.pointerId !== e.pointerId)) return;
+    this.cancelDrag();
+  }
+
   cancelDrag(this: Editor) {
+    if (this.builderSession) this.builderSession.picked.clear();
     const d = this.drag;
     if (!d) return;
     this.drag = null;
@@ -740,20 +826,33 @@ export class EditorPointer {
       this.dropSnapshot();
       this.setSel([]);
     } else if (d.type === 'node') {
-      const subs = (d.obj.shape as { subs: SubPath[] }).subs;
-      const restore = (n: Node, orig: Node) => {
-        delete n.cin;
-        delete n.cout;
-        Object.assign(n, clone(orig));
-      };
-      restore(subs[d.sub].nodes[d.idx], d.orig);
-      for (const g of d.group) restore(subs[g.sub].nodes[g.idx], g.orig);
-      this.touch(d.obj.shape);
-      this.dropSnapshot();
+      if (d.moved) {
+        for (const s of d.shapes) { s.obj.shape = s.shape; this.touch(s.shape); }
+        this.dropSnapshot(); this.history.restoreRedo(d.redo);
+      }
     }
     this.hint = '';
     this.clearSnap();
     this.emit('doc');
     this.emit('sel');
+  }
+
+  startComponentDrag(this: Editor, target: Obj, sub: number, idx: number, which: 'p' | 'cin' | 'cout', start: Pt) {
+    const handles=which==='p'?[]:this.selectedHandles().map(h=>({...h,orig:clone(shapeSubs(h.obj.shape)[h.sub].nodes[h.idx])}));
+    const targets = which === 'p' ? this.nodeTargets().filter((o) => this.movingNodes(o).length) : handles.length?[...new Set(handles.map(h=>h.obj))]:[target];
+    const shapes = targets.map((obj) => ({ obj, shape: clone(obj.shape) }));
+    const subs = shapeSubs(target.shape), orig = clone(subs[sub].nodes[idx]);
+    const group = which === 'p' ? targets.flatMap((obj) => this.movingNodes(obj).map((n) => ({ ...n, orig: clone(shapeSubs(obj.shape)[n.sub].nodes[n.idx]) }))) : [];
+    const op = which === 'p' ? orig : orig[which]!;
+    const snapSet = this.buildSnap(targets);
+    for (const obj of targets) {
+      const moving = new Set(group.filter((g) => g.obj === obj).map((g) => `${g.sub}:${g.idx}`));
+      shapeSubs(obj.shape).forEach((sp, si) => sp.nodes.forEach((n, ni) => {
+        if (moving.has(`${si}:${ni}`) || (obj === target && si === sub && ni === idx)) return;
+        const p = apply(obj.m, n.x, n.y); snapSet.addPoint(p.x, p.y, 'node');
+      }));
+    }
+    this.drag = { type: 'node', obj: target, sub, idx, which, start, orig, group, shapes, handles:handles.length>1?handles:[],
+      origWorld: apply(target.m, op.x, op.y), snapSet, moved: false, redo: this.history.saveRedo() };
   }
 }

@@ -29,6 +29,27 @@ Offline regressions: `npm run test:camera`. No hardware is acquired by the tests
 
 ## Interface and workspace
 
+### Extended vector editing
+
+- **Tools → Simplify / smooth paths…** refits whole selected paths/basic shapes
+  within a world-mm deviation. Preview in orange, adjust tolerance, choose cubics
+  or lines and preserve sharp corners; Apply is one Undo step, Cancel changes
+  nothing. Object identity, transforms, layer and path metadata are retained.
+- **Node editing:** edit selected top-level paths/basic shapes together. Click,
+  Shift/Ctrl toggle, marquee and Ctrl+A select components across objects. Drag,
+  nudge, node/segment types and deletion are transactional. Segments are selected
+  independently; deleting one splits the surviving runs without bridging the gap.
+- **Tools → Freehand / Pencil** fits a dragged stroke to editable cubic paths.
+  Tool options set tolerance and explicit closure. Release commits one Undo step;
+  Escape, taps and excessive strokes do not create partial paths.
+
+These are whole-path refitting tools, not a Gaussian smooth brush or partial-run
+simplification. No Lasso, multi-handle selection, redraw/continuation or pressure
+appearance is provided. Ungroup/convert text and generators explicitly. Inspect
+small gaps, holes and intersections: deviation limits do not certify topology.
+Tests: `npm run test:vector` (synthetic geometry and actual editor methods, with
+application/file/native/hardware boundaries excluded).
+
 - Familiar layout: menu, main toolbar, numeric edits toolbar at the top, tools on the left, Cuts / Layers and Laser on the right, color palette 00–29 plus T1/T2 at the bottom, status bar.
 - Customizable interface:
   - Tool windows (Cuts / Layers, Objects, Laser, Move, Console, Material, Camera) can be docked individually. Drag a tab onto another tab header to add it as a tab, onto the top or bottom edge of a group to place it above or below, onto the left edge next to the tools toolbar for the left dock, or onto the workspace to make it a floating window (move by its header, resize at the bottom-right corner, ⇥ or double-click docks it on the right).

@@ -31,6 +31,30 @@ Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
 
 ## Oberfläche und Arbeitsfläche
 
+### Erweiterte Vektorbearbeitung
+
+- **Werkzeuge → Pfade vereinfachen / glätten…** passt ganze ausgewählte
+  Pfade/Grundformen innerhalb einer Abweichung in Welt-mm neu an. Orange Vorschau,
+  Toleranz, Kurven/Geraden und Eckenschutz; Übernehmen ist ein Undo-Schritt,
+  Abbrechen verändert nichts. Objektidentität, Matrix, Ebene und Pfadmetadaten
+  bleiben erhalten.
+- **Knoten bearbeiten:** mehrere ausgewählte Pfade/Grundformen gemeinsam bearbeiten.
+  Klick, Shift/Ctrl, Rahmen und Ctrl+A wählen Komponenten über Objektgrenzen.
+  Ziehen, Verschieben, Knoten-/Segmenttypen und Löschen sind transaktional.
+  Segmente sind unabhängig auswählbar; Löschen trennt verbleibende Teilstücke,
+  ohne die Lücke zu überbrücken.
+- **Werkzeuge → Freihand / Bleistift** passt gezogene Striche an editierbare
+  Bézierpfade an. Toleranz und explizites Schließen stehen in den Werkzeugoptionen.
+  Loslassen erzeugt einen Undo-Schritt; Esc, Klicks ohne Strich und überlange
+  Striche erzeugen keine Teilpfade.
+
+Keine partielle Vereinfachung, Gauß-Glättung, Lasso, Mehrfach-Anfasserauswahl,
+Nachzeichnen/Fortsetzen oder Druckdarstellung. Text/Generatoren ausdrücklich
+umwandeln und Gruppen auflösen. Kleine Lücken, Löcher und Schnittpunkte prüfen:
+Die Abweichungsgrenze garantiert keine unveränderte Topologie.
+Tests: `npm run test:vector` (synthetische Geometrie und echte Editormethoden,
+ohne Anwendungsstart, Datei-, Native- oder Hardwarezugriff).
+
 - Vertrautes Layout: Menü, Symbolleiste, Zahlenleiste oben, Werkzeuge links, Schnitte/Layer und Laser rechts, Farbpalette 00–29 plus T1/T2 unten, Statusleiste.
 - Anpassbare Oberfläche:
   - Werkzeugfenster (Schnitte/Layer, Objekte, Laser, Verschieben, Konsole, Material, Kamera) sind einzeln andockbar. Reiter ziehen: auf einen anderen Reiterkopf = als Reiter dazu, an den oberen oder unteren Rand einer Gruppe = darüber bzw. darunter, an den linken Rand neben der Werkzeugleiste = linke Andockleiste, auf die Arbeitsfläche = freies Fenster (verschieben am Kopf, Größe an der Ecke unten rechts, ⇥ oder Doppelklick dockt rechts an).

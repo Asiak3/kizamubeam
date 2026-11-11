@@ -34,7 +34,7 @@ export type BarKey = BarId | 'numbar' | 'palette' | 'status';
 type IconSize = 's' | 'm' | 'l';
 
 interface Config {
-  /** Version der gespeicherten Belegung (2: Knopfgruppen, 3: Knopf Werkzeugkasten, 4: Generatoren und Verbindungen nur noch im Werkzeugkasten, 5: Beziehungen und Messen) */
+  /** Version der gespeicherten Belegung (2: Knopfgruppen, 3: Werkzeugkasten, 4: Generatoren/Verbindungen im Werkzeugkasten, 5: Beziehungen/Messen, 6: Vektorwerkzeuge, 7: Kamera-Overlay) */
   v: number;
   bars: Record<BarId, string[]>;
   size: Record<BarId, IconSize>;
@@ -55,12 +55,17 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 5;
+const CONFIG_V = 7;
 /** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende) */
 const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 3, bar: 'tools', id: 'apps', after: 'grp:gen' },
   { v: 5, bar: 'tools', id: 'grp:relate', after: 'nest' },
   { v: 5, bar: 'tools', id: 'tool:measure', after: 'grp:relate' },
+  { v: 6, bar: 'tools', id: 'tool:pencil', after: 'tool:line' },
+  { v: 6, bar: 'tools', id: 'vectorfit', after: 'tool:node' },
+  { v: 6, bar: 'tools', id: 'shape-builder', after: 'vectorfit' },
+  { v: 6, bar: 'tools', id: 'isolate', after: 'shape-builder' },
+  { v: 7, bar: 'main', id: 'camera-overlays', after: 'view3d' },
 ];
 /** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
  *  Leiste verliert sie nur, wenn die Folge seq noch genau so dasteht; sie wird durch keep ersetzt.
@@ -132,8 +137,14 @@ export function refreshBars() {
       }
       if (a.enabled) b.disabled = !a.enabled();
       else b.disabled = false;
-      if (a.on) b.classList.toggle('on', a.on());
-      else b.classList.remove('on');
+      if (a.on) {
+        const pressed = a.on();
+        b.classList.toggle('on', pressed);
+        b.setAttribute('aria-pressed', String(pressed));
+      } else {
+        b.classList.remove('on');
+        b.removeAttribute('aria-pressed');
+      }
       if (a.dyn) {
         const d = a.dyn();
         if (d.icon && b.dataset.icon !== d.icon) ((b.innerHTML = ICONS[d.icon]), (b.dataset.icon = d.icon));

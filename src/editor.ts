@@ -42,11 +42,25 @@ import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
 import { DEFAULT_GRID, GridSettings } from './grid';
+import { EditorVector, VectorPlan } from './editor/vector';
+import { EditorInteraction, BuilderSession, IsolationState } from './editor/interaction';
+import { EditorOutline, type OutlinePreview } from './editor/outline';
+import { EditorContourOffset } from './editor/contourOffset';
+import { installPinchGestures } from './canvasZoom';
+import { EditorFreehand } from './editor/freehand';
+import type { FreehandMode } from './freehandEdit';
+import { EditorSelection } from './editor/selection';
+import { installOverlapPicker } from './overlapPicker';
 
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
 
 export class Editor {
+  freehandMode: FreehandMode = 'continue';
+  freehandTolerance = 0.2;
+  handleSets = new Map<Obj, Set<string>>();
+  nodeLasso = false;
+  overlapHover: Obj | null = null;
   doc: Doc = newDoc();
   sel: Obj[] = [];
   tool: Tool = 'select';
@@ -105,6 +119,16 @@ export class Editor {
   /** Ausgewählte Knoten des Knotenziels als "Unterpfad:Index" */
   nodeSel = new Set<string>();
   nodeSelObj: Obj | null = null;
+  nodeSets = new Map<Obj, Set<string>>();
+  segmentSets = new Map<Obj, Set<string>>();
+  nodeEditObj: Obj | null = null;
+  vectorPreview: VectorPlan[] | null = null;
+  pencilTolerance = 0.2;
+  pencilClosed = false;
+  builderSession: BuilderSession | null = null;
+  isolation: IsolationState | null = null;
+  suppressContextMenu = false;
+  onCanvasContext: ((event: MouseEvent) => void) | null = null;
   hint = '';
 
   /** Rückgängig-Verlauf mit benannten Schritten (Verlaufsfenster, höchstens 200) */
@@ -140,7 +164,7 @@ export class Editor {
   // Fangen an Raster, Objekten und Hilfslinien
   /** Ist der Werkzeug-Modus einer, bei dem der Mauszeiger schon ohne Ziehen fängt? */
   get drawTool() {
-    return this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
+    return this.tool === 'pencil' || this.tool === 'line' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
   }
 
   // Pfad-Werkzeuge: Schließen, Verbinden, Zerlegen, Startpunkt, Trimmen
@@ -174,6 +198,7 @@ export class Editor {
   boolKeep = false;
   /** Vorschau für den Offset-Dialog (ohne das Dokument zu ändern) */
   offsetPreview: SubPath[] | null = null;
+  outlinePreview: OutlinePreview | null = null;
   /** Vorschau für die Array-Dialoge: Weltmatrix je Kopie (die erste ist das Original) */
   arrayPreview: Mat[] | null = null;
   /** Mittelpunkt des Kreisarrays (Welt), wird als Kreuz gezeigt */
@@ -250,8 +275,11 @@ export class Editor {
     onImageReady(() => this.redraw());
     new ResizeObserver(() => this.resize()).observe(canvas);
     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
+    installOverlapPicker(this);
     canvas.addEventListener('pointermove', (e) => this.onMove(e));
     canvas.addEventListener('pointerup', (e) => this.onUp(e));
+    canvas.addEventListener('pointercancel', (e) => this.cancelPointerDrag(e));
+    canvas.addEventListener('lostpointercapture', (e) => this.cancelPointerDrag(e));
     canvas.addEventListener('pointerleave', () => {
       if (this.drag || (!this.nodeHover && !this.segHover && !this.snapHit && !this.alignGuides.length)) return;
       this.nodeHover = this.segHover = null;
@@ -260,7 +288,12 @@ export class Editor {
     });
     canvas.addEventListener('dblclick', (e) => this.onDouble(e));
     canvas.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    installPinchGestures(canvas, (factor, x, y) => this.zoomAt(factor, x, y));
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (this.suppressContextMenu) { this.suppressContextMenu = false; return; }
+      this.onCanvasContext?.(e);
+    });
     window.addEventListener('keydown', (e) => this.onKey(e));
     window.addEventListener('paste', (e) => this.onPaste(e));
     window.addEventListener('keyup', (e) => {
@@ -284,6 +317,7 @@ export class Editor {
     this.listeners.delete(fn);
   }
   emit(what: 'doc' | 'sel' | 'view' | 'tool') {
+    this.updateInteraction(what);
     this.dirty = true;
     if (what !== 'view') this.snapVer++;
     if (what === 'doc') this.syncTextLinks();
@@ -394,6 +428,10 @@ export class Editor {
     return boundsOf(this.sel);
   }
   setSel(objs: Obj[]) {
+    if (this.isolation) objs = objs.filter((o) => this.isolation!.ids.has(o.id) || !this.isolation!.known.has(o.id));
+    for (const o of this.nodeSets.keys()) if (!objs.includes(o)) this.nodeSets.delete(o);
+    for (const o of this.segmentSets.keys()) if (!objs.includes(o)) this.segmentSets.delete(o);
+    for (const o of this.handleSets.keys()) if (!objs.includes(o)) this.handleSets.delete(o);
     if (objs.length !== this.sel.length || objs.some((o, i) => o !== this.sel[i])) {
       this.pivot = null;
       this.rotateMode = false;
@@ -407,7 +445,7 @@ export class Editor {
     const tol = 4 / this.view.zoom;
     for (let i = this.doc.objs.length - 1; i >= 0; i--) {
       const top = this.doc.objs[i];
-      if (this.isLocked(top)) continue;
+      if (!this.selectable(top)) continue;
       for (const [leaf, m] of visibleLeaves([top])) {
         const ly = this.layer(leaf.layer);
         if (!ly.show) continue;
@@ -475,6 +513,8 @@ export class Editor {
   // ---------- Werkzeuge ----------
 
   setTool(t: Tool) {
+    if (t !== 'builder') this.builderSession = null;
+    if (this.drag) this.cancelDrag();
     if (this.draft) this.finishLine();
     this.tool = t;
     this.nodeHover = this.segHover = null;
@@ -499,7 +539,7 @@ export class Editor {
 // Die Teile in src/editor/ sind Klassen ohne eigene Felder; ihre Methoden haben `this: Editor` und werden hier
 // in Editor.prototype kopiert. Neue Methoden kommen in den passenden Teil, neue Felder in die Klasse Editor oben.
 export interface Editor
-  extends EditorDocument,
+  extends EditorFreehand, EditorSelection, EditorDocument,
     EditorPointer,
     EditorKeyboard,
     EditorSnapping,
@@ -524,9 +564,15 @@ export interface Editor
     EditorTabs,
     EditorRelations,
     EditorSketch,
+    EditorVector,
+    EditorInteraction,
+    EditorOutline,
+    EditorContourOffset,
     EditorRender {}
 
 const PARTS = [
+  EditorFreehand,
+  EditorSelection,
   EditorDocument,
   EditorPointer,
   EditorKeyboard,
@@ -552,6 +598,10 @@ const PARTS = [
   EditorTabs,
   EditorRelations,
   EditorSketch,
+  EditorVector,
+  EditorInteraction,
+  EditorOutline,
+  EditorContourOffset,
   EditorRender,
 ];
 for (const part of PARTS) {

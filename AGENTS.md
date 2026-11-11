@@ -106,6 +106,25 @@ There are additional focused `test:*` scripts in `package.json`; identify and ru
 - Do not report tests as passing if they were not executed. If OS/hardware restrictions prevent testing, state exactly what remains unverified.
 - Release workflows are not a substitute for checking PR changes; do not assume all tests are run automatically on every PR.
 
+## Context economy
+
+- Prefer focused entry points over whole-suite runs: `npm run test:<suite>`,
+  `cargo test -p <crate> <filter>`, `npm run i18n:check` only when texts changed.
+- Search before reading: `grep -n` first, then read only the surrounding window.
+  Do not open `TODO.md`, lockfiles, `node_modules/`, `target/`, `dist/` or
+  generated assets in full; never read a file twice in one task.
+- Source of truth order: this file, then `docs/development.md`, then code and
+  tests. Do not re-derive documented behavior; cite `docs/...` instead.
+- Never paste test or build logs verbatim; report the command, the counts and
+  the first failure. Long logs go to a file and are queried with `grep`.
+- Stop when the stated problem is solved and verified. No incidental cleanups,
+  formatting sweeps or broad exploration.
+- Do not implement against guesses. If a requirement, decision or expected
+  behavior is unclear, ask first and state the uncertainty.
+- Delegate read-heavy, well-scoped work (exploration, symbol lookup, suite runs,
+  log triage) to subagents; keep decisions and small edits in the main session.
+- Keep answers and documentation free of filler; state facts, paths and numbers.
+
 ## Virtual Machine specifics
 
 - `vm/` is a **separately distributed** product, even though it shares this repository and root dependencies.

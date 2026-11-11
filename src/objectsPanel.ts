@@ -71,7 +71,9 @@ export function buildObjectsPanel(ed: Editor) {
   /** Nur neu aufbauen, wenn das Fenster zu sehen ist; beim Einblenden wird nachgeholt */
   const open = () => isShown('objects');
   const setCount = () => setBadge('objects', ed.doc.objs.length ? String(ed.doc.objs.length) : '');
-  const collapsedLayers = new Set<number>();
+  // Layers start folded, including layers first encountered after an import.
+  // Explicit user toggles remain unchanged across ordinary tree refreshes.
+  const collapsedLayers = new Set<number>(Array.from({ length: PALETTE.length }, (_, i) => i));
   const openGroups = new Set<number>();
   const showAll = new Set<number>();
   /** Zeile → Objekt und oberstes Objekt */
