@@ -102,8 +102,6 @@ export function outlineFromPolys(polys: Pt[][], tol = 0.02): SubPath[] {
   return pts.map((p) => fitPolyline(p.map((q) => ({ x: q.x - cx, y: q.y - cy })), true, tol));
 }
 
-/** Umriss aus Bézierpfaden (lokale Koordinaten) */
-export const outlineFromSubs = (subs: SubPath[], tol = 0.02) => outlineFromPolys(subs.filter((s) => s.closed).map((s) => fromPath(flattenSub(s, IDENT))), tol);
 
 // ---------- Anordnung ----------
 
