@@ -22,10 +22,10 @@ const TEMPLATES_STORE = PRE + 'templates';
 const PACKS_STORE = PRE + 'packs';
 /**
  * Gehören immer zu diesem Rechner und werden nie übertragen: offene Dokumente, Update-Prüfung, Assistent,
- * Sicherungen der FluidNC-Konfiguration, altes Einzelgerät, Abgleich selbst, Dialogpositionen (hängen am Bildschirm). Jeder Schlüssel im Code muss in
+ * Sicherungen der FluidNC-Konfiguration, altes Einzelgerät, Abgleich selbst, Dialogpositionen und -größen (hängen am Bildschirm). Jeder Schlüssel im Code muss in
  * einer dieser Listen stehen (npm run test:sync prüft das).
  */
-export const LOCAL_KEYS = ['autosave', 'tabs', 'updateLastCheck', 'setupOffered', 'fluidBackups', 'materialtest.last', 'device', 'sync', 'syncKnown', 'syncFp', 'syncExport', 'dialogPos'].map(
+export const LOCAL_KEYS = ['autosave', 'tabs', 'updateLastCheck', 'setupOffered', 'fluidBackups', 'materialtest.last', 'device', 'sync', 'syncKnown', 'syncFp', 'syncExport', 'dialogPos', 'dialogSize'].map(
   (k) => PRE + k,
 );
 export const BROWSER_STORES = [TEMPLATES_STORE, PACKS_STORE];

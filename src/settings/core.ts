@@ -96,10 +96,10 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
       },
       {
         kind: 'action', id: 'appearance.resetDialogs', group: t('Fenster und Leisten'), label: t('Dialogpositionen zurücksetzen'),
-        hint: t('Verschobene Dialoge öffnen wieder in der Mitte. Wirkt sofort.'),
+        hint: t('Verschobene oder vergrößerte Dialoge öffnen wieder in der Mitte und in Standardgröße. Wirkt sofort.'),
         button: t('Zurücksetzen'), run: () => {
           resetDialogPositions();
-          ed.hint = t('Dialoge öffnen wieder in der Mitte.');
+          ed.hint = t('Dialoge öffnen wieder in der Mitte und in Standardgröße.');
           ed.emit('tool');
         },
       },

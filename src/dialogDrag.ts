@@ -6,12 +6,24 @@
 // übrigen merken sich ihre eigene. Gespeichert wird wie beim Dock-Layout im localStorage; beim Öffnen
 // und bei Größenänderungen des Fensters wird neu begrenzt, damit der Titel immer erreichbar bleibt.
 
+// Dialoge, deren Inhalt nicht hineinpasst (sie oder ein Bereich in ihnen scrollen), bekommen unten rechts
+// einen Griff zum Vergrößern. Die Größe wird je Dialog gemerkt (eigener Schlüssel, nicht je Gruppe) und
+// immer auf das Fenster begrenzt: wird es kleiner, rückt der Dialog erst nach und schrumpft dann mit;
+// wird es wieder größer, kehrt die gemerkte Größe zurück. Doppelklick auf den Griff: Standardgröße.
+
 export interface DlgPos {
   x: number;
   y: number;
 }
+export interface DlgSize {
+  w: number;
+  h: number;
+}
 
 const KEY = 'kizamubeam.dialogPos';
+const SIZE_KEY = 'kizamubeam.dialogSize';
+/** Abstand, den ein vergrößerter Dialog zum Fensterrand hält */
+const EDGE = 8;
 const MIN_VISIBLE = 80; // so viel vom Titel bleibt mindestens waagerecht im Fenster
 const MAX_ENTRIES = 50;
 /** Dialoge ohne Titelleiste bleiben fest */
@@ -29,6 +41,59 @@ const GROUPS: [group: string, classes: string[]][] = [
 const INTERACTIVE = 'button, input, select, textarea, a, label';
 /** Tooltip des Schließen-Kreuzes; kommt übersetzt aus app.ts, damit dieses Modul ohne DOM testbar bleibt */
 let closeLabel = () => 'Close';
+/** Tooltip des Größengriffs, ebenfalls aus app.ts */
+let gripLabel = () => 'Resize (double-click: default size)';
+
+/**
+ * Größe und Position eines vergrößerten Dialogs im Fenster: die gewünschte Größe, nie kleiner als die
+ * Standardgröße (min), nie größer als das Fenster; danach wird die Position so verschoben, dass er
+ * ganz hineinpasst. Erst rücken, dann schrumpfen: die Größe ändert sich nur, wenn das Fenster selbst
+ * zu klein ist.
+ */
+export function fitDialog(pos: DlgPos, want: DlgSize, min: DlgSize, vw: number, vh: number): DlgPos & DlgSize {
+  const fin = (v: number, d: number) => (Number.isFinite(v) ? v : d);
+  const maxW = Math.max(0, vw - 2 * EDGE);
+  const maxH = Math.max(0, vh - 2 * EDGE);
+  const w = Math.round(Math.min(maxW, Math.max(fin(min.w, 0), fin(want.w, min.w))));
+  const h = Math.round(Math.min(maxH, Math.max(fin(min.h, 0), fin(want.h, min.h))));
+  const x = Math.round(Math.max(Math.min(EDGE, vw - w), Math.min(fin(pos.x, 0), vw - EDGE - w)));
+  const y = Math.round(Math.max(Math.min(EDGE, vh - h), Math.min(fin(pos.y, 0), vh - EDGE - h)));
+  return { x: Math.max(0, x), y: Math.max(0, y), w, h };
+}
+
+/** Schlüssel der Größe: je Dialog nach seinen Klassen (ohne Gruppen), sonst nach dem Titel */
+export function sizeKey(classes: readonly string[], title: string): string {
+  return classes.length ? [...classes].sort().join('.') : `|${title.trim()}`;
+}
+
+export function loadSizes(store: Pick<Storage, 'getItem'> | null): Record<string, DlgSize> {
+  const out: Record<string, DlgSize> = {};
+  try {
+    const raw = JSON.parse(store?.getItem(SIZE_KEY) || 'null');
+    if (raw && typeof raw === 'object') {
+      for (const [k, v] of Object.entries(raw as Record<string, DlgSize>)) {
+        if (v && Number.isFinite(v.w) && Number.isFinite(v.h) && v.w > 0 && v.h > 0) out[k] = { w: v.w, h: v.h };
+      }
+    }
+  } catch {
+    /* kein Speicher oder beschädigter Eintrag: Standardgröße */
+  }
+  return out;
+}
+
+/** Größe merken; null vergisst sie (Standardgröße) */
+export function saveSize(store: Pick<Storage, 'getItem' | 'setItem'> | null, key: string, s: DlgSize | null) {
+  try {
+    const all = loadSizes(store);
+    delete all[key];
+    if (s) all[key] = { w: Math.round(s.w), h: Math.round(s.h) };
+    const keys = Object.keys(all);
+    for (const k of keys.slice(0, Math.max(0, keys.length - MAX_ENTRIES))) delete all[k];
+    store?.setItem(SIZE_KEY, JSON.stringify(all));
+  } catch {
+    /* Speichern nicht möglich: Größe gilt nur für diese Sitzung */
+  }
+}
 
 /** Position so begrenzen, dass der Titel immer erreichbar im Fenster bleibt (wie clampFloat in dock.ts) */
 export function clampDialogPos(p: DlgPos, w: number, vw: number, vh: number): DlgPos {
@@ -77,10 +142,11 @@ export function savePosition(store: Pick<Storage, 'getItem' | 'setItem'> | null,
   }
 }
 
-/** Forget all remembered positions: dialogs open centred again (Settings → Appearance) */
+/** Forget all remembered positions and sizes: dialogs open centred and at their default size again (Settings → Appearance) */
 export function resetDialogPositions(store: Pick<Storage, 'removeItem'> | null = storage()) {
   try {
     store?.removeItem(KEY);
+    store?.removeItem(SIZE_KEY);
   } catch {
     /* nothing stored */
   }
@@ -154,18 +220,235 @@ function fitBar(dlg: HTMLDialogElement, bar: HTMLElement) {
   bar.style.paddingRight = `${Math.max(right, 12)}px`;
 }
 
+// ---------- Größe ----------
+
+/** Je geöffnetem Dialog: Schlüssel, Standardgröße beim Öffnen und gewünschte Größe (null: Standard) */
+interface SizeState {
+  key: string;
+  min: DlgSize;
+  want: DlgSize | null;
+  grip: HTMLElement | null;
+  watch: MutationObserver | null;
+  /** hält den Griff in der Ecke, wenn sich der Dialog von selbst in der Größe ändert */
+  follow: ResizeObserver | null;
+  /** Senkrecht maximiert (Doppelklick auf die Titelleiste): Größe und Lage davor; wird nicht gespeichert */
+  max: { want: DlgSize | null; pos: DlgPos | null } | null;
+}
+
+/**
+ * Höhe, bei der der ganze Inhalt ohne Scrollen sichtbar ist: die jetzige Höhe plus das, was der Dialog
+ * oder ein Bereich mit eigener Scrollleiste darin (z. B. die Felder der Einstellungen) noch verbirgt.
+ */
+function contentHeight(dlg: HTMLDialogElement): number {
+  let extra = Math.max(0, dlg.scrollHeight - dlg.clientHeight);
+  for (const el of dlg.querySelectorAll('*')) {
+    if (!(el instanceof HTMLElement) || el.clientHeight === 0) continue;
+    if (/(auto|scroll)/.test(getComputedStyle(el).overflowY)) extra = Math.max(extra, el.scrollHeight - el.clientHeight);
+  }
+  return dlg.getBoundingClientRect().height + extra;
+}
+const sizing = new WeakMap<HTMLDialogElement, SizeState>();
+
+/** Standardgröße wiederherstellen: nur die Werte entfernen, die dieses Modul selbst gesetzt hat */
+function clearSize(dlg: HTMLDialogElement) {
+  if (!dlg.dataset.dlgSized) return;
+  delete dlg.dataset.dlgSized;
+  for (const p of ['width', 'height', 'max-width', 'max-height', 'box-sizing']) dlg.style.removeProperty(p);
+}
+
+/** Gewünschte Größe ans Fenster angepasst anwenden; die Position rückt dabei nach, wenn nötig */
+function applySize(dlg: HTMLDialogElement, st: SizeState) {
+  if (!st.want) return;
+  const r = dlg.getBoundingClientRect();
+  const f = fitDialog({ x: r.left, y: r.top }, st.want, st.min, window.innerWidth, window.innerHeight);
+  dlg.dataset.dlgSized = '1';
+  Object.assign(dlg.style, { boxSizing: 'border-box', maxWidth: 'none', maxHeight: 'none', width: `${f.w}px`, height: `${f.h}px` });
+  // Zentrierte Dialoge bleiben zentriert (sie passen immer hinein); verschobene rücken ins Fenster
+  if (dlg.style.inset) place(dlg, { x: f.x, y: f.y });
+  placeGrip(dlg, st);
+}
+
+/** Inhalt passt nicht hinein: der Dialog selbst oder ein Bereich mit eigener Scrollleiste darin scrollt */
+function overflows(dlg: HTMLDialogElement): boolean {
+  const scrolls = (el: Element) => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+  if (scrolls(dlg)) return true;
+  for (const el of dlg.querySelectorAll('*')) {
+    // SVG (z. B. Vorschauen) hat keine eigene Scrollleiste und wird oft neu gezeichnet
+    if (!(el instanceof HTMLElement) || el.clientHeight === 0) continue;
+    const o = getComputedStyle(el);
+    if ((/(auto|scroll)/.test(o.overflowY) && el.scrollHeight > el.clientHeight + 1) || (/(auto|scroll)/.test(o.overflowX) && el.scrollWidth > el.clientWidth + 1)) return true;
+  }
+  return false;
+}
+
+/** Griff immer in der sichtbaren unteren rechten Ecke, auch wenn der Dialog selbst scrollt (links der Scrollleiste) */
+function placeGrip(dlg: HTMLDialogElement, st: SizeState) {
+  const g = st.grip;
+  if (!g) return;
+  const s = g.offsetWidth || 12;
+  g.style.left = `${dlg.scrollLeft + dlg.clientWidth - s}px`;
+  g.style.top = `${dlg.scrollTop + dlg.clientHeight - s}px`;
+}
+
+function addGrip(dlg: HTMLDialogElement, st: SizeState) {
+  if (st.grip) return;
+  st.watch?.disconnect();
+  st.watch = null;
+  const g = Object.assign(document.createElement('div'), { className: 'dlg-grip', title: gripLabel() });
+  g.setAttribute('aria-hidden', 'true');
+  dlg.append(g);
+  st.grip = g;
+  st.follow = new ResizeObserver(() => placeGrip(dlg, st));
+  st.follow.observe(dlg);
+  placeGrip(dlg, st);
+}
+
+/** Griff zeigen, sobald der Inhalt nicht mehr hineinpasst (auch später, z. B. nach dem Aufklappen eines Abschnitts) */
+function watchOverflow(dlg: HTMLDialogElement, st: SizeState) {
+  let queued = false;
+  const check = () => {
+    queued = false;
+    if (dlg.open && !st.grip && overflows(dlg)) addGrip(dlg, st);
+  };
+  const later = () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(check);
+  };
+  st.watch = new MutationObserver(later);
+  st.watch.observe(dlg, { childList: true, subtree: true, attributes: true, attributeFilter: ['open', 'hidden', 'class'] });
+  later();
+}
+
+function initSize(dlg: HTMLDialogElement, key: string) {
+  const old = sizing.get(dlg);
+  old?.watch?.disconnect();
+  old?.follow?.disconnect();
+  old?.grip?.remove();
+  clearSize(dlg);
+  const r = dlg.getBoundingClientRect();
+  const st: SizeState = { key, min: { w: r.width, h: r.height }, want: loadSizes(storage())[key] ?? null, grip: null, watch: null, follow: null, max: null };
+  sizing.set(dlg, st);
+  if (st.want) {
+    addGrip(dlg, st);
+    applySize(dlg, st);
+  } else watchOverflow(dlg, st);
+}
+
+function startResize(e: PointerEvent, dlg: HTMLDialogElement, grip: HTMLElement) {
+  const st = sizing.get(dlg);
+  if (!st) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const r = dlg.getBoundingClientRect();
+  // Die linke obere Ecke bleibt beim Ziehen stehen
+  place(dlg, { x: r.left, y: r.top });
+  const sx = e.clientX, sy = e.clientY;
+  grip.setPointerCapture(e.pointerId);
+  const move = (ev: PointerEvent) => {
+    // Nur bis zum Fensterrand, damit der Dialog dabei nicht nach links oder oben rückt
+    st.want = {
+      w: Math.min(r.width + ev.clientX - sx, window.innerWidth - EDGE - r.left),
+      h: Math.min(r.height + ev.clientY - sy, window.innerHeight - EDGE - r.top),
+    };
+    applySize(dlg, st);
+  };
+  const end = () => {
+    grip.removeEventListener('pointermove', move);
+    grip.removeEventListener('pointerup', end);
+    grip.removeEventListener('pointercancel', end);
+    if (st.want) {
+      st.max = null; // von Hand gezogen: das ist jetzt die normale Größe
+      const now = dlg.getBoundingClientRect();
+      st.want = { w: now.width, h: now.height };
+      saveSize(storage(), st.key, st.want);
+      const bar = headerOf(dlg);
+      if (bar) savePosition(storage(), keyOf(dlg, bar), { x: now.left, y: now.top });
+    }
+  };
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+}
+
+/**
+ * Doppelklick auf die Titelleiste (nur vergrößerbare Dialoge): senkrecht maximieren, also bei gleicher
+ * Breite so hoch, wie der Inhalt braucht, höchstens bis zum Fensterrand; noch einmal: zurück zu Größe und
+ * Lage davor. Maximiert wird nicht gespeichert.
+ */
+function toggleMax(dlg: HTMLDialogElement, st: SizeState) {
+  if (!st.max) {
+    const r = dlg.getBoundingClientRect();
+    st.max = { want: st.want, pos: dlg.style.inset ? { x: r.left, y: r.top } : null };
+    st.want = { w: r.width, h: contentHeight(dlg) };
+    applySize(dlg, st);
+    return;
+  }
+  const prev = st.max;
+  st.max = null;
+  st.want = prev.want;
+  if (!st.want) clearSize(dlg);
+  if (prev.pos) place(dlg, prev.pos);
+  else {
+    // war zentriert: wieder zentrieren
+    dlg.style.removeProperty('margin');
+    dlg.style.removeProperty('inset');
+  }
+  if (st.want) applySize(dlg, st);
+  else if (prev.pos) place(dlg, clampTo(dlg, prev.pos));
+  placeGrip(dlg, st);
+}
+
+/** Doppelklick auf den Griff: Standardgröße, gemerkte Größe vergessen; auf die Titelleiste: maximieren */
+function onDoubleClick(e: MouseEvent) {
+  if (!(e.target instanceof Element)) return;
+  const bar = e.target.closest<HTMLElement>('.dlg-bar');
+  if (bar && !e.target.closest(INTERACTIVE)) {
+    const dlg = bar.parentElement;
+    const st = dlg instanceof HTMLDialogElement ? sizing.get(dlg) : undefined;
+    if (dlg instanceof HTMLDialogElement && dlg.open && st?.grip) {
+      e.preventDefault();
+      toggleMax(dlg, st);
+    }
+    return;
+  }
+  if (!e.target.classList.contains('dlg-grip')) return;
+  const dlg = e.target.parentElement;
+  if (!(dlg instanceof HTMLDialogElement)) return;
+  const st = sizing.get(dlg);
+  if (!st) return;
+  e.preventDefault();
+  st.max = null;
+  st.want = null;
+  saveSize(storage(), st.key, null);
+  clearSize(dlg);
+  if (dlg.style.inset) {
+    const r = dlg.getBoundingClientRect();
+    place(dlg, clampTo(dlg, { x: r.left, y: r.top }));
+  }
+  placeGrip(dlg, st);
+}
+
 function onOpen(dlg: HTMLDialogElement) {
   const bar = headerOf(dlg);
   if (!bar) return;
   fitBar(dlg, bar);
   const key = keyOf(dlg, bar);
+  // vor dem Schließen-Knopf, damit dessen Zeichen nicht im Titel landet
+  const sKey = (dlg.dataset.dlgSize ??= sizeKey(Array.from(dlg.classList), bar.textContent || ''));
   addClose(dlg, bar);
   const saved = loadPositions(storage())[key];
   if (saved) place(dlg, clampTo(dlg, saved));
+  initSize(dlg, sKey);
 }
 
 function onPointerDown(e: PointerEvent) {
   if (e.button !== 0 || !(e.target instanceof Element)) return;
+  if (e.target.classList.contains('dlg-grip')) {
+    const dlg = e.target.parentElement;
+    if (dlg instanceof HTMLDialogElement && dlg.open) startResize(e, dlg, e.target as HTMLElement);
+    return;
+  }
   const bar = e.target.closest<HTMLElement>('.dlg-bar');
   const dlg = bar?.parentElement;
   if (!bar || !(dlg instanceof HTMLDialogElement) || !dlg.open) return;
@@ -175,8 +458,11 @@ function onPointerDown(e: PointerEvent) {
   const dx = e.clientX - r.left;
   const dy = e.clientY - r.top;
   let pos: DlgPos = { x: r.left, y: r.top };
+  let moved = false;
   bar.setPointerCapture(e.pointerId);
   const move = (ev: PointerEvent) => {
+    if (!moved && ev.clientX - dx === r.left && ev.clientY - dy === r.top) return;
+    moved = true;
     pos = clampTo(dlg, { x: ev.clientX - dx, y: ev.clientY - dy });
     place(dlg, pos);
   };
@@ -184,25 +470,44 @@ function onPointerDown(e: PointerEvent) {
     bar.removeEventListener('pointermove', move);
     bar.removeEventListener('pointerup', end);
     bar.removeEventListener('pointercancel', end);
-    savePosition(storage(), keyOf(dlg, bar), pos);
+    // Nur echtes Verschieben merken: kein Klick oder Doppelklick, und nicht die Lage im maximierten Zustand
+    if (moved && !sizing.get(dlg)?.max) savePosition(storage(), keyOf(dlg, bar), pos);
   };
   bar.addEventListener('pointermove', move);
   bar.addEventListener('pointerup', end);
   bar.addEventListener('pointercancel', end);
 }
 
-/** Geöffnete, verschobene Dialoge nach einer Größenänderung des Fensters wieder ins Bild holen */
+/**
+ * Nach einer Größenänderung des Fensters: verschobene Dialoge wieder ins Bild holen; vergrößerte rücken
+ * nach und schrumpfen mit, ohne die gemerkte Größe zu ändern, und wachsen später wieder bis zu ihr.
+ */
 function onResize() {
   document.querySelectorAll<HTMLDialogElement>('dialog[open]').forEach((dlg) => {
-    if (!dlg.style.inset || !headerOf(dlg)) return;
+    if (!headerOf(dlg)) return;
+    const st = sizing.get(dlg);
+    if (st?.want) return applySize(dlg, st);
+    if (st) placeGrip(dlg, st);
+    if (!dlg.style.inset) return;
     const r = dlg.getBoundingClientRect();
     place(dlg, clampTo(dlg, { x: r.left, y: r.top }));
   });
 }
 
-export function initDialogDrag(label?: () => string) {
+/** Griff beim Scrollen eines Dialogs in der sichtbaren Ecke halten */
+function onScroll(e: Event) {
+  const dlg = e.target;
+  if (!(dlg instanceof HTMLDialogElement)) return;
+  const st = sizing.get(dlg);
+  if (st) placeGrip(dlg, st);
+}
+
+export function initDialogDrag(label?: () => string, resizeLabel?: () => string) {
   if (typeof document === 'undefined') return;
   if (label) closeLabel = label;
+  if (resizeLabel) gripLabel = resizeLabel;
+  document.addEventListener('dblclick', onDoubleClick);
+  document.addEventListener('scroll', onScroll, true);
   new MutationObserver((list) => {
     for (const m of list) {
       const t = m.target;
