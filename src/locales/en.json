@@ -4228,8 +4228,6 @@
   "Knöpfe und Reihenfolge der Leisten wählen.": "Choose the buttons and their order on the toolbars.",
   "Alle Fenster an ihren ursprünglichen Platz, alle Leisten einblenden. Wirkt sofort.": "Puts all windows back in their original place and shows all toolbars. Takes effect immediately.",
   "Dialogpositionen zurücksetzen": "Reset dialog positions",
-  "Verschobene Dialoge öffnen wieder in der Mitte. Wirkt sofort.": "Dialogs you moved open in the center again. Takes effect immediately.",
-  "Dialoge öffnen wieder in der Mitte.": "Dialogs open in the center again.",
   "Arbeitsfläche und Fangen": "Workspace and snapping",
   "Fangen": "Snapping",
   "An Objekten fangen": "Snap to objects",
@@ -4264,5 +4262,8 @@
   "Mit gedrückter rechter Maustaste verschieben": "Drag with the right mouse button",
   "Rechtsklick Ziehen Mitteltaste Leertaste": "right click drag middle button space pan",
   "Mitteltaste und Leertaste + Ziehen verschieben immer. Ein Rechtsklick ohne Bewegung öffnet weiter das Kontextmenü bzw. beendet die Linie.": "The middle button and Space + drag always pan. A right click without moving still opens the context menu or finishes the line.",
-  "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Space + drag, middle button, right drag"
+  "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Space + drag, middle button, right drag",
+  "Größe ändern (Doppelklick: Standardgröße)": "Resize (double-click: default size)",
+  "Verschobene oder vergrößerte Dialoge öffnen wieder in der Mitte und in Standardgröße. Wirkt sofort.": "Dialogs you moved or resized open in the center and at their default size again. Takes effect immediately.",
+  "Dialoge öffnen wieder in der Mitte und in Standardgröße.": "Dialogs open in the center and at their default size again."
 }

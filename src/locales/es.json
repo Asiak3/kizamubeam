@@ -4039,5 +4039,8 @@
   "Mit gedrückter rechter Maustaste verschieben": "Arrastrar con el botón derecho",
   "Rechtsklick Ziehen Mitteltaste Leertaste": "clic derecho arrastrar botón central espacio desplazar",
   "Mitteltaste und Leertaste + Ziehen verschieben immer. Ein Rechtsklick ohne Bewegung öffnet weiter das Kontextmenü bzw. beendet die Linie.": "El botón central y Espacio + arrastrar siempre desplazan la vista. Un clic derecho sin mover sigue abriendo el menú contextual o terminando la línea.",
-  "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Barra espaciadora + arrastrar, botón central, arrastrar con el derecho"
+  "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Barra espaciadora + arrastrar, botón central, arrastrar con el derecho",
+  "Größe ändern (Doppelklick: Standardgröße)": "Cambiar tamaño (doble clic: tamaño estándar)",
+  "Verschobene oder vergrößerte Dialoge öffnen wieder in der Mitte und in Standardgröße. Wirkt sofort.": "Los diálogos movidos o agrandados vuelven a abrirse en el centro y con su tamaño estándar. Se aplica al instante.",
+  "Dialoge öffnen wieder in der Mitte und in Standardgröße.": "Los diálogos vuelven a abrirse en el centro y con su tamaño estándar."
 }
