@@ -182,6 +182,12 @@ export function refreshFonts(families: string[] = []) {
   listListeners.forEach((cb) => cb());
 }
 
+/** Wurde für diese Schrift Roboto als Ersatz genommen? (null = noch nicht geladen) */
+export function isFallbackFont(family: string, bold = false, italic = false): boolean | null {
+  const f = ready.get(fontKey(family, bold, italic));
+  return f ? f.fallback : null;
+}
+
 /** Desktop-App? Nur dort gibt es den Font-Manager mit eigenem Schriftordner. */
 export const hasFontManager = isTauri;
 

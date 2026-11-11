@@ -81,6 +81,9 @@ export function nameToUnicode(name: string): string | undefined {
   if (m) return String.fromCodePoint(parseInt(m[1], 16));
   return undefined;
 }
+const UNI_NAME = new Map<string, string>();
+for (const [n, u] of NAME_UNI) if (!UNI_NAME.has(u)) UNI_NAME.set(u, n);
+export const unicodeToName = (ch: string) => UNI_NAME.get(ch) ?? `uni${ch.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
 
 // ---------- Hilfen ----------
 
