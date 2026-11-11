@@ -169,6 +169,12 @@ export function buildUI(ed: Editor) {
   setTimeout(() => maybeCheckForUpdates(), 5000);
   initSync(ed);
   initDock();
+  registerCoreSettings(ed, {
+    theme: () => themeMode,
+    setTheme: (m) => applyTheme(ed, m),
+    setLanguage: (p) => changeLanguage(ed, p),
+    shortcuts: helpRows,
+  });
   buildMenu(ed);
   const isolationBadge = h('div', { class: 'editor-isolation-badge', hidden: true },
     h('span', {}, t('Isolation aktiv – kein Ausgabefilter')),
@@ -252,7 +258,6 @@ function buildMenu(ed: Editor) {
       [t('Schriften …'), '', () => openFontManager(ed)],
       [t('Erweiterungen …'), '', () => openPacksDialog()],
       [t('Einstellungen übertragen …'), '', () => openSyncDialog(ed)],
-      [t('Überlappungsauswahl einstellen …'), '', () => openOverlapSettings()],
       [t('KI-Agenten (MCP) …'), '', () => openAgentDialog(ed)],
     ]],
     [t('Bearbeiten'), [
@@ -271,6 +276,8 @@ function buildMenu(ed: Editor) {
       'sep',
       [t('Sichtbar, wenn …'), '', () => openShowIfDialog(ed, ed.sel)],
       [t('Zur Bibliothek hinzufügen …'), '', () => openAddSelectionDialog(ed)],
+      'sep',
+      [t('Einstellungen …'), '', () => void openSettings()],
     ]],
     [t('Werkzeuge'), [
       [t('Werkzeugkasten …'), '', () => openAppsPanel()],
@@ -561,8 +568,9 @@ function showAbout() {
   dlg.showModal();
 }
 
-function showHelp() {
-  const rows: [string, string][] = [
+/** Shortcut overview, shown with F1 and in Settings → Mouse and keyboard */
+function helpRows(): [string, string][] {
+  return [
     ['Esc', t('Auswahlwerkzeug / Auswahl aufheben')],
     ['Ctrl+L / R / E / T', t('Linie / Rechteck / Ellipse / Text')],
     ['Ctrl+`', t('Knoten bearbeiten')],
@@ -585,6 +593,10 @@ function showHelp() {
     ['Alt+P', t('Vorschau mit Zeitschätzung')],
     [t('Palette'), t('Farbe anklicken = Auswahl diesem Layer zuordnen')],
   ];
+}
+
+function showHelp() {
+  const rows = helpRows();
   const dlg = h(
     'dialog',
     {},
@@ -1125,6 +1137,7 @@ function buildBars(ed: Editor) {
     { id: 'filltemplate', cat: F, icon: 'filltemplate', label: t('Vorlage ausfüllen …'), run: () => openFillDialog(ed) },
     { id: 'packs', cat: F, icon: 'packs', label: t('Erweiterungen …'), run: () => openPacksDialog() },
     { id: 'sync', cat: F, icon: 'sync', label: t('Einstellungen übertragen …'), run: () => openSyncDialog(ed) },
+    { id: 'preferences', cat: F, icon: 'settings', label: t('Einstellungen …'), run: () => void openSettings() },
     { id: 'fonts', cat: F, icon: 'fonts', short: t('Schriften'), label: t('Schriften: Google Fonts laden, eigene Schriften und Favoriten verwalten'), run: () => openFontManager(ed) },
     { id: 'apps', cat: W, icon: 'apps', label: t('Werkzeugkasten: alle Generatoren und Werkzeuge mit Suche'), run: () => toggleWindow('apps'), on: () => !isHidden('apps') },
     // Knopfgruppen: ein Knopf für die zuletzt benutzte Aktion, der Pfeil daneben zeigt die übrigen
@@ -2097,5 +2110,6 @@ function buildTextEditor(ed: Editor) {
   }, true);
   ta.addEventListener('blur', () => setTimeout(() => document.activeElement !== ta && close(), 0));
 }
-import { openOverlapSettings } from './overlapPicker';
+import { openSettings } from './settings/dialog';
+import { registerCoreSettings } from './settings/core';
 import { openFreehandEditDialog } from './freehandEditDialog';

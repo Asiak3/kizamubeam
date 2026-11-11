@@ -4262,3 +4262,184 @@ input.jig-count {
   min-width: 0;
 }
 .outline-choices .outline-choice-active { outline: 2px solid var(--accent, #5b9bff); outline-offset: 2px; border-radius: 3px; background: color-mix(in srgb, var(--accent, #5b9bff) 18%, transparent); }
+
+/* Settings window (src/settings/dialog.ts): sidebar with sections, search on top, OK/Cancel below */
+dialog.settings-dialog {
+  width: min(820px, calc(100vw - 32px));
+  height: min(620px, calc(100vh - 48px));
+  box-sizing: border-box;
+  padding-bottom: 12px;
+}
+dialog.settings-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.settings-top {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.settings-search {
+  flex: 1;
+  min-width: 0;
+}
+.settings-nav-select {
+  display: none;
+}
+.settings-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 12px;
+}
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+  padding-right: 8px;
+}
+.settings-nav button {
+  font: inherit;
+  text-align: left;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.settings-nav button:hover {
+  background: var(--surface);
+}
+.settings-nav button.on {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+.settings-body {
+  overflow: auto;
+  min-width: 0;
+  padding-right: 4px;
+}
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.settings-body h4 {
+  margin: 4px 0;
+  font-size: 13px;
+}
+.settings-section + .settings-section {
+  margin-top: 14px;
+}
+.settings-note {
+  margin: 0 0 8px;
+}
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 230px);
+  gap: 4px 12px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--row-line, var(--line));
+}
+.settings-row.settings-toggle,
+.settings-row.settings-custom {
+  grid-template-columns: minmax(0, 1fr);
+}
+.settings-label {
+  min-width: 0;
+}
+label.settings-label {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+label.settings-label input {
+  margin-top: 2px;
+}
+.settings-toggle .settings-hint {
+  margin-left: 22px;
+}
+.settings-hint {
+  margin-top: 2px;
+}
+.settings-ctl {
+  display: flex;
+  justify-content: flex-end;
+}
+.settings-ctl select,
+.settings-ctl input[type='text'] {
+  width: 100%;
+}
+.settings-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+.settings-unit input {
+  flex: 1;
+  min-width: 0;
+}
+.settings-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-color input[type='color'] {
+  width: 48px;
+  padding: 0;
+}
+.settings-keys {
+  margin-top: 6px;
+  border-collapse: collapse;
+}
+.settings-keys td {
+  padding: 2px 8px 2px 0;
+  vertical-align: top;
+}
+.settings-flash {
+  animation: settings-flash 1.6s ease-out;
+}
+@keyframes settings-flash {
+  from { background: var(--accent-soft); }
+  to { background: transparent; }
+}
+.settings-status {
+  margin: 0 auto 0 0;
+  align-self: center;
+}
+@media (max-width: 640px) {
+  .settings-main {
+    grid-template-columns: 1fr;
+  }
+  .settings-nav {
+    display: none;
+  }
+  .settings-nav-select {
+    display: block;
+    max-width: 45%;
+  }
+  .settings-row {
+    grid-template-columns: 1fr;
+  }
+  .settings-ctl {
+    justify-content: flex-start;
+  }
+}
+.settings-group {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.settings-keys td:first-child {
+  width: 38%;
+}
