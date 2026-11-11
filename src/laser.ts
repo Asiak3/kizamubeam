@@ -1237,10 +1237,10 @@ export async function openPreview(ed: Editor, src?: JobSource) {
   );
   const warn = h('div', { class: 'note' }, ...job.warnings.map((w) => h('div', {}, w)));
   const dlg = h('dialog', { class: 'preview-dialog' },
+    h('h3', {}, t('Vorschau')),
     h('div', { class: 'preview-main' },
       cv,
       h('div', { class: 'preview-side' },
-        h('h3', {}, t('Vorschau')),
         info,
         h('label', { class: 'check' }, rapidChk, t('Leerwege zeigen')),
         h('label', { class: 'check' }, shadeChk, t('Nach Leistung schattieren')),

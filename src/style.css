@@ -11,6 +11,7 @@
   --surface: #ffffff;
   --surface-2: #f0f1f3;
   --title: #e3e6eb;
+  --dlg-bar: var(--title);
   --row-line: #eceef1;
   --icon: #2b3038;
   --status-text: #3d434b;
@@ -37,6 +38,7 @@
     --surface: #2c3138;
     --surface-2: #262a30;
     --title: #2e333a;
+    --dlg-bar: #363c44;
     --row-line: #30353c;
     --icon: #d4d8de;
     --status-text: #c3c8cf;
@@ -59,6 +61,7 @@
   --surface: #2c3138;
   --surface-2: #262a30;
   --title: #2e333a;
+  --dlg-bar: #363c44;
   --row-line: #30353c;
   --icon: #d4d8de;
   --status-text: #c3c8cf;
@@ -707,6 +710,49 @@ dialog.about img {
 dialog h3 {
   margin: 0 0 8px;
   font-size: 14px;
+}
+/* Titelleiste verschiebbarer Dialoge wie bei den schwebenden Dock-Fenstern (src/dialogDrag.ts
+   setzt die Ränder passend zum Innenabstand des jeweiligen Dialogs) */
+dialog > .dlg-bar {
+  position: sticky;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 27px; /* wie .dg-head: Reiter 26px + Linie */
+  box-sizing: border-box;
+  margin-bottom: 12px;
+  padding-top: 0;
+  padding-bottom: 0;
+  background: var(--dlg-bar);
+  border-bottom: 1px solid var(--line);
+  border-radius: 5px 5px 0 0;
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+dialog > .dlg-bar h3,
+dialog > h3.dlg-bar {
+  margin: 0;
+  font-size: inherit;
+  font-weight: 600;
+}
+dialog > .dlg-bar button {
+  cursor: pointer;
+}
+/* Knöpfe in der Leiste so klein wie in der Dock-Leiste; das Kreuz sitzt ganz rechts */
+dialog > .dlg-bar .ib {
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+  font-weight: normal;
+}
+dialog > .dlg-bar .dlg-close {
+  margin-left: auto;
+  margin-right: -6px;
+}
+.preview-dialog > .dlg-bar {
+  margin-bottom: 0;
 }
 dialog table td {
   padding: 2px 10px 2px 0;
