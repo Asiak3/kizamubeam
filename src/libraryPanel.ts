@@ -2,7 +2,7 @@
 // Ziehen auf die Arbeitsfläche fügt einen Eintrag ein; „+“ speichert die Auswahl, „Dateien …“ übernimmt SVG,
 // DXF, Bilder und .kza-Dateien. Einträge aus Erweiterungen erscheinen mit dem Namen der Erweiterung.
 import type { Editor } from './editor';
-import { h } from './dom';
+import { h, showDialog } from './dom';
 import { t, tn } from './i18n';
 import { dockWindow, isShown, onWindowShow, setBadge, showWindow } from './dock';
 import { fileObjs, IMPORT_EXT, objsPreviewSvg, saveText } from './files';
@@ -113,13 +113,6 @@ async function pickFiles(ed: Editor) {
 }
 
 // ---------- Dialog: Name, Art, Stichwörter ----------
-
-function showDialog(dlg: HTMLDialogElement) {
-  dlg.addEventListener('keydown', (e) => e.stopPropagation());
-  dlg.addEventListener('close', () => dlg.remove());
-  document.body.append(dlg);
-  dlg.showModal();
-}
 
 function editDialog(title: string, a: AssetData, okLabel: string, onSave: (a: AssetData) => Promise<void>) {
   const name = h('input', { type: 'text', id: 'asset-name', value: a.name }) as HTMLInputElement;
