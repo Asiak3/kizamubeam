@@ -50,6 +50,7 @@ Do not claim a fix is verified merely because code was written or another AI mod
 - Avoid unchecked DOM assumptions and injecting untrusted data into `innerHTML`. Use text nodes or safe DOM construction for user-controlled content.
 - Add dependencies only when justified; check licensing and whether existing utilities already solve the problem.
 - Preserve existing public behavior, shortcuts, settings, file associations and cross-platform operation unless the task explicitly changes them.
+- Application-wide preferences live in the settings window (Edit → Settings, `src/settings/`). Add a new preference as a field of a section (`src/settings/core.ts`, or `addSettingsFields()` from the feature) that reads and writes through the feature's own getter and setter; do not add a standalone settings dialog. Every new `kizamubeam.*` storage key must be assigned to a list in `src/syncData.ts` (`npm run test:sync` checks this).
 
 ## Data and backward compatibility
 

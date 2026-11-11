@@ -68,6 +68,7 @@ import { buildView3dPanel } from './view3d/panel';
 import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { installSketchPanel } from './sketchPanel';
 import { isSketchObj } from './editor/sketch';
+import { loadRightPan } from './editor/pointer';
 import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, showWindow, windowList } from './dock';
 
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
@@ -156,7 +157,12 @@ export function buildUI(ed: Editor) {
   buildBars(ed);
   buildNumbar(ed);
   buildLayers(ed);
-  buildObjectsPanel(ed);
+  const contextCallbacks = {
+    adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
+    saveBitmap: () => saveProcessedBitmap(ed), vectorFit: () => openVectorFitDialog(ed), builder: () => beginShapeBuilder(ed),
+    library: () => openAddSelectionDialog(ed), preview: () => openPreview(ed), objects: () => showWindow('objects'),
+  };
+  buildObjectsPanel(ed, contextCallbacks);
   buildHistoryPanel(ed);
   buildLibraryPanel(ed);
   buildParamsPanel(ed);
@@ -169,6 +175,12 @@ export function buildUI(ed: Editor) {
   setTimeout(() => maybeCheckForUpdates(), 5000);
   initSync(ed);
   initDock();
+  registerCoreSettings(ed, {
+    theme: () => themeMode,
+    setTheme: (m) => applyTheme(ed, m),
+    setLanguage: (p) => changeLanguage(ed, p),
+    shortcuts: helpRows,
+  });
   buildMenu(ed);
 
   const isolationBadge = h('div', { class: 'editor-isolation-badge', hidden: true },
@@ -176,11 +188,7 @@ export function buildUI(ed: Editor) {
     h('button', { type: 'button', class: 'btn', onclick: () => ed.leaveIsolation() }, t('Isolation verlassen')));
   document.body.append(isolationBadge);
   ed.on(() => { isolationBadge.hidden = !ed.isolation; });
-  installEditorContext(ed, {
-    adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
-    saveBitmap: () => saveProcessedBitmap(ed), vectorFit: () => openVectorFitDialog(ed), builder: () => beginShapeBuilder(ed),
-    library: () => openAddSelectionDialog(ed), preview: () => openPreview(ed), objects: () => showWindow('objects'),
-  });
+  installEditorContext(ed, contextCallbacks);
   buildPalette(ed);
   buildStatus(ed);
   startAgentBridge(ed);
@@ -264,7 +272,6 @@ function buildMenu(ed: Editor) {
       [t('Schriften …'), '', () => openFontManager(ed)],
       [t('Erweiterungen …'), '', () => openPacksDialog()],
       [t('Einstellungen übertragen …'), '', () => openSyncDialog(ed)],
-      [t('Überlappungsauswahl einstellen …'), '', () => openOverlapSettings()],
       [t('KI-Agenten (MCP) …'), '', () => openAgentDialog(ed)],
     ]],
     [t('Bearbeiten'), [
@@ -283,6 +290,8 @@ function buildMenu(ed: Editor) {
       'sep',
       [t('Sichtbar, wenn …'), '', () => openShowIfDialog(ed, ed.sel)],
       [t('Zur Bibliothek hinzufügen …'), '', () => openAddSelectionDialog(ed)],
+      'sep',
+      [t('Einstellungen …'), '', () => void openSettings()],
     ]],
     [t('Werkzeuge'), [
       [t('Werkzeugkasten …'), '', () => openAppsPanel()],
@@ -375,6 +384,9 @@ function buildMenu(ed: Editor) {
         [t('Horizontal verteilen'), '', () => ed.distribute(true)],
         [t('Vertikal verteilen'), '', () => ed.distribute(false)],
       ] },
+      { sub: t('Reihenfolge'), items: ([['front', t('Ganz nach vorne')], ['forward', t('Eine Ebene nach vorne')],
+        ['backward', t('Eine Ebene nach hinten')], ['back', t('Ganz nach hinten')]] as const).map(([dir, label]): MenuItem =>
+        [label, '', () => ed.restack(dir), undefined, () => ed.canRestack(dir)]) },
       { sub: t('Beziehungen'), items: [
         ...REL_MODES.map((m): MenuItem => [REL_LABELS[m], '', () => ed.startRelation(m), () => ed.tool === 'relate' && ed.relMode === m]),
       ] },
@@ -575,8 +587,9 @@ function showAbout() {
   dlg.showModal();
 }
 
-function showHelp() {
-  const rows: [string, string][] = [
+/** Shortcut overview, shown with F1 and in Settings → Mouse and keyboard */
+function helpRows(): [string, string][] {
+  return [
     ['Esc', t('Auswahlwerkzeug / Auswahl aufheben')],
     ['Ctrl+L / R / E / T', t('Linie / Rechteck / Ellipse / Text')],
     ['Ctrl+`', t('Knoten bearbeiten')],
@@ -585,7 +598,7 @@ function showHelp() {
     [t('Pfeiltasten'), t('1 mm verschieben (Shift 10 mm, Alt 0,1 mm)')],
     [t('. und ,'), t('90° drehen')],
     ['L R T B C E', t('Ausrichten (mehrere Objekte gewählt)')],
-    [t('Leertaste + Ziehen, Mitteltaste'), t('Ansicht verschieben')],
+    [loadRightPan() ? t('Leertaste + Ziehen, Mitteltaste, rechte Maustaste') : t('Leertaste + Ziehen, Mitteltaste'), t('Ansicht verschieben')],
     [t('Mausrad'), t('Zoomen')],
     [t('Knoten: D I L C E S'), t('Löschen, Einfügen, Gerade, Kurve, Ecke, Glatt')],
     ['Alt+W', t('Drahtgitter / Gefüllt')],
@@ -599,6 +612,10 @@ function showHelp() {
     ['Alt+P', t('Vorschau mit Zeitschätzung')],
     [t('Palette'), t('Farbe anklicken = Auswahl diesem Layer zuordnen')],
   ];
+}
+
+function showHelp() {
+  const rows = helpRows();
   const dlg = h(
     'dialog',
     {},
@@ -1143,6 +1160,7 @@ function buildBars(ed: Editor) {
     { id: 'filltemplate', cat: F, icon: 'filltemplate', label: t('Vorlage ausfüllen …'), run: () => openFillDialog(ed) },
     { id: 'packs', cat: F, icon: 'packs', label: t('Erweiterungen …'), run: () => openPacksDialog() },
     { id: 'sync', cat: F, icon: 'sync', label: t('Einstellungen übertragen …'), run: () => openSyncDialog(ed) },
+    { id: 'preferences', cat: F, icon: 'settings', label: t('Einstellungen …'), run: () => void openSettings() },
     { id: 'fonts', cat: F, icon: 'fonts', short: t('Schriften'), label: t('Schriften: Google Fonts laden, eigene Schriften und Favoriten verwalten'), run: () => openFontManager(ed) },
     { id: 'apps', cat: W, icon: 'apps', label: t('Werkzeugkasten: alle Generatoren und Werkzeuge mit Suche'), run: () => toggleWindow('apps'), on: () => !isHidden('apps') },
     // Knopfgruppen: ein Knopf für die zuletzt benutzte Aktion, der Pfeil daneben zeigt die übrigen
@@ -2115,6 +2133,7 @@ function buildTextEditor(ed: Editor) {
   }, true);
   ta.addEventListener('blur', () => setTimeout(() => document.activeElement !== ta && close(), 0));
 }
-import { openOverlapSettings } from './overlapPicker';
+import { openSettings } from './settings/dialog';
+import { registerCoreSettings } from './settings/core';
 import { openFreehandEditDialog } from './freehandEditDialog';
 import { openPathIslandsDialog } from './pathIslandsDialog';

@@ -326,27 +326,3 @@ export function sketchSubs(sk: Sketch): SubPath[] {
   for (const ed of edges) if (!ed.used) walk(ed.u);
   return subs;
 }
-
-/** Begrenzung aller Punkte und Kreise (für Zoom und Auswahl) */
-export function sketchBounds(sk: Sketch): { x: number; y: number; w: number; h: number } | null {
-  let x0 = Infinity,
-    y0 = Infinity,
-    x1 = -Infinity,
-    y1 = -Infinity;
-  const add = (x: number, y: number) => {
-    x0 = Math.min(x0, x);
-    y0 = Math.min(y0, y);
-    x1 = Math.max(x1, x);
-    y1 = Math.max(y1, y);
-  };
-  for (const p of sk.pts) add(p.x, p.y);
-  for (const e of sk.ents)
-    if (e.t !== 'line') {
-      const c = ptOf(sk, e.c);
-      if (c) {
-        add(c.x - e.r, c.y - e.r);
-        add(c.x + e.r, c.y + e.r);
-      }
-    }
-  return isFinite(x0) ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
-}
