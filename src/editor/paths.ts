@@ -13,6 +13,7 @@ import { cornerSub, CornerMode, isCorner } from '../corners';
 import { shapeCenters, shownMark } from '../arcs';
 import type { Editor } from '../editor';
 import { SNAP_COLOR, TOOL_HINTS } from './shared';
+import { pathIslands, IslandOptions } from '../pathIslands';
 
 /** Formen, die Pfad-Werkzeuge bearbeiten (Grundformen werden dabei zu Pfaden) */
 const VECTOR = ['path', 'rect', 'ellipse', 'polygon'];
@@ -36,6 +37,28 @@ function subsBox(subs: SubPath[]): Box {
 }
 
 export class EditorPaths {
+  separatePathIslands(this: Editor, options:IslandOptions={}): number {
+    if (this.drag || this.draft || this.pickHandler) return 0;
+    const plans = new Map<Obj, Obj[]>();
+    try {
+      if (!this.sel.length || this.sel.some(o=>!this.doc.objs.includes(o) || !this.selectable(o) ||
+          this.layer(o.layer).locked || !this.layer(o.layer).show || o.shape.kind!=='path' || !!o.shape.mark))
+        throw Error(t('Pfadinseln: bearbeitbare Pfade auswählen; Gruppen auflösen und parametrische Formen ausdrücklich umwandeln.'));
+      for(const o of this.sel) {
+        if(o.shape.kind!=='path') continue;
+        const islands=pathIslands(o.shape.subs,{...options,matrix:o.m});
+        if(islands.length<2 && JSON.stringify(islands[0])===JSON.stringify(o.shape.subs)) continue;
+        plans.set(o,islands.map((subs,i)=>({...o,id:i?newId():o.id,m:[...o.m],shape:{...o.shape,kind:'path',subs:structuredClone(subs)}} as Obj)));
+      }
+    } catch(error) { this.hint=error instanceof Error?error.message:String(error); this.emit('tool'); return 0; }
+    if(!plans.size) { this.hint=t('Keine getrennten Pfadinseln gefunden.'); this.emit('tool'); return 0; }
+    this.snapshot(t('Pfadinseln trennen'));
+    this.doc.objs=this.doc.objs.flatMap(o=>plans.get(o)??[o]);
+    this.setSel(this.sel.flatMap(o=>plans.get(o)??[o]));
+    this.emit('doc');
+    return [...plans.values()].reduce((n,p)=>n+p.length,0);
+  }
+
   /** Pfad-Blätter der Auswahl samt Weltmatrix (Gruppen werden durchsucht, Texte und Bilder ausgelassen) */
   selPathLeaves(this: Editor): [Obj, Mat][] {
     return [...leaves(this.sel)].filter(([l]) => VECTOR.includes(l.shape.kind));

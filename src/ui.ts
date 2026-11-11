@@ -307,6 +307,7 @@ function buildMenu(ed: Editor) {
         [t('Zerlegen'), 'Alt+B', () => ed.breakApartSel()],
         [t('Freihandpfad bearbeiten …'), '', () => openFreehandEditDialog(ed)],
         [t('Lasso-Auswahl'), '', () => ed.setTool('lasso')],
+        [t('Pfadinseln trennen …'), '', () => openPathIslandsDialog(ed)],
         [t('Richtung umkehren'), '', () => ed.reverseSel()],
         [t('Ecken runden oder fasen …'), '', () => openCornerDialog(ed)],
         'sep',
@@ -1002,6 +1003,7 @@ function buildBars(ed: Editor) {
     { id: 'breakapart', cat: M, short: t('Zerlegen'), label: t('Zerlegen (Alt+B)'), run: () => ed.breakApartSel(), enabled: sel1 },
     { id: 'freehand-edit', cat: W, icon:'line', label:t('Freihandpfad bearbeiten …'), run:()=>openFreehandEditDialog(ed), enabled:sel1, on:()=>ed.tool==='freehand-edit' },
     tool('lasso','select',t('Lasso-Auswahl')),
+    { id: 'path-islands', cat: M, label: t('Pfadinseln trennen …'), run: () => openPathIslandsDialog(ed), enabled: sel1 },
     { id: 'reverse', cat: M, short: t('Umkehren'), label: t('Richtung umkehren'), run: () => ed.reverseSel(), enabled: sel1 },
     { id: 'corners', cat: M, short: t('Ecken'), label: t('Ecken runden oder fasen …'), run: () => openCornerDialog(ed), enabled: sel1 },
     { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern (+)'), run: () => ed.zoomAt(1.25) },
@@ -2095,3 +2097,4 @@ function buildTextEditor(ed: Editor) {
 }
 import { openOverlapSettings } from './overlapPicker';
 import { openFreehandEditDialog } from './freehandEditDialog';
+import { openPathIslandsDialog } from './pathIslandsDialog';
