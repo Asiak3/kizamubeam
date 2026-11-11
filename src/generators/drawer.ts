@@ -4,7 +4,7 @@
 // Maße: Außenmaß des Korpus; der Schubkasten bekommt seitlich, oben und hinten Luft.
 import type { Pt, SubPath } from '../model';
 import { t } from '../i18n';
-import { flipY, packParts, PathBuilder, polySub } from './build';
+import { arrangeParts, flipY, PathBuilder, polySub } from './build';
 import { BoxParams, panelPolys } from './box';
 import type { Generator, Issue, Params } from './types';
 
@@ -86,11 +86,12 @@ const PART_NAMES: Record<string, () => string> = {
 
 export const DRAWER: Generator = {
   id: 'drawer',
-  version: 1,
+  version: 2,
   kind: 'assembly',
   name: t('Schublade'),
   icon: 'drawer',
   schema: [
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'width', type: 'length', label: t('Breite'), min: 20, max: 3000, def: 160, title: t('Außenmaß des Korpus (ohne Korpus: Breite des Fachs)') },
     { key: 'height', type: 'length', label: t('Höhe'), min: 15, max: 3000, def: 80 },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 20, max: 3000, def: 150 },
@@ -108,6 +109,8 @@ export const DRAWER: Generator = {
     { key: 'clearance', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0, advanced: true, title: t('Jede Zinke wird um so viel schmaler; negativ = Presspassung') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Löcher werden kleiner. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],
+  // Saved objects keep their packParts layout; new ones are nested compactly.
+  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'packed' } : p; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -139,7 +142,7 @@ export const DRAWER: Generator = {
     if (p.carcass) add('c_', boxOf(p, p.width, p.height, p.depth), { bottom: 'back', front: 'bottom', back: 'top' });
     add('d_', boxOf(p, box.W, box.D, box.H));
     if (front) items.push({ key: 'front', subs: frontPlate(p, front.W, front.H).map(flipY) });
-    const parts = packParts(items, 5 + p.kerf);
+    const parts = arrangeParts(items, 5 + p.kerf, raw.partLayout);
     return {
       parts,
       info: [

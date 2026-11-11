@@ -3,7 +3,7 @@
 // zur halben Tiefe; der Boden wird von vorne über die Seiten geschoben. Die Böden stehen um den Überstand über.
 import type { Pt } from '../model';
 import { t } from '../i18n';
-import { packParts, polySub } from './build';
+import { arrangeParts, polySub } from './build';
 import { cleanup, offsetOrtho } from './box';
 import type { Generator, Issue, Params } from './types';
 
@@ -62,11 +62,12 @@ export function boardOutline(p: ShelfParams): Pt[] {
 
 export const SHELF: Generator = {
   id: 'shelf',
-  version: 1,
+  version: 2,
   kind: 'assembly',
   name: t('Steckregal'),
   icon: 'shelf',
   schema: [
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'width', type: 'length', label: t('Breite'), min: 30, max: 3000, def: 300, title: t('Länge der Böden') },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 20, max: 1000, def: 150 },
     { key: 'height', type: 'length', label: t('Höhe'), min: 30, max: 3000, def: 300 },
@@ -78,6 +79,8 @@ export const SHELF: Generator = {
     { key: 'play', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0.1, title: t('Die Schlitze werden um so viel breiter als die Materialdicke; negativ = Presspassung') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Schlitze werden schmaler. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],
+  // Saved objects keep their packParts layout; new ones are nested compactly.
+  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'packed' } : p; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -101,7 +104,7 @@ export const SHELF: Generator = {
       { key: 'side2', subs: [polySub(side)] },
       ...shelfHeights(p).map((_, i) => ({ key: `board${i + 1}`, subs: [polySub(board)] })),
     ];
-    const parts = packParts(items, 5 + p.kerf);
+    const parts = arrangeParts(items, 5 + p.kerf, raw.partLayout);
     const zs = shelfHeights(p);
     return {
       parts,

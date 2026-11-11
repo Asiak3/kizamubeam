@@ -30,10 +30,12 @@ function lastParams(g: Generator): Params {
   }
 }
 
-/** Last-used settings must not carry a legacy layout into a newly created box. */
+/** Last-used settings must not carry a legacy layout into a newly created object. */
 export function initialDialogParams(g: Generator, old: GenShape | null, init?: Params): Params {
   const p = old ? normalizeParams(g, old.params) : init ? normalizeParams(g, init, lastParams(g)) : lastParams(g);
   if (!old && g.id === 'box-divided') p.jointLayout = 'current';
+  // New multi-part objects are nested compactly, even if the last-used settings came from a saved one.
+  if (!old && g.schema.some((s) => s.key === 'partLayout')) p.partLayout = 'nest';
   return p;
 }
 

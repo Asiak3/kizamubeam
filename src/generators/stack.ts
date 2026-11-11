@@ -8,7 +8,7 @@
 import type { Pt, SubPath } from '../model';
 import { t, tn } from '../i18n';
 import { fitPolyline } from '../fit';
-import { packParts } from './build';
+import { arrangeParts } from './build';
 import type { Generator, GenPart, Issue, Params } from './types';
 import { getMesh } from '../model3d/store';
 import type { Mesh } from '../model3d/mesh';
@@ -198,11 +198,12 @@ export function placeNumber(polys: Pt[][], label: string, maxH: number): SubPath
 
 export const STACK: Generator = {
   id: 'stack',
-  version: 1,
+  version: 2,
   kind: 'assembly',
   name: t('Schichtmodell'),
   icon: 'stack',
   schema: [
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'model', type: 'data', label: t('Modell'), def: '' },
     { key: 'name', type: 'data', label: t('Dateiname'), def: '' },
     {
@@ -227,6 +228,8 @@ export const STACK: Generator = {
     { key: 'minArea', type: 'number', label: t('Kleinste Fläche (mm²)'), min: 0, max: 10000, def: 4, advanced: true, title: t('Inseln und Löcher, die kleiner sind, werden weggelassen bzw. gefüllt.') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.1, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],
+  // Saved objects keep their packParts layout; new ones are nested compactly.
+  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'packed' } : p; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -259,7 +262,7 @@ export const STACK: Generator = {
       const marks = p.numbers ? placeNumber(local, layer.key.slice(1), p.numberSize) : null;
       items.push(marks ? { key: layer.key, subs, marks } : { key: layer.key, subs });
     }
-    const placed = packParts(items, 3 + p.kerf);
+    const placed = arrangeParts(items, 3 + p.kerf, raw.partLayout);
     const parts: GenPart[] = placed.map((pl, i) => (items[i].marks ? { ...pl, marks: items[i].marks } : pl));
     const [dx, dy, dz] = L.dims;
     return {

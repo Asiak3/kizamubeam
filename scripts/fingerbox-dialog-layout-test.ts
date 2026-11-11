@@ -8,14 +8,26 @@ import type { GenShape, Pt } from '../src/model';
 const box = getGenerator('box')!;
 const divided = getGenerator('box-divided')!;
 const prior = { ...defaultParams(divided), width: 60, depth: 60, height: 60, thickness: 3.6,
-  finger: 10, compartmentsX: 1, compartmentsY: 1, jointLayout: 'legacy' };
+  finger: 10, compartmentsX: 1, compartmentsY: 1, jointLayout: 'legacy', partLayout: 'rows' };
+const priorBox = { ...defaultParams(box), width: 70, partLayout: 'rows' };
+const gearpair = getGenerator('gearpair')!;
+const priorGears = { ...defaultParams(gearpair), teeth1: 20, partLayout: 'rows' };
 localStorage.setItem = () => {};
-localStorage.getItem = (key) => key === 'kizamubeam.gen.box-divided' ? JSON.stringify(prior) : null;
+localStorage.getItem = (key) => ({ 'kizamubeam.gen.box-divided': JSON.stringify(prior), 'kizamubeam.gen.box': JSON.stringify(priorBox),
+  'kizamubeam.gen.gearpair': JSON.stringify(priorGears) } as Record<string, string>)[key] ?? null;
 const fresh = initialDialogParams(divided, null);
 assert.equal(fresh.jointLayout, 'current', 'new boxes must not inherit old geometry');
+assert.equal(fresh.partLayout, 'nest', 'new boxes must not inherit the old row layout');
+for (const [g, last] of [[box, priorBox], [gearpair, priorGears]] as const) {
+  const p = initialDialogParams(g, null);
+  assert.equal(p.partLayout, 'nest', `new ${g.id} is nested`);
+  assert.equal(p.width ?? p.teeth1, last.width ?? last.teeth1, `${g.id} keeps other last-used settings`);
+  assert.equal(initialDialogParams(g, { kind: 'gen', gen: g.id, v: 2, params: last, subs: [] }).partLayout, 'rows', `saved ${g.id} keeps rows`);
+}
 assert.equal(fresh.width, 60, 'ordinary last-used settings still work');
 const previous: GenShape = { kind: 'gen', gen: divided.id, v: 2, params: prior, subs: [] };
 assert.equal(initialDialogParams(divided, previous).jointLayout, 'legacy', 'old boxes keep their geometry');
+assert.equal(initialDialogParams(divided, previous).partLayout, 'rows', 'old boxes keep their layout');
 assert.equal(initialDialogParams(divided, null, prior).jointLayout, 'current');
 
 function difference(a: Pt[], b: Pt[]) {
@@ -54,4 +66,4 @@ for (const key of ['bottom', 'top']) {
   assert.ok(difference(own.subs[0].nodes, original.subs[0].nodes) < 0.000001, key);
   if (key === 'bottom') assert.ok(own.subs.length > 1, 'base keeps divider holes');
 }
-console.log('ok   Box mit Trennwänden: new dialog ignores legacy layout; actual generated base and lid match Box');
+console.log('ok   Box mit Trennwänden: new dialog ignores legacy joints and row layout; actual generated base and lid match Box');

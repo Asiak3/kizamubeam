@@ -3,7 +3,7 @@
 // damit der Achsabstand m·(z₁ + z₂)/2 bleibt.
 import type { SubPath } from '../model';
 import { t } from '../i18n';
-import { flipY, PathBuilder } from './build';
+import { flipY, layoutParts, PathBuilder } from './build';
 import { boreIssues, boreSchema } from './bore';
 import { GEAR, gearGeometry, GearParams } from './gear';
 import type { GenPart, Generator, Issue, Params } from './types';
@@ -73,11 +73,12 @@ function plateOutline(p: GearPairParams, w: number, h: number, x1: number, x2: n
 
 export const GEARPAIR: Generator = {
   id: 'gearpair',
-  version: 1,
+  version: 2,
   kind: 'assembly',
   name: t('Zahnradpaar'),
   icon: 'gearpair',
   schema: [
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'teeth1', type: 'int', label: t('Zähnezahl Rad 1'), min: 5, max: 400, def: 18 },
     { key: 'teeth2', type: 'int', label: t('Zähnezahl Rad 2'), min: 5, max: 400, def: 36 },
     { key: 'module', type: 'length', label: t('Modul'), min: 0.3, max: 20, def: 2, title: t('Teilkreisdurchmesser geteilt durch Zähnezahl') },
@@ -93,6 +94,8 @@ export const GEARPAIR: Generator = {
     { key: 'rootFillet', type: 'number', label: t('Fußrundung (× Modul)'), min: 0, max: 0.45, def: 0.38, advanced: true, title: t('Radius der Werkzeugkopfrundung, Norm: 0,38') },
     { key: 'clearance', type: 'number', label: t('Kopfspiel (× Modul)'), min: 0.1, max: 0.5, def: 0.25, advanced: true, title: t('Abstand zwischen Zahnkopf und Fußkreis des Gegenrads, Norm: 0,25') },
   ],
+  // Saved gear pairs keep their row layout; new ones are nested compactly.
+  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'rows' } : p; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -120,9 +123,9 @@ export const GEARPAIR: Generator = {
     const g2 = gearGeometry(pairGear(raw, 2) as unknown as GearParams);
     const a = centerDistance(p);
     const gap = 5 + p.kerf;
-    // Zum Ausschneiden nebeneinander, die Platte darunter
+    // Reihen (gespeicherte Paare): Räder nebeneinander, die Platte darunter. Neue Paare werden danach kompakt verschachtelt.
     const W = 2 * g1.ra + gap + 2 * g2.ra;
-    const parts: GenPart[] = [
+    let parts: GenPart[] = [
       { key: 'gear1', subs: r1.subs, at: { x: -W / 2 + g1.ra, y: 0 } },
       { key: 'gear2', subs: r2.subs, at: { x: W / 2 - g2.ra, y: 0 } },
     ];
@@ -135,6 +138,7 @@ export const GEARPAIR: Generator = {
       const subs = plateOutline(p, w, h, -a / 2 - c0, a / 2 - c0).map(flipY);
       parts.push({ key: 'plate', subs, at: { x: 0, y: Math.max(g1.ra, g2.ra) + gap + h / 2 + p.kerf / 2 } });
     }
+    parts = layoutParts(parts, gap, raw.partLayout);
     return {
       parts,
       info: [
