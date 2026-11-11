@@ -1,6 +1,6 @@
 // Fenster „Einstellungen übertragen“ (Menü Datei): Bereiche wählen, als Datei exportieren/importieren und über
 // einen Ordner synchronisieren. Dazu der Hinweis „Neu laden“, wenn ein anderer Rechner etwas geändert hat.
-import { h } from './dom';
+import { h, showDialog } from './dom';
 import { openText, saveText } from './files';
 import { t, tn } from './i18n';
 import type { Editor } from './editor';
@@ -34,13 +34,6 @@ function sectionLabel(s: SectionId): [string, string] {
     case 'camera':
       return [t('Kamera-Kalibrierung'), t('Gehört zur Kamera an diesem Rechner; wird nie synchronisiert, nur auf Wunsch exportiert')];
   }
-}
-
-function showDialog(dlg: HTMLDialogElement, onClose: () => void = () => {}) {
-  dlg.addEventListener('keydown', (e) => e.stopPropagation());
-  dlg.addEventListener('close', () => (dlg.remove(), onClose()));
-  document.body.append(dlg);
-  dlg.showModal();
 }
 
 /** Arbeitsstand sichern und die App neu laden (übernimmt Einstellungen, die schon im Arbeitsspeicher lagen) */

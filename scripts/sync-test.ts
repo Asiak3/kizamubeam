@@ -229,9 +229,10 @@ await test('Jeder Speicher-Schlüssel im Code ist einem Bereich zugeordnet', () 
       const p = join(dir, f);
       if (statSync(p).isDirectory()) walk(p);
       else if (/\.ts$/.test(f))
-        for (const m of readFileSync(p, 'utf8').matchAll(/['"`](kizamubeam\.[A-Za-z0-9_.]+?)(\$\{|['"`])/g)) {
+        for (const m of readFileSync(p, 'utf8').matchAll(/['"`](kizamubeam\.[A-Za-z0-9_.-]+?)(\$\{|['"`])/g)) {
           const key = m[2] === '${' ? m[1] + 'x' : m[1];
           if (key.endsWith('.gcode') || key.endsWith('.kzb')) continue; // Dateinamen, keine Schlüssel
+          if (key === 'kizamubeam.camera-profile') continue; // Kennung des Dateiformats, kein Schlüssel
           if (!data.classifyKey(key)) missing.push(`${p}: ${key}`);
         }
     }

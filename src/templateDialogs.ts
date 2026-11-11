@@ -1,7 +1,7 @@
 // Dialoge für Vorlagen: „Als Vorlage speichern …“ (Titel, Beschreibung, gefragte Parameter), „Neu aus
 // Vorlage …“ (Vorlagen-Ordner) und das Ausfüllen mit Vorschau.
 import type { Editor } from './editor';
-import { h } from './dom';
+import { h, showDialog } from './dom';
 import { t, tn } from './i18n';
 import { buildSvg, openText, saveText } from './files';
 import { loadDoc } from './model';
@@ -22,13 +22,6 @@ const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 function hint(ed: Editor, msg: string) {
   ed.hint = msg;
   ed.emit('tool');
-}
-
-function showDialog(dlg: HTMLDialogElement, onClose: () => void) {
-  dlg.addEventListener('keydown', (e) => e.stopPropagation());
-  dlg.addEventListener('close', () => (dlg.remove(), onClose()));
-  document.body.append(dlg);
-  dlg.showModal();
 }
 
 // ---------- Als Vorlage speichern ----------

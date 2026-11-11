@@ -20,7 +20,7 @@ normal selectable top-level objects, not silently ungrouped or bypassed. A group
 can be opened/ungrouped through established commands for leaf editing. Subpaths
 within one compound path are not distinct document objects in this chooser.
 
-**File → Overlap selection settings …** persists trigger (long right click,
+**Edit → Settings → Mouse and keyboard** persists trigger (long right click,
 long left click, disabled) and duration (250–2000 ms). Invalid/unavailable settings
 fall back to right/550. Names are text, not HTML; labels include layer and ID to
 distinguish duplicate names. Arrow/Home/End navigation, Escape and Enter/Space

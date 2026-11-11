@@ -24,4 +24,29 @@ const key = { key: 'c', ctrlKey: true, metaKey: false, shiftKey: false, altKey: 
 assert.ok(commandMatches('copy', key)); assert.equal(commandMatches('copy', { ...key, altKey: true }), false);
 ed.draft = { nodes: [{ x: 40, y: 40 }, { x: 60, y: 40 }], closed: false };
 ed.onDown({ button: 2, clientX: 60, clientY: 40, pointerId: 1 } as PointerEvent); assert.equal(ed.suppressContextMenu, true);
-console.log('Context menus: vector/image/node/blank variants, disabled commands, exact modifiers and reserved right-click gesture passed.');
+
+// Right-drag panning (opt-in): a drag pans and keeps the line, a click without moving is a right click on release
+const right = (type: 'down' | 'move' | 'up', x: number, y: number) =>
+  ed[type === 'down' ? 'onDown' : type === 'move' ? 'onMove' : 'onUp']({ button: 2, clientX: x, clientY: y, pointerId: 2 } as PointerEvent);
+const line = () => ({ nodes: [{ x: 40, y: 40 }, { x: 60, y: 40 }], closed: false });
+ed.rightPan = true; ed.suppressContextMenu = false; ed.draft = line();
+right('down', 100, 100); assert.equal(ed.drag?.type, 'right'); assert.ok(ed.draft, 'press alone keeps the line');
+right('move', 103, 102); assert.deepEqual([ed.view.ox, ed.view.oy], [0, 0], 'below the threshold the view stays');
+right('move', 130, 90); assert.deepEqual([ed.view.ox, ed.view.oy], [30, -10], 'pans from the press point');
+right('up', 130, 90); assert.equal(ed.drag, null); assert.ok(ed.draft, 'a right drag does not finish the line');
+assert.equal(ed.suppressContextMenu, true, 'the contextmenu after release (Windows) is swallowed');
+ed.suppressContextMenu = false;
+right('down', 130, 90); right('up', 131, 90); assert.equal(ed.draft, null, 'a click without moving finishes the line');
+assert.equal(ed.suppressContextMenu, true);
+ed.suppressContextMenu = false;
+right('down', 50, 50); right('up', 50, 50); assert.equal(ed.suppressContextMenu, false, 'blank click: the native menu opens on release');
+// WebKit sends contextmenu on press: held while the button is down, opened on release without moving
+(globalThis as Record<string, unknown>).MouseEvent ??= class { constructor(public type: string, init: object) { Object.assign(this, init); } };
+let menus = 0; ed.onCanvasContext = () => void menus++;
+right('down', 50, 50); (ed.drag as { context: boolean }).context = true; right('up', 50, 50);
+assert.equal(menus, 1); assert.equal(ed.suppressContextMenu, false);
+right('down', 50, 50); (ed.drag as { context: boolean }).context = true; right('move', 80, 50); right('up', 80, 50);
+assert.equal(menus, 1, 'no menu after a pan'); assert.equal(ed.suppressContextMenu, false, 'nothing left to swallow');
+// Setting off: the right button works as before
+ed.rightPan = false; ed.draft = line(); right('down', 50, 50); assert.equal(ed.drag, null); assert.equal(ed.draft, null);
+console.log('Context menus: vector/image/node/blank variants, disabled commands, exact modifiers, reserved right-click gesture and right-drag panning passed.');

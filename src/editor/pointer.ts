@@ -9,6 +9,17 @@ import type { Editor } from '../editor';
 import { MAX_VECTOR_SAMPLES } from '../vectorFit';
 import { genLeaves, isMarkGroup } from './generators';
 import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, RULER, SNAP_PX, TOOL_HINTS } from './shared';
+import { OVERLAP_MOVE_PX } from '../overlapPicker';
+
+const RIGHT_PAN_KEY = 'kizamubeam.rightPan';
+/** Right-drag panning is opt-in: off unless switched on in the settings */
+export function loadRightPan(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(RIGHT_PAN_KEY) ?? 'false') === true;
+  } catch {
+    return false;
+  }
+}
 
 const ROTATE_CURSOR =
   `url("data:image/svg+xml,${encodeURIComponent(
@@ -49,16 +60,13 @@ export class EditorPointer {
       return;
     }
     if (e.button === 2) {
-      if (this.outlinePreview) { this.suppressContextMenu = true; return; }
-      this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || !!this.pickHandler || !!this.drag;
-      this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || this.tool === 'builder' || !!this.pickHandler || !!this.drag;
-      if (this.tool === 'builder') this.setTool('select');
-      if (this.draft) this.finishLine();
-      if (this.sketchEdit && this.sketchEdit.draft.length) {
-        this.sketchEdit.draft = [];
-        this.sketchEdit.draftIds = [];
-        this.redraw();
+      // Opt-in right-drag panning: decide on release whether it was a click or a drag
+      if (this.rightPan && !this.drag) {
+        this.suppressContextMenu = false;
+        this.drag = { type: 'right', pointerId: e.pointerId, sx, sy, ox: this.view.ox, oy: this.view.oy, panning: false, context: false };
+        return;
       }
+      this.rightPress();
       return;
     }
     if (e.button !== 0) return;
@@ -299,6 +307,29 @@ export class EditorPointer {
     }
   }
 
+  /** Right click: finish the line or sketch draft, or let the context menu open (see suppressContextMenu) */
+  rightPress(this: Editor) {
+    if (this.outlinePreview) { this.suppressContextMenu = true; return; }
+    this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || this.tool === 'builder' || !!this.pickHandler || !!this.drag;
+    if (this.tool === 'builder') this.setTool('select');
+    if (this.draft) this.finishLine();
+    if (this.sketchEdit && this.sketchEdit.draft.length) {
+      this.sketchEdit.draft = [];
+      this.sketchEdit.draftIds = [];
+      this.redraw();
+    }
+  }
+
+  /** Pan the view by dragging with the right mouse button (Edit → Settings → Mouse and keyboard) */
+  setRightPan(this: Editor, on: boolean) {
+    this.rightPan = on;
+    try {
+      localStorage.setItem(RIGHT_PAN_KEY, JSON.stringify(on));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+
   onMove(this: Editor, e: PointerEvent) {
     if(this.drag?.type==='freehand-edit' && this.drag.pointerId!==e.pointerId)return;
     if(this.drag?.type==='lasso'&&this.drag.pointerId!==e.pointerId)return;
@@ -384,6 +415,17 @@ export class EditorPointer {
         this.redraw(); return;
       }
       case 'pan':
+        this.view.ox = d.ox + sx - d.sx;
+        this.view.oy = d.oy + sy - d.sy;
+        return;
+      case 'right':
+        if (e.pointerId !== d.pointerId) return;
+        if (!d.panning) {
+          if (Math.hypot(sx - d.sx, sy - d.sy) < OVERLAP_MOVE_PX) return;
+          d.panning = true;
+          this.canvas.style.cursor = 'grabbing';
+        }
+        // From the press point, so the view does not jump by the threshold
         this.view.ox = d.ox + sx - d.sx;
         this.view.oy = d.oy + sy - d.sy;
         return;
@@ -646,6 +688,20 @@ export class EditorPointer {
       case 'pan':
         this.canvas.style.cursor = this.tool === 'select' ? 'default' : 'crosshair';
         return;
+      case 'right':
+        if (d.panning) {
+          this.canvas.style.cursor = this.tool === 'select' ? 'default' : 'crosshair';
+          // Windows sends contextmenu after the release: swallow it. WebKit already sent it on press.
+          this.suppressContextMenu = !d.context;
+          return;
+        }
+        // A click without moving: the same as with the setting off, only on release
+        this.rightPress();
+        if (d.context) {
+          if (!this.suppressContextMenu) this.onCanvasContext?.(new MouseEvent('contextmenu', { clientX: e.clientX, clientY: e.clientY, button: 2 }));
+          this.suppressContextMenu = false;
+        }
+        return;
       case 'move':
         if (!d.moved && d.toggleRotate) {
           this.rotateMode = !this.rotateMode;
@@ -836,6 +892,10 @@ export class EditorPointer {
         for (const s of d.shapes) { s.obj.shape = s.shape; this.touch(s.shape); }
         this.dropSnapshot(); this.history.restoreRedo(d.redo);
       }
+    } else if (d.type === 'right') {
+      // Cancelled (e.g. Esc): no context menu when the button comes up
+      this.suppressContextMenu = !d.context;
+      if (d.panning) this.canvas.style.cursor = this.tool === 'select' ? 'default' : 'crosshair';
     }
     this.hint = '';
     this.clearSnap();

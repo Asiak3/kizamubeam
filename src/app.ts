@@ -11,7 +11,7 @@ const editor = new Editor(canvas);
 // Erweiterungen im Hintergrund lesen; Dialoge warten bei Bedarf darauf
 void ensurePacks();
 buildUI(editor);
-initDialogDrag(() => t('Schließen'));
+initDialogDrag(() => t('Schließen'), () => t('Größe ändern (Doppelklick: Standardgröße)'));
 editor.setTool('select');
 // Für Tests und Fehlersuche in der Konsole erreichbar
 (window as unknown as { editor: Editor }).editor = editor;

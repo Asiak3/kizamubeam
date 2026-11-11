@@ -2,7 +2,6 @@ import type { Editor } from './editor';
 import { Obj, Pt, visibleLeaves } from './model';
 import { hitLeaf } from './geom';
 import { t } from './i18n';
-import { h } from './dom';
 
 export const OVERLAP_HOLD_MS = 550;
 // Pointer coordinates are CSS pixels, independent of devicePixelRatio.
@@ -16,23 +15,15 @@ export function loadOverlapSettings():OverlapSettings {
   }catch{/* unavailable or invalid preferences retain safe defaults */}
   return {trigger:'right',delay:OVERLAP_HOLD_MS};
 }
-export function openOverlapSettings() {
-  const current=loadOverlapSettings();
-  const trigger=h('select',{},h('option',{value:'right'},t('Langer Rechtsklick')),h('option',{value:'left'},t('Langer Linksklick')),h('option',{value:'off'},t('Deaktiviert')));
-  trigger.value=current.trigger;
-  const delay=h('input',{type:'number',min:250,max:2000,step:50,value:String(current.delay)});
-  const info=h('p',{role:'status'});
-  const save=h('button',{},t('Übernehmen'));
-  const dialog=h('dialog',{class:'offset-dialog'},h('h3',{},t('Überlappungsauswahl einstellen')),
-    h('label',{},t('Auslösung'),trigger),h('label',{},t('Haltedauer (ms)'),delay),
-    h('p',{},t('Kurzer Klick und Ziehen bleiben unverändert. Die Liste ändert die Auswahl erst beim Bestätigen.')),info,
-    h('div',{class:'dialog-buttons'},h('button',{onclick:()=>dialog.close()},t('Abbrechen')),save));
-  save.addEventListener('click',()=>{
-    if(!Number.isInteger(delay.valueAsNumber)||delay.valueAsNumber<250||delay.valueAsNumber>2000){info.textContent=t('Haltedauer zwischen 250 und 2000 ms wählen.');return}
-    try{localStorage.setItem(SETTINGS_KEY,JSON.stringify({trigger:trigger.value,delay:delay.valueAsNumber}));dialog.close()}
-    catch{info.textContent=t('Einstellung konnte nicht gespeichert werden.')}
-  });
-  dialog.addEventListener('keydown',e=>e.stopPropagation());dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+/** Save trigger and hold duration (edited in Edit → Settings → Mouse and keyboard); false if not stored */
+export function saveOverlapSettings(v: OverlapSettings): boolean {
+  if (!['right', 'left', 'off'].includes(v.trigger) || !Number.isInteger(v.delay) || v.delay < 250 || v.delay > 2000) return false;
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ trigger: v.trigger, delay: v.delay }));
+    return true;
+  } catch {
+    return false;
+  }
 }
 /** Same top-level/group and isolation semantics as ordinary selection. */
 export function overlapCandidates(ed: Editor, point: Pt): Obj[] {
@@ -50,6 +41,8 @@ export function installOverlapPicker(ed: Editor): () => void {
   let menu:HTMLElement|null=null, oldFocus:HTMLElement|null=null;
   let opening=false;
   let consumeContext=false;
+  // contextmenu swallowed while pending (WebKit sends it on press); handed to the editor with a right drag
+  let sawContext=false;
   const clearPending=()=>{
     const p=pending;pending=null;
     if(p){window.clearTimeout(p.timer);if(canvas.hasPointerCapture(p.event.pointerId)) canvas.releasePointerCapture(p.event.pointerId)}
@@ -85,7 +78,7 @@ export function installOverlapPicker(ed: Editor): () => void {
     menu.querySelector<HTMLButtonElement>('button')?.focus();
   };
   const down=(event:PointerEvent)=>{
-    consumeContext=false;
+    consumeContext=false;sawContext=false;
     if(menu){if(!menu.contains(event.target as Node))close();return}
     if(pending){if(event.pointerId!==pending.event.pointerId){close();return}clearPending()}
     const settings=loadOverlapSettings();
@@ -111,6 +104,12 @@ export function installOverlapPicker(ed: Editor): () => void {
       // Keep secondary presses until release: WebKit may already have sent
       // the contextmenu that we suppressed while waiting. Left drags instead
       // resume the ordinary editor pointer path immediately.
+      // With right-drag panning on, the drag pans instead: the editor takes over from the press point.
+      if(p.event.button===2 && ed.rightPan){
+        pending=null;ed.onDown(p.event);
+        if(ed.drag?.type==='right')ed.drag.context=sawContext;
+        return;
+      }
       if(p.event.button===2){event.preventDefault();event.stopImmediatePropagation();return}
       pending=null;consumeContext=false;ed.onDown(p.event);return;
     }
@@ -122,11 +121,12 @@ export function installOverlapPicker(ed: Editor): () => void {
     window.clearTimeout(p.timer);pending=null;
     if(valid(p)) {
       if(p.event.button===2){
-        consumeContext=true;ed.onDown(p.event);ed.onCanvasContext?.(new MouseEvent('contextmenu',{clientX:event.clientX,clientY:event.clientY,button:2}));
+        // With right-drag panning, onDown would start a drag after the button is already up
+        consumeContext=true;if(ed.rightPan)ed.rightPress();else ed.onDown(p.event);ed.onCanvasContext?.(new MouseEvent('contextmenu',{clientX:event.clientX,clientY:event.clientY,button:2}));
       }else ed.onDown(p.event);
     }
   };
-  const context=(event:MouseEvent)=>{if(pending||consumeContext||menu){event.preventDefault();event.stopImmediatePropagation()}};
+  const context=(event:MouseEvent)=>{if(pending)sawContext=true;if(pending||consumeContext||menu){event.preventDefault();event.stopImmediatePropagation()}};
   const lost=()=>{if(!opening)clearPending()};
   const outside=(event:PointerEvent)=>{if(menu && !menu.contains(event.target as Node)){close();event.stopImmediatePropagation();event.preventDefault()}};
   const key=(event:KeyboardEvent)=>{

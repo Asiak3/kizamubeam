@@ -254,12 +254,17 @@ export class EditorDocument {
   /** Neue leere Seite hinter der aktuellen (oder an Stelle at) anlegen und zu ihr wechseln */
   addPage(this: Editor, name?: string, at = this.doc.page + 1): number {
     this.snapshot(t('Seite hinzufügen'));
+    at = this.insertPage(name, at);
+    this.emit('doc');
+    this.emit('sel');
+    return at;
+  }
+  /** Wie addPage, aber ohne eigenen Undo-Schritt und ohne Meldung (Teil eines größeren Schritts) */
+  insertPage(this: Editor, name?: string, at = this.doc.page + 1): number {
     at = Math.max(0, Math.min(this.doc.pages.length, at));
     this.doc.pages.splice(at, 0, { name: name?.trim() || this.freePageName(), objs: [] });
     this.clearPageState();
     this.doc.page = at;
-    this.emit('doc');
-    this.emit('sel');
     return at;
   }
   /** Seite i samt Objekten (mit neuen IDs) dahinter kopieren und zu ihr wechseln */

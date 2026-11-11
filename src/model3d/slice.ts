@@ -367,15 +367,6 @@ export function deepestPoint(polys: Pt[][]): { p: Pt; r: number } | null {
 
 // ---------- Für gesteckte Modelle (Rippen auf Rückgrat) ----------
 
-/** Rechteck x0..x1 × y0..y1 (mm) als Fläche */
-export const rectRegion = (x0: number, y0: number, x1: number, y1: number): IntPath[] => [
-  [
-    { X: Math.round(x0 * SCALE), Y: Math.round(y0 * SCALE) },
-    { X: Math.round(x1 * SCALE), Y: Math.round(y0 * SCALE) },
-    { X: Math.round(x1 * SCALE), Y: Math.round(y1 * SCALE) },
-    { X: Math.round(x0 * SCALE), Y: Math.round(y1 * SCALE) },
-  ],
-];
 /** a ohne b */
 export const subtractRegions = (a: IntPath[], b: IntPath[]): IntPath[] =>
   b.length ? clip(ClipperLib.ClipType.ctDifference, a, b, ClipperLib.PolyFillType.pftNonZero) : a;

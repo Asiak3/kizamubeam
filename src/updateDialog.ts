@@ -27,6 +27,13 @@ const write = (k: string, v: string) => {
 const channel = (): Channel => (read(CHANNEL_KEY) as Channel | null) ?? defaultChannel(APP_VERSION);
 const autoCheck = () => read(AUTO_KEY) !== '0';
 
+/** For the settings window */
+export const updateChannel = channel;
+export const setUpdateChannel = (ch: Channel) => write(CHANNEL_KEY, ch);
+export const updateAutoCheck = autoCheck;
+export const setUpdateAutoCheck = (on: boolean) => write(AUTO_KEY, on ? '1' : '0');
+export const defaultUpdateChannel = () => defaultChannel(APP_VERSION);
+
 interface Found {
   version: string;
   notes?: string | null;
