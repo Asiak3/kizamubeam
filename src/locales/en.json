@@ -4260,5 +4260,9 @@
   "Bereiche": "Sections",
   "Keine passende Einstellung gefunden.": "No matching setting found.",
   "Die Werte dieses Bereichs auf die Vorgaben setzen; wirksam erst mit OK": "Set the values of this section to their defaults; takes effect with OK",
-  "Nicht übernommen: {names}": "Not applied: {names}"
+  "Nicht übernommen: {names}": "Not applied: {names}",
+  "Mit gedrückter rechter Maustaste verschieben": "Drag with the right mouse button",
+  "Rechtsklick Ziehen Mitteltaste Leertaste": "right click drag middle button space pan",
+  "Mitteltaste und Leertaste + Ziehen verschieben immer. Ein Rechtsklick ohne Bewegung öffnet weiter das Kontextmenü bzw. beendet die Linie.": "The middle button and Space + drag always pan. A right click without moving still opens the context menu or finishes the line.",
+  "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Space + drag, middle button, right drag"
 }

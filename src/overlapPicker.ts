@@ -41,6 +41,8 @@ export function installOverlapPicker(ed: Editor): () => void {
   let menu:HTMLElement|null=null, oldFocus:HTMLElement|null=null;
   let opening=false;
   let consumeContext=false;
+  // contextmenu swallowed while pending (WebKit sends it on press); handed to the editor with a right drag
+  let sawContext=false;
   const clearPending=()=>{
     const p=pending;pending=null;
     if(p){window.clearTimeout(p.timer);if(canvas.hasPointerCapture(p.event.pointerId)) canvas.releasePointerCapture(p.event.pointerId)}
@@ -76,7 +78,7 @@ export function installOverlapPicker(ed: Editor): () => void {
     menu.querySelector<HTMLButtonElement>('button')?.focus();
   };
   const down=(event:PointerEvent)=>{
-    consumeContext=false;
+    consumeContext=false;sawContext=false;
     if(menu){if(!menu.contains(event.target as Node))close();return}
     if(pending){if(event.pointerId!==pending.event.pointerId){close();return}clearPending()}
     const settings=loadOverlapSettings();
@@ -102,6 +104,12 @@ export function installOverlapPicker(ed: Editor): () => void {
       // Keep secondary presses until release: WebKit may already have sent
       // the contextmenu that we suppressed while waiting. Left drags instead
       // resume the ordinary editor pointer path immediately.
+      // With right-drag panning on, the drag pans instead: the editor takes over from the press point.
+      if(p.event.button===2 && ed.rightPan){
+        pending=null;ed.onDown(p.event);
+        if(ed.drag?.type==='right')ed.drag.context=sawContext;
+        return;
+      }
       if(p.event.button===2){event.preventDefault();event.stopImmediatePropagation();return}
       pending=null;consumeContext=false;ed.onDown(p.event);return;
     }
@@ -113,11 +121,12 @@ export function installOverlapPicker(ed: Editor): () => void {
     window.clearTimeout(p.timer);pending=null;
     if(valid(p)) {
       if(p.event.button===2){
-        consumeContext=true;ed.onDown(p.event);ed.onCanvasContext?.(new MouseEvent('contextmenu',{clientX:event.clientX,clientY:event.clientY,button:2}));
+        // With right-drag panning, onDown would start a drag after the button is already up
+        consumeContext=true;if(ed.rightPan)ed.rightPress();else ed.onDown(p.event);ed.onCanvasContext?.(new MouseEvent('contextmenu',{clientX:event.clientX,clientY:event.clientY,button:2}));
       }else ed.onDown(p.event);
     }
   };
-  const context=(event:MouseEvent)=>{if(pending||consumeContext||menu){event.preventDefault();event.stopImmediatePropagation()}};
+  const context=(event:MouseEvent)=>{if(pending)sawContext=true;if(pending||consumeContext||menu){event.preventDefault();event.stopImmediatePropagation()}};
   const lost=()=>{if(!opening)clearPending()};
   const outside=(event:PointerEvent)=>{if(menu && !menu.contains(event.target as Node)){close();event.stopImmediatePropagation();event.preventDefault()}};
   const key=(event:KeyboardEvent)=>{

@@ -4035,5 +4035,9 @@
   "Größer als der Arbeitsbereich": "Más grande que el área de trabajo",
   "Das Teil passt mit Randabstand nicht auf eine leere Seite. Es wird keine neue Seite angelegt.": "La pieza no cabe en una página vacía con el margen al borde. No se creará ninguna página nueva.",
   "Zurück zur Bearbeitung": "Volver a editar",
-  "Trotzdem erstellen": "Crear igualmente"
+  "Trotzdem erstellen": "Crear igualmente",
+  "Mit gedrückter rechter Maustaste verschieben": "Arrastrar con el botón derecho",
+  "Rechtsklick Ziehen Mitteltaste Leertaste": "clic derecho arrastrar botón central espacio desplazar",
+  "Mitteltaste und Leertaste + Ziehen verschieben immer. Ein Rechtsklick ohne Bewegung öffnet weiter das Kontextmenü bzw. beendet die Linie.": "El botón central y Espacio + arrastrar siempre desplazan la vista. Un clic derecho sin mover sigue abriendo el menú contextual o terminando la línea.",
+  "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Barra espaciadora + arrastrar, botón central, arrastrar con el derecho"
 }

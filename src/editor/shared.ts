@@ -29,6 +29,9 @@ export type Drag =
   | import('./freehand').FreehandStroke
   | {type:'lasso';points:Pt[];pointerId:number;components:boolean;overflow:boolean;doc:import('../model').Doc;base:Obj[];nodeBase:Map<Obj,Set<string>>;handleBase:Map<Obj,Set<string>>;mode:'set'|'add'|'remove'|'toggle'}
   | { type: 'pan'; sx: number; sy: number; ox: number; oy: number }
+  /** Right button held with right-drag panning on: a click until it moves OVERLAP_MOVE_PX, then a pan.
+   * context: the browser already sent contextmenu while held (WebKit does on press) */
+  | { type: 'right'; pointerId: number; sx: number; sy: number; ox: number; oy: number; panning: boolean; context: boolean }
   | {
       type: 'move'; start: Pt; orig: Mat[]; moved: boolean; toggleRotate: boolean; sx: number; sy: number;
       /** Fangpunkt der Auswahl, an dem gegriffen wurde (sonst null: Ecken und Mitte der Auswahl fangen) */
