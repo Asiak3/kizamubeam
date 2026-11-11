@@ -1,29 +1,43 @@
 // Bounded faces of a planar line network. No convex hull or implicit closing chord.
 import { flattenSub, Paths, SCALE, FLATTEN_TOL } from './clip';
-import { Obj, leaves } from './model';
+import { Obj, leaves, type SubPath } from './model';
 import { shapeSubs } from './geom';
+import { segments as curveSegments } from './curves';
 import ClipperLib from 'clipper-lib';
+import { outlinePolyline } from './outlinePrecision';
 
 // Default endpoint tolerance matches the existing curve approximation; callers
 // may explicitly increase it in the preview, never in the source document.
 export const OUTLINE_JOIN_TOL = FLATTEN_TOL;
 export type NetworkPoint = { X: number; Y: number };
 type Point = NetworkPoint;
-export interface NetworkPath { points: Point[]; closed: boolean }
-export interface OutlineNetwork { faces: Paths; looseEnds: Point[] }
-type Segment = { a: Point; b: Point; cuts: number[]; path: number };
+export interface NetworkPath { points: Point[]; closed: boolean; parameters: number[]; period: number; objectId: number; sub: number; world?: SubPath; connection?: boolean }
+export interface NetworkSpan { path: number; u0: number; u1: number }
+export interface NetworkEdge { a: Point; b: Point; sources: NetworkSpan[] }
+export interface OutlineNetwork { faces: Paths; looseEnds: Point[]; paths: NetworkPath[]; edges: NetworkEdge[]; tolerance?: number; ambiguousJoins?: Point[] }
+type Segment = { a: Point; b: Point; cuts: number[]; path: number; u0: number; u1: number };
 const cross = (x: number, y: number, u: number, v: number) => x * v - y * u;
 
-export function outlineNetwork(objects: Obj[], tolerance = OUTLINE_JOIN_TOL): OutlineNetwork {
+export function outlineNetwork(objects: Obj[], tolerance = OUTLINE_JOIN_TOL, precise = false): OutlineNetwork {
   const paths: NetworkPath[] = [];
   for (const [leaf, matrix] of leaves(objects)) {
     if (leaf.shape.kind === 'image' || leaf.shape.kind === 'text') continue;
-    for (const sp of shapeSubs(leaf.shape)) paths.push({ points: flattenSub(sp, matrix), closed: sp.closed });
+    shapeSubs(leaf.shape).forEach((sp, sub) => {
+      if (precise) {
+        const flat = outlinePolyline(sp, matrix);
+        paths.push({ ...flat, closed: sp.closed, period: curveSegments(sp).length, objectId: leaf.id, sub });
+        return;
+      }
+      const parameters: number[] = [];
+      paths.push({ points: flattenSub(sp, matrix, parameters), closed: sp.closed, parameters,
+        period: curveSegments(sp).length, objectId: leaf.id, sub });
+    });
   }
-  return outlineNetworkPaths(paths, tolerance);
+  return outlineNetworkPaths(paths, tolerance, precise);
 }
 
-export function outlineNetworkPaths(paths: NetworkPath[], tolerance = OUTLINE_JOIN_TOL): OutlineNetwork {
+export function outlineNetworkPaths(inputPaths: NetworkPath[], tolerance = OUTLINE_JOIN_TOL, preserveEndpoints = false): OutlineNetwork {
+  const paths = [...inputPaths];
   if (!Number.isFinite(tolerance) || tolerance < 0 || tolerance > 0.5) throw new Error('outline-tolerance');
   const segments: Segment[] = [];
   const endpoints: { p: Point; path: number }[] = [];
@@ -32,7 +46,8 @@ export function outlineNetworkPaths(paths: NetworkPath[], tolerance = OUTLINE_JO
         if (!closed && path.length) endpoints.push({ p: path[0], path: id }, { p: path[path.length - 1], path: id });
         for (let i = 0; i < path.length - (closed ? 0 : 1); i++) {
           const a = path[i], b = path[(i + 1) % path.length];
-          if (a.X !== b.X || a.Y !== b.Y) segments.push({ a, b, cuts: [0, 1], path: id });
+          if (a.X !== b.X || a.Y !== b.Y) segments.push({ a, b, cuts: [0, 1], path: id,
+            u0: input.parameters[i], u1: i + 1 === path.length ? input.period : input.parameters[i + 1] });
         }
   });
   if (segments.length > 20000) throw new Error('shape-builder-budget');
@@ -40,20 +55,26 @@ export function outlineNetworkPaths(paths: NetworkPath[], tolerance = OUTLINE_JO
   // Project endpoints onto nearby segments before constructing intersections.
   // Coordinates are copies; source nodes and handles never move.
   const moved = new Map<string, Point>();
+  const ambiguousJoins: Point[] = [];
   let work = 0;
   const tick = () => { if (++work > 8000000) throw new Error('shape-builder-budget'); };
   for (const endpoint of endpoints) {
     const p = endpoint.p;
     const key = `${p.X},${p.Y}`;
     if (moved.has(key)) continue;
-    let best = tol * tol, hit = p;
+    let best = tol * tol, hit = p, ambiguous = false, hasHit = false;
+    const consider = (q: Point, d: number) => {
+      if (d < best || (preserveEndpoints && !hasHit && d === best)) {
+        best = d; hit = q; ambiguous = false; hasHit = true;
+      } else if (preserveEndpoints && hasHit && Math.abs(d-best)<1e-8 && (q.X!==hit.X||q.Y!==hit.Y)) ambiguous = true;
+    };
     for (const other of endpoints) {
       tick();
       if (other.path !== endpoint.path || other.p === p) continue;
       const q = other.p;
-      if (q.X > p.X || (q.X === p.X && q.Y > p.Y)) continue;
+      if (!preserveEndpoints && (q.X > p.X || (q.X === p.X && q.Y > p.Y))) continue;
       const d = (p.X - q.X) ** 2 + (p.Y - q.Y) ** 2;
-      if (d < best) { best = d; hit = q; }
+      consider(q,d);
     }
     for (const s of segments) {
       tick();
@@ -64,13 +85,28 @@ export function outlineNetworkPaths(paths: NetworkPath[], tolerance = OUTLINE_JO
       const dx = s.b.X - s.a.X, dy = s.b.Y - s.a.Y;
       const t = Math.max(0, Math.min(1, ((p.X - s.a.X) * dx + (p.Y - s.a.Y) * dy) / (dx * dx + dy * dy)));
       const q = { X: Math.round(s.a.X + t * dx), Y: Math.round(s.a.Y + t * dy) };
-      if ((t === 0 || t === 1) && (q.X > p.X || (q.X === p.X && q.Y > p.Y))) continue;
+      if (!preserveEndpoints && (t === 0 || t === 1) && (q.X > p.X || (q.X === p.X && q.Y > p.Y))) continue;
       const d = (p.X - q.X) ** 2 + (p.Y - q.Y) ** 2;
-      if (d < best) { best = d; hit = q; }
+      consider(q,d);
     }
+    if(ambiguous){ambiguousJoins.push(p);hit=p;}
     moved.set(key, hit);
   }
-  for (const s of segments) {
+  if (preserveEndpoints) {
+    // Keep every source span where it is. Tolerance adds an explicit short
+    // connector instead of rotating/stretching the source's final segment.
+    const seen = new Set<string>();
+    for (const endpoint of endpoints) {
+      const a = endpoint.p, b = moved.get(`${a.X},${a.Y}`)!;
+      if (a.X === b.X && a.Y === b.Y) continue;
+      const key = [`${a.X},${a.Y}`, `${b.X},${b.Y}`].sort().join(':');
+      if (seen.has(key)) continue; seen.add(key);
+      const path = paths.length;
+      paths.push({ points: [a, b], parameters: [0, 1], period: 1, closed: false, objectId: -1, sub: -1, connection: true,
+        world: { closed: false, nodes: [{ x: a.X / SCALE, y: a.Y / SCALE }, { x: b.X / SCALE, y: b.Y / SCALE }] } });
+      segments.push({ a, b, cuts: [0, 1], path, u0: 0, u1: 1 });
+    }
+  } else for (const s of segments) {
     s.a = moved.get(`${s.a.X},${s.a.Y}`) ?? s.a; s.b = moved.get(`${s.b.X},${s.b.Y}`) ?? s.b;
   }
   const sorted = [...segments].sort((a, b) => Math.min(a.a.X, a.b.X) - Math.min(b.a.X, b.b.X));
@@ -119,17 +155,27 @@ export function outlineNetworkPaths(paths: NetworkPath[], tolerance = OUTLINE_JO
     if (id === undefined) { id = vertices.length; ids.set(key, id); vertices.push({ p, outgoing: [] }); }
     return id;
   };
-  const edges: { from: number; to: number; used: boolean }[] = [], unique = new Map<string, number>();
+  const edges: { from: number; to: number; used: boolean; sources: NetworkSpan[] }[] = [], unique = new Map<string, number>();
   for (const s of segments) {
     s.cuts.sort((a, b) => a - b);
     const points = s.cuts.map(t => vertex({ X: Math.round(s.a.X + (s.b.X - s.a.X) * t), Y: Math.round(s.a.Y + (s.b.Y - s.a.Y) * t) }));
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1], b = points[i], key = a < b ? `${a}:${b}` : `${b}:${a}`;
       if (a === b) continue;
-      if (unique.has(key)) continue;
+      const span: NetworkSpan = { path: s.path, u0: s.u0 + (s.u1 - s.u0) * s.cuts[i - 1], u1: s.u0 + (s.u1 - s.u0) * s.cuts[i] };
+      const existing = unique.get(key);
+      if (existing !== undefined) {
+        const forward = edges[existing].from === a;
+        const ref = forward ? span : { path: span.path, u0: span.u1, u1: span.u0 };
+        if (!edges[existing].sources.some(e => e.path === ref.path && Math.abs(e.u0 - ref.u0) < 1e-10 && Math.abs(e.u1 - ref.u1) < 1e-10)) {
+          edges[existing].sources.push(ref);
+          edges[existing ^ 1].sources.push({ path: ref.path, u0: ref.u1, u1: ref.u0 });
+        }
+        continue;
+      }
       unique.set(key, edges.length);
-      vertices[a].outgoing.push(edges.length); edges.push({ from: a, to: b, used: false });
-      vertices[b].outgoing.push(edges.length); edges.push({ from: b, to: a, used: false });
+      vertices[a].outgoing.push(edges.length); edges.push({ from: a, to: b, used: false, sources: [span] });
+      vertices[b].outgoing.push(edges.length); edges.push({ from: b, to: a, used: false, sources: [{ path: span.path, u0: span.u1, u1: span.u0 }] });
       if (edges.length > 100000) throw new Error('shape-builder-budget');
     }
   }
@@ -157,5 +203,6 @@ export function outlineNetworkPaths(paths: NetworkPath[], tolerance = OUTLINE_JO
       if (faces.length > 2048) throw new Error('shape-builder-budget');
     }
   }
-  return { faces, looseEnds: vertices.filter(v => v.outgoing.length === 1).map(v => v.p) };
+  return { faces, looseEnds: vertices.filter(v => v.outgoing.length === 1).map(v => v.p), paths, tolerance, ambiguousJoins,
+    edges: edges.flatMap((e, i) => i % 2 ? [] : [{ a: vertices[e.from].p, b: vertices[e.to].p, sources: e.sources }]) };
 }

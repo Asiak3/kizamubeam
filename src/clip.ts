@@ -18,31 +18,31 @@ export type Path = ClipperLib.Path;
 export type Paths = ClipperLib.Paths;
 const { Clipper, ClipType, PolyType, PolyFillType } = ClipperLib;
 
-export function flattenSub(sp: SubPath, m: Mat): Path {
+export function flattenSub(sp: SubPath, m: Mat, parameters?: number[]): Path {
   const out: Path = [];
-  const push = (p: Pt) => {
+  const push = (p: Pt, u: number) => {
     const q = apply(m, p.x, p.y);
     const X = Math.round(q.x * SCALE),
       Y = Math.round(q.y * SCALE);
     const l = out[out.length - 1];
-    if (!l || l.X !== X || l.Y !== Y) out.push({ X, Y });
+    if (!l || l.X !== X || l.Y !== Y) { out.push({ X, Y }); parameters?.push(u); }
   };
-  if (sp.nodes.length) push(sp.nodes[0]);
-  for (const s of segments(sp)) {
+  if (sp.nodes.length) push(sp.nodes[0], 0);
+  for (const [index, s] of segments(sp).entries()) {
     if (!s.curve) {
-      push(s.b);
+      push(s.b, index + 1);
       continue;
     }
     // Anzahl Teilstücke aus der Länge des Kontrollpolygons (in Weltkoordinaten)
     const w = [s.a, s.c1, s.c2, s.b].map((p) => apply(m, p.x, p.y));
     const len = Math.hypot(w[1].x - w[0].x, w[1].y - w[0].y) + Math.hypot(w[2].x - w[1].x, w[2].y - w[1].y) + Math.hypot(w[3].x - w[2].x, w[3].y - w[2].y);
     const n = Math.max(4, Math.min(2048, Math.max(Math.ceil(Math.sqrt(len / FLATTEN_TOL) * 0.6), Math.ceil(len / FLATTEN_MAX_STEP))));
-    for (let i = 1; i <= n; i++) push(bezierPt(s.a, s.c1, s.c2, s.b, i / n));
+    for (let i = 1; i <= n; i++) push(bezierPt(s.a, s.c1, s.c2, s.b, i / n), index + i / n);
   }
   if (sp.closed && out.length > 1) {
     const a = out[0],
       b = out[out.length - 1];
-    if (a.X === b.X && a.Y === b.Y) out.pop();
+    if (a.X === b.X && a.Y === b.Y) { out.pop(); parameters?.pop(); }
   }
   return out;
 }
