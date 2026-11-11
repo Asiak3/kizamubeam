@@ -26,6 +26,14 @@ export const iconBtn = (icon: string, title: string, onclick: () => void, id?: s
 
 export const sep = () => h('div', { class: 'sep' });
 
+/** Modal dialog that keeps its key presses away from the editor shortcuts and removes itself when closed */
+export function showDialog(dlg: HTMLDialogElement, onClose: () => void = () => {}) {
+  dlg.addEventListener('keydown', (e) => e.stopPropagation());
+  dlg.addEventListener('close', () => (dlg.remove(), onClose()));
+  document.body.append(dlg);
+  dlg.showModal();
+}
+
 /** Zahlenfeld-Auswertung mit Einheiten und Grundrechenarten: „5in“, „100/3“, „2*(3+4)cm“. */
 export function evalExpr(src: string): number | null {
   const s = src.replace(/,/g, '.').trim().toLowerCase();

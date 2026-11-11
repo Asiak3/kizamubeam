@@ -27,9 +27,6 @@ export function onImageReady(cb: () => void): () => void {
 }
 const notify = () => listeners.forEach((f) => f());
 
-export function hasAsset(id: string) {
-  return assets.has(id);
-}
 export function assetUrl(id: string): string | null {
   return assets.get(id)?.dataUrl ?? null;
 }

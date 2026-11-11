@@ -1,5 +1,5 @@
 // Fenster „Erweiterungen“ (Menü Datei): installierte Inhaltspakete zeigen, installieren und entfernen.
-import { h } from './dom';
+import { h, showDialog } from './dom';
 import { openText } from './files';
 import { entryLabel } from './materials';
 import { FIRMWARES } from './gcode';
@@ -11,13 +11,6 @@ import {
 } from './packs';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-function showDialog(dlg: HTMLDialogElement, onClose: () => void = () => {}) {
-  dlg.addEventListener('keydown', (e) => e.stopPropagation());
-  dlg.addEventListener('close', () => (dlg.remove(), onClose()));
-  document.body.append(dlg);
-  dlg.showModal();
-}
 
 /** Eintrag der Auswahl „Neues Gerät aus Vorlage“; Vorlagen aus Erweiterungen nennen das Paket, die Quelle steht im Tooltip */
 export function presetOption(p: ReturnType<typeof presetList>[number], i: number) {
