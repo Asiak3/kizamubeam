@@ -1,6 +1,6 @@
 import './core-fixtures-env';
 import assert from 'node:assert/strict';
-import { pathIslands } from '../src/pathIslands';
+import { pathIslands, pathIslandPlan } from '../src/pathIslands';
 import { bumpIds, defaultLayer, newDoc, Obj, SubPath } from '../src/model';
 import { Editor } from '../src/editor';
 import { History } from '../src/history';
@@ -57,4 +57,62 @@ test('invalid member cancels entire selection, no-op has no Undo',()=>{
   const before=ed.state();assert.equal(ed.separatePathIslands(),0);assert.equal(ed.state(),before);assert.equal(ed.history.position,0);
   const one=editor([object(3,[ring(0,0,20),ring(5,5,5)])]);assert.equal(one.separatePathIslands(),0);assert.equal(one.history.position,0);
 });
-console.log(`${count} path-island groups passed`);
+test('problematic remnants are retained exactly while valid islands can be split',()=>{
+  const a=ring(0,0,10),b=ring(30,0,10),bad:SubPath={closed:true,nodes:[{x:15,y:0},{x:16,y:0},{x:17,y:0}]};
+  const source=[a,b,bad],before=JSON.stringify(source),plan=pathIslandPlan(source,{preserveInvalid:true});
+  assert.deepEqual(plan.groups,[[bad],[a],[b]]);assert.deepEqual(plan.preserved,[bad]);assert.equal(JSON.stringify(source),before);
+  assert.throws(()=>pathIslands(source));
+});
+test('preserving remnants never bypasses invalid settings, coordinates or geometry budgets',()=>{
+  assert.throws(()=>pathIslandPlan([ring(0,0,10)],{preserveInvalid:true,distance:NaN}));
+  const bad=ring(0,0,10);bad.nodes[0].x=Infinity;assert.throws(()=>pathIslandPlan([bad],{preserveInvalid:true}));
+  const huge:SubPath={closed:true,nodes:Array.from({length:16385},(_,i)=>({x:i,y:i%2}))};
+  assert.throws(()=>pathIslandPlan([huge],{preserveInvalid:true}));
+  const contact=[ring(0,0,10),ring(5,5,10)];
+  const plan=pathIslandPlan(contact,{preserveInvalid:true});assert.deepEqual(plan.groups,[contact]);assert.deepEqual(plan.preserved,contact);
+});
+test('sweep contact testing supports more than4096 real points without changing geometry',()=>{
+  const source:SubPath[]=Array.from({length:80},(_,i)=>({closed:true,nodes:Array.from({length:60},(_,j)=>({x:i*15+5*Math.cos(j*Math.PI/30),y:5*Math.sin(j*Math.PI/30)}))}));
+  const before=JSON.stringify(source);assert.equal(pathIslands(source).length,80);assert.equal(JSON.stringify(source),before);
+});
+test('closed two-node Bezier islands retain exact handles',()=>{
+  const source:SubPath={closed:true,nodes:[{x:0,y:0,cout:{x:5,y:-5},cin:{x:5,y:5}},{x:10,y:0,cin:{x:5,y:-5},cout:{x:5,y:5}}]};
+  assert.equal(pathIslands([source])[0][0],source);
+});
+test('distance broad phase matches an exhaustive rectangle-distance oracle',()=>{
+  const source=Array.from({length:32},(_,i)=>ring((i%8)*12,Math.floor(i/8)*15,3+i%4,4+i%3));
+  for(const distance of [0,1,5,6,7,10,20]){
+    const parent=source.map((_,i)=>i),find=(i:number):number=>parent[i]===i?i:find(parent[i]);
+    for(let i=0;i<source.length;i++)for(let j=i+1;j<source.length;j++){
+      const a=source[i].nodes,b=source[j].nodes;
+      const d=Math.hypot(Math.max(0,a[0].x-b[1].x,b[0].x-a[1].x),Math.max(0,a[0].y-b[2].y,b[0].y-a[2].y));
+      if(distance>0&&d<=distance)parent[find(j)]=find(i);
+    }
+    const canonical=(groups:SubPath[][])=>groups.map(g=>g.map(s=>source.indexOf(s)).sort((a,b)=>a-b).join(',')).sort();
+    const expected=new Map<number,SubPath[]>();source.forEach((s,i)=>{const key=find(i),g=expected.get(key)??[];g.push(s);expected.set(key,g);});
+    assert.deepEqual(canonical(pathIslands(source,{distance})),canonical([...expected.values()]));
+  }
+});
+test('preserved source retains its original ID and all spans through Apply and Undo',()=>{
+  const bad:SubPath={closed:true,nodes:[{x:25,y:0},{x:26,y:0},{x:27,y:0}]},a=object(1,[ring(0,0,10),ring(40,0,10),bad]),ed=editor([a]),before=ed.state();
+  assert.equal(ed.separatePathIslands({preserveInvalid:true}),3);
+  assert.equal(ed.doc.objs[0].id,a.id);assert.deepEqual((ed.doc.objs[0].shape as {subs:SubPath[]}).subs,[bad]);
+  assert.equal(ed.doc.objs.flatMap(o=>(o.shape as {subs:SubPath[]}).subs).length,3);ed.doUndo();assert.equal(ed.state(),before);
+});
+if(process.argv[3]){
+  const {readFileSync}=await import('node:fs'),{loadDoc}=await import('../src/model');
+  const file=process.argv[3],bytes=readFileSync(file),doc=loadDoc(JSON.parse(bytes.toString('utf8'))),source=doc.objs.find(o=>o.id===233)!;
+  assert.equal(source.shape.kind,'path');const paths=(source.shape as {subs:SubPath[]}).subs;
+  const plan=pathIslandPlan(paths,{matrix:source.m,preserveInvalid:true});assert.equal(plan.groups.length,51);assert.deepEqual(plan.preserved,[paths[41]]);
+  for(const index of [3,4,9,10,18,29,35,37,42,50]){
+    for(const matrix of [source.m,[1,0,0,1,0,0],[0,1,-1,0,.00037,20.22016],[-1,0,0,1,20.22016,.00037]] as import('../src/model').Mat[])
+      assert.equal(pathIslands([paths[index]],{matrix})[0][0],paths[index]);
+  }
+  assert.throws(()=>pathIslands([paths[41]],{matrix:source.m}));
+  assert.deepEqual(plan.groups.flat().map(s=>JSON.stringify(s)).sort(),paths.map(s=>JSON.stringify(s)).sort());
+  const ed=editor(doc.objs);ed.doc=doc;ed.sel=[source];
+  const {createHash}=await import('node:crypto'),hash=(s:string)=>createHash('sha256').update(s).digest('hex');
+  const before=hash(ed.state());assert.equal(ed.separatePathIslands({preserveInvalid:true}),51);assert.equal(ed.doc.objs.length,53);ed.doUndo();assert.equal(hash(ed.state()),before);
+  assert.deepEqual(readFileSync(file),bytes);console.log('PASS original inseln.kzb:50 valid islands,1 preserved self-crossing subpath,translation/reflection/rotation,exact source/Undo/file preservation');
+}
+console.log(`${count} total path-island groups passed`);

@@ -16,6 +16,8 @@ import { STACK } from './stack';
 import { RIBS } from './ribs';
 import { JIG } from './jig';
 import { SKETCH } from '../sketch/generator';
+import { SLOT_PLACEMENT, SLOT_GENERATOR, isSlotGenerator } from '../slotPlacement';
+import { CONTOUR_OFFSET, CONTOUR_OFFSET_ID, LEGACY_CONTOUR_OFFSET_ID } from '../contourOffset';
 import type { Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet } from './types';
 import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
@@ -23,7 +25,7 @@ export type { GenPart, Generator, Issue, Params, ParamSpec } from './types';
 
 export const GENERATORS: Generator[] = [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, FINGERBOX, DRAWER, INSERT, SHELF, DISCSPHERE, STACK, RIBS, JIG];
 
-export const getGenerator = (id: string): Generator | undefined => (id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
+export const getGenerator = (id: string): Generator | undefined => (id === CONTOUR_OFFSET_ID ? CONTOUR_OFFSET : id === LEGACY_CONTOUR_OFFSET_ID ? { ...CONTOUR_OFFSET, id, version: 1 } : id === SLOT_GENERATOR ? SLOT_PLACEMENT : isSlotGenerator(id) ? { ...SLOT_PLACEMENT, id } : id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
 
 /** Gilt das Feld bei diesen Parametern (showIf)? */
 export const fieldActive = (s: ParamSpec, p: Params) => !s.showIf || s.showIf(p);

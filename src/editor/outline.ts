@@ -15,7 +15,7 @@ export interface OutlineSession {
 export interface OutlinePreview {
   subs: SubPath[]; holes: SubPath[][]; hover: number;
   original?: SubPath[];
-  excluded?: SubPath[]; removed?: SubPath[];
+  excluded?: SubPath[]; removed?: SubPath[]; markers?: Pt[];
   pick: (point: Pt) => void; move: (point: Pt) => void; cancel: () => void;
 }
 
@@ -62,7 +62,7 @@ function current(ed: Editor, session: OutlineSession) {
 
 export class EditorOutline {
   async prepareOutline(this: Editor, tolerance?: number, allowEmpty = false): Promise<OutlineSession> {
-    if (!this.sel.length || this.sel.length > 32 || this.drag || this.draft || this.sketchEdit || this.pickHandler)
+    if (!this.sel.length || this.sel.length > 32 || this.drag || this.draft || this.sketchEdit || this.pickHandler || this.tool === 'builder')
       throw new Error(t('Für die Außenkontur 1 bis 32 Formen auswählen und laufende Bearbeitung beenden.'));
     const sources = this.doc.objs.filter((o) => this.sel.includes(o));
     const noLaser = validate(this, sources);

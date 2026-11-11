@@ -13,7 +13,7 @@ import { cornerSub, CornerMode, isCorner } from '../corners';
 import { shapeCenters, shownMark } from '../arcs';
 import type { Editor } from '../editor';
 import { SNAP_COLOR, TOOL_HINTS } from './shared';
-import { pathIslands, IslandOptions } from '../pathIslands';
+import { pathIslandPlan, IslandOptions } from '../pathIslands';
 
 /** Formen, die Pfad-Werkzeuge bearbeiten (Grundformen werden dabei zu Pfaden) */
 const VECTOR = ['path', 'rect', 'ellipse', 'polygon'];
@@ -46,7 +46,7 @@ export class EditorPaths {
         throw Error(t('Pfadinseln: bearbeitbare Pfade auswählen; Gruppen auflösen und parametrische Formen ausdrücklich umwandeln.'));
       for(const o of this.sel) {
         if(o.shape.kind!=='path') continue;
-        const islands=pathIslands(o.shape.subs,{...options,matrix:o.m});
+        const islands=pathIslandPlan(o.shape.subs,{...options,matrix:o.m}).groups;
         if(islands.length<2 && JSON.stringify(islands[0])===JSON.stringify(o.shape.subs)) continue;
         plans.set(o,islands.map((subs,i)=>({...o,id:i?newId():o.id,m:[...o.m],shape:{...o.shape,kind:'path',subs:structuredClone(subs)}} as Obj)));
       }

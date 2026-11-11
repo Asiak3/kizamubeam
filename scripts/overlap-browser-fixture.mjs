@@ -117,6 +117,7 @@ window.runOverlapRegressionChecks=async()=>{
   window.dispatchEvent(new Event('blur'));closeEditorMenu();ed.onDown=realDown;ed.setSel=realSetSel;ed.onCanvasContext=realContext;
   if(platform)Object.defineProperty(navigator,'platform',platform);else delete navigator.platform;
  }
+
  return {errors,passed};
 };`;
 const result=await build({stdin:{contents,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,outfile:'fixture.js',format:'esm',external:['node:module'],metafile:true,loader:{'.woff':'empty','.woff2':'empty'},plugins:[{name:'offline',setup(b){

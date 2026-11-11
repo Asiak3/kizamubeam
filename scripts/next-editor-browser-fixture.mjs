@@ -52,6 +52,7 @@ window.runFeatureChecks=async()=>{
  ed.doUndo();check(ed.state()===before2,'Undo exact restoration');ed.doRedo();check(ed.doc.objs.length===2,'Redo restores split');
  ed.setSel([ed.doc.objs[0]]);openPathIslandsDialog(ed);dialog2=[...document.querySelectorAll('dialog')].at(-1);ed.emit('doc');check([...dialog2.querySelectorAll('button')].find(b=>b.textContent==='Übernehmen').disabled,'changed source invalidates preview');dialog2.close();
  }
+
  return {errors,passed};};`;
 const result=await build({stdin:{contents,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,outfile:'fixture.js',format:'esm',external:['node:module'],metafile:true,loader:{'.woff':'empty','.woff2':'empty'},plugins:[{name:'offline',setup(b){
 b.onResolve({filter:/(?:^|\/)files$/},()=>({path:'files',namespace:'offline'}));b.onResolve({filter:/(?:^|\/)native$/},()=>({path:'native',namespace:'offline'}));
