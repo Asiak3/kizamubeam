@@ -4215,3 +4215,4 @@ input.jig-count {
   flex: 1;
   min-width: 0;
 }
+.outline-choices .outline-choice-active { outline: 2px solid var(--accent, #5b9bff); outline-offset: 2px; border-radius: 3px; background: color-mix(in srgb, var(--accent, #5b9bff) 18%, transparent); }

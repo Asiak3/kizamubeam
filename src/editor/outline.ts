@@ -1,7 +1,7 @@
 import type { Editor } from '../editor';
 import { Doc, Obj, Pt, SubPath, defaultLayer, IDENT, isOff, newId } from '../model';
 import { shapeSubs } from '../geom';
-import { OutlinePlan, outlinePlan, outlineResult } from '../outline';
+import { OutlinePlan, preciseOutlinePlan, outlineResult, type OutlineMode } from '../outline';
 import { t } from '../i18n';
 import { pruneMultiLayers } from '../multilayer';
 
@@ -15,12 +15,16 @@ export interface OutlineSession {
 export interface OutlinePreview {
   subs: SubPath[]; holes: SubPath[][]; hover: number;
   original?: SubPath[];
+  excluded?: SubPath[]; removed?: SubPath[];
   pick: (point: Pt) => void; move: (point: Pt) => void; cancel: () => void;
 }
 
 function plan(geometry: Obj[], tolerance?: number, allowEmpty = false): OutlinePlan {
-  try { return outlinePlan(geometry, tolerance, allowEmpty); }
-  catch { throw new Error(t('Arbeitsgrenze der Außenkontur erreicht oder keine geschlossene Fläche vorhanden.')); }
+  try { return preciseOutlinePlan(geometry, tolerance, allowEmpty); }
+  catch (error) {
+    if (error instanceof Error && error.message === 'outline-boundary') throw new Error(t('Konturgrenze nicht eindeutig aus den Quellkurven ableitbar. Verbindungstoleranz und Übergänge prüfen.'));
+    throw new Error(t('Arbeitsgrenze der Außenkontur erreicht oder keine geschlossene Fläche vorhanden.'));
+  }
 }
 
 function validate(ed: Editor, sources: Obj[]): boolean {
@@ -77,18 +81,25 @@ export class EditorOutline {
   }
 
   applyOutline(this: Editor, session: OutlineSession, holes: ReadonlySet<number>, layer: number,
-    keepOriginals = true, replaceConfirmed = false): Obj {
+    keepOriginals = true, replaceConfirmed = false, mode: OutlineMode = 'combined',
+    // `confirmed` remains accepted for earlier local callers; approximation
+    // selection is now informational, not a modal-confirmation workflow.
+    approximation: { islands?: ReadonlySet<number>; confirmed?: boolean } = {}): Obj {
     if (!current(this, session)) throw new Error(t('Auswahl oder Quelle geändert. Außenkontur erneut öffnen.'));
     validate(this, session.sources);
     const target = this.doc.layers[layer] ?? defaultLayer(layer);
     if (!Number.isInteger(layer) || layer < 0 || layer >= 32 || target.locked || !target.show)
       throw new Error(t('Eine sichtbare, entsperrte Zielebene wählen.'));
     if (!keepOriginals && !replaceConfirmed) throw new Error(t('Das Ersetzen der Originale muss ausdrücklich bestätigt werden.'));
-    const subs = outlineResult(session.plan, holes);
-    if (!subs.length) throw new Error(t('Die gewählten Löcher lassen keine Außenkontur übrig.'));
-    const result: Obj = { id: newId(), m: [...IDENT], layer, name: t('Außenkontur'), shape: { kind: 'path', subs } };
+    const approximateIslands=approximation.islands??new Set<number>();
+    const subs = outlineResult(session.plan, holes, mode, approximateIslands);
+    if (!subs.length) throw new Error(t('Keine Kontur für den gewählten Ausgabemodus vorhanden. Inseln auswählen oder den Modus ändern.'));
+    const approximated=mode!=='outer'&&approximateIslands.size>0;
+    const name=mode==='islands'?(approximated?t('Inselkonturen (mit Näherung)'):t('Inselkonturen')):
+      approximated?t('Außenkontur (mit angenäherten Inseln)'):t('Außenkontur');
+    const result: Obj = { id: newId(), m: [...IDENT], layer, name, shape: { kind: 'path', subs } };
     if (session.noLaser) result.noLaser = true;
-    this.snapshot(t('Außenkontur mit gewählten Löchern'));
+    this.snapshot(t('Außenkontur und Inseln ableiten'));
     if (!keepOriginals) {
       this.doc.objs = this.doc.objs.filter((o) => !session.sources.includes(o));
       pruneMultiLayers(this.doc);

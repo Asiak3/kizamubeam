@@ -5,6 +5,8 @@ import { Obj, SubPath } from './model';
 import { ShapeRegion, shapeRegions, regionContains } from './shapeRegions';
 import { objectPaths } from './ops';
 import { outlineNetwork, OUTLINE_JOIN_TOL, type OutlineNetwork } from './outlineNetwork';
+import { outlineBoundary } from './outlineBoundary';
+import { outlineApproximation } from './outlineApproximation';
 
 const { Clipper, ClipType: C, PolyType, PolyFillType: F, PolyTree } = ClipperLib;
 const clip = (op: ClipperLib.ClipType, a: Paths, b: Paths) => execute(op, a, b, F.pftNonZero);
@@ -31,11 +33,55 @@ function areas(ps: Paths): ShapeRegion[] {
   return out;
 }
 
-export interface OutlinePlan { outer: SubPath[]; holes: ShapeRegion[]; looseEnds?: number }
+export type OutlineMode = 'outer' | 'combined' | 'islands';
+export interface OutlinePlan {
+  outer: SubPath[]; holes: ShapeRegion[]; looseEnds?: number;
+  network?: OutlineNetwork; connections?: SubPath[];
+  outerError?: boolean; islandErrors?: boolean[];
+  approximationEligible?: boolean[];
+  boundaryCache?: Map<string, SubPath>;
+  boundaryFailures?: Map<string,{edges:OutlineNetwork['edges'];error:unknown}>;
+}
 
-export function outlinePlan(objects: Obj[], tolerance = OUTLINE_JOIN_TOL, allowEmpty = false, preparedNetwork?: OutlineNetwork): OutlinePlan {
+function restoredBoundary(plan: OutlinePlan, polygon: ClipperLib.Path): SubPath {
+  const key = polygon.map(p => `${p.X}:${p.Y}`).join('|'), cache = plan.boundaryCache!;
+  let boundary = cache.get(key);
+  if (!boundary) {
+    const failure=plan.boundaryFailures?.get(key);
+    if(failure?.edges===plan.network!.edges)throw failure.error;
+    const connections: SubPath[]=[];
+    try{boundary = outlineBoundary(polygon, plan.network!, connections);}
+    catch(error){const failures=plan.boundaryFailures??=new Map();if(failures.size<4096)failures.set(key,{edges:plan.network!.edges,error});throw error;}
+    if(cache.size<4096)cache.set(key, boundary);
+    for(const connection of connections) if(!plan.connections!.some(p=>JSON.stringify(p.nodes)===JSON.stringify(connection.nodes)||JSON.stringify([...p.nodes].reverse())===JSON.stringify(connection.nodes)))plan.connections!.push(connection);
+  }
+  return structuredClone(boundary);
+}
+
+/** Precision pipeline for independent contour extraction. Legacy offset recipes
+ * keep their existing detection network and are not silently reinterpreted. */
+export function preciseOutlinePlan(objects: Obj[], tolerance = OUTLINE_JOIN_TOL, allowEmpty = false): OutlinePlan {
+  const network = outlineNetwork(objects, tolerance, true);
+  const plan = outlinePlan(objects, tolerance, allowEmpty, network, true);
+  plan.network = network;
+  plan.boundaryCache = new Map();
+  plan.boundaryFailures = new Map();
+  plan.connections = network.paths.filter(p => p.connection).map(p => p.world!);
+  // Keep ambiguous candidates visible but unavailable. One tiny ambiguous
+  // island must not prevent extracting another independently proven boundary.
+  const unresolved = (boundaries: SubPath[]) => {
+    try { for (const boundary of boundaries) restoredBoundary(plan, paths([boundary])[0]); return false; }
+    catch { return true; }
+  };
+  plan.outerError = unresolved(plan.outer);
+  plan.islandErrors = plan.holes.map(h => unresolved(h.subs));
+  plan.approximationEligible = plan.holes.map((h,i)=>!!plan.islandErrors?.[i]&&!!outlineApproximation(h));
+  return plan;
+}
+
+export function outlinePlan(objects: Obj[], tolerance = OUTLINE_JOIN_TOL, allowEmpty = false, preparedNetwork?: OutlineNetwork, forceNetwork = false): OutlinePlan {
   if (!Number.isFinite(tolerance) || tolerance < 0 || tolerance > 0.5) throw new Error('outline-tolerance');
-  if (objects.some(o => objectPaths(o).open.length)) {
+  if (forceNetwork || objects.some(o => objectPaths(o).open.length)) {
     if (!objects.length || objects.length > 32) throw new Error('shape-builder-budget');
     const network = preparedNetwork ?? outlineNetwork(objects, tolerance);
     if (!network.faces.length) {
@@ -86,9 +132,31 @@ export function outlineHoleAt(plan: OutlinePlan, x: number, y: number): number {
   return plan.holes.findIndex((h) => regionContains(h, x, y));
 }
 
-export function outlineResult(plan: OutlinePlan, selected: ReadonlySet<number>): SubPath[] {
+export function outlineResult(plan: OutlinePlan, selected: ReadonlySet<number>, mode: OutlineMode = 'combined', approximateIslands: ReadonlySet<number> = new Set()): SubPath[] {
+  if (!['outer', 'combined', 'islands'].includes(mode)) throw new Error('outline-selection');
   if ([...selected].some((i) => !Number.isInteger(i) || i < 0 || i >= plan.holes.length)) throw new Error('outline-selection');
-  if (!selected.size) return structuredClone(plan.outer);
-  const holes = [...selected].reduce((acc, i) => clip(C.ctUnion, acc, paths(plan.holes[i].subs)), [] as Paths);
-  return subs(clip(C.ctDifference, paths(plan.outer), holes));
+  const approved:Paths=[];
+  for(const i of approximateIslands){
+    if(!Number.isInteger(i)||!selected.has(i)||!plan.islandErrors?.[i])throw new Error('outline-selection');
+    const polygons=outlineApproximation(plan.holes[i]);
+    if(!polygons)throw new Error('outline-approximation-unsafe');
+    approved.push(...polygons);
+  }
+  if ((mode !== 'islands' && plan.outerError) || (mode !== 'outer' && [...selected].some(i => plan.islandErrors?.[i]&&!approximateIslands.has(i)))) throw new Error('outline-boundary');
+  const restore = (polygons: Paths) => plan.network ? polygons.map(p => {
+    try{return restoredBoundary(plan,p);}
+    catch(error){
+      // Only the expressly approved complete boundary may use the polygon.
+      // Mixed/merged boundaries are NOT blanket-approved by a nearby island.
+      if(mode==='outer'||!approved.some(q=>clip(C.ctXor,[p],[q]).length===0))throw error;
+      if(!outlineApproximation({layer:0,subs:subs([p])}))throw new Error('outline-approximation-unsafe');
+      return subs([p])[0];
+    }
+  }) : subs(polygons);
+  if (mode === 'outer' || !selected.size) return mode === 'islands' ? [] : restore(paths(plan.outer));
+  // Precision-plan regions already have consistent outer/hole winding. Union
+  // them once, rather than rebuilding the growing arrangement for every island.
+  const holes = plan.network ? clip(C.ctUnion,[...selected].flatMap(i=>paths(plan.holes[i].subs)),[]) :
+    [...selected].reduce((acc, i) => clip(C.ctUnion, acc, paths(plan.holes[i].subs)), [] as Paths);
+  return restore(mode === 'islands' ? holes : clip(C.ctDifference, paths(plan.outer), holes));
 }
