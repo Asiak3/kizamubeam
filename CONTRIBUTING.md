@@ -72,6 +72,7 @@ Changes to G-code, streaming, homing, limits, laser power, emergency handling, f
 - Keep geometry, document/model logic, UI, and device transport responsibilities clear. Prefer small, understandable changes.
 - Preserve compatibility with existing projects, settings, machine profiles, templates, packs, and file formats. Changes to serialization or migrations should include tests and a clear compatibility plan.
 - User-facing UI strings are written in German using `t('…')` or `tn(…)`, with translations in `src/locales/`. See [translation instructions](docs/development.md#translations). Check localization whenever you add or change strings.
+- New application-wide preferences go into the settings window (Edit → Settings) as a field in `src/settings/` instead of a dialog of their own. Device, project and layer settings stay where they are.
 - Avoid introducing new dependencies without a clear reason; mention additions and licensing implications in the PR.
 - For changes to the independent Virtual Machine, keep its behavior and release versioning separate from the main application.
 

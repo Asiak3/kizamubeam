@@ -8,7 +8,7 @@ const PRE = 'kizamubeam.';
 export const SETTINGS_KEYS = [
   'theme', 'lang', 'snap', 'grid', 'boolean', 'updateChannel', 'updateAuto', 'fontFavorites', 'fontAutoInstall', 'imagePresets', 'check',
   'nest', 'joints', 'hinges', 'slots', 'qr', 'barcode', 'printcut', 'jigfill', 'focustest', 'materialtest', 'warp', 'calib', 'view3d',
-  'workpieces',
+  'workpieces', 'overlap-picker',
 ].map((k) => PRE + k);
 /** Schlüssel mit diesem Anfang zählen auch zu den Einstellungen (letzte Werte der Generatoren) */
 export const SETTINGS_PREFIXES = [PRE + 'gen.'];
@@ -22,10 +22,10 @@ const TEMPLATES_STORE = PRE + 'templates';
 const PACKS_STORE = PRE + 'packs';
 /**
  * Gehören immer zu diesem Rechner und werden nie übertragen: offene Dokumente, Update-Prüfung, Assistent,
- * Sicherungen der FluidNC-Konfiguration, altes Einzelgerät, Abgleich selbst. Jeder Schlüssel im Code muss in
+ * Sicherungen der FluidNC-Konfiguration, altes Einzelgerät, Abgleich selbst, Dialogpositionen (hängen am Bildschirm). Jeder Schlüssel im Code muss in
  * einer dieser Listen stehen (npm run test:sync prüft das).
  */
-export const LOCAL_KEYS = ['autosave', 'tabs', 'updateLastCheck', 'setupOffered', 'fluidBackups', 'materialtest.last', 'device', 'sync', 'syncKnown', 'syncFp', 'syncExport'].map(
+export const LOCAL_KEYS = ['autosave', 'tabs', 'updateLastCheck', 'setupOffered', 'fluidBackups', 'materialtest.last', 'device', 'sync', 'syncKnown', 'syncFp', 'syncExport', 'dialogPos'].map(
   (k) => PRE + k,
 );
 export const BROWSER_STORES = [TEMPLATES_STORE, PACKS_STORE];

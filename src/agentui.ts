@@ -34,6 +34,18 @@ async function call(cmd: string, args: Record<string, unknown> = {}): Promise<Ag
   return info;
 }
 
+/** Current access settings, for the settings window (desktop app only) */
+export async function agentSettings(): Promise<{ enabled: boolean; level: number; port: number }> {
+  const i = await call('agent_info');
+  return { enabled: i.enabled, level: i.level, port: i.port };
+}
+export async function configureAgent(v: { enabled: boolean; level: number; port: number }) {
+  const i = await call('agent_configure', { enabled: v.enabled, level: v.level, port: v.port || 47800 });
+  if (i.error) throw new Error(tBackend(i.error));
+}
+/** Levels with their labels (lowest first) */
+export const agentLevels = (): [number, string][] => LEVELS.map(([v, l]) => [v, l]);
+
 /** Hinweis in der Statusleiste, solange der Zugang an ist; Klick öffnet die Einstellungen */
 export function agentStatus(ed: Editor): HTMLElement {
   const el = h('button', { class: 'agent-status', hidden: true, title: t('Zugang für KI-Agenten ist eingeschaltet'), onclick: () => openAgentDialog(ed) }, t('KI-Agenten an'));

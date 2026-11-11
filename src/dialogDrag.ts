@@ -77,6 +77,15 @@ export function savePosition(store: Pick<Storage, 'getItem' | 'setItem'> | null,
   }
 }
 
+/** Forget all remembered positions: dialogs open centred again (Settings → Appearance) */
+export function resetDialogPositions(store: Pick<Storage, 'removeItem'> | null = storage()) {
+  try {
+    store?.removeItem(KEY);
+  } catch {
+    /* nothing stored */
+  }
+}
+
 function storage(): Storage | null {
   try {
     return localStorage;

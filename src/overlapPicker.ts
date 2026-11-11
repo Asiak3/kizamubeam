@@ -2,7 +2,6 @@ import type { Editor } from './editor';
 import { Obj, Pt, visibleLeaves } from './model';
 import { hitLeaf } from './geom';
 import { t } from './i18n';
-import { h } from './dom';
 
 export const OVERLAP_HOLD_MS = 550;
 // Pointer coordinates are CSS pixels, independent of devicePixelRatio.
@@ -16,23 +15,15 @@ export function loadOverlapSettings():OverlapSettings {
   }catch{/* unavailable or invalid preferences retain safe defaults */}
   return {trigger:'right',delay:OVERLAP_HOLD_MS};
 }
-export function openOverlapSettings() {
-  const current=loadOverlapSettings();
-  const trigger=h('select',{},h('option',{value:'right'},t('Langer Rechtsklick')),h('option',{value:'left'},t('Langer Linksklick')),h('option',{value:'off'},t('Deaktiviert')));
-  trigger.value=current.trigger;
-  const delay=h('input',{type:'number',min:250,max:2000,step:50,value:String(current.delay)});
-  const info=h('p',{role:'status'});
-  const save=h('button',{},t('Übernehmen'));
-  const dialog=h('dialog',{class:'offset-dialog'},h('h3',{},t('Überlappungsauswahl einstellen')),
-    h('label',{},t('Auslösung'),trigger),h('label',{},t('Haltedauer (ms)'),delay),
-    h('p',{},t('Kurzer Klick und Ziehen bleiben unverändert. Die Liste ändert die Auswahl erst beim Bestätigen.')),info,
-    h('div',{class:'dialog-buttons'},h('button',{onclick:()=>dialog.close()},t('Abbrechen')),save));
-  save.addEventListener('click',()=>{
-    if(!Number.isInteger(delay.valueAsNumber)||delay.valueAsNumber<250||delay.valueAsNumber>2000){info.textContent=t('Haltedauer zwischen 250 und 2000 ms wählen.');return}
-    try{localStorage.setItem(SETTINGS_KEY,JSON.stringify({trigger:trigger.value,delay:delay.valueAsNumber}));dialog.close()}
-    catch{info.textContent=t('Einstellung konnte nicht gespeichert werden.')}
-  });
-  dialog.addEventListener('keydown',e=>e.stopPropagation());dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();
+/** Save trigger and hold duration (edited in Edit → Settings → Mouse and keyboard); false if not stored */
+export function saveOverlapSettings(v: OverlapSettings): boolean {
+  if (!['right', 'left', 'off'].includes(v.trigger) || !Number.isInteger(v.delay) || v.delay < 250 || v.delay > 2000) return false;
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ trigger: v.trigger, delay: v.delay }));
+    return true;
+  } catch {
+    return false;
+  }
 }
 /** Same top-level/group and isolation semantics as ordinary selection. */
 export function overlapCandidates(ed: Editor, point: Pt): Obj[] {

@@ -3,7 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const out='artifacts/feature-browser';await mkdir(out,{recursive:true});
 const contents=`
 import {Editor} from './src/editor';import {newDoc,newId,defaultLayer} from './src/model';import {History} from './src/history';
-import {loadOverlapSettings,openOverlapSettings,OVERLAP_MOVE_PX} from './src/overlapPicker';import './src/style.css';
+import {loadOverlapSettings,saveOverlapSettings,OVERLAP_MOVE_PX} from './src/overlapPicker';import './src/style.css';
 import {installEditorContext} from './src/editorContext';import {closeEditorMenu} from './src/contextMenu';
 Editor.prototype.restore=function(){};Editor.prototype.scheduleSave=function(){};
 localStorage.removeItem('kizamubeam.overlap-picker');
@@ -41,7 +41,7 @@ window.runFeatureChecks=async()=>{
  event('pointerdown');event('pointermove',2,90,80);event('pointerup',2,90,80);await wait(600);check(!document.querySelector('.overlap-picker'),'movement cancels long-click opening');
  event('pointerdown');await wait(600);event('pointerup');document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));check(!document.querySelector('.overlap-picker') && ed.sel.length===0,'Escape cancels without selection');
  event('pointerdown');await wait(600);event('pointerup');ed.emit('doc');check(!document.querySelector('.overlap-picker'),'document changes close stale chooser');
- openOverlapSettings();const dialog=document.querySelector('dialog'),select=dialog.querySelector('select'),delay=dialog.querySelector('input');select.value='left';delay.value='300';[...dialog.querySelectorAll('button')].find(b=>b.textContent==='Übernehmen').click();
+ check(!saveOverlapSettings({trigger:'left',delay:100}),'out-of-range hold duration is rejected');saveOverlapSettings({trigger:'left',delay:300});
  check(loadOverlapSettings().trigger==='left' && loadOverlapSettings().delay===300,'settings persist trigger and hold duration');
  event('pointerdown',0);await wait(350);event('pointerup',0);check(!!document.querySelector('.overlap-picker'),'configured long left click opens chooser');
  document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));

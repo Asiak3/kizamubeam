@@ -362,6 +362,21 @@ export async function startRemoteHost(ed: Editor) {
   await refreshInfo();
 }
 
+/** Current host mode settings, for the settings window (desktop app only) */
+export async function hostSettings(): Promise<{ enabled: boolean; port: number; name: string; shownName: string; confirm: boolean }> {
+  await refreshInfo();
+  if (!info) throw new Error(t('Host-Modus nicht verfügbar'));
+  return { enabled: info.enabled, port: info.port, name: info.name, shownName: info.shown_name, confirm: info.confirm };
+}
+export async function configureHost(v: { enabled: boolean; port: number; name: string; confirm: boolean }) {
+  try {
+    info = await invoke<HostInfo>('remote_host_configure', { enabled: v.enabled, port: v.port || 47900, name: v.name.trim(), confirm: v.confirm });
+  } finally {
+    await refreshInfo();
+  }
+  if (info?.error) throw new Error(tBackend(info.error));
+}
+
 async function refreshInfo() {
   info = await invoke<HostInfo>('remote_host_info').catch(() => null);
   clients = info?.running ? await invoke<ClientInfo[]>('remote_host_clients').catch(() => []) : [];
