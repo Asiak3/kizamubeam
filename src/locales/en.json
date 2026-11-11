@@ -4192,5 +4192,17 @@
   "Host und dieser Rechner verwenden verschiedene Protokollversionen. Bitte beide KizamuBeam auf dieselbe Version bringen.": "The host and this computer use different protocol versions. Please bring both KizamuBeam installations to the same version.",
   "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visible on the network as “{name}”; other computers find it with “Find host …”.",
   "Startpunkt: Knoten oder Kante anklicken, dort beginnt der Schnitt (auf einer Kante geschlossener Konturen entsteht ein neuer Knoten). Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Start point: click a node or an edge to start the cut there (an edge of a closed contour gets a new node). Shift+click: reverse direction, Ctrl+click: reset (optimization decides).",
-  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Set start point: click the node or edge where the cut begins (Shift: reverse direction)"
+  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Set start point: click the node or edge where the cut begins (Shift: reverse direction)",
+  "Reihenfolge": "Stacking order",
+  "Ganz nach vorne": "Bring to front",
+  "Eine Ebene nach vorne": "Bring forward",
+  "Eine Ebene nach hinten": "Send backward",
+  "Ganz nach hinten": "Send to back",
+  "Umbenennen …": "Rename …",
+  "Auf Layer verschieben": "Move to layer",
+  "Auf Seite verschieben": "Move to page",
+  "Gruppe zuklappen": "Collapse group",
+  "Gruppe aufklappen": "Expand group",
+  "Objekte dieses Layers auswählen": "Select objects on this layer",
+  "Zu dieser Seite wechseln": "Go to this page"
 }

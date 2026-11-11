@@ -4014,5 +4014,18 @@
   "Fertig nach {time} min, {n} Fehler|one": "Terminado tras {time} min, {n} error",
   "Fertig nach {time} min, {n} Fehler": "Terminado tras {time} min, {n} errores",
   "Startpunkt: Knoten oder Kante anklicken, dort beginnt der Schnitt (auf einer Kante geschlossener Konturen entsteht ein neuer Knoten). Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Punto de inicio: haz clic en un nodo o en un borde para que el corte empiece allí (en el borde de un contorno cerrado se crea un nodo nuevo). Mayús+clic: invertir dirección; Ctrl+clic: restablecer (decide la optimización).",
-  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Fijar punto de inicio: haz clic en el nodo o borde donde empieza el corte (Mayús: invertir dirección)"
+  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Fijar punto de inicio: haz clic en el nodo o borde donde empieza el corte (Mayús: invertir dirección)",
+  "Reihenfolge": "Orden de apilado",
+  "Ganz nach vorne": "Traer al frente",
+  "Eine Ebene nach vorne": "Traer adelante",
+  "Eine Ebene nach hinten": "Enviar atrás",
+  "Ganz nach hinten": "Enviar al fondo",
+  "Umbenennen …": "Cambiar nombre …",
+  "Auf Layer verschieben": "Mover a la capa",
+  "Auf Seite verschieben": "Mover a la página",
+  "Gruppe zuklappen": "Contraer grupo",
+  "Gruppe aufklappen": "Expandir grupo",
+  "Objekte dieses Layers auswählen": "Seleccionar los objetos de esta capa",
+  "Zu dieser Seite wechseln": "Ir a esta página",
+  "Ausblenden": "Ocultar"
 }

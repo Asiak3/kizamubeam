@@ -53,10 +53,38 @@ export function editorContextGroups(ed: Editor, callbacks: ContextCallbacks, bla
     action('mirrorh', t('Horizontal spiegeln'), () => ed.mirror(true), editable), action('mirrorv', t('Vertikal spiegeln'), () => ed.mirror(false), editable),
     action('alignl', t('Links ausrichten'), () => ed.align('left'), editable && count > 1),
     action('alignhc', t('Mitten horizontal'), () => ed.align('hcenter'), editable && count > 1)] };
-  return [common, organize, images.length ? imageActions : vectorActions, [arrange,
+  const stacking: ContextAction = { id: 'stacking', label: t('Reihenfolge'), run: () => {}, items: stackingActions(ed, editable) };
+  return [common, organize, images.length ? imageActions : vectorActions, [arrange, stacking,
     action('library', t('Zur Bibliothek hinzufügen …'), callbacks.library, count > 0),
     { ...action('no-laser', t('Nicht lasern'), () => ed.toggleNoLaser(), editable), checked: !!count && ed.sel.every((o) => o.noLaser) }],
   [action('preview', t('Vorschau …'), callbacks.preview), windows]];
+}
+
+/** Stacking order commands; shared by the canvas menu, the Objects window and the main menu. No default shortcuts. */
+export function stackingActions(ed: Editor, editable = ed.sel.length > 0 && ed.sel.every((o) => ed.selectable(o))): ContextAction[] {
+  const item = (id: string, label: string, dir: 'forward' | 'backward' | 'front' | 'back'): ContextAction =>
+    ({ id, label, run: () => ed.restack(dir), enabled: editable && ed.canRestack(dir) });
+  return [item('tofront', t('Ganz nach vorne'), 'front'), item('forward', t('Eine Ebene nach vorne'), 'forward'),
+    item('backward', t('Eine Ebene nach hinten'), 'backward'), item('toback', t('Ganz nach hinten'), 'back')];
+}
+
+/**
+ * Open the shared editor menu. Actions only run while the document and selection are unchanged since the
+ * menu opened, and errors become a status hint instead of an unhandled rejection.
+ */
+export function openEditorContextMenu(ed: Editor, x: number, y: number, groups: ContextAction[][]) {
+  const doc = ed.doc, stamp = ed.state();
+  const guard = (items: ContextAction[]): ContextAction[] => items.map((item) => ({ ...item,
+    items: item.items ? guard(item.items) : undefined,
+    run: async () => {
+      if (ed.doc !== doc || ed.state() !== stamp || document.querySelector('dialog[open]')) return;
+      try { await item.run(); }
+      catch (error) { ed.hint = error instanceof Error ? error.message : String(error); ed.emit('tool'); }
+    } }));
+  let close: () => void;
+  const changed = () => close?.();
+  close = showEditorMenu(x, y, groups.map(guard), () => ed.off(changed));
+  ed.on(changed);
 }
 
 export function installEditorContext(ed: Editor, callbacks: ContextCallbacks) {
@@ -68,17 +96,6 @@ export function installEditorContext(ed: Editor, callbacks: ContextCallbacks) {
     const hit = ed.hitTest(ed.toWorld(sx, sy));
     if (hit && !ed.sel.includes(hit)) ed.setSel([hit]);
     if (ed.tool === 'node') ed.updateNodeHover(sx, sy);
-    const doc = ed.doc, stamp = ed.state(), groups = editorContextGroups(ed, callbacks, !hit);
-    const guard = (items: ContextAction[]): ContextAction[] => items.map((item) => ({ ...item,
-      items: item.items ? guard(item.items) : undefined,
-      run: async () => {
-        if (ed.doc !== doc || ed.state() !== stamp || document.querySelector('dialog[open]')) return;
-        try { await item.run(); }
-        catch (error) { ed.hint = error instanceof Error ? error.message : String(error); ed.emit('tool'); }
-      } }));
-    let close: () => void;
-    const changed = () => close?.();
-    close = showEditorMenu(event.clientX, event.clientY, groups.map(guard), () => ed.off(changed));
-    ed.on(changed);
+    openEditorContextMenu(ed, event.clientX, event.clientY, editorContextGroups(ed, callbacks, !hit));
   };
 }

@@ -13,6 +13,10 @@ import { openShowIfDialog } from './paramsPanel';
 import { $, h } from './dom';
 import { t, tn } from './i18n';
 import { isShown, onWindowShow, setBadge } from './dock';
+import { ContextCallbacks, openEditorContextMenu } from './editorContext';
+import { closeEditorMenu } from './contextMenu';
+import { objectsContextGroups, ObjectsRowTarget } from './objectsContext';
+import { openLayerDialog } from './layerdialog';
 
 /** Mehr Zeilen je Layer werden erst auf Wunsch gezeigt (große Arrays, Nachzeichnungen) */
 const ROW_LIMIT = 300;
@@ -66,7 +70,7 @@ type Drop =
 /** Einrückung unter der Seitenzeile */
 const INDENT = 14;
 
-export function buildObjectsPanel(ed: Editor) {
+export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
   const body = $('#objects');
   /** Nur neu aufbauen, wenn das Fenster zu sehen ist; beim Einblenden wird nachgeholt */
   const open = () => isShown('objects');
@@ -400,6 +404,49 @@ export function buildObjectsPanel(ed: Editor) {
     if (e.shiftKey || e.ctrlKey || e.metaKey) ed.setSel(ed.sel.includes(top) ? ed.sel.filter((o) => o !== top) : [...ed.sel, top]);
     else ed.setSel([top]);
     fromPanel = false;
+  });
+
+  // ---------- Context menu (right-click, Ctrl+click on macOS) ----------
+
+  /** Start renaming the row with this selector, even if the tree was rebuilt since the menu opened */
+  const renameRow = (selector: string, value: () => string, commit: (v: string) => void) => () => {
+    const label = body.querySelector<HTMLElement>(`${selector} .ot-label`);
+    if (label) startRename(label, value(), commit);
+  };
+
+  body.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const row = (e.target as HTMLElement).closest('.ot-row') as HTMLElement | null;
+    if (!row || !callbacks || renaming || document.querySelector('dialog[open]') || ed.drag || ed.draft || ed.pickHandler) return;
+    closeEditorMenu();
+    let target: ObjectsRowTarget;
+    if (row.dataset.page) {
+      const i = Number(row.dataset.page);
+      target = { kind: 'page', page: i,
+        rename: renameRow(`[data-page="${i}"]`, () => ed.doc.pages[i]?.name ?? '', (v) => ed.renamePage(i, v)) };
+    } else if (row.dataset.layer) {
+      target = { kind: 'layer', layer: Number(row.dataset.layer) };
+    } else {
+      const r = rows.get(Number(row.dataset.id));
+      if (!r) return;
+      const { obj, top } = r;
+      // Same rule as a left click: a child selects its top-level group. Keep an existing multi-selection.
+      if (ed.selectable(top) && !ed.sel.includes(top)) {
+        fromPanel = true;
+        ed.setSel([top]);
+        fromPanel = false;
+      }
+      const group = obj.shape.kind === 'group'
+        ? { open: openGroups.has(obj.id), toggle: () => { if (!openGroups.delete(obj.id)) openGroups.add(obj.id); render(); } }
+        : undefined;
+      target = { kind: 'obj', obj, top, group,
+        rename: renameRow(`[data-id="${obj.id}"]`, () => obj.name ?? '', (v) => ed.setObjProps([obj], { name: v })) };
+    }
+    const groups = objectsContextGroups(ed, callbacks, {
+      showIf: (objs) => openShowIfDialog(ed, objs),
+      layerSettings: (i) => openLayerDialog(ed, i),
+    }, target);
+    openEditorContextMenu(ed, e.clientX, e.clientY, groups);
   });
 
   // ---------- Ziehen ----------
