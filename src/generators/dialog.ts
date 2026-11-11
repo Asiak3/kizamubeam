@@ -239,7 +239,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       rows.get(s.key)!.forEach((el) => el.classList.toggle('invalid', bad));
     }
     infoEl.replaceChildren(...r.info.map(([k, v]) => h('div', {}, h('span', { class: 'muted' }, k), ' ', v)));
-    okBtn.disabled = !built;
+    okBtn.disabled = addBtn.disabled = !built;
     panel?.refresh(np);
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -294,20 +294,37 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
           : t('Ohne Schnittfuge werden die Teile um die Fugenbreite zu klein. Fuge hier oder als Kerf-Versatz am Layer eintragen.');
   };
 
-  const okBtn = h('button', {
-    class: 'btn primary',
-    onclick: () => {
-      if (!built) return;
-      try {
-        localStorage.setItem(LAST_KEY(g.id), JSON.stringify(built.parts[0].shape.params));
-      } catch {
-        /* Speicher nicht verfügbar */
-      }
-      if (o && old) ed.updateGen(o, built);
-      else ed.addGen(built);
-      dlg.close();
-    },
-  }, old ? t('Übernehmen') : t('Erstellen')) as HTMLButtonElement;
+  /**
+   * Übernehmen/Erstellen (close) oder Hinzufügen (Dialog bleibt offen). Hinzufügen legt immer ein neues Teil an,
+   * auch beim Bearbeiten; das bearbeitete Teil bleibt dann unverändert.
+   */
+  const commit = async (close: boolean) => {
+    if (!built) return;
+    // Eigene Kopie: Ein zweites Hinzufügen ohne Änderung darf nicht dieselben Formen wiederverwenden
+    const r = structuredClone(built);
+    const apply = close && !!old ? o : undefined;
+    if (!apply && !ed.genFitsPage(r)) {
+      const answer = await askTooLarge();
+      if (answer === 'back') return;
+      if (answer === 'cancel') return dlg.close();
+    }
+    try {
+      localStorage.setItem(LAST_KEY(g.id), JSON.stringify(r.parts[0].shape.params));
+    } catch {
+      /* Speicher nicht verfügbar */
+    }
+    if (apply) ed.updateGen(apply, r);
+    else ed.addGen(r, o?.layer);
+    if (close) dlg.close();
+  };
+  const okBtn = h('button', { class: 'btn primary', onclick: () => void commit(true) }, old ? t('Übernehmen') : t('Erstellen')) as HTMLButtonElement;
+  const addBtn = h('button', {
+    class: 'btn',
+    title: old
+      ? t('Fügt ein neues Teil mit diesen Werten hinzu; das bearbeitete Teil bleibt unverändert.')
+      : t('Fügt das Teil hinzu und lässt den Dialog offen, um das nächste mit anderen Maßen einzustellen.'),
+    onclick: () => void commit(false),
+  }, t('Hinzufügen')) as HTMLButtonElement;
 
   const dlg = h(
     'dialog',
@@ -326,6 +343,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     kerfNote,
     h('div', { class: 'dialog-buttons' },
       h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen')),
+      addBtn,
       okBtn,
     ),
   );
@@ -340,6 +358,33 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   document.body.append(dlg);
   dlg.showModal();
   update();
+}
+
+/**
+ * Das Teil ist größer als der Arbeitsbereich: trotzdem erstellen (in der Mitte), zurück zur Bearbeitung oder alles
+ * abbrechen. Esc und das Schließkreuz führen zurück zur Bearbeitung, nur „Abbrechen“ schließt auch den Dialog.
+ */
+function askTooLarge(): Promise<'create' | 'back' | 'cancel'> {
+  return new Promise((resolve) => {
+    let answer: 'create' | 'back' | 'cancel' = 'back';
+    const done = (a: typeof answer) => ((answer = a), dlg.close());
+    const dlg = h(
+      'dialog',
+      { class: 'offset-dialog gen-guard' },
+      h('h3', {}, t('Größer als der Arbeitsbereich')),
+      h('p', {}, t('Das Teil passt mit Randabstand nicht auf eine leere Seite. Es wird keine neue Seite angelegt.')),
+      h('div', { class: 'dialog-buttons' },
+        h('button', { class: 'btn', onclick: () => done('cancel') }, t('Abbrechen')),
+        h('button', { class: 'btn', onclick: () => done('back') }, t('Zurück zur Bearbeitung')),
+        h('button', { class: 'btn primary', onclick: () => done('create') }, t('Trotzdem erstellen')),
+      ),
+    );
+    dlg.addEventListener('keydown', (e) => e.stopPropagation());
+    dlg.addEventListener('close', () => (dlg.remove(), resolve(answer)));
+    document.body.append(dlg);
+    // Erst nach dem auslösenden Tastendruck öffnen: Ein Enter im Feld würde sonst gleich einen Knopf drücken
+    setTimeout(() => dlg.showModal(), 0);
+  });
 }
 
 /** Beim Import eines 3D-Modells: Schichtmodell oder Rippenmodell? null = abgebrochen */
