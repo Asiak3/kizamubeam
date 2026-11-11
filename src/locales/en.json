@@ -4192,5 +4192,13 @@
   "Host und dieser Rechner verwenden verschiedene Protokollversionen. Bitte beide KizamuBeam auf dieselbe Version bringen.": "The host and this computer use different protocol versions. Please bring both KizamuBeam installations to the same version.",
   "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visible on the network as “{name}”; other computers find it with “Find host …”.",
   "Startpunkt: Knoten oder Kante anklicken, dort beginnt der Schnitt (auf einer Kante geschlossener Konturen entsteht ein neuer Knoten). Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Start point: click a node or an edge to start the cut there (an edge of a closed contour gets a new node). Shift+click: reverse direction, Ctrl+click: reset (optimization decides).",
-  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Set start point: click the node or edge where the cut begins (Shift: reverse direction)"
+  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Set start point: click the node or edge where the cut begins (Shift: reverse direction)",
+  "Fügt das Teil hinzu und lässt den Dialog offen, um das nächste mit anderen Maßen einzustellen.": "Adds the part and keeps the dialog open, so you can set up the next one with other dimensions.",
+  "Fügt ein neues Teil mit diesen Werten hinzu; das bearbeitete Teil bleibt unverändert.": "Adds a new part with these values; the edited part stays unchanged.",
+  "Auf der Seite war kein Platz mehr: neue Seite „{page}“.": "No space left on the page: new page “{page}”.",
+  "Größer als der Arbeitsbereich: liegt in seiner Mitte.": "Larger than the work area: placed in its centre.",
+  "Größer als der Arbeitsbereich": "Larger than the work area",
+  "Das Teil passt mit Randabstand nicht auf eine leere Seite. Es wird keine neue Seite angelegt.": "The part does not fit on an empty page with the edge margin. No new page will be created.",
+  "Zurück zur Bearbeitung": "Back to editing",
+  "Trotzdem erstellen": "Create anyway"
 }

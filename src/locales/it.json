@@ -4131,5 +4131,13 @@
   "Host und dieser Rechner verwenden verschiedene Protokollversionen. Bitte beide KizamuBeam auf dieselbe Version bringen.": "L'host e questo computer usano versioni di protocollo diverse. Porta entrambe le installazioni di KizamuBeam alla stessa versione.",
   "Im Netzwerk sichtbar als „{name}“, andere Rechner finden ihn unter „Host suchen …“.": "Visibile nella rete come “{name}”; gli altri computer lo trovano con “Cerca host …”.",
   "Startpunkt: Knoten oder Kante anklicken, dort beginnt der Schnitt (auf einer Kante geschlossener Konturen entsteht ein neuer Knoten). Shift+Klick: Richtung umkehren, Ctrl+Klick: zurücksetzen (Optimierung wählt).": "Punto iniziale: fai clic su un nodo o su un lato per iniziare il taglio da lì (sul lato di un contorno chiuso viene creato un nuovo nodo). Maiusc+clic: inverti la direzione, Ctrl+clic: ripristina (decide l'ottimizzazione).",
-  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Imposta punto iniziale: fai clic sul nodo o sul lato in cui inizia il taglio (Maiusc: inverti direzione)"
+  "Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)": "Imposta punto iniziale: fai clic sul nodo o sul lato in cui inizia il taglio (Maiusc: inverti direzione)",
+  "Fügt das Teil hinzu und lässt den Dialog offen, um das nächste mit anderen Maßen einzustellen.": "Aggiunge il pezzo e lascia aperta la finestra, per impostare il successivo con altre misure.",
+  "Fügt ein neues Teil mit diesen Werten hinzu; das bearbeitete Teil bleibt unverändert.": "Aggiunge un nuovo pezzo con questi valori; il pezzo modificato resta invariato.",
+  "Auf der Seite war kein Platz mehr: neue Seite „{page}“.": "Non c’era più spazio sulla pagina: nuova pagina «{page}».",
+  "Größer als der Arbeitsbereich: liegt in seiner Mitte.": "Più grande dell’area di lavoro: posizionato al centro.",
+  "Größer als der Arbeitsbereich": "Più grande dell’area di lavoro",
+  "Das Teil passt mit Randabstand nicht auf eine leere Seite. Es wird keine neue Seite angelegt.": "Il pezzo non entra in una pagina vuota con il margine dal bordo. Non verrà creata una nuova pagina.",
+  "Zurück zur Bearbeitung": "Torna alla modifica",
+  "Trotzdem erstellen": "Crea comunque"
 }

@@ -1,12 +1,13 @@
 // Editor: parametrische Bauteile und Baugruppen aus Generatoren (Zahnrad, Box …) einfügen, ändern und vor
 // ungewollter Umwandlung schützen.
 import { defaultCutSettings, GenShape, IDENT, leaves, mul, newAsmId, newId, Obj, SubPath, translate } from '../model';
-import { boundsOf } from '../geom';
+import { boundsOf, type Box } from '../geom';
 import { BuildResult, GenPart, genLabel, getGenerator, normalizeParams } from '../generators';
 import type { PlanSheet } from '../generators/types';
 import { t } from '../i18n';
 import type { Editor } from '../editor';
-import { RULER } from './shared';
+import { findFreeSpot, fitsArea } from '../placement';
+import { DEFAULT_NEST_SETTINGS } from './nest';
 
 /** Parametrische Bauteile unter den Objekten (auch in Gruppen) */
 export const genLeaves = (objs: Obj[]): Obj[] => [...leaves(objs)].map(([l]) => l).filter((l) => l.shape.kind === 'gen');
@@ -122,32 +123,60 @@ export class EditorGenerators {
     for (let i = 2; used.has(pn); i++) pn = `${name} ${i}`;
     this.doc.pages.splice(at, 0, { name: pn, objs });
   }
+  /** Passt das Ergebnis als Ganzes (Baugruppe samt Anordnung) mit Randabstand auf eine leere Seite? */
+  genFitsPage(this: Editor, r: BuildResult): boolean {
+    const b = boundsOf(r.parts.map((p): Obj => ({ id: 0, m: translate(p.at.x, p.at.y), layer: 0, shape: p.shape })));
+    return !b || fitsArea(b, this.doc.bed, DEFAULT_NEST_SETTINGS.margin);
+  }
+  /**
+   * Bauteil bzw. Baugruppe einfügen. Mit center (z. B. vom KI-Agenten) an genau diese Stelle; sonst auf den
+   * ersten freien Platz der Seite (von unten links, Baugruppe als ein Rechteck, alle Objekte der Seite zählen).
+   * Ist kein Platz mehr frei, kommt sie auf eine neue Seite; ist sie größer als der Arbeitsbereich, in seine Mitte.
+   */
   addGen(this: Editor, r: BuildResult, layer = this.currentLayer, center?: { x: number; y: number }): Obj[] {
     if (!r.parts.length) return [];
-    let c = center ?? this.toWorld(RULER + (this.w - RULER) / 2, RULER + (this.h - RULER) / 2);
+    const c = center ?? { x: 0, y: 0 };
     const bed = this.doc.bed;
-    if (!center && (c.x < 0 || c.y < 0 || c.x > bed.w || c.y > bed.h)) c = { x: bed.w / 2, y: bed.h / 2 };
     const asm = r.parts.some((p) => p.shape.part) ? newAsmId() : undefined;
-    // Vor dem Beschriftungs-Layer, damit Rückgängig auch seine Einstellungen zurücknimmt
+    // Vor dem Beschriftungs-Layer und der neuen Seite, damit Rückgängig alles in einem Schritt zurücknimmt
     this.snapshot(t('Objekt hinzufügen'));
     const markLayer = r.parts.some((p) => p.marks?.length) ? this.markLayer(layer) : layer;
     const objs: Obj[] = r.parts.map((p) =>
       this.withMark({ id: newId(), m: translate(c.x + p.at.x, c.y + p.at.y), layer, shape: asm ? { ...p.shape, asm } : p.shape }, p.marks, markLayer),
     );
-    // Ragt die Baugruppe über das Bett, kommt sie in die Bettmitte
+    let placed: 'free' | 'page' | 'center' = 'free';
     const b = boundsOf(objs);
-    if (!center && b && (b.x < -1e-6 || b.y < -1e-6 || b.x + b.w > bed.w + 1e-6 || b.y + b.h > bed.h + 1e-6))
-      for (const o of objs) o.m = mul(translate(bed.w / 2 - (b.x + b.w / 2), bed.h / 2 - (b.y + b.h / 2)), o.m);
+    if (!center && b) {
+      const { gap, margin } = DEFAULT_NEST_SETTINGS;
+      const obstacles = this.doc.objs.map((o) => boundsOf([o])).filter((x): x is Box => !!x);
+      let spot = findFreeSpot(obstacles, b, bed, gap, margin);
+      if (!spot && fitsArea(b, bed, margin)) {
+        this.insertPage();
+        placed = 'page';
+        spot = findFreeSpot([], b, bed, gap, margin);
+      }
+      if (!spot) {
+        placed = 'center';
+        spot = { x: bed.w / 2 - b.w / 2, y: bed.h / 2 - b.h / 2 };
+      }
+      for (const o of objs) o.m = mul(translate(spot.x - b.x, spot.y - b.y), o.m);
+    }
     this.layer(layer);
     this.doc.objs.push(...objs);
     if (r.plan) this.addPlanPage(r.plan, t('Bauplan'));
     if (!this.agentCall) this.setTool('select');
     this.setSel(objs);
     const name = groupLabel(r.parts[0].shape);
-    this.hint = asm
+    const done = asm
       ? t('{name} eingefügt ({n} Teile). Doppelklick auf ein Teil öffnet die Parameter der ganzen Baugruppe.', { name, n: objs.length })
       : t('{name} eingefügt. Doppelklick öffnet die Parameter wieder.', { name });
+    this.hint = placed === 'page'
+      ? `${t('Auf der Seite war kein Platz mehr: neue Seite „{page}“.', { page: this.doc.pages[this.doc.page].name })} ${done}`
+      : placed === 'center'
+        ? `${t('Größer als der Arbeitsbereich: liegt in seiner Mitte.')} ${done}`
+        : done;
     this.emit('doc');
+    if (placed === 'page') this.emit('sel');
     return objs;
   }
   /**
