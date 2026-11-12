@@ -140,6 +140,7 @@ ohne Anwendungsstart, Datei-, Native- oder Hardwarezugriff).
 ## Layer, Material und Tests
 
 - Farbe ist der Layer: Klick auf eine Palettenfarbe ordnet die Auswahl zu. Layer-Tabelle mit Modus (Linie/Füllen), Speed, Leistung, Air Assist, Ausgabe, Sichtbarkeit und Schnellbearbeitung.
+  - **Anzeige vs. Ausgabe**: `show`/Sichtbarkeit steuert nur die Editor-Anzeige, `output` allein entscheidet über die Laser-Teilnahme. Versteckte Objekte mit Ausgabe werden trotzdem gelasert und gerahmt, aber in einer Job-Warnung aufgeführt; `showIf` mit unerfüllter Bedingung, `noLaser` und `output: false` nehmen von der Ausgabe aus. Details in `docs/show-vs-output.md`.
 - Layer-Einstellungen (Doppelklick auf einen Layer): Kerf-Versatz, Haltestege (Anzahl oder Abstand, innere Formen auslassen), Füllart (zeilenweise oder „Kontur folgend“ in Ringen nach innen), Scanwinkel, Kreuzschraffur, Bidirektional, Überfahrweg, Air Assist (M8 oder M7, aus mit M9; einstellbar in den Geräteeinstellungen). Die Einstellungen liegen als `CutSettings` im Layer (`src/model.ts`).
   - **Sub-Layer**: weitere Bearbeitungen derselben Formen nach dem Layer, jeweils mit eigenem Modus, Geschwindigkeit, Leistung, Durchgängen und den Einstellungen unten, z. B. erst füllen, dann den Umriss schneiden. Sub-Layer lassen sich einzeln abschalten; Air Assist und Aussehen in 3D kommen vom Layer.
   - **Perforation** (Linie): eine Strecke schneiden, dann eine Lücke lassen, z. B. für Abreißkanten oder Falzlinien; Haltestege bleiben ungeschnitten.
