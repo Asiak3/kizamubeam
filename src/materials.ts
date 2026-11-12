@@ -2,7 +2,7 @@
 // Ein Eintrag hält die Bearbeitungseinstellungen eines Layers und wahlweise die Bild-Einstellungen.
 // Gespeichert wird im Browser-Speicher der App; Austausch über .kzm-Dateien (JSON, früher .lwm). LightBurn-
 // Bibliotheken (.clb) lassen sich einlesen, soweit ihre Felder hier eine Entsprechung haben.
-import { CutSettings, cutSettings, defaultCutSettings, normalizeCut, defaultImageLayer, stripImageOutput, defaultTabs, DitherMode, ImageLayer, Layer, LayerMode } from './model';
+import { CutSettings, cutSettings, defaultCutSettings, normalizeCut, defaultImageLayer, legacyImageValues, stripImageOutput, defaultTabs, DitherMode, ImageLayer, Layer, LayerMode } from './model';
 import { dec, t } from './i18n';
 import { cleanLook } from './view3d/looks';
 
@@ -198,7 +198,7 @@ export function layerPatch(e: MaterialEntry, imagesOnly = false): Partial<Layer>
   // Ohne eigenes Aussehen im Eintrag gilt wieder das automatische (aus dem Materialnamen)
   const p: Partial<Layer> = { look: undefined, sub: undefined, ...structuredClone(e.settings), material: e.id, name: entryLabel(e) };
   if (e.img) {
-    if (imagesOnly) for (const k of ['speed', 'power', 'minPower', 'passes'] as const) if (typeof e.img[k] === 'number') p[k] = e.img[k];
+    if (imagesOnly) Object.assign(p, legacyImageValues(e.img));
     p.img = stripImageOutput(e.img);
   }
   return p;

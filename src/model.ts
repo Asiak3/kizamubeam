@@ -147,9 +147,10 @@ export const DITHER_MODES: [DitherMode, string][] = [
 ];
 
 /**
- * Image settings of a layer (own "Image" row in the layer table). Speed, power, min power and passes
- * come from the layer itself (see imageOutput); the optional fields below only exist in older files
- * and material entries and are moved into the layer when a document is loaded.
+ * Image settings of a layer (own "Image" row in the layer table): only what is specific to images.
+ * Speed, power, min power, passes, line interval, bidirectional and overscan come from the layer itself
+ * (see imageOutput); the optional fields below only exist in older files and material entries and are
+ * moved into the layer when a document is loaded.
  */
 export interface ImageLayer {
   /** @deprecated legacy, use the layer's speed */
@@ -160,13 +161,14 @@ export interface ImageLayer {
   minPower?: number;
   /** @deprecated legacy, use the layer's passes */
   passes?: number;
-  /** Zeilenabstand in mm (DPI = 25,4 / interval) */
-  interval: number;
+  /** @deprecated legacy, use the layer's interval */
+  interval?: number;
+  /** @deprecated legacy, use the layer's bidirectional */
+  bidirectional?: boolean;
+  /** @deprecated legacy, use the layer's overscan */
+  overscan?: number;
   dither: DitherMode;
   negative: boolean;
-  bidirectional: boolean;
-  /** Überfahrweg in % der Geschwindigkeit */
-  overscan: number;
   /** Halbton und Zeitungsdruck: Zellen pro Zoll und Rasterwinkel */
   cells: number;
   angle: number;
@@ -181,26 +183,34 @@ export const isCellMode = (d: DitherMode) => d === 'halftone' || d === 'newsprin
 
 export function defaultImageLayer(): ImageLayer {
   return {
-    interval: 0.1, dither: 'jarvis', negative: false,
-    bidirectional: true, overscan: 2.5, cells: 50, angle: 45, threshold: 128,
+    dither: 'jarvis', negative: false, cells: 50, angle: 45, threshold: 128,
   };
 }
 
-/** Image settings plus the layer's speed, power and passes: what the laser and the preview use */
-export type ImageOutput = ImageLayer & { speed: number; power: number; minPower: number; passes: number };
+/** Layer settings that images use as well (in older files they were stored with the image settings) */
+const IMG_OUTPUT_KEYS = ['speed', 'power', 'minPower', 'passes', 'interval', 'bidirectional', 'overscan'] as const;
+type ImgOutputKey = (typeof IMG_OUTPUT_KEYS)[number];
 
-/** Speed and power a layer gets when an image is placed on it while it is still empty */
-export const IMAGE_LAYER_DEFAULTS = { speed: 3000, power: 30, minPower: 0, passes: 1 } as const;
+/** Image settings plus the layer settings images use: what the laser and the preview work with */
+export type ImageOutput = Omit<ImageLayer, ImgOutputKey> & Pick<CutSettings, ImgOutputKey>;
 
-const IMG_OUTPUT_KEYS = ['speed', 'power', 'minPower', 'passes'] as const;
-
-/** Output settings for the images of a layer: image settings with speed, power and passes of the layer */
-export function imageOutput(L: Pick<CutSettings, 'speed' | 'power' | 'minPower' | 'passes'> & { img?: ImageLayer }, img = L.img): ImageOutput {
-  const out = { ...defaultImageLayer(), ...img, speed: L.speed, power: L.power, minPower: L.minPower, passes: L.passes };
-  return out;
+/** Output settings for the images of a layer: image settings with speed, power, passes, interval, bidirectional and overscan of the layer */
+export function imageOutput(L: Pick<CutSettings, ImgOutputKey> & { img?: ImageLayer }, img = L.img): ImageOutput {
+  const { dither, negative, cells, angle, threshold } = { ...defaultImageLayer(), ...img };
+  return { dither, negative, cells, angle, threshold, speed: L.speed, power: L.power, minPower: L.minPower, passes: L.passes, interval: L.interval, bidirectional: L.bidirectional, overscan: L.overscan };
 }
 
-/** Image settings without the legacy speed/power fields (they belong to the layer) */
+/** Layer values kept in older image settings (only the valid ones) */
+export function legacyImageValues(img: ImageLayer): Partial<CutSettings> {
+  const out: Record<string, unknown> = {};
+  for (const key of IMG_OUTPUT_KEYS) {
+    const v = img[key];
+    if (key === 'bidirectional' ? typeof v === 'boolean' : typeof v === 'number' && isFinite(v)) out[key] = v;
+  }
+  return out as Partial<CutSettings>;
+}
+
+/** Image settings without the legacy layer fields (they belong to the layer) */
 export function stripImageOutput(img: ImageLayer): ImageLayer {
   const out = { ...img };
   for (const k of IMG_OUTPUT_KEYS) delete out[k];
@@ -208,8 +218,9 @@ export function stripImageOutput(img: ImageLayer): ImageLayer {
 }
 
 /**
- * Older files kept speed, power, min power and passes of images separately from the layer. Move them into
- * the layer when it holds only images; on layers that also hold vectors the layer's values win.
+ * Older files kept speed, power, min power, passes, interval, bidirectional and overscan of images separately
+ * from the layer. Move them into the layer when it holds only images; on layers that also hold vectors the
+ * layer's values win.
  */
 function migrateImageOutput(layers: Record<number, Layer>, pages: Page[]) {
   const vec = new Set<number>();
@@ -217,7 +228,7 @@ function migrateImageOutput(layers: Record<number, Layer>, pages: Page[]) {
   for (const [k, L] of Object.entries(layers)) {
     const img = L?.img;
     if (!img || typeof img !== 'object') continue;
-    if (!vec.has(Number(k))) for (const key of IMG_OUTPUT_KEYS) if (typeof img[key] === 'number' && isFinite(img[key]!)) L[key] = img[key]!;
+    if (!vec.has(Number(k))) Object.assign(L, legacyImageValues(img));
     L.img = stripImageOutput(img);
   }
 }
