@@ -1,6 +1,7 @@
 // Werkzeuge zum Aufbau von Generator-Konturen: glatte Kurven als kubische Béziers einpassen, Kreisbögen, Linien.
 import { IDENT, type Node, type Pt, type SubPath } from '../model';
 import { bezierPt } from '../curves';
+import ClipperLib from 'clipper-lib';
 import { flattenSub, SCALE } from '../clip';
 import { autoCell, nest, type Poly } from '../nest';
 
@@ -192,23 +193,133 @@ function simplifyRing(pts: Pt[], tol: number): Pt[] {
 /**
  * Kompakte, aufgeräumte Anordnung einer Baugruppe (ohne Drehung). Kandidaten:
  * - Spalten (columnLayout): gleiche Teile als Reihe in Spaltenbreite oder als Stapel, Blöcke in Spalten;
- * - Verschachteln mit echten Konturen (nestLayout), gleiche Teile als Block bzw. einzeln.
- * Genommen wird die bessere aufgeräumte Anordnung (Spalten oder Blöcke); einzeln verschachtelt nur, wenn es deutlich
- * kleiner ist, packParts ebenso. Alles ohne Zufall und Zeitgrenze: Gleiche Teile ergeben immer dieselbe Anordnung,
- * damit eine gespeicherte Baugruppe beim Bearbeiten als vom Generator angeordnet erkannt wird.
+ * - Blöcke unten links: bei fast rechteckigen Teilen exakt mit Rechtecken (rectLayout), sonst mit den echten
+ *   Konturen auf einem Raster (nestLayout); gleiche Teile jeweils als Block bzw. einzeln.
+ * Genommen wird die bessere aufgeräumte Anordnung (Spalten oder Blöcke); einzeln nur, wenn es deutlich kleiner ist,
+ * packParts ebenso.
+ *
+ * WICHTIG: Gespeicherte Baugruppen mit partLayout 'nest' werden beim Bearbeiten nur dann als vom Generator angeordnet
+ * erkannt (updateGen erzeugt die alten Parameter neu und vergleicht die Lage jedes Teils), wenn diese Funktion für
+ * dieselben Teile genau dasselbe Ergebnis liefert. Deshalb gibt es keinen Zufall und keine Zeitgrenze. Jede Änderung
+ * an nestParts, columnLayout, rectLayout, nestLayout, packParts oder src/nest.ts, die Ergebnisse verschiebt, lässt
+ * solche Teile beim Bearbeiten liegen (wachsende Teile rücken dann nicht mehr auseinander). Eine echte Änderung der
+ * Anordnung bekommt daher einen neuen Wert für partLayout (mit migrate für die alten Objekte), statt 'nest' zu ändern.
  */
 export function nestParts(items: { key: string; subs: SubPath[] }[], gap: number): { key: string; subs: SubPath[]; at: Pt }[] {
   if (items.length < 2) return packParts(items, gap);
-  const tidy = [columnLayout(items, gap), nestLayout(items, gap, true)].filter((x): x is { at: Pt[]; score: number } => !!x);
+  const memoKey = `${gap}|${items.map((it) => shapeKey(it.subs)).join('|')}`;
+  const known = layoutMemo.get(memoKey);
+  if (known) {
+    layoutMemo.delete(memoKey);
+    layoutMemo.set(memoKey, known);
+    return items.map((it, i) => ({ key: it.key, subs: it.subs, at: { ...known[i] } }));
+  }
+  const rect = items.every((it) => grownFill(it.subs, gap) >= RECT_FILL);
+  const blocks = (group: boolean) => (rect ? rectLayout(items, gap, group) : nestLayout(items, gap, group));
+  const groupedBlocks = blocks(true);
+  const tidy = [columnLayout(items, gap), groupedBlocks].filter((x): x is { at: Pt[]; score: number } => !!x);
   const grouped = tidy.length ? tidy.reduce((a, b) => (b.score < a.score - 1e-6 ? b : a)) : null;
-  const single = nestLayout(items, gap, false);
-  // Aufgeräumt (gleiche Teile zusammen) bevorzugt, außer einzeln verschachtelt ist deutlich kleiner
-  const best = !grouped || (single && single.score < grouped.score / GROUP_BONUS) ? single : grouped;
+  // Ohne gleiche Teile ist „einzeln“ dieselbe Rechnung wie „als Block“
+  const single = sameParts(items).some((g) => g.length > 1) ? blocks(false) : groupedBlocks;
+  // Aufgeräumt (gleiche Teile zusammen) bevorzugt, außer einzeln ist deutlich kleiner
+  let best = !grouped || (single && single.score < grouped.score / GROUP_BONUS) ? single : grouped;
   const packed = packParts(items, gap);
-  if (!best) return packed;
-  const pb = subsBoundsAt(packed);
-  if (layoutScore(pb.w, pb.h) < best.score / 1.05) return packed;
-  return items.map((it, i) => ({ key: it.key, subs: it.subs, at: best.at[i] }));
+  if (best) {
+    const pb = subsBoundsAt(packed);
+    if (layoutScore(pb.w, pb.h) < best.score / 1.05) best = null;
+  }
+  const at = best ? best.at : packed.map((p) => p.at);
+  layoutMemo.set(memoKey, at.map((q) => ({ ...q })));
+  if (layoutMemo.size > MEMO_SIZE) layoutMemo.delete(layoutMemo.keys().next().value!);
+  return items.map((it, i) => ({ key: it.key, subs: it.subs, at: { ...at[i] } }));
+}
+
+/** Zuletzt berechnete Anordnungen (Vorschau, Übernehmen und updateGen rechnen dieselben Teile mehrmals) */
+const layoutMemo = new Map<string, Pt[]>();
+const MEMO_SIZE = 16;
+
+/** Ab diesem Füllgrad (siehe grownFill) gilt ein Teil als fast rechteckig */
+const RECT_FILL = 0.82;
+
+/**
+ * Anteil des umschließenden Rechtecks, den ein Teil ausfüllt, nachdem es um gap/2 gewachsen ist (rechtwinklige
+ * Ecken). Schlitze und Kerben, die schmaler als der Abstand sind, schließen sich dabei; dort könnte ohnehin kein
+ * anderes Teil liegen. Fingerzinken-Platten liegen bei 0,86 bis 1, Kreise und Zahnräder bei etwa 0,78.
+ */
+function grownFill(subs: SubPath[], gap: number): number {
+  const b = subsBounds(subs);
+  if (!(b.w > 0 && b.h > 0)) return 0;
+  const co = new ClipperLib.ClipperOffset(2, 0.25 * SCALE);
+  co.AddPaths(subs.filter((sp) => sp.closed).map((sp) => flattenSub(sp, IDENT)), ClipperLib.JoinType.jtSquare, ClipperLib.EndType.etClosedPolygon);
+  const grown: ClipperLib.Paths = [];
+  co.Execute(grown, (gap / 2) * SCALE);
+  const c = new ClipperLib.Clipper();
+  c.AddPaths(grown, ClipperLib.PolyType.ptSubject, true);
+  const tree = new ClipperLib.PolyTree();
+  c.Execute(ClipperLib.ClipType.ctUnion, tree, ClipperLib.PolyFillType.pftNonZero, ClipperLib.PolyFillType.pftNonZero);
+  // Nur Außenkonturen: Löcher in einem Teil zählen als belegt
+  const area = tree.Childs().reduce((s, n) => s + Math.abs(ClipperLib.Clipper.Area(n.Contour())), 0) / (SCALE * SCALE);
+  return area / ((b.w + gap) * (b.h + gap));
+}
+
+/**
+ * Blöcke (gleiche Teile im ungefähr quadratischen Raster wie bei nestLayout) als Rechtecke unten links ablegen:
+ * jeder Block, größte Fläche zuerst, an die tiefste, dann linkeste freie Stelle, an der er mit Abstand gap neben die
+ * schon gelegten passt. Mehrere Breiten wie bei nestLayout; Mitte im Ursprung, mit Bewertung.
+ */
+export function rectLayout(items: { key: string; subs: SubPath[] }[], gap: number, group: boolean): { at: Pt[]; score: number } | null {
+  const boxes = items.map((it) => subsBounds(it.subs));
+  if (!boxes.every((b) => isFinite(b.w) && isFinite(b.h))) return null;
+  const groups = group ? sameParts(items) : items.map((_, i) => [i]);
+  const blocks = groups.map((members) => {
+    const b = boxes[members[0]], n = members.length;
+    const cols = Math.max(1, Math.min(n, Math.round(Math.sqrt((n * (b.h + gap)) / (b.w + gap)))));
+    return { members, cols, pw: b.w, ph: b.h, w: cols * (b.w + gap) - gap, h: Math.ceil(n / cols) * (b.h + gap) - gap };
+  });
+  const order = blocks.map((_, i) => i).sort((a, b) => blocks[b].w * blocks[b].h - blocks[a].w * blocks[a].h || a - b);
+  const area = blocks.reduce((s, b) => s + (b.w + gap) * (b.h + gap), 0);
+  const widest = Math.max(...blocks.map((b) => b.w));
+  let best: { at: Pt[]; score: number } | null = null;
+  for (const f of [0.8, 1, 1.3, 1.7, 2.2]) {
+    const W = Math.max(widest, Math.sqrt(area) * f);
+    // x von links, y von unten
+    const placed: { x: number; y: number; w: number; h: number }[] = [];
+    const pos: { x: number; y: number }[] = [];
+    for (const bi of order) {
+      const b = blocks[bi];
+      const xs = [...new Set([0, ...placed.map((p) => p.x + p.w + gap)])].filter((x) => x + b.w <= W + 1e-9).sort((a, c) => a - c);
+      const ys = [...new Set([0, ...placed.map((p) => p.y + p.h + gap)])].sort((a, c) => a - c);
+      let spot: { x: number; y: number } | null = null;
+      for (const y of ys) {
+        for (const x of xs) {
+          const hit = placed.some((p) => x < p.x + p.w + gap - 1e-9 && p.x < x + b.w + gap - 1e-9 && y < p.y + p.h + gap - 1e-9 && p.y < y + b.h + gap - 1e-9);
+          if (!hit) {
+            spot = { x, y };
+            break;
+          }
+        }
+        if (spot) break;
+      }
+      // Über allem ist immer Platz (x = 0 passt, weil W mindestens so breit ist wie jeder Block)
+      if (!spot) spot = { x: 0, y: Math.max(0, ...placed.map((p) => p.y + p.h + gap)) };
+      placed.push({ ...spot, w: b.w, h: b.h });
+      pos[bi] = spot;
+    }
+    const Wt = Math.max(...placed.map((p) => p.x + p.w)), Ht = Math.max(...placed.map((p) => p.y + p.h));
+    const score = layoutScore(Wt, Ht);
+    if (best && score >= best.score - 1e-6) continue;
+    const at: Pt[] = [];
+    blocks.forEach((b, bi) => {
+      // y nach unten: Oberkante des Blocks = Ht − (Abstand von unten + Höhe)
+      const top = Ht - pos[bi].y - b.h;
+      b.members.forEach((m, j) => {
+        const bb = boxes[m];
+        at[m] = { x: pos[bi].x + (j % b.cols) * (b.pw + gap) - bb.x0 - Wt / 2, y: top + Math.floor(j / b.cols) * (b.ph + gap) - bb.y0 - Ht / 2 };
+      });
+    });
+    best = { at, score };
+  }
+  return best;
 }
 
 /** So viel größer darf die aufgeräumte Anordnung (gleiche Teile als Block) sein */
@@ -360,9 +471,12 @@ function subsBoundsAt(parts: { subs: SubPath[]; at: Pt }[]) {
   return { w: x1 - x0, h: y1 - y0 };
 }
 
-/** Teile ohne Lage anordnen: 'packed' = packParts (gespeicherte Objekte), sonst nestParts */
+/**
+ * Teile ohne Lage anordnen: 'packed' = packParts (gespeicherte Objekte), 'rows' ebenso (schnell, wenn die Lage keine
+ * Rolle spielt, z. B. für die 3D-Ansicht), sonst nestParts
+ */
 export function arrangeParts<T extends { key: string; subs: SubPath[] }>(items: T[], gap: number, layout: unknown): (T & { at: Pt })[] {
-  const placed = layout === 'packed' ? packParts(items, gap) : nestParts(items, gap);
+  const placed = layout === 'packed' || layout === 'rows' ? packParts(items, gap) : nestParts(items, gap);
   return items.map((it, i) => ({ ...it, at: placed[i].at }));
 }
 
