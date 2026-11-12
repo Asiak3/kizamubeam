@@ -101,6 +101,7 @@
         "Ruote dentate cilindriche a evolvente, coppie di ingranaggi, cremagliere, pulegge dentate GT2/HTD e camme",
         "Strumento giunzioni: giunzioni a dita, tenone e mortasa, incastri a croce, a scatto e a gancio, tenoni a cuneo, cave a T, cerniera del coperchio",
         "Cerniere flessibili (living hinge) in sette motivi",
+        "Riempi con motivo: decora superfici con motivi vettoriali continui dal tuo disegno o da 13 motivi inclusi, con ripetizioni specchiate, a mattoni, esagonali e a girandola, bordi continui e nessuna linea incisa due volte",
         "Sfera di dischi: un paralume fatto di dischi rotondi con fessure inclinate, da 6 a 32 dischi, senza colla",
         "Modello a strati: affetta un modello STL o OBJ in fogli impilati e numerati",
         "Modello a costole: costole con mezze fessure su una spina dorsale, da STL o OBJ; corpo, zampe e una coda curva come sezioni separate, proposte con un clic, con una pagina di montaggio e costole più fitte nei dettagli",
@@ -188,6 +189,7 @@
     "lead": "Un programma separato e gratuito che si comporta come un laser con FluidNC. Inviagli il tuo lavoro e guardalo incidere e tagliare in tempo reale – senza consumare materiale e senza rischi per la tua macchina.",
     "b": [
       "Emula un controller FluidNC tramite Telnet (porta 2323) e WebSocket (porta 8181) – KizamuBeam si collega con il profilo di dispositivo “KizamuBeam Virtual Machine”, altri programmi come dispositivo di rete GRBL o FluidNC",
+      "Risponde anche come un controller DSP Ruida tramite UDP (porte 50200/50207): LightBurn, RDWorks, MeerK40t o Rayforge possono inviargli lavori CO2, con contorno, spostamento e stato",
       "Si muove con accelerazione reale e pianificatore di movimento: tempo di esecuzione, frame, homing e messaggi di errore proprio come sulla macchina",
       "Vista 3D del piano con il modulo laser, più una vista dall’alto in 2D",
       "Posiziona il materiale: compensato, acrilico, cartone e altro – le linee si bruciano in base a potenza e velocità",

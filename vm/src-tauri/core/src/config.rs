@@ -22,6 +22,17 @@ pub enum CameraMount {
     Head,
 }
 
+/// Corner where a Ruida controller has its machine origin (home). Ruida coordinates grow away from it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RuidaOrigin {
+    /// back right, the usual home of CO2 lasers
+    TopRight,
+    TopLeft,
+    BottomLeft,
+    BottomRight,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Config {
@@ -76,6 +87,13 @@ pub struct Config {
     pub camera_fps: f64,
     /// Barrel distortion of the lens: shift at the image corner in % of the half diagonal (0 = none)
     pub camera_lens: f64,
+    /// Ruida DSP emulation over UDP (like RDC644x: data port 50200, keypad port 50207)
+    pub ruida_enabled: bool,
+    pub ruida_port: u16,
+    pub ruida_jog_port: u16,
+    /// Scramble value expected first; clients that ask for the card ID switch it automatically
+    pub ruida_magic: u8,
+    pub ruida_origin: RuidaOrigin,
 }
 
 impl Default for Config {
@@ -111,6 +129,11 @@ impl Default for Config {
             camera_height: 720,
             camera_fps: 10.0,
             camera_lens: 4.0,
+            ruida_enabled: true,
+            ruida_port: 50200,
+            ruida_jog_port: 50207,
+            ruida_magic: 0x88,
+            ruida_origin: RuidaOrigin::TopRight,
         }
     }
 }

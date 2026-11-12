@@ -5,7 +5,7 @@ import { Editor, Tool } from './editor';
 import { initSync, openSyncDialog } from './syncDialog';
 import type { CornerMode } from './corners';
 import { ICONS } from './icons';
-import { DITHER_MODES, DitherMode, ImageAdjust, ImageLayer, ImageShape, isCellMode, Layer, layerLabel, Obj, ObjBindKey, pageName, PALETTE, SubPath, TextShape, BarcodeShape, GenShape } from './model';
+import { ImageAdjust, ImageShape, Layer, layerLabel, Obj, ObjBindKey, pageName, PALETTE, SubPath, TextShape, BarcodeShape, GenShape } from './model';
 import { evaluate, formatNumber, namesIn } from './params';
 import { deletePreset, loadPresets, presetOutput, savePreset } from './imagePresets';
 import { openFillDialog, openSaveTemplateDialog, openSeriesDialog, openTemplateLibrary } from './templateDialogs';
@@ -23,6 +23,8 @@ import { cameraOverlaysVisible, toggleCameraOverlays } from './cameraOverlayVisi
 import { openBackgroundDialog } from './bgDialog';
 import { openJointDialog } from './jointDialog';
 import { openHingeDialog } from './hingeDialog';
+import { openPatternDialog } from './patternDialog';
+import { PATTERN_GEN_ID } from './pattern';
 import { openSlotDialog } from './slotDialog';
 import { openSlotPlacementDialog } from './slotPlacementDialog';
 import { isSlotGenerator } from './slotPlacement';
@@ -42,7 +44,8 @@ import { maybeCheckForUpdates, openUpdateDialog } from './updateDialog';
 import { openPacksDialog } from './packsDialog';
 import { openGridDialog } from './gridDialog';
 import { buildLaser, frameJob, isPositionPick, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob, togglePositionPick } from './laser';
-import { openLayerDialog } from './layerdialog';
+import { openLayerDialog, setAdjustOpener } from './layerdialog';
+import { imageLayerFields, liveLayerRaster } from './imageLayerFields';
 import { openMaterialTestDialog } from './materialtest';
 import { openTestPhotoDialog } from './testphotoDialog';
 import { BoolBase } from './ops';
@@ -199,7 +202,7 @@ export function buildUI(ed: Editor) {
   onMeshReady(() => ed.emit('doc'));
   ed.onGridArray = () => openGridArrayDialog(ed);
   ed.onBarcodeEdit = (o) => editBarcode(ed, o);
-  ed.onGenEdit = (o) => (o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
+  ed.onGenEdit = (o) => (o.shape.kind === 'gen' && o.shape.gen === PATTERN_GEN_ID ? openPatternDialog(ed, { edit: o }) : o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
   installSketchPanel(ed);
   ed.onGenGuard = askGenConvert;
   ed.onJointDialog = () => openJointDialog(ed);
@@ -928,7 +931,7 @@ function buildNumbar(ed: Editor) {
     if (imgs.length) {
       const o = imgs[0],
         s = o.shape as ImageShape;
-      const L = ed.imgLayer(o.layer);
+      const L = ed.imgOutput(o.layer);
       const g = outputGrid(s, o.m, L.interval);
       imgInfo.textContent = imgs.length > 1 ? t('{n} Bilder', { n: imgs.length }) : t('{pxW} × {pxH} px → {cols} × {rows} Punkte ({dpi} DPI)', { pxW: s.pxW, pxH: s.pxH, cols: g.cols, rows: g.rows, dpi: Math.round(25.4 / L.interval) });
     }
@@ -1128,6 +1131,7 @@ function buildBars(ed: Editor) {
     { id: 'circarray', cat: M, icon: 'circArray', label: t('Kreisarray: Auswahl im Kreis um einen Mittelpunkt kopieren'), run: () => openCircularArrayDialog(ed), enabled: sel1 },
     { id: 'nest', cat: M, icon: 'nest', label: t('Verschachteln: Auswahl mit ihren echten Konturen platzsparend auf Bett, Material oder Reststück legen'), run: () => openNestDialog(ed), enabled: sel1 },
     { id: 'hinge', cat: M, icon: 'hinge', label: t('Biegeschnitte (Living Hinge): gewählte Form mit einem Schnittmuster füllen, damit sich die Platte dort biegen lässt'), run: () => openHingeDialog(ed) },
+    { id: 'patternfill', cat: M, icon: 'pattern', label: t('Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen'), run: () => openPatternDialog(ed), enabled: sel1 },
     { id: 'adjust', cat: I, icon: 'adjust', label: t('Bild anpassen …'), run: () => openAdjustDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'trace', cat: I, icon: 'trace', label: t('Bild nachzeichnen (Alt+T)'), run: () => openTraceDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'addpage', cat: S, short: t('+ Seite'), label: t('Neue Seite'), run: () => ed.addPage() },
@@ -1509,8 +1513,6 @@ function openOffsetDialog(ed: Editor) {
 
 function buildLayers(ed: Editor) {
   const root = $('#layers');
-  /** Gewählter Eintrag: Vektoren oder Bilder des aktiven Layers */
-  let part: 'vec' | 'img' = 'vec';
   const render = () => {
     const used = ed.layerOrder();
     if (ed.activeLayer === null || !used.includes(ed.activeLayer)) ed.activeLayer = used[0] ?? null;
@@ -1524,36 +1526,32 @@ function buildLayers(ed: Editor) {
       { class: 'layers' },
       h('tr', {}, ...[t('Nr.'), t('Layer'), t('Modus'), t('Speed'), t('Leist.'), t('Air'), t('Aus'), t('Zeig.')].map((s) => h('th', {}, s))),
     );
-    const partsOf = new Map(used.map((i) => [i, ed.layerParts(i)]));
-    const ap = partsOf.get(ed.activeLayer!)!;
-    if (part === 'img' && !ap.img) part = 'vec';
-    if (part === 'vec' && !ap.vec && ap.img) part = 'img';
+    // One row per layer: images on it use the same settings as its shapes
     for (const i of used) {
       const L = ed.layer(i);
-      const parts = partsOf.get(i)!;
-      const rows: ('vec' | 'img')[] = [];
-      if (parts.vec) rows.push('vec');
-      if (parts.img) rows.push('img');
-      for (const p of rows) {
-        const isImg = p === 'img';
-        const IL = isImg ? ed.imgLayer(i) : null;
-        const mode = isImg
-          ? h('span', { class: 'mode-img', title: t('Bilder dieses Layers') }, t('Bild'))
-          : h('select', { onchange: (e: Event) => ed.updateLayer(i, { mode: (e.target as HTMLSelectElement).value as Layer['mode'] }) },
-              h('option', { value: 'line', selected: L.mode === 'line' }, t('Linie')),
-              h('option', { value: 'fill', selected: L.mode === 'fill' }, t('Füllen')),
-            );
+      const parts = ed.layerParts(i);
+      {
+        const imgTag = h('span', { class: 'mode-img', title: t('Auf diesem Layer liegen Bilder; sie nutzen dieselben Einstellungen') }, parts.vec ? t('+ Bild') : t('Bild'));
+        const mode = h('span', { class: 'mode-cell' },
+          parts.vec || !parts.img
+            ? h('select', { onchange: (e: Event) => ed.updateLayer(i, { mode: (e.target as HTMLSelectElement).value as Layer['mode'] }) },
+                h('option', { value: 'line', selected: L.mode === 'line' }, t('Linie')),
+                h('option', { value: 'fill', selected: L.mode === 'fill' }, t('Füllen')),
+              )
+            : null,
+          parts.img ? imgTag : null,
+        );
         const out = h('input', { type: 'checkbox', checked: L.output, onchange: (e: Event) => ed.updateLayer(i, { output: (e.target as HTMLInputElement).checked }) });
         const show = h('input', { type: 'checkbox', checked: L.show, onchange: (e: Event) => ed.updateLayer(i, { show: (e.target as HTMLInputElement).checked }) });
         const air = h('input', { type: 'checkbox', checked: L.air, title: t('Air Assist'), onchange: (e: Event) => ed.updateLayer(i, { air: (e.target as HTMLInputElement).checked }) });
         const row = h(
           'tr',
-          { class: ed.activeLayer === i && part === p ? 'active' : '', title: isImg ? t('Doppelklick: Bild anpassen') : t('Doppelklick: Layer-Einstellungen') },
+          { class: ed.activeLayer === i ? 'active' : '', title: t('Doppelklick: Layer-Einstellungen') },
           h('td', {}, h('span', { class: 'swatch', style: `background:${PALETTE[i]}` }, layerLabel(i))),
           h('td', {}, L.name),
           h('td', {}, mode),
-          h('td', {}, String(IL ? IL.speed : L.speed)),
-          h('td', {}, `${IL ? IL.power : L.power}%`),
+          h('td', {}, String(L.speed)),
+          h('td', {}, `${L.power}%`),
           h('td', {}, air),
           h('td', {}, out),
           h('td', {}, show),
@@ -1562,15 +1560,13 @@ function buildLayers(ed: Editor) {
           if ((e.target as HTMLElement).closest('select,input')) return;
           ed.activeLayer = i;
           ed.currentLayer = i;
-          part = p;
           render();
           ed.emit('tool');
         });
         // Wie in LightBurn: Doppelklick öffnet die Einstellungen
         row.addEventListener('dblclick', (e) => {
           if ((e.target as HTMLElement).closest('select,input')) return;
-          if (isImg) openAdjustDialog(ed, i);
-          else openLayerDialog(ed, i);
+          openLayerDialog(ed, i);
         });
         table.append(row);
       }
@@ -1584,16 +1580,13 @@ function buildLayers(ed: Editor) {
         h('button', { title: t('Nach oben (früher ausgeben)'), onclick: () => ed.moveLayer(a, -1), html: '▲' }),
         h('button', { title: t('Nach unten (später ausgeben)'), onclick: () => ed.moveLayer(a, 1), html: '▼' }),
         h('button', { onclick: () => ed.selectLayer(a) }, t('Formen auswählen')),
-        part === 'vec' ? h('button', { title: t('Alle Einstellungen dieses Layers (Doppelklick auf den Layer)'), onclick: () => openLayerDialog(ed, a) }, t('Einstellungen …')) : null,
+        h('button', { title: t('Alle Einstellungen dieses Layers (Doppelklick auf den Layer)'), onclick: () => openLayerDialog(ed, a) }, t('Einstellungen …')),
       ),
     );
     const L = ed.layer(a);
+    const ap = ed.layerParts(a);
     const name = h('input', { type: 'text', value: L.name, onchange: (e: Event) => ed.updateLayer(a, { name: (e.target as HTMLInputElement).value }) });
     const head = [h('label', {}, h('span', { class: 'swatch', style: `background:${PALETTE[a]}` }, layerLabel(a)), ' ', t('Name')), name];
-    if (part === 'img') {
-      root.append(imageLayerForm(ed, a, head));
-      return;
-    }
     const num = (key: 'speed' | 'power' | 'minPower' | 'passes' | 'interval', min: number, max: number, int = false) => {
       const el = numInput('', (v) => {
         const c = Math.max(min, Math.min(max, int ? Math.round(v) : v));
@@ -1611,14 +1604,19 @@ function buildLayers(ed: Editor) {
         h('label', {}, t('Max. Leistung (%)')), num('power', 0, 100),
         h('label', {}, t('Min. Leistung (%)')), num('minPower', 0, 100),
         h('label', {}, t('Durchgänge')), num('passes', 1, 100, true),
-        ...(L.mode === 'fill' ? [h('label', {}, t('Zeilenabstand (mm)')), num('interval', 0.01, 5)] : []),
+        ...(L.mode === 'fill' && ap.vec ? [h('label', {}, t('Zeilenabstand (mm)')), num('interval', 0.01, 5)] : []),
         h('span', { class: 'checks' },
           h('label', { class: 'check', title: t('Luftunterstützung während dieses Layers (M8/M7, aus mit M9)') },
             h('input', { type: 'checkbox', checked: L.air, onchange: (e: Event) => ed.updateLayer(a, { air: (e.target as HTMLInputElement).checked }) }), t('Air Assist')),
         ),
+        // Images use the layer's settings; below only what is specific to images (interval comes from Fill when shown above)
+        ...(ap.img
+          ? [h('div', { class: 'form-title' }, t('Bilder')), ...imageLayerFields(ed, a, false, undefined, L.mode === 'fill' && ap.vec ? null : { get: () => ed.layer(a), set: (p) => ed.updateLayer(a, p) })]
+          : []),
       ),
-      h('div', { class: 'note' }, layerSummary(L)),
     );
+    if (ap.img) root.append(h('div', { class: 'layer-tools' }, h('button', { onclick: () => openAdjustDialog(ed, a) }, t('Bild anpassen …'))));
+    if (ap.vec) root.append(h('div', { class: 'note' }, layerSummary(L)));
   };
   ed.on((w) => (w === 'doc' || w === 'sel') && schedule());
   let pending = false;
@@ -1671,74 +1669,6 @@ function layerSummary(L: Layer): string {
   return parts.length ? t('Außerdem: {list}.', { list: parts.join(', ') }) : t('Kerf, Haltestege, Scanwinkel und mehr: Doppelklick auf den Layer.');
 }
 
-/** Felder für die Bild-Einstellungen eines Layers (auch im Dialog „Bild anpassen“ verwendet) */
-function imageLayerFields(ed: Editor, i: number, live: boolean, onChange?: () => void): HTMLElement[] {
-  const IL = ed.imgLayer(i);
-  const set = (patch: Partial<ImageLayer>) => {
-    ed.updateImgLayer(i, patch, !live);
-    onChange?.();
-  };
-  const num = (key: 'speed' | 'power' | 'minPower' | 'passes' | 'overscan' | 'cells' | 'angle' | 'threshold', min: number, max: number, int = false) => {
-    const el = numInput('', (v) => set({ [key]: Math.max(min, Math.min(max, int ? Math.round(v) : v)) } as Partial<ImageLayer>));
-    el.value = String(IL[key]);
-    return el;
-  };
-  const interval = numInput('', (v) => {
-    const c = Math.max(0.01, Math.min(2, v));
-    set({ interval: c });
-    dpi.value = String(Math.round(25.4 / c));
-  }, t('Zeilenabstand in mm'));
-  interval.value = String(IL.interval);
-  const dpi = numInput('', (v) => {
-    const c = Math.max(12.7, Math.min(2540, v));
-    set({ interval: Math.round((25.4 / c) * 10000) / 10000 });
-    interval.value = String(ed.imgLayer(i).interval);
-  }, t('Auflösung in Punkten pro Zoll'));
-  dpi.value = String(Math.round(25.4 / IL.interval));
-  const modeSel = h('select', {}, ...DITHER_MODES.map(([v, t]) => h('option', { value: v, selected: IL.dither === v }, t))) as HTMLSelectElement;
-  const extra = h('div', { class: 'form sub' });
-  const renderExtra = () => {
-    const d = ed.imgLayer(i).dither;
-    extra.replaceChildren(
-      ...(d === 'threshold' ? [h('label', {}, t('Schwellwert (0–255)')), num('threshold', 0, 255, true)] : []),
-      ...(isCellMode(d) ? [h('label', {}, t('Zellen pro Zoll')), num('cells', 2, 300), h('label', {}, t('Rasterwinkel (°)')), num('angle', -90, 90)] : []),
-    );
-    extra.hidden = !extra.childElementCount;
-  };
-  modeSel.addEventListener('change', () => {
-    set({ dither: modeSel.value as DitherMode });
-    renderExtra();
-  });
-  renderExtra();
-  const check = (key: 'negative' | 'bidirectional', label: string) =>
-    h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: IL[key], onchange: (e: Event) => set({ [key]: (e.target as HTMLInputElement).checked }) }), label);
-  return [
-    h('label', {}, t('Bildmodus')), modeSel,
-    extra,
-    h('label', {}, t('Zeilenabstand (mm)')), interval,
-    h('label', {}, 'DPI'), dpi,
-    h('span', { class: 'checks' }, check('negative', t('Negativ')), check('bidirectional', t('Bidirektional'))),
-    ...(live ? [] : [
-      h('label', {}, t('Geschwindigkeit (mm/min)')), num('speed', 1, 100000),
-      h('label', {}, t('Max. Leistung (%)')), num('power', 0, 100),
-      h('label', {}, t('Min. Leistung (%)')), num('minPower', 0, 100),
-      h('label', {}, t('Durchgänge')), num('passes', 1, 100, true),
-      h('label', {}, t('Überfahrweg (%)')), num('overscan', 0, 50),
-    ]),
-  ];
-}
-
-function imageLayerForm(ed: Editor, i: number, head: HTMLElement[]) {
-  return h(
-    'div',
-    {},
-    h('div', { class: 'form' }, ...head, ...imageLayerFields(ed, i, false)),
-    h('div', { class: 'layer-tools' },
-      h('button', { onclick: () => openAdjustDialog(ed, i) }, t('Bild anpassen …')),
-    ),
-  );
-}
-
 // ---------- Bild anpassen ----------
 
 /** Schieberegler mit Zahlenanzeige */
@@ -1764,6 +1694,8 @@ function targetImages(ed: Editor, layer?: number): Obj[] {
   return ed.doc.objs.filter((o) => o.shape.kind === 'image' && o.layer === layer);
 }
 
+setAdjustOpener((ed, layer) => openAdjustDialog(ed, layer));
+
 function openAdjustDialog(ed: Editor, layer?: number) {
   const targets = targetImages(ed, layer);
   if (!targets.length) {
@@ -1776,6 +1708,8 @@ function openAdjustDialog(ed: Editor, layer?: number) {
   const li = first.layer;
   const origAdj = targets.map((o) => ({ ...(o.shape as ImageShape).adjust }));
   const origLayer = { ...ed.imgLayer(li) };
+  const rasterOf = () => { const L = ed.layer(li); return { interval: L.interval, bidirectional: L.bidirectional, overscan: L.overscan }; };
+  const origRaster = rasterOf();
   const adj: ImageAdjust = { ...shape().adjust };
 
   const view = h('canvas', { class: 'adjust-preview', width: 420, height: 300 }) as HTMLCanvasElement;
@@ -1795,7 +1729,7 @@ function openAdjustDialog(ed: Editor, layer?: number) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, W, H);
       const s = shape();
-      const src: CanvasImageSource | null = showOrig ? assetImageOf(s) : displayCanvas(s, first.m, ed.imgLayer(li), true);
+      const src: CanvasImageSource | null = showOrig ? assetImageOf(s) : displayCanvas(s, first.m, ed.imgOutput(li), true);
       if (!src) return;
       const sw = (src as HTMLCanvasElement).width || (src as HTMLImageElement).naturalWidth,
         sh = (src as HTMLCanvasElement).height || (src as HTMLImageElement).naturalHeight;
@@ -1825,7 +1759,7 @@ function openAdjustDialog(ed: Editor, layer?: number) {
   const sS = slider(t('Schärfen (%)'), 0, 300, 1, adj.sharpen, (v) => setAdj({ sharpen: v }));
   const sR = slider(t('Radius'), 1, 10, 0.5, adj.sharpenRadius, (v) => setAdj({ sharpenRadius: v }));
   const sD = slider(t('Entrauschen'), 0, 50, 1, adj.denoise, (v) => setAdj({ denoise: v }));
-  const layerForm = h('div', { class: 'form' }, ...imageLayerFields(ed, li, true, drawPreview));
+  const layerForm = h('div', { class: 'form' }, ...imageLayerFields(ed, li, true, drawPreview, liveLayerRaster(ed, li)));
 
   // Presets: Anpassungen und Bildmodus unter einem Namen merken
   let presets = loadPresets();
@@ -1847,7 +1781,7 @@ function openAdjustDialog(ed: Editor, layer?: number) {
     sB.set(p.adjust.brightness), sC.set(p.adjust.contrast), sG.set(p.adjust.gamma);
     sS.set(p.adjust.sharpen), sR.set(p.adjust.sharpenRadius), sD.set(p.adjust.denoise);
     ed.updateImgLayer(li, p.output, false);
-    layerForm.replaceChildren(...imageLayerFields(ed, li, true, drawPreview));
+    layerForm.replaceChildren(...imageLayerFields(ed, li, true, drawPreview, liveLayerRaster(ed, li)));
     setAdj({ ...p.adjust });
   });
   const savePresetNow = () => {
@@ -1923,13 +1857,16 @@ function openAdjustDialog(ed: Editor, layer?: number) {
     offReady();
     const newAdj = targets.map((o) => ({ ...(o.shape as ImageShape).adjust }));
     const newLayer = { ...ed.imgLayer(li) };
+    const newRaster = rasterOf();
     // Ausgangszustand herstellen; bei „Übernehmen“ die Änderung als ein Undo-Schritt wieder anwenden
     targets.forEach((o, k) => ((o.shape as ImageShape).adjust = origAdj[k]));
     Object.assign(ed.imgLayer(li), origLayer);
-    if (applied && (JSON.stringify(newAdj) !== JSON.stringify(origAdj) || JSON.stringify(newLayer) !== JSON.stringify(origLayer))) {
+    Object.assign(ed.layer(li), origRaster);
+    if (applied && (JSON.stringify(newAdj) !== JSON.stringify(origAdj) || JSON.stringify(newLayer) !== JSON.stringify(origLayer) || JSON.stringify(newRaster) !== JSON.stringify(origRaster))) {
       ed.snapshot(t('Bild anpassen'));
       targets.forEach((o, k) => ((o.shape as ImageShape).adjust = newAdj[k]));
       Object.assign(ed.imgLayer(li), newLayer);
+      Object.assign(ed.layer(li), newRaster);
     }
     ed.emit('doc');
     dlg.remove();
@@ -2028,8 +1965,10 @@ function buildPalette(ed: Editor) {
     const b = h('button', {
       class: i >= 30 ? 'tool' : '',
       style: `background:${c}`,
-      title: i >= 30 ? t('Werkzeug-Layer {layer} (wird nicht gelasert)', { layer: layerLabel(i) }) : t('Layer {layer}: Auswahl zuordnen', { layer: layerLabel(i) }),
-      onclick: () => ed.assignLayer(i),
+      title: i >= 30 ? t('Werkzeug-Layer {layer} (wird nicht gelasert). Doppelklick: Layer-Einstellungen', { layer: layerLabel(i) }) : t('Layer {layer}: Auswahl zuordnen. Doppelklick: Layer-Einstellungen', { layer: layerLabel(i) }),
+      // The second click of a double-click does not assign again (no extra undo step)
+      onclick: (e: MouseEvent) => e.detail < 2 && ed.assignLayer(i),
+      ondblclick: () => openLayerDialog(ed, i),
     }, layerLabel(i));
     btns.push(b);
     root.append(b);

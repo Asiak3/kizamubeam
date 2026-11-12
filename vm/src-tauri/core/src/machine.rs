@@ -713,6 +713,47 @@ impl Machine {
         self.soft_reset();
     }
 
+    /// Lines of a connection that were received but not processed yet
+    pub fn queued_lines(&self, id: ClientId) -> usize {
+        self.clients.get(&id).map_or(0, |c| c.lines.len())
+    }
+
+    /// Free bytes in a connection's receive buffer
+    pub fn rx_free(&self, id: ClientId) -> usize {
+        let used = self.clients.get(&id).map_or(0, |c| c.rx_used);
+        self.cfg.rx_buffer.saturating_sub(used)
+    }
+
+    /// Stop like a DSP controller's stop key: drop everything planned and waiting, laser off,
+    /// no alarm and no lost position (unlike Ctrl-X during motion).
+    pub fn stop_quiet(&mut self) {
+        self.queue.clear();
+        self.pending.clear();
+        self.pending_client = None;
+        for c in self.clients.values_mut() {
+            c.lines.clear();
+            c.partial.clear();
+            c.rx_used = 0;
+            c.wait_idle = false;
+        }
+        self.speed = 0.0;
+        self.hold = false;
+        self.jog_cancel = false;
+        self.active = Applied {
+            outputs: self.active.outputs,
+            ..Applied::default()
+        };
+        self.modal.spindle = Spindle::Off;
+        self.modal.flood = false;
+        self.modal.mist = false;
+        self.last_power = 0.0;
+        self.plan_pos = self.pos;
+        if !matches!(self.state, State::Alarm(_)) {
+            self.state = State::Idle;
+        }
+        self.end_job();
+    }
+
     fn alarm(&mut self, code: u8) {
         self.queue.clear();
         self.pending.clear();

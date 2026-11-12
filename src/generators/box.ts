@@ -9,6 +9,7 @@
 import type { Pt, SubPath } from '../model';
 import { t } from '../i18n';
 import type { Generator, GenPart, Issue, Params } from './types';
+import { layoutParts } from './build';
 
 export interface BoxParams {
   sizeMode: 'outer' | 'inner';
@@ -269,11 +270,12 @@ const PART_NAMES: Record<string, () => string> = {
 
 export const BOX: Generator = {
   id: 'box',
-  version: 1,
+  version: 2,
   kind: 'assembly',
   name: t('Box'),
   icon: 'box',
   schema: [
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'sizeMode', type: 'enum', label: t('Maße'), def: 'outer', options: [['outer', t('Außenmaß')], ['inner', t('Innenmaß')]] },
     { key: 'width', type: 'length', label: t('Breite'), min: 5, max: 3000, def: 100 },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 5, max: 3000, def: 80 },
@@ -284,6 +286,8 @@ export const BOX: Generator = {
     { key: 'clearance', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0, title: t('Jede Zinke wird um so viel schmaler; negativ = Presspassung') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, damit die Teile die Sollmaße haben. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],
+  // Saved boxes keep their row layout; new boxes are nested compactly.
+  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'rows' } : p; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -300,13 +304,13 @@ export const BOX: Generator = {
     const p = P(raw);
     const th = p.thickness;
     const panels = boxPanels(p);
-    // Anordnung: obere Reihe Boden, Vorder- und Rückwand; untere Reihe Deckel, Seitenwände
+    // Reihen (gespeicherte Boxen): oben Boden, Vorder- und Rückwand; unten Deckel, Seitenwände. Neue Boxen werden danach kompakt verschachtelt.
     const gap = 5 + p.kerf;
     const rows = [panels.filter((x) => ['bottom', 'front', 'back'].includes(x.key)), panels.filter((x) => ['top', 'left', 'right'].includes(x.key))];
     const rowW = rows.map((r) => r.reduce((s, x) => s + x.a, 0) + gap * (r.length - 1));
     const rowH = rows.map((r) => Math.max(0, ...r.map((x) => x.b)));
     const totalH = rowH[0] + gap + rowH[1];
-    const parts: GenPart[] = [];
+    let parts: GenPart[] = [];
     rows.forEach((r, ri) => {
       let x = -rowW[ri] / 2;
       const y0 = -totalH / 2 + (ri ? rowH[0] + gap : 0);
@@ -317,6 +321,7 @@ export const BOX: Generator = {
         x += panel.a + gap;
       }
     });
+    parts = layoutParts(parts, gap, raw.partLayout);
     const { W, D, H } = boxOuter(p);
     const inner = { W: W - 2 * th, D: D - 2 * th, H: H - (p.top === 'closed' ? 2 : 1) * th };
     return {

@@ -1,6 +1,6 @@
 // Editor: Dokument, Rückgängig/Wiederholen, Autosave und Seiten.
 import {
-  allObjs, bumpIds, cloneObjs, Doc, defaultImageLayer, defaultLayer, normalizeLayer, loadDoc, pageName, ImageLayer, Layer, leaves, newDoc, Obj,
+  allObjs, bumpIds, cloneObjs, Doc, defaultImageLayer, defaultLayer, imageOutput, ImageOutput, normalizeLayer, loadDoc, pageName, ImageLayer, Layer, leaves, newDoc, Obj,
   Shape,
 } from '../model';
 import { assetUrl, registerAsset, restoreAssets } from '../images';
@@ -26,6 +26,10 @@ export class EditorDocument {
   /** Bild-Einstellungen eines Layers */
   imgLayer(this: Editor, i: number): ImageLayer {
     return (this.layer(i).img ??= defaultImageLayer());
+  }
+  /** Image settings of a layer together with its speed, power and passes (for the laser and the preview) */
+  imgOutput(this: Editor, i: number): ImageOutput {
+    return imageOutput(this.layer(i), this.imgLayer(i));
   }
   /** Welche Arten von Objekten liegen auf dem Layer? (Vektoren und Bilder sind getrennte Einträge) */
   layerParts(this: Editor, i: number): { vec: boolean; img: boolean } {

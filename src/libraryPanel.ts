@@ -11,6 +11,9 @@ import {
   ASSET_CATEGORIES, ASSET_EXT, AssetCategory, AssetData, assetJson, categoryLabel, categoryPlural, parseAsset, parseTags, searchAssets,
 } from './assetFormat';
 import { groupLabel } from './builtinLibrary';
+import { openPatternDialog } from './patternDialog';
+import { patternAsset } from './patternLibrary';
+import type { PatternSpec } from './patternFormat';
 import {
   addToLibrary, hasLibraryFolder, LibraryItem, libraryItems, loadLibraryAsset, onLibraryChanged, openLibraryFolder, reloadLibrary, removeFromLibrary,
   updateLibraryAsset,
@@ -57,7 +60,10 @@ function previewOf(it: LibraryItem): Promise<string> | string | null {
 /** Eintrag aus der Bibliothek einfügen (at: Weltpunkt, sonst Mitte der Ansicht) */
 export async function insertLibraryItem(ed: Editor, key: string, at?: { x: number; y: number }) {
   try {
-    ed.insertAsset(await loadLibraryAsset(key), at);
+    const a = await loadLibraryAsset(key);
+    // a pattern fills the selected shape (pattern fill dialog) instead of being placed as a motif
+    if (a.pattern) openPatternDialog(ed, { pattern: { name: a.name, spec: a.pattern } });
+    else ed.insertAsset(a, at);
   } catch (e) {
     alert(errText(e));
   }
@@ -114,9 +120,14 @@ async function pickFiles(ed: Editor) {
 
 // ---------- Dialog: Name, Art, Stichwörter ----------
 
-function editDialog(title: string, a: AssetData, okLabel: string, onSave: (a: AssetData) => Promise<void>) {
+/**
+ * asPattern: the entry can also be saved as a fill pattern with this tile and these repeat settings
+ * (adding a selection); without it patterns stay patterns and other entries cannot become one.
+ */
+function editDialog(title: string, a: AssetData, okLabel: string, onSave: (a: AssetData) => Promise<void>, asPattern?: PatternSpec) {
   const name = h('input', { type: 'text', id: 'asset-name', value: a.name }) as HTMLInputElement;
-  const cat = h('select', { id: 'asset-cat' }, ...ASSET_CATEGORIES.map((c) => h('option', { value: c, selected: c === a.category }, categoryLabel(c)))) as HTMLSelectElement;
+  const cats = ASSET_CATEGORIES.filter((c) => (asPattern ? true : (c === 'pattern') === !!a.pattern));
+  const cat = h('select', { id: 'asset-cat' }, ...cats.map((c) => h('option', { value: c, selected: c === a.category }, categoryLabel(c)))) as HTMLSelectElement;
   const tags = h('input', { type: 'text', id: 'asset-tags', value: a.tags.join(', '), placeholder: t('z. B. Blume, Ranke, Hochzeit') }) as HTMLInputElement;
   const err = h('div', { class: 'error' });
   const save = async () => {
@@ -125,13 +136,19 @@ function editDialog(title: string, a: AssetData, okLabel: string, onSave: (a: As
       return;
     }
     try {
-      await onSave({ ...a, name: name.value.trim().slice(0, 80), category: cat.value as AssetCategory, tags: parseTags(tags.value) });
+      const n = name.value.trim().slice(0, 80), c = cat.value as AssetCategory, tg = parseTags(tags.value);
+      if (asPattern && c === 'pattern') await onSave(patternAsset(n, asPattern, tg));
+      else if (asPattern) await onSave({ ...a, name: n, category: c, tags: tg, pattern: undefined });
+      else await onSave({ ...a, name: n, category: c, tags: tg });
       dlg.close();
     } catch (e) {
       err.textContent = errText(e);
     }
   };
-  name.onkeydown = tags.onkeydown = (e: KeyboardEvent) => e.key === 'Enter' && save();
+  // A listener, not onkeydown: a handler property returning false would cancel every key and block typing
+  for (const el of [name, tags]) el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') void save();
+  });
   const dlg = h('dialog', { class: 'tpl-dialog lib-dialog' },
     h('h3', {}, title),
     h('div', { class: 'tpl-head' },
@@ -166,11 +183,14 @@ export function openAddSelectionDialog(ed: Editor) {
     return;
   }
   if (!first) a.name = '';
+  // the selection can also become a fill pattern; a selected pattern object is offered as one first
+  const spec = ed.patternSpecFromSel() ?? undefined;
+  if (spec && ed.patternObj()) a.category = 'pattern';
   editDialog(t('Zur Bibliothek hinzufügen'), a, t('Hinzufügen'), async (x) => {
     await addToLibrary(x);
     showWindow('library');
     hint(ed, t('„{name}“ in der Bibliothek gespeichert.', { name: x.name }));
-  });
+  }, spec);
 }
 
 // ---------- Fenster ----------

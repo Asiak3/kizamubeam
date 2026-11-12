@@ -1,7 +1,7 @@
 //! Without a window: `kizamubeam-vm --headless [options]` starts only the servers and prints the traffic
 //! to standard output. For automated tests (CI) and computers without a screen.
 
-use kizamubeam_vm_core::{Config, Event, Flavor, Runner};
+use kizamubeam_vm_core::{Config, Event, Flavor, RuidaOrigin, Runner};
 use std::time::Duration;
 
 const HELP: &str = "KizamuBeam Virtual Machine
@@ -13,6 +13,8 @@ Optionen für --headless (sonst gelten die gespeicherten Einstellungen):
   --telnet-port N   Telnet-Port (Standard 2323, 0 = aus)
   --ws-port N       WebSocket-Port (Standard 8181, 0 = aus)
   --camera-port N   Kamera-Port (Standard 8282, 0 = aus; ohne Fenster gibt es kein Bild)
+  --ruida-port N    Ruida-Datenport UDP (Standard 50200, 0 = aus); Tastenport = N + 7
+  --ruida-origin O  Ruida-Nullpunkt: top-right (Standard), top-left, bottom-left, bottom-right
   --lan             auch aus dem Netzwerk erreichbar (sonst nur 127.0.0.1)
   --grbl            als GRBL 1.1 statt FluidNC melden
   --bed BxH         Fahrweg in mm, z. B. 400x400
@@ -25,7 +27,11 @@ pub fn run(args: &[String]) -> i32 {
         print!("{HELP}");
         return 0;
     }
-    let mut cfg = if args.iter().any(|a| a == "--defaults") { Config::default() } else { kizamubeam_vm_lib::load_config() };
+    let mut cfg = if args.iter().any(|a| a == "--defaults") {
+        Config::default()
+    } else {
+        kizamubeam_vm_lib::load_config()
+    };
     let mut quiet = false;
     let mut it = args.iter();
     while let Some(a) = it.next() {
@@ -56,6 +62,28 @@ pub fn run(args: &[String]) -> i32 {
                 Some(p) => (cfg.camera_enabled, cfg.camera_port) = (true, p),
                 None => return 2,
             },
+            "--ruida-port" => match num("--ruida-port") {
+                Some(0) => cfg.ruida_enabled = false,
+                Some(p) => {
+                    (cfg.ruida_enabled, cfg.ruida_port, cfg.ruida_jog_port) =
+                        (true, p, p.saturating_add(7))
+                }
+                None => return 2,
+            },
+            "--ruida-origin" => {
+                cfg.ruida_origin = match it.next().map(String::as_str) {
+                    Some("top-right") => RuidaOrigin::TopRight,
+                    Some("top-left") => RuidaOrigin::TopLeft,
+                    Some("bottom-left") => RuidaOrigin::BottomLeft,
+                    Some("bottom-right") => RuidaOrigin::BottomRight,
+                    _ => {
+                        eprintln!(
+                            "--ruida-origin: top-right, top-left, bottom-left oder bottom-right"
+                        );
+                        return 2;
+                    }
+                }
+            }
             "--bed" => {
                 let Some((w, h)) = it.next().and_then(|v| v.split_once(['x', 'X'])) else {
                     eprintln!("--bed: z. B. 400x400");
@@ -79,7 +107,12 @@ pub fn run(args: &[String]) -> i32 {
     let runner = Runner::start(cfg);
     let info = runner.info();
     let mut ok = false;
-    for (name, r) in [("Telnet", info.telnet), ("WebSocket", info.ws), ("Kamera", info.camera)] {
+    for (name, r) in [
+        ("Telnet", info.telnet),
+        ("WebSocket", info.ws),
+        ("Ruida (UDP)", info.ruida),
+        ("Kamera", info.camera),
+    ] {
         match r {
             Some(Ok(a)) => {
                 ok = true;
@@ -99,8 +132,14 @@ pub fn run(args: &[String]) -> i32 {
         for e in runner.take_events() {
             match e {
                 Event::Console { status: true, .. } if quiet => {}
-                Event::Console { client, dir, text, .. } => {
-                    let who = if client == u32::MAX { "*".to_string() } else { client.to_string() };
+                Event::Console {
+                    client, dir, text, ..
+                } => {
+                    let who = if client == u32::MAX {
+                        "*".to_string()
+                    } else {
+                        client.to_string()
+                    };
                     let arrow = match dir {
                         "in" => "→",
                         "rt" => "⇢",
@@ -108,7 +147,9 @@ pub fn run(args: &[String]) -> i32 {
                     };
                     println!("[{who}] {arrow} {text}");
                 }
-                Event::Warning { code, client, x, y } => println!("WARNUNG {code} (Verbindung {client:?}, Kopf {x:.1}/{y:.1})"),
+                Event::Warning { code, client, x, y } => {
+                    println!("WARNUNG {code} (Verbindung {client:?}, Kopf {x:.1}/{y:.1})")
+                }
                 Event::Alarm { code } => println!("ALARM {code}"),
                 Event::ConfigChanged => {}
             }

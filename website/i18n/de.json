@@ -101,6 +101,7 @@
         "Zahnräder mit Evolventen, Zahnradpaare, Zahnstangen, GT2/HTD-Zahnriemenräder und Kurvenscheiben",
         "Verbindungs-Werkzeug: Fingerzinken, Zapfen, Kreuzschlitz, Schnapp- und Hakenverbindungen, Keilzapfen, T-Nut, Deckelscharnier",
         "Flex-Scharniere (Living Hinges) in sieben Mustern",
+        "Muster füllen: Flächen mit nahtlosen Vektormustern verzieren, aus eigenem Motiv oder 13 mitgelieferten Mustern, mit gespiegelten, versetzten, sechseckigen und Windrad-Wiederholungen, umbrechenden Kanten und ohne doppelt gelaserte Linien",
         "Scheibenkugel: Lampenschirm aus Kreisscheiben mit schrägen Schlitzen, 6 bis 32 Scheiben, ohne Leim",
         "Schichtmodell: STL- oder OBJ-Modell in gestapelte, nummerierte Scheiben zerlegen",
         "Rippenmodell: Rippen mit Halbschlitzen auf einem Rückgrat, aus STL oder OBJ; Rumpf, Beine und gebogener Schwanz als eigene Abschnitte, auf Knopfdruck vorgeschlagen, mit Bauplan-Seite und dichteren Rippen an Details",
@@ -188,6 +189,7 @@
     "lead": "Ein eigenes, kostenloses Programm, das sich wie ein Laser mit FluidNC verhält. Schick deinen Auftrag hin und sieh in Echtzeit zu, wie er graviert und schneidet – ohne Material zu verbrauchen und ohne Risiko für deine Maschine.",
     "b": [
       "Emuliert einen FluidNC-Controller per Telnet (Port 2323) und WebSocket (Port 8181) – KizamuBeam verbindet sich über die Gerätevorlage „KizamuBeam Virtual Machine“, andere Programme als GRBL- oder FluidNC-Netzwerkgerät",
+      "Antwortet auch wie eine Ruida-DSP-Steuerung per UDP (Ports 50200/50207): LightBurn, RDWorks, MeerK40t oder Rayforge können CO2-Aufträge senden, mit Rahmen, Joggen und Status",
       "Fährt mit echter Beschleunigung und Planer: Laufzeit, Rahmen, Referenzfahrt und Fehlermeldungen wie an der Maschine",
       "3D-Ansicht des Bettes mit Lasermodul, Draufsicht in 2D",
       "Material einlegen: Sperrholz, Acryl, Pappe und mehr – Linien brennen sich je nach Leistung und Tempo ein",

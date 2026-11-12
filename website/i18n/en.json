@@ -101,6 +101,7 @@
         "Involute spur gears, gear pairs, racks, GT2/HTD timing pulleys and cams",
         "Joint tool: finger joints, tab-and-slot, cross-lap, snap-fit and hook joints, wedge tenons, T-slots, lid hinge",
         "Living hinges in seven patterns",
+        "Pattern fill: decorate surfaces with seamless vector patterns from your own motif or 13 built-in patterns, with mirrored, brick, hexagonal and pinwheel repeats, wrapped edges and no line lasered twice",
         "Disc sphere: a lamp shade made of round discs with angled slots, 6 to 32 discs, no glue",
         "Layered model: slice an STL or OBJ model into stacked, numbered sheets",
         "Rib model: ribs with half slots on a spine, from STL or OBJ; body, legs and a curved tail as separate sections, suggested at the push of a button, with an assembly plan page and denser ribs at details",
@@ -188,6 +189,7 @@
     "lead": "A separate, free program that behaves like a laser running FluidNC. Send your job to it and watch it engrave and cut in real time – no material used and no risk to your machine.",
     "b": [
       "Emulates a FluidNC controller over Telnet (port 2323) and WebSocket (port 8181) – KizamuBeam connects through the “KizamuBeam Virtual Machine” device preset, other programs as a GRBL or FluidNC network device",
+      "Also answers like a Ruida DSP controller over UDP (ports 50200/50207): LightBurn, RDWorks, MeerK40t or Rayforge can send CO2 jobs to it, including framing, jogging and status",
       "Moves with real acceleration and a motion planner: run time, framing, homing and error messages just like on the machine",
       "3D view of the bed with the laser module, plus a 2D top view",
       "Place material: plywood, acrylic, cardboard and more – lines burn in according to power and speed",

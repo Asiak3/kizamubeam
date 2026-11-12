@@ -19,7 +19,7 @@
 import type { Pt, SubPath } from '../model';
 import { t, tn } from '../i18n';
 import { fitPolyline } from '../fit';
-import { packParts } from './build';
+import { arrangeParts } from './build';
 import type { Generator, GenPart, Issue, Params, PlanSheet } from './types';
 import { getMesh } from '../model3d/store';
 import type { Mesh } from '../model3d/mesh';
@@ -871,11 +871,12 @@ const simple = (p: Params) => !parseSections(String(p.sections ?? ''))?.length;
 
 export const RIBS: Generator = {
   id: 'ribs',
-  version: 1,
+  version: 2,
   kind: 'assembly',
   name: t('Rippenmodell'),
   icon: 'ribs',
   schema: [
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'model', type: 'data', label: t('Modell'), def: '' },
     { key: 'name', type: 'data', label: t('Dateiname'), def: '' },
     { key: 'sections', type: 'data', label: t('Abschnitte'), def: '' },
@@ -916,6 +917,8 @@ export const RIBS: Generator = {
     { key: 'maxPlate', type: 'length', label: t('Platten teilen ab'), min: 0, max: 3000, def: 0, advanced: true, title: t('Rückgrat-Platten, die länger sind (z. B. als das Bett), werden mit einem Schwalbenschwanz geteilt. 0 = nie teilen.') },
     { key: 'plan', type: 'bool', label: t('Bauplan als eigene Seite'), def: true, title: t('Beim Erstellen eine Seite mit Ansicht, Teilenummern und Steckreihenfolge anlegen. Sie wird nicht gelasert.') },
   ],
+  // Saved objects keep their packParts layout; new ones are nested compactly.
+  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'packed' } : p; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -975,7 +978,7 @@ export const RIBS: Generator = {
       if (p.numbers && part.key.startsWith('R')) marks.push(...(placeNumber(part.polys, part.key.slice(1), p.numberSize) ?? []));
       items.push(marks.length ? { key: part.key, subs, marks } : { key: part.key, subs });
     }
-    const placed = packParts(items, 3 + p.kerf);
+    const placed = arrangeParts(items, 3 + p.kerf, raw.partLayout);
     const parts: GenPart[] = placed.map((pl, i) => (items[i].marks ? { ...pl, marks: items[i].marks } : pl));
     const [dx, dy, dz] = L.dims;
     const info: [string, string][] = [

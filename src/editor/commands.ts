@@ -1,5 +1,5 @@
 // Editor: Befehle: Löschen, Kopieren, Einfügen, Transformieren, Formparameter.
-import { about, clone, cloneObjs, Mat, mul, Pt, rotate, scale, translate, visibleLeaves } from '../model';
+import { about, clone, cloneObjs, homeLayer, Mat, mul, Pt, rotate, scale, translate, visibleLeaves } from '../model';
 import type { Editor } from '../editor';
 import { t } from '../i18n';
 import { genLeaves } from './generators';
@@ -19,6 +19,12 @@ export class EditorCommands {
   }
   selectLayer(this: Editor, i: number) {
     this.setSel(this.doc.objs.filter((o) => this.selectable(o) && [...visibleLeaves([o])].some(([l]) => l.layer === i)));
+  }
+  /** Objekte auf den Layern der Auswahl auswählen; Layer eines Objekts wie bei „Auf Layer verschieben“ (homeLayer) */
+  selectLayerObjects(this: Editor) {
+    const layers = new Set(this.sel.map(homeLayer));
+    if (!layers.size) return;
+    this.setSel(this.doc.objs.filter((o) => this.selectable(o) && [...visibleLeaves([o])].some(([l]) => layers.has(l.layer))));
   }
   copy(this: Editor) {
     this.clipboard = this.sel.map((o) => clone(o));

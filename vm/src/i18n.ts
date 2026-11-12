@@ -148,6 +148,19 @@ const EN: Record<string, string> = {
   Dunkel: 'Dark',
   Ansicht: 'View',
   'Strg+B': 'Ctrl+B',
+  Ruida: 'Ruida',
+  'Ruida (DSP)': 'Ruida (DSP)',
+  'Datenport (UDP)': 'Data port (UDP)',
+  'Tastenport (UDP)': 'Keypad port (UDP)',
+  Maschinennullpunkt: 'Machine origin',
+  'Verwürfelung (Magic)': 'Scrambling (magic)',
+  'hinten rechts': 'back right',
+  'hinten links': 'back left',
+  'vorne links': 'front left',
+  'vorne rechts': 'front right',
+  'Programme wie LightBurn oder RDWorks verbinden sich mit Ruida-Steuerungen immer über die Ports 50200 und 50207. Die Verwürfelung stellt sich selbst ein, sobald das Programm nach der Karten-ID fragt.':
+    'Programs such as LightBurn or RDWorks always talk to Ruida controllers on ports 50200 and 50207. The scrambling adjusts itself as soon as the program asks for the card ID.',
+  'Daten- und Tastenport von Ruida müssen verschieden sein.': 'The Ruida data and keypad ports must differ.',
 };
 
 export function t(de: string, vars?: Record<string, string | number>): string {

@@ -8,10 +8,19 @@ import { t } from './i18n';
 import { lookEditor } from './view3d/lookui';
 import { guessLook, lookName, resolveLook } from './view3d/looks';
 import { library } from './materials';
+import { imageLayerFields } from './imageLayerFields';
+
+/** Opens "Adjust Image" for a layer; set by the UI module (it lives there) */
+let openAdjust: ((ed: Editor, layer: number) => void) | null = null;
+export const setAdjustOpener = (fn: (ed: Editor, layer: number) => void) => (openAdjust = fn);
 
 export function openLayerDialog(ed: Editor, i: number) {
   const L = ed.layer(i);
   const c: CutSettings = cutSettings(L);
+  // Images use speed, power and passes of the layer; their own image settings are edited live and reverted on cancel
+  const parts = ed.layerParts(i);
+  const vecs = parts.vec || !parts.img;
+  const origImg = parts.img ? { ...ed.imgLayer(i) } : null;
   let name = L.name;
   let output = L.output;
   c.sub = c.sub?.map((s) => structuredClone(s)) ?? [];
@@ -86,14 +95,14 @@ export function openLayerDialog(ed: Editor, i: number) {
     const sub = tab >= 0 ? subs[tab] : null;
     general.replaceChildren(
       ...(sub ? [] : row(t('Name'), h('input', { type: 'text', value: name, oninput: (ev: Event) => (name = (ev.target as HTMLInputElement).value) }))),
-      ...row(t('Modus'), modeSel),
+      ...(vecs ? row(t('Modus'), modeSel) : []),
       ...row(t('Geschwindigkeit (mm/min)'), num(() => e.speed, (v) => (e.speed = v), 1, 100000)),
       ...row(t('Max. Leistung (%)'), num(() => e.power, (v) => (e.power = v), 0, 100)),
       ...row(t('Min. Leistung (%)'), num(() => e.minPower, (v) => (e.minPower = v), 0, 100, false, t('Leistung in Ecken (Leistungsrampe) und bei Bildern in Graustufen'))),
       ...row(t('Durchgänge'), num(() => e.passes, (v) => (e.passes = v), 1, 100, true)),
-      ...row(t('Kerf-Versatz (mm)'), num(() => e.kerf, (v) => (e.kerf = v), -5, 5, false, t('Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden.'))),
-      ...row(t('Z-Versatz (mm)'), num(() => e.zOffset, (v) => (e.zOffset = v), -50, 50, false, t('Fokus beim ersten Durchgang verschieben, positiv = tiefer ins Material. Braucht eine Z-Achse (Geräteeinstellungen); bezogen auf die Höhe beim Start.'))),
-      ...row(t('Je Durchgang tiefer (mm)'), num(() => e.zStep, (v) => (e.zStep = v), -20, 20, false, t('Fokus nach jedem Durchgang um diesen Wert tiefer setzen, z. B. bei dickem Material. Am Ende fährt Z zurück.'))),
+      ...(!vecs ? [] : row(t('Kerf-Versatz (mm)'), num(() => e.kerf, (v) => (e.kerf = v), -5, 5, false, t('Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden.')))),
+      ...(row(t('Z-Versatz (mm)'), num(() => e.zOffset, (v) => (e.zOffset = v), -50, 50, false, t('Fokus beim ersten Durchgang verschieben, positiv = tiefer ins Material. Braucht eine Z-Achse (Geräteeinstellungen); bezogen auf die Höhe beim Start.')))),
+      ...(row(t('Je Durchgang tiefer (mm)'), num(() => e.zStep, (v) => (e.zStep = v), -20, 20, false, t('Fokus nach jedem Durchgang um diesen Wert tiefer setzen, z. B. bei dickem Material. Am Ende fährt Z zurück.')))),
       sub
         ? h('span', { class: 'checks' },
             check(t('Ausgabe'), () => sub.output, (v) => (sub.output = v), t('Sub-Layer beim Lasern ausgeben'), render),
@@ -104,8 +113,10 @@ export function openLayerDialog(ed: Editor, i: number) {
             check(t('Ausgabe'), () => output, (v) => (output = v), t('Layer beim Lasern ausgeben')),
           ),
     );
-    modeBox.replaceChildren(e.mode === 'line' ? lineSection(e) : fillSection(e));
+    modeBox.replaceChildren(...(vecs ? [e.mode === 'line' ? lineSection(e) : fillSection(e)] : []));
     lookSection.hidden = !!sub;
+    imageSection.hidden = !!sub;
+    if (!sub) renderImage();
   };
 
   const lineSection = (c: Entry) => {
@@ -228,14 +239,41 @@ export function openLayerDialog(ed: Editor, i: number) {
     ),
   );
 
+  // Image settings of this layer (only when it holds images). Interval, bidirectional and overscan belong to the
+  // layer: shown here, unless the fill section above already shows them
+  const imageSection = h('div');
+  const renderImage = () => {
+    if (!parts.img) return;
+    const fillShown = vecs && c.mode === 'fill';
+    const kids: (HTMLElement | null)[] = [
+      h('div', { class: 'form-title' }, vecs ? t('Bilder') : t('Bild')),
+      h('div', { class: 'form' }, ...imageLayerFields(ed, i, true, undefined, fillShown ? null : { get: () => c, set: (p) => Object.assign(c, p) })),
+      fillShown ? h('div', { class: 'note' }, t('Zeilenabstand, Bidirektional und Überfahrweg unter „Füllen“ gelten auch für die Bilder.')) : null,
+      openAdjust
+        ? h('div', { class: 'layer-tools' }, h('button', {
+            type: 'button',
+            class: 'btn small',
+            title: t('Helligkeit, Kontrast, Schärfen und Vorschau; die Layer-Einstellungen werden dabei übernommen'),
+            onclick: () => {
+              applied = true;
+              dlg.close();
+              openAdjust?.(ed, i);
+            },
+          }, t('Bild anpassen …')))
+        : null,
+    ];
+    imageSection.replaceChildren(...kids.filter((k): k is HTMLElement => !!k));
+  };
+
   let applied = false;
   const dlg = h(
     'dialog',
     { class: 'layer-dialog' },
     h('h3', {}, h('span', { class: 'swatch', style: `background:${PALETTE[i]}` }, layerLabel(i)), ' ', t('Layer-Einstellungen')),
-    tabBar,
+    vecs ? tabBar : null,
     general,
     modeBox,
+    imageSection,
     lookSection,
     h(
       'div',
@@ -244,7 +282,7 @@ export function openLayerDialog(ed: Editor, i: number) {
         class: 'btn',
         title: t('Standardwerte für den gewählten Modus'),
         onclick: () => {
-          if (tab < 0) Object.assign(c, { ...defaultCutSettings(c.mode), sub: subs });
+          if (tab < 0) Object.assign(c, { ...defaultCutSettings(vecs ? c.mode : 'fill'), mode: c.mode, sub: subs });
           else subs[tab] = { ...defaultSubLayer(subs[tab].mode), output: subs[tab].output } as SubLayer;
           render();
         },
@@ -263,11 +301,15 @@ export function openLayerDialog(ed: Editor, i: number) {
   render();
   dlg.addEventListener('close', () => {
     // Felder schreiben ihre Werte beim Verlassen; der Klick auf „Übernehmen“ kommt danach
+    // Image fields changed the layer live: restore first, so the undo step holds the state before the dialog
+    const newImg = origImg ? { ...ed.imgLayer(i) } : null;
+    if (origImg) L.img = { ...origImg };
     if (applied) {
-      const before = JSON.stringify({ ...cutSettings(L), name: L.name, output: L.output });
-      const after = { ...c, sub: subs.length ? subs : undefined, name: name.trim() || L.name, output };
+      const before = JSON.stringify({ ...cutSettings(L), name: L.name, output: L.output, img: origImg ?? undefined });
+      const after = { ...c, sub: subs.length ? subs : undefined, name: name.trim() || L.name, output, img: newImg ?? undefined };
       if (JSON.stringify(after) !== before) ed.updateLayer(i, after);
-    }
+      else ed.emit('doc');
+    } else if (origImg) ed.emit('doc');
     dlg.remove();
   });
   dlg.addEventListener('keydown', (e) => e.stopPropagation());

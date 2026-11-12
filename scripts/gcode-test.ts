@@ -3,7 +3,7 @@ import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
-import { defaultImageLayer, defaultLayer, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
+import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
 
 let failed = 0;
 async function test(name: string, fn: () => void | Promise<void>) {
@@ -592,6 +592,34 @@ await test('„Nicht lasern“ je Objekt, auch für Gruppen', async () => {
   assert.equal(job.warnings.length, 0);
   const none = await lineJob([sqObj(1, 10, 10, { noLaser: true })]);
   assert.equal(none.moves.n, 0);
+});
+
+await test('Images use speed, power, passes, interval, direction and overscan of their layer; older files move image values into image-only layers', () => {
+  const img = (layer: number): Obj => ({ id: 900 + layer, m: [1, 0, 0, 1, 0, 0], layer, shape: { kind: 'image', asset: 'a', w: 10, h: 10, pxW: 10, pxH: 10, adjust: { brightness: 0, contrast: 0, gamma: 1, sharpen: 0, sharpenRadius: 1, denoise: 0 } } } as Obj);
+  const legacy = { ...defaultImageLayer(), speed: 1800, power: 42, minPower: 5, passes: 2, interval: 0.2, bidirectional: false, overscan: 5, dither: 'floyd' };
+  const doc = loadDoc({
+    version: 2, bed: { w: 400, h: 400 }, page: 0,
+    pages: [{ name: 'P', objs: [img(0), img(1), { ...sqObj(1, 0, 0), layer: 1 }] }],
+    layers: {
+      0: { ...defaultLayer(0), speed: 1000, power: 60, img: legacy },
+      1: { ...defaultLayer(1), speed: 300, power: 95, img: legacy },
+    },
+  });
+  // Image-only layer: the old image values become the layer's values
+  const L0 = doc.layers[0];
+  assert.deepEqual([L0.speed, L0.power, L0.minPower, L0.passes, L0.interval, L0.bidirectional, L0.overscan], [1800, 42, 5, 2, 0.2, false, 5]);
+  // Layer with vectors: the layer's values win
+  assert.deepEqual([doc.layers[1].speed, doc.layers[1].power, doc.layers[1].interval, doc.layers[1].bidirectional], [300, 95, 0.1, true]);
+  for (const L of [doc.layers[0], doc.layers[1]]) {
+    assert.equal(L.img!.speed, undefined);
+    assert.equal(L.img!.interval, undefined);
+    assert.equal(L.img!.dither, 'floyd');
+  }
+  const out = imageOutput(normalizeLayer(doc.layers[1]));
+  assert.deepEqual([out.speed, out.power, out.passes, out.interval, out.overscan, out.dither], [300, 95, 1, 0.1, 2.5, 'floyd']);
+  // Loading again does not move anything (the legacy fields are gone)
+  doc.layers[0].speed = 700;
+  assert.equal(loadDoc(JSON.parse(JSON.stringify(doc))).layers[0].speed, 700);
 });
 
 if (failed) {

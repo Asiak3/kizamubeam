@@ -1,6 +1,7 @@
 //! Runtime of the virtual machine: a tick thread runs the controller in real time, plus a
 //! Telnet server (raw TCP like FluidNC port 23) and a WebSocket server (like FluidNC port 81). Each
 //! connection gets its own number; replies go to the sender, alarms and the welcome to everyone.
+//! Optionally a Ruida DSP emulation on UDP (see `ruida_net`).
 
 use crate::camera::{self, FrameStore};
 use crate::config::Config;
@@ -24,7 +25,7 @@ const TICK: Duration = Duration::from_millis(2);
 #[serde(rename_all = "camelCase")]
 pub struct ClientInfo {
     pub id: ClientId,
-    /// "telnet" or "ws"
+    /// "telnet", "ws" or "ruida"
     pub kind: &'static str,
     pub addr: String,
 }
@@ -36,6 +37,8 @@ pub struct ServerInfo {
     pub telnet: Option<Result<String, String>>,
     pub ws: Option<Result<String, String>>,
     pub camera: Option<Result<String, String>>,
+    /// Ruida data port (UDP); the keypad port is ruida_jog_port
+    pub ruida: Option<Result<String, String>>,
 }
 
 struct Listener {
@@ -55,11 +58,11 @@ impl Drop for Listener {
 /// Connection: info, channel for replies, flag to disconnect
 type ClientSlot = (ClientInfo, Sender<String>, Arc<AtomicBool>);
 
-struct Shared {
-    machine: Mutex<Machine>,
+pub(crate) struct Shared {
+    pub(crate) machine: Mutex<Machine>,
     clients: Mutex<HashMap<ClientId, ClientSlot>>,
     next_id: AtomicU32,
-    stop: AtomicBool,
+    pub(crate) stop: AtomicBool,
     /// events and segments for the UI (or the headless output)
     events: Mutex<Vec<Event>>,
     segments: Mutex<Vec<Segment>>,
@@ -150,6 +153,27 @@ impl Runner {
                 },
             );
         }
+        if cfg.ruida_enabled {
+            let stop = Arc::new(AtomicBool::new(false));
+            info.ruida = Some(
+                match crate::ruida_net::start(
+                    host,
+                    cfg.ruida_port,
+                    cfg.ruida_jog_port,
+                    self.shared.clone(),
+                    stop.clone(),
+                ) {
+                    Ok((addr, handle)) => {
+                        self.listeners.push(Listener {
+                            stop,
+                            handle: Some(handle),
+                        });
+                        Ok(addr)
+                    }
+                    Err(e) => Err(e),
+                },
+            );
+        }
         self.info = info;
     }
 
@@ -179,6 +203,7 @@ impl Runner {
             old.lan,
             old.camera_enabled,
             old.camera_port,
+            (old.ruida_enabled, old.ruida_port, old.ruida_jog_port),
         ) != (
             new.telnet_enabled,
             new.telnet_port,
@@ -187,6 +212,7 @@ impl Runner {
             new.lan,
             new.camera_enabled,
             new.camera_port,
+            (new.ruida_enabled, new.ruida_port, new.ruida_jog_port),
         ) {
             self.restart_servers();
         }
@@ -244,7 +270,7 @@ impl Drop for Runner {
 }
 
 /// Distribute controller output to the connections, collect events
-fn flush(s: &Shared) {
+pub(crate) fn flush(s: &Shared) {
     let (out, events, segs) = {
         let mut m = s.machine.lock().unwrap();
         (m.take_out(), m.take_events(), m.take_segments())
@@ -307,6 +333,18 @@ fn accept_loop(l: TcpListener, s: Arc<Shared>, stop: Arc<AtomicBool>, ws: bool) 
             Err(_) => thread::sleep(Duration::from_millis(200)),
         }
     }
+}
+
+pub(crate) fn register_client(
+    s: &Shared,
+    kind: &'static str,
+    addr: SocketAddr,
+) -> (ClientId, Receiver<String>, Arc<AtomicBool>) {
+    register(s, kind, addr)
+}
+
+pub(crate) fn unregister_client(s: &Shared, id: ClientId) {
+    unregister(s, id)
 }
 
 fn register(
