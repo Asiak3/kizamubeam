@@ -136,6 +136,7 @@ application/file/native/hardware boundaries excluded).
 
 - Color is the layer: clicking a palette color assigns the selection to it. Layer table with mode (Line/Fill), speed, power, air assist, output, visibility and quick editing.
 - Cut Settings (double-click a layer): kerf offset, tabs (count or spacing, skip inner shapes), fill style (line by line or offset fill, which follows the outline inwards in rings), scan angle, cross-hatch, bidirectional, overscan, air assist (M8 or M7, off with M9; configurable in Device Settings). The settings are stored as `CutSettings` in the layer (`src/model.ts`).
+  - **Duplicate lines** (line): optional per operation (`dedup`, default off, tolerance `dedupTol` default 0.05 mm); whole duplicates are dropped and partially overlapping spans are merged before kerf/tabs, with a warning and an orange dashed preview overlay. Fill, images and reg marks are excluded.
   - **Sub-layers**: further operations on the same shapes after the layer, each with its own mode, speed, power, passes and the settings below, e.g. fill first, then cut the outline. Sub-layers can be switched off individually; air assist and 3D appearance come from the layer.
   - **Perforation** (line): cut a given length, then leave a gap, e.g. for tear-off edges or fold lines; tabs stay uncut.
   - **Lead-in, lead-out and overcut** (line, closed shapes): a straight lead at an angle to the contour or a tangent arc, always on the waste side (outside for outer contours, inside for holes, found automatically); the overcut follows the contour past the start.
