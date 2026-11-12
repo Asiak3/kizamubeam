@@ -150,7 +150,7 @@ export function engravings(ed: Editor, solids: Solid[], places: Map<string, Canv
     for (const mk of hits) {
       if (mk.kind !== 'image') continue;
       const sh = mk.o.shape as ImageShape;
-      const cv = displayCanvas(sh, mk.m, ed.imgLayer(mk.o.layer), true);
+      const cv = displayCanvas(sh, mk.m, ed.imgOutput(mk.o.layer), true);
       if (!cv) continue;
       ctx.save();
       ctx.transform(mk.m[0], mk.m[1], mk.m[2], mk.m[3], mk.m[4], mk.m[5]);

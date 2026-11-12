@@ -86,9 +86,11 @@ export class EditorLibrary {
     if (!at && (c.x < 0 || c.y < 0 || c.x > bed.w || c.y > bed.h)) c = { x: bed.w / 2, y: bed.h / 2 };
     o.m = mul(translate(c.x - (b.x + b.w / 2), c.y - (b.y + b.h / 2)), o.m);
     this.snapshot(t('Aus Bibliothek einfügen'));
+    const vecLayers = new Set([...leaves([o])].filter(([l]) => l.shape.kind !== 'image').map(([l]) => l.layer));
     for (const [leaf] of leaves([o])) {
-      if (leaf.shape.kind === 'image') this.imgLayer(leaf.layer);
-      else this.layer(leaf.layer);
+      if (leaf.shape.kind !== 'image') this.layer(leaf.layer);
+      else if (vecLayers.has(leaf.layer)) this.imgLayer(leaf.layer);
+      else this.prepareImageLayer(leaf.layer);
     }
     this.doc.objs.push(o);
     if (!this.agentCall) this.setTool('select');

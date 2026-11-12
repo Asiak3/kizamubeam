@@ -3721,7 +3721,6 @@
   "Aus": "Sal.",
   "Zeig.": "Ver",
   "Bilder dieses Layers": "Imágenes de esta capa",
-  "Doppelklick: Bild anpassen": "Doble clic: ajustar imagen",
   "Doppelklick: Layer-Einstellungen": "Doble clic: ajustes de capa",
   "Nach oben (früher ausgeben)": "Subir (se envía antes)",
   "Nach unten (später ausgeben)": "Bajar (se envía después)",
@@ -4341,5 +4340,6 @@
   "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Barra espaciadora + arrastrar, botón central, arrastrar con el derecho",
   "Größe ändern (Doppelklick: Standardgröße)": "Cambiar tamaño (doble clic: tamaño estándar)",
   "Verschobene oder vergrößerte Dialoge öffnen wieder in der Mitte und in Standardgröße. Wirkt sofort.": "Los diálogos movidos o agrandados vuelven a abrirse en el centro y con su tamaño estándar. Se aplica al instante.",
-  "Dialoge öffnen wieder in der Mitte und in Standardgröße.": "Los diálogos vuelven a abrirse en el centro y con su tamaño estándar."
+  "Dialoge öffnen wieder in der Mitte und in Standardgröße.": "Los diálogos vuelven a abrirse en el centro y con su tamaño estándar.",
+  "Helligkeit, Kontrast, Schärfen und Vorschau; die Layer-Einstellungen werden dabei übernommen": "Brillo, contraste, nitidez y vista previa; antes se aplican los ajustes de la capa"
 }

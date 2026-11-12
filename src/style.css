@@ -4529,3 +4529,6 @@ label.settings-label input {
 .settings-keys td:first-child {
   width: 38%;
 }
+.form > .form-title {
+  grid-column: 1 / -1;
+}

@@ -1830,7 +1830,8 @@ export const EDIT_TOOLS: ToolDef[] = [
       const e = library.get(String(a.material_id));
       if (!e) throw new ToolError(`Kein Eintrag mit id ${a.material_id} (siehe list_materials)`);
       const i = num(a, 'layer', { min: 0, max: 31, int: true });
-      ed.updateLayer(i, layerPatch(e));
+      const parts = ed.layerParts(i);
+      ed.updateLayer(i, layerPatch(e, parts.img && !parts.vec));
       return { layer: i, material: { id: e.id, material: e.material, thickness: e.thickness, title: e.title } };
     },
   },

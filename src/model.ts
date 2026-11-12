@@ -146,12 +146,20 @@ export const DITHER_MODES: [DitherMode, string][] = [
   ['grayscale', t('Graustufen')],
 ];
 
-/** Einstellungen für Bilder auf einem Layer (eigener Eintrag „Bild“ in der Layer-Tabelle) */
+/**
+ * Image settings of a layer (own "Image" row in the layer table). Speed, power, min power and passes
+ * come from the layer itself (see imageOutput); the optional fields below only exist in older files
+ * and material entries and are moved into the layer when a document is loaded.
+ */
 export interface ImageLayer {
-  speed: number;
-  power: number;
-  minPower: number;
-  passes: number;
+  /** @deprecated legacy, use the layer's speed */
+  speed?: number;
+  /** @deprecated legacy, use the layer's power */
+  power?: number;
+  /** @deprecated legacy, use the layer's minPower */
+  minPower?: number;
+  /** @deprecated legacy, use the layer's passes */
+  passes?: number;
   /** Zeilenabstand in mm (DPI = 25,4 / interval) */
   interval: number;
   dither: DitherMode;
@@ -173,9 +181,45 @@ export const isCellMode = (d: DitherMode) => d === 'halftone' || d === 'newsprin
 
 export function defaultImageLayer(): ImageLayer {
   return {
-    speed: 3000, power: 30, minPower: 0, passes: 1, interval: 0.1, dither: 'jarvis', negative: false,
+    interval: 0.1, dither: 'jarvis', negative: false,
     bidirectional: true, overscan: 2.5, cells: 50, angle: 45, threshold: 128,
   };
+}
+
+/** Image settings plus the layer's speed, power and passes: what the laser and the preview use */
+export type ImageOutput = ImageLayer & { speed: number; power: number; minPower: number; passes: number };
+
+/** Speed and power a layer gets when an image is placed on it while it is still empty */
+export const IMAGE_LAYER_DEFAULTS = { speed: 3000, power: 30, minPower: 0, passes: 1 } as const;
+
+const IMG_OUTPUT_KEYS = ['speed', 'power', 'minPower', 'passes'] as const;
+
+/** Output settings for the images of a layer: image settings with speed, power and passes of the layer */
+export function imageOutput(L: Pick<CutSettings, 'speed' | 'power' | 'minPower' | 'passes'> & { img?: ImageLayer }, img = L.img): ImageOutput {
+  const out = { ...defaultImageLayer(), ...img, speed: L.speed, power: L.power, minPower: L.minPower, passes: L.passes };
+  return out;
+}
+
+/** Image settings without the legacy speed/power fields (they belong to the layer) */
+export function stripImageOutput(img: ImageLayer): ImageLayer {
+  const out = { ...img };
+  for (const k of IMG_OUTPUT_KEYS) delete out[k];
+  return out;
+}
+
+/**
+ * Older files kept speed, power, min power and passes of images separately from the layer. Move them into
+ * the layer when it holds only images; on layers that also hold vectors the layer's values win.
+ */
+function migrateImageOutput(layers: Record<number, Layer>, pages: Page[]) {
+  const vec = new Set<number>();
+  for (const p of pages) for (const [o] of leaves(p.objs)) if (o.shape.kind !== 'image') vec.add(o.layer);
+  for (const [k, L] of Object.entries(layers)) {
+    const img = L?.img;
+    if (!img || typeof img !== 'object') continue;
+    if (!vec.has(Number(k))) for (const key of IMG_OUTPUT_KEYS) if (typeof img[key] === 'number' && isFinite(img[key]!)) L[key] = img[key]!;
+    L.img = stripImageOutput(img);
+  }
 }
 
 export interface TextShape {
@@ -684,6 +728,7 @@ export function loadDoc(raw: unknown): Doc {
   d.page = Math.min(Math.max(0, Math.floor(Number(d.page) || 0)), pages.length - 1);
   d.bed ??= { w: 400, h: 400 };
   d.layers ??= {};
+  migrateImageOutput(d.layers as Record<number, Layer>, pages);
   const mla = Array.isArray(d.multiLayerAssemblies) ? d.multiLayerAssemblies : [];
   const seen = new Set<number>();
   const cleanAssemblies: MultiLayerAssembly[] = [];

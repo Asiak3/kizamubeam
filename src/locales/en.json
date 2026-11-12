@@ -1669,7 +1669,6 @@
   "Aus": "Out",
   "Zeig.": "Show",
   "Bilder dieses Layers": "Images on this layer",
-  "Doppelklick: Bild anpassen": "Double-click: adjust image",
   "Doppelklick: Layer-Einstellungen": "Double-click: Cut Settings",
   "Nach oben (früher ausgeben)": "Move up (output earlier)",
   "Nach unten (später ausgeben)": "Move down (output later)",
@@ -4557,5 +4556,6 @@
   "Leertaste + Ziehen, Mitteltaste, rechte Maustaste": "Space + drag, middle button, right drag",
   "Größe ändern (Doppelklick: Standardgröße)": "Resize (double-click: default size)",
   "Verschobene oder vergrößerte Dialoge öffnen wieder in der Mitte und in Standardgröße. Wirkt sofort.": "Dialogs you moved or resized open in the center and at their default size again. Takes effect immediately.",
-  "Dialoge öffnen wieder in der Mitte und in Standardgröße.": "Dialogs open in the center and at their default size again."
+  "Dialoge öffnen wieder in der Mitte und in Standardgröße.": "Dialogs open in the center and at their default size again.",
+  "Helligkeit, Kontrast, Schärfen und Vorschau; die Layer-Einstellungen werden dabei übernommen": "Brightness, contrast, sharpening and preview; the layer settings are applied first"
 }
