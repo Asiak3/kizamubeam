@@ -132,7 +132,7 @@
         "Maschinenaktionen von Agenten starten erst nach deiner Bestätigung – Pause und Stopp funktionieren immer",
         "Erweiterungen (.kzp) bringen Gerätevorlagen, Vorlagen, Materialien und Motive – ohne App-Update, nur Daten, kein Code",
         "Einstellungen, Geräte und Bibliotheken als Datei übertragen oder über einen eigenen Ordner (iCloud, Dropbox, Nextcloud) zwischen Rechnern synchronisieren",
-        "Oberfläche auf Deutsch, Englisch und Italienisch; neue Sprachen lassen sich einfach ergänzen",
+        "Oberfläche auf Deutsch, Englisch, Italienisch, Spanisch und Portugiesisch; neue Sprachen lassen sich einfach ergänzen",
         "GPL-3.0-or-later, offene JSON-Dateiformate, gebaut mit Tauri 2, TypeScript und Rust",
         "Früher „Laserwerk“: Einstellungen, Geräte und Materialien werden übernommen, alte Projekte öffnen weiter"
       ]

@@ -89,18 +89,18 @@ const withVersion = (v, version) =>
         : v;
 
 // Runs inline in <head> of the German root page only. First-time visitors
-// whose browser language is Italian go to /it/, any other non-German language
-// goes to /en/. Any explicit choice made with the language switch is stored
-// and always wins. Crawlers are left alone.
-const REDIRECT = `<script>(function(){try{var s=localStorage.getItem('kb-lang');if(s)return;if(/bot|crawl|spider|slurp|preview/i.test(navigator.userAgent))return;var l=((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase();if(!l||l.indexOf('de')===0)return;location.replace((l.indexOf('it')===0?'it/':'en/')+location.hash);}catch(e){}})();</script>`;
+// whose browser language is Italian go to /it/, Portuguese to /pt/, any other
+// non-German language goes to /en/. Any explicit choice made with the language
+// switch is stored and always wins. Crawlers are left alone.
+const REDIRECT = `<script>(function(){try{var s=localStorage.getItem('kb-lang');if(s)return;if(/bot|crawl|spider|slurp|preview/i.test(navigator.userAgent))return;var l=((navigator.languages&&navigator.languages[0])||navigator.language||'').toLowerCase();if(!l||l.indexOf('de')===0)return;location.replace((l.indexOf('pt')===0?'pt/':l.indexOf('it')===0?'it/':'en/')+location.hash);}catch(e){}})();</script>`;
 
 // Every language of the site: code, name in its own language, path below SITE.
 const LANGS = [
   { code: 'de', name: 'Deutsch', path: '' },
   { code: 'en', name: 'English', path: 'en/' },
   { code: 'it', name: 'Italiano', path: 'it/' },
+  { code: 'pt', name: 'Português', path: 'pt/' },
 ];
-
 const pages = LANGS.map((l) => ({
   lang: l.code,
   out: `${l.path}index.html`,
