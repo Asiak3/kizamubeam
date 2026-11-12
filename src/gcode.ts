@@ -1607,7 +1607,13 @@ export async function buildJob(inp: JobInput): Promise<Job> {
           warnings.push(t('Bild „{name}“ ist noch nicht geladen und wurde übersprungen.', { name: im.shape.name ?? t('Bild') }));
           continue;
         }
-        for (let p = 0; p < Math.max(1, IL.passes); p++) emitScanlines(mv, lines, { speed: IL.speed, bidirectional: IL.bidirectional, overscan: ov, layer: li }, flip);
+        // Z per pass from the layer, like for vectors
+        if (!useZ && (L.zOffset || L.zStep)) zSkipped = true;
+        for (let p = 0; p < Math.max(1, IL.passes); p++) {
+          mv.zCur = useZ ? L.zOffset + p * L.zStep : 0;
+          emitScanlines(mv, lines, { speed: IL.speed, bidirectional: IL.bidirectional, overscan: ov, layer: li }, flip);
+        }
+        mv.zCur = 0;
       }
     }
     entriesOf(L).forEach((e, k) => {

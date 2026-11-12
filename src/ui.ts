@@ -43,7 +43,7 @@ import { openPacksDialog } from './packsDialog';
 import { openGridDialog } from './gridDialog';
 import { buildLaser, frameJob, isPositionPick, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob, togglePositionPick } from './laser';
 import { openLayerDialog, setAdjustOpener } from './layerdialog';
-import { imageLayerFields } from './imageLayerFields';
+import { imageLayerFields, liveLayerRaster } from './imageLayerFields';
 import { openMaterialTestDialog } from './materialtest';
 import { openTestPhotoDialog } from './testphotoDialog';
 import { BoolBase } from './ops';
@@ -929,7 +929,7 @@ function buildNumbar(ed: Editor) {
     if (imgs.length) {
       const o = imgs[0],
         s = o.shape as ImageShape;
-      const L = ed.imgLayer(o.layer);
+      const L = ed.imgOutput(o.layer);
       const g = outputGrid(s, o.m, L.interval);
       imgInfo.textContent = imgs.length > 1 ? t('{n} Bilder', { n: imgs.length }) : t('{pxW} × {pxH} px → {cols} × {rows} Punkte ({dpi} DPI)', { pxW: s.pxW, pxH: s.pxH, cols: g.cols, rows: g.rows, dpi: Math.round(25.4 / L.interval) });
     }
@@ -1612,7 +1612,7 @@ function buildLayers(ed: Editor) {
             h('input', { type: 'checkbox', checked: L.air, onchange: (e: Event) => ed.updateLayer(a, { air: (e.target as HTMLInputElement).checked }) }), t('Air Assist')),
         ),
         // Images use speed, power and passes of the layer; below come their own image settings
-        ...(part === 'img' ? [h('div', { class: 'form-title' }, t('Bilder')), ...imageLayerFields(ed, a, false)] : []),
+        ...(part === 'img' ? [h('div', { class: 'form-title' }, t('Bilder')), ...imageLayerFields(ed, a, false, undefined, { get: () => ed.layer(a), set: (p) => ed.updateLayer(a, p) })] : []),
       ),
       part === 'img'
         ? h('div', { class: 'layer-tools' }, h('button', { onclick: () => openAdjustDialog(ed, a) }, t('Bild anpassen …')))
@@ -1709,6 +1709,8 @@ function openAdjustDialog(ed: Editor, layer?: number) {
   const li = first.layer;
   const origAdj = targets.map((o) => ({ ...(o.shape as ImageShape).adjust }));
   const origLayer = { ...ed.imgLayer(li) };
+  const rasterOf = () => { const L = ed.layer(li); return { interval: L.interval, bidirectional: L.bidirectional, overscan: L.overscan }; };
+  const origRaster = rasterOf();
   const adj: ImageAdjust = { ...shape().adjust };
 
   const view = h('canvas', { class: 'adjust-preview', width: 420, height: 300 }) as HTMLCanvasElement;
@@ -1758,7 +1760,7 @@ function openAdjustDialog(ed: Editor, layer?: number) {
   const sS = slider(t('Schärfen (%)'), 0, 300, 1, adj.sharpen, (v) => setAdj({ sharpen: v }));
   const sR = slider(t('Radius'), 1, 10, 0.5, adj.sharpenRadius, (v) => setAdj({ sharpenRadius: v }));
   const sD = slider(t('Entrauschen'), 0, 50, 1, adj.denoise, (v) => setAdj({ denoise: v }));
-  const layerForm = h('div', { class: 'form' }, ...imageLayerFields(ed, li, true, drawPreview));
+  const layerForm = h('div', { class: 'form' }, ...imageLayerFields(ed, li, true, drawPreview, liveLayerRaster(ed, li)));
 
   // Presets: Anpassungen und Bildmodus unter einem Namen merken
   let presets = loadPresets();
@@ -1780,7 +1782,7 @@ function openAdjustDialog(ed: Editor, layer?: number) {
     sB.set(p.adjust.brightness), sC.set(p.adjust.contrast), sG.set(p.adjust.gamma);
     sS.set(p.adjust.sharpen), sR.set(p.adjust.sharpenRadius), sD.set(p.adjust.denoise);
     ed.updateImgLayer(li, p.output, false);
-    layerForm.replaceChildren(...imageLayerFields(ed, li, true, drawPreview));
+    layerForm.replaceChildren(...imageLayerFields(ed, li, true, drawPreview, liveLayerRaster(ed, li)));
     setAdj({ ...p.adjust });
   });
   const savePresetNow = () => {
@@ -1856,13 +1858,16 @@ function openAdjustDialog(ed: Editor, layer?: number) {
     offReady();
     const newAdj = targets.map((o) => ({ ...(o.shape as ImageShape).adjust }));
     const newLayer = { ...ed.imgLayer(li) };
+    const newRaster = rasterOf();
     // Ausgangszustand herstellen; bei „Übernehmen“ die Änderung als ein Undo-Schritt wieder anwenden
     targets.forEach((o, k) => ((o.shape as ImageShape).adjust = origAdj[k]));
     Object.assign(ed.imgLayer(li), origLayer);
-    if (applied && (JSON.stringify(newAdj) !== JSON.stringify(origAdj) || JSON.stringify(newLayer) !== JSON.stringify(origLayer))) {
+    Object.assign(ed.layer(li), origRaster);
+    if (applied && (JSON.stringify(newAdj) !== JSON.stringify(origAdj) || JSON.stringify(newLayer) !== JSON.stringify(origLayer) || JSON.stringify(newRaster) !== JSON.stringify(origRaster))) {
       ed.snapshot(t('Bild anpassen'));
       targets.forEach((o, k) => ((o.shape as ImageShape).adjust = newAdj[k]));
       Object.assign(ed.imgLayer(li), newLayer);
+      Object.assign(ed.layer(li), newRaster);
     }
     ed.emit('doc');
     dlg.remove();

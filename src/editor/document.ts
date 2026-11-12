@@ -1,6 +1,6 @@
 // Editor: Dokument, Rückgängig/Wiederholen, Autosave und Seiten.
 import {
-  allObjs, bumpIds, cloneObjs, Doc, defaultImageLayer, defaultLayer, IMAGE_LAYER_DEFAULTS, imageOutput, ImageOutput, normalizeLayer, loadDoc, pageName, ImageLayer, Layer, leaves, newDoc, Obj,
+  allObjs, bumpIds, cloneObjs, Doc, defaultImageLayer, defaultLayer, imageOutput, ImageOutput, normalizeLayer, loadDoc, pageName, ImageLayer, Layer, leaves, newDoc, Obj,
   Shape,
 } from '../model';
 import { assetUrl, registerAsset, restoreAssets } from '../images';
@@ -30,15 +30,6 @@ export class EditorDocument {
   /** Image settings of a layer together with its speed, power and passes (for the laser and the preview) */
   imgOutput(this: Editor, i: number): ImageOutput {
     return imageOutput(this.layer(i), this.imgLayer(i));
-  }
-  /**
-   * Prepare a layer for a newly placed image: image settings exist, and a layer without any objects
-   * gets speed and power suited for engraving images
-   */
-  prepareImageLayer(this: Editor, i: number) {
-    const empty = !allObjs(this.doc).some((o) => [...leaves([o])].some(([l]) => l.layer === i));
-    this.imgLayer(i);
-    if (empty) Object.assign(this.layer(i), IMAGE_LAYER_DEFAULTS);
   }
   /** Welche Arten von Objekten liegen auf dem Layer? (Vektoren und Bilder sind getrennte Einträge) */
   layerParts(this: Editor, i: number): { vec: boolean; img: boolean } {

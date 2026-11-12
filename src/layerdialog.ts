@@ -3,7 +3,7 @@
 // Sub-Layer bearbeiten dieselben Formen nach dem Layer (z. B. erst füllen, dann ausschneiden) und haben eigene Reiter.
 import type { Editor } from './editor';
 import { h, numInput } from './dom';
-import { CutSettings, cutSettings, defaultCutSettings, defaultSubLayer, FillStyle, IMAGE_LAYER_DEFAULTS, LayerMode, layerLabel, PALETTE, SubLayer } from './model';
+import { CutSettings, cutSettings, defaultCutSettings, defaultSubLayer, FillStyle, LayerMode, layerLabel, PALETTE, SubLayer } from './model';
 import { t } from './i18n';
 import { lookEditor } from './view3d/lookui';
 import { guessLook, lookName, resolveLook } from './view3d/looks';
@@ -101,8 +101,8 @@ export function openLayerDialog(ed: Editor, i: number) {
       ...row(t('Min. Leistung (%)'), num(() => e.minPower, (v) => (e.minPower = v), 0, 100, false, t('Leistung in Ecken (Leistungsrampe) und bei Bildern in Graustufen'))),
       ...row(t('Durchgänge'), num(() => e.passes, (v) => (e.passes = v), 1, 100, true)),
       ...(!vecs ? [] : row(t('Kerf-Versatz (mm)'), num(() => e.kerf, (v) => (e.kerf = v), -5, 5, false, t('Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden.')))),
-      ...(!vecs ? [] : row(t('Z-Versatz (mm)'), num(() => e.zOffset, (v) => (e.zOffset = v), -50, 50, false, t('Fokus beim ersten Durchgang verschieben, positiv = tiefer ins Material. Braucht eine Z-Achse (Geräteeinstellungen); bezogen auf die Höhe beim Start.')))),
-      ...(!vecs ? [] : row(t('Je Durchgang tiefer (mm)'), num(() => e.zStep, (v) => (e.zStep = v), -20, 20, false, t('Fokus nach jedem Durchgang um diesen Wert tiefer setzen, z. B. bei dickem Material. Am Ende fährt Z zurück.')))),
+      ...(row(t('Z-Versatz (mm)'), num(() => e.zOffset, (v) => (e.zOffset = v), -50, 50, false, t('Fokus beim ersten Durchgang verschieben, positiv = tiefer ins Material. Braucht eine Z-Achse (Geräteeinstellungen); bezogen auf die Höhe beim Start.')))),
+      ...(row(t('Je Durchgang tiefer (mm)'), num(() => e.zStep, (v) => (e.zStep = v), -20, 20, false, t('Fokus nach jedem Durchgang um diesen Wert tiefer setzen, z. B. bei dickem Material. Am Ende fährt Z zurück.')))),
       sub
         ? h('span', { class: 'checks' },
             check(t('Ausgabe'), () => sub.output, (v) => (sub.output = v), t('Sub-Layer beim Lasern ausgeben'), render),
@@ -116,6 +116,7 @@ export function openLayerDialog(ed: Editor, i: number) {
     modeBox.replaceChildren(...(vecs ? [e.mode === 'line' ? lineSection(e) : fillSection(e)] : []));
     lookSection.hidden = !!sub;
     imageSection.hidden = !!sub;
+    if (!sub) renderImage();
   };
 
   const lineSection = (c: Entry) => {
@@ -238,27 +239,31 @@ export function openLayerDialog(ed: Editor, i: number) {
     ),
   );
 
-  // Image settings of this layer (only when it holds images)
-  const imageSection = h('div', {},
-    ...(parts.img
-      ? [
-          h('div', { class: 'form-title' }, vecs ? t('Bilder') : t('Bild')),
-          h('div', { class: 'form' }, ...imageLayerFields(ed, i, true)),
-          openAdjust
-            ? h('div', { class: 'layer-tools' }, h('button', {
-                type: 'button',
-                class: 'btn small',
-                title: t('Helligkeit, Kontrast, Schärfen und Vorschau; die Layer-Einstellungen werden dabei übernommen'),
-                onclick: () => {
-                  applied = true;
-                  dlg.close();
-                  openAdjust?.(ed, i);
-                },
-              }, t('Bild anpassen …')))
-            : null,
-        ]
-      : []),
-  );
+  // Image settings of this layer (only when it holds images). Interval, bidirectional and overscan belong to the
+  // layer: shown here, unless the fill section above already shows them
+  const imageSection = h('div');
+  const renderImage = () => {
+    if (!parts.img) return;
+    const fillShown = vecs && c.mode === 'fill';
+    const kids: (HTMLElement | null)[] = [
+      h('div', { class: 'form-title' }, vecs ? t('Bilder') : t('Bild')),
+      h('div', { class: 'form' }, ...imageLayerFields(ed, i, true, undefined, fillShown ? null : { get: () => c, set: (p) => Object.assign(c, p) })),
+      fillShown ? h('div', { class: 'note' }, t('Zeilenabstand, Bidirektional und Überfahrweg unter „Füllen“ gelten auch für die Bilder.')) : null,
+      openAdjust
+        ? h('div', { class: 'layer-tools' }, h('button', {
+            type: 'button',
+            class: 'btn small',
+            title: t('Helligkeit, Kontrast, Schärfen und Vorschau; die Layer-Einstellungen werden dabei übernommen'),
+            onclick: () => {
+              applied = true;
+              dlg.close();
+              openAdjust?.(ed, i);
+            },
+          }, t('Bild anpassen …')))
+        : null,
+    ];
+    imageSection.replaceChildren(...kids.filter((k): k is HTMLElement => !!k));
+  };
 
   let applied = false;
   const dlg = h(
@@ -277,7 +282,7 @@ export function openLayerDialog(ed: Editor, i: number) {
         class: 'btn',
         title: t('Standardwerte für den gewählten Modus'),
         onclick: () => {
-          if (tab < 0) Object.assign(c, { ...defaultCutSettings(c.mode), sub: subs }, vecs ? {} : IMAGE_LAYER_DEFAULTS);
+          if (tab < 0) Object.assign(c, { ...defaultCutSettings(vecs ? c.mode : 'fill'), mode: c.mode, sub: subs });
           else subs[tab] = { ...defaultSubLayer(subs[tab].mode), output: subs[tab].output } as SubLayer;
           render();
         },
