@@ -854,6 +854,16 @@ dialog::backdrop {
 .offset-dialog {
   margin: 110px 330px auto auto;
 }
+/* Manual layer assignment for groups on several layers (#255) */
+.layer-assign-map th,
+.layer-assign-map td {
+  padding: 3px 6px;
+  text-align: left;
+}
+.layer-assign-map th {
+  color: var(--muted);
+  font-weight: 600;
+}
 dialog {
   background: var(--surface);
   color: var(--text);

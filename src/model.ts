@@ -934,3 +934,53 @@ export function setLayerDeep(o: Obj, layer: number) {
   o.layer = layer;
   if (o.shape.kind === 'group') o.shape.children.forEach((c) => setLayerDeep(c, layer));
 }
+
+/**
+ * Moving a group to another layer (#255): 'all' puts every object in it on the new layer (setLayerDeep),
+ * 'preserve' only those on the group's layer (homeLayer) and keeps the other layers, e.g. an engraving.
+ */
+export type ChildLayers = 'preserve' | 'all';
+
+/** Group whose objects (hidden ones included) are on more than one layer */
+export function mixedLayers(o: Obj): boolean {
+  if (o.shape.kind !== 'group') return false;
+  const layers = new Set<number>();
+  for (const [l] of leaves([o])) layers.add(l.layer);
+  return layers.size > 1;
+}
+
+/** Each group (nested ones too) gets the layer of its first object, like homeLayer; innermost groups first */
+export function syncGroupLayers(o: Obj) {
+  if (o.shape.kind !== 'group') return;
+  o.shape.children.forEach(syncGroupLayers);
+  o.layer = homeLayer(o);
+}
+
+/** Move the objects on the group's layer (homeLayer) to the new layer, keep the others, then sync the group layers */
+export function setLayerPreserving(o: Obj, layer: number) {
+  if (o.shape.kind !== 'group') {
+    o.layer = layer;
+    return;
+  }
+  const from = homeLayer(o);
+  for (const [l] of leaves([o])) if (l.layer === from) l.layer = layer;
+  syncGroupLayers(o);
+}
+
+/** Move an object to a layer, keeping or not the other layers inside groups */
+export const setLayerOf = (o: Obj, layer: number, childLayers: ChildLayers) =>
+  childLayers === 'all' ? setLayerDeep(o, layer) : setLayerPreserving(o, layer);
+
+/** Manual assignment per layer inside groups: old layer → new layer; layers not in the map stay */
+export type LayerMap = Map<number, number>;
+/** What to do with groups on several layers: keep, move all, or a manual map */
+export type LayerChoice = ChildLayers | LayerMap;
+
+/** Every object in the group whose layer is in the map goes to the mapped layer, then sync the group layers */
+export function setLayerMapped(o: Obj, map: LayerMap) {
+  for (const [l] of leaves([o])) {
+    const to = map.get(l.layer);
+    if (to !== undefined) l.layer = to;
+  }
+  syncGroupLayers(o);
+}

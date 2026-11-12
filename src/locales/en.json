@@ -4684,5 +4684,18 @@
   "{where}: Kachelgröße fehlt oder liegt nicht zwischen 0,05 und 5000 mm": "{where}: tile size missing or not between 0.05 and 5000 mm",
   "{where}: Die Kachel ist leer": "{where}: the tile is empty",
   "Ungültiges Muster-Rezept.": "Invalid pattern recipe.",
-  "Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen": "Pattern fill: fill the selected shape with a seamless pattern made from vectors"
+  "Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen": "Pattern fill: fill the selected shape with a seamless pattern made from vectors",
+  "Nur Hauptlayer verschieben": "Move main layer only",
+  "Alle Objekte verschieben": "Move all objects",
+  "Auf Layer {layer} verschieben": "Move to layer {layer}",
+  "{n} Gruppe hat auch Objekte auf anderen Layern, z. B. eine Gravur.": "{n} group also has objects on other layers, e.g. an engraving.",
+  "{n} Gruppen haben auch Objekte auf anderen Layern, z. B. eine Gravur.": "{n} groups also have objects on other layers, e.g. an engraving.",
+  "Was soll auf {layer}?": "What should go to {layer}?",
+  "Layer manuell zuweisen": "Assign layers manually",
+  "Manuell zuweisen …": "Assign manually …",
+  "Für jeden Layer der Auswahl das Ziel wählen.": "Choose the target for each layer in the selection.",
+  "Herkunft": "Source",
+  "Ziel": "Target",
+  "Nur die Objekte auf dem Layer der Gruppe kommen auf {layer}. Die anderen bleiben, z. B. die Gravur.": "Only the objects on the group’s layer go to {layer}. The others stay, e.g. the engraving.",
+  "Alle Objekte der Gruppe kommen auf {layer}.": "All objects of the group go to {layer}."
 }

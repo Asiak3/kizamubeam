@@ -4591,5 +4591,18 @@
   "{where}: Kachelgröße fehlt oder liegt nicht zwischen 0,05 und 5000 mm": "{where}: dimensione della piastrella mancante o non compresa tra 0,05 e 5000 mm",
   "{where}: Die Kachel ist leer": "{where}: la piastrella è vuota",
   "Ungültiges Muster-Rezept.": "Ricetta del motivo non valida.",
-  "Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen": "Riempi con motivo: riempie la forma selezionata con un motivo continuo fatto di vettori"
+  "Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen": "Riempi con motivo: riempie la forma selezionata con un motivo continuo fatto di vettori",
+  "Nur Hauptlayer verschieben": "Sposta solo il livello principale",
+  "Alle Objekte verschieben": "Sposta tutti gli oggetti",
+  "Auf Layer {layer} verschieben": "Sposta sul livello {layer}",
+  "{n} Gruppe hat auch Objekte auf anderen Layern, z. B. eine Gravur.": "{n} gruppo ha anche oggetti su altri livelli, ad es. un’incisione.",
+  "{n} Gruppen haben auch Objekte auf anderen Layern, z. B. eine Gravur.": "{n} gruppi hanno anche oggetti su altri livelli, ad es. un’incisione.",
+  "Was soll auf {layer}?": "Cosa spostare su {layer}?",
+  "Layer manuell zuweisen": "Assegna livelli manualmente",
+  "Manuell zuweisen …": "Assegna manualmente …",
+  "Für jeden Layer der Auswahl das Ziel wählen.": "Scegli la destinazione di ogni livello della selezione.",
+  "Herkunft": "Origine",
+  "Ziel": "Destinazione",
+  "Nur die Objekte auf dem Layer der Gruppe kommen auf {layer}. Die anderen bleiben, z. B. die Gravur.": "Solo gli oggetti sul livello del gruppo passano a {layer}. Gli altri restano, ad es. l’incisione.",
+  "Alle Objekte der Gruppe kommen auf {layer}.": "Tutti gli oggetti del gruppo passano a {layer}."
 }
