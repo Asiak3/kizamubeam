@@ -4,7 +4,7 @@ import { IDENT, leaves, Mat, newId, Obj, Pt, SubPath, translate } from '../model
 import { boundsOf, shapeSubs } from '../geom';
 import { buildGen } from '../generators';
 import { optionsFromParams, paramsFromOptions, PATTERN_GEN, PATTERN_GEN_ID, PatternOptions, runPattern, subsBox, transformSubs } from '../pattern';
-import { parseRecipe, PatternRecipe, PatternSpec, PatternTile } from '../patternFormat';
+import { DEFAULT_PATTERN_SETTINGS, parseRecipe, PatternRecipe, PatternSpec, PatternTile } from '../patternFormat';
 import { t } from '../i18n';
 import type { Editor } from '../editor';
 
@@ -43,6 +43,14 @@ const within = (inner: Obj, outer: Obj, tol = 1e-6) => {
   return !!a && !!b && a.x >= b.x - tol && a.y >= b.y - tol && a.x + a.w <= b.x + b.w + tol && a.y + a.h <= b.y + b.h + tol;
 };
 
+/** A rectangle around all other motif objects becomes the tile frame */
+function markFrame(picks: PatternPick[]) {
+  const motif = picks.filter((p) => p.role === 'motif');
+  if (motif.length < 2) return;
+  const frame = motif.find((p) => p.obj.shape.kind === 'rect' && motif.every((q) => q === p || within(q.obj, p.obj)));
+  if (frame) frame.role = 'frame';
+}
+
 export interface PatternSetup {
   recipe: PatternRecipe;
   /** World position of the object origin (centre of the target box) */
@@ -73,12 +81,24 @@ export class EditorPattern {
       for (const p of picks)
         if (p !== target && (withPattern || (boxOnly(p.obj) && within(p.obj, target.obj)))) p.role = withPattern ? (within(p.obj, target.obj) ? 'hole' : 'ignore') : 'hole';
     }
-    const motif = picks.filter((p) => p.role === 'motif');
-    if (motif.length >= 2) {
-      const frame = motif.find((p) => p.obj.shape.kind === 'rect' && motif.every((q) => q === p || within(q.obj, p.obj)));
-      if (frame) frame.role = 'frame';
-    }
+    markFrame(picks);
     return picks;
+  }
+
+  /**
+   * The selection as a library pattern: a selected pattern object gives its own tile and settings, other
+   * objects become the tile (a rectangle around them is the tile frame) with the default repeat settings.
+   */
+  patternSpecFromSel(this: Editor): PatternSpec | null {
+    const po = this.patternObj();
+    if (po) {
+      const p = this.patternOf(po);
+      return p ? this.patternSpecOf(p.recipe, p.options) : null;
+    }
+    const picks: PatternPick[] = this.doc.objs.filter((o) => this.sel.includes(o)).map((obj) => ({ obj, role: 'motif' }));
+    markFrame(picks);
+    const tile = this.patternTile(picks);
+    return typeof tile === 'string' ? null : { tile, settings: { ...DEFAULT_PATTERN_SETTINGS } };
   }
 
   /** Tile from the motif objects (and the frame, if any), centred on the frame */
