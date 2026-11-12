@@ -1718,13 +1718,12 @@ function imageLayerFields(ed: Editor, i: number, live: boolean, onChange?: () =>
     h('label', {}, t('Zeilenabstand (mm)')), interval,
     h('label', {}, 'DPI'), dpi,
     h('span', { class: 'checks' }, check('negative', t('Negativ')), check('bidirectional', t('Bidirektional'))),
-    ...(live ? [] : [
-      h('label', {}, t('Geschwindigkeit (mm/min)')), num('speed', 1, 100000),
-      h('label', {}, t('Max. Leistung (%)')), num('power', 0, 100),
-      h('label', {}, t('Min. Leistung (%)')), num('minPower', 0, 100),
-      h('label', {}, t('Durchgänge')), num('passes', 1, 100, true),
-      h('label', {}, t('Überfahrweg (%)')), num('overscan', 0, 50),
-    ]),
+    // Also in the "Adjust image" dialog: double-clicking an image layer opens it, so speed and power must be editable there too
+    h('label', {}, t('Geschwindigkeit (mm/min)')), num('speed', 1, 100000),
+    h('label', {}, t('Max. Leistung (%)')), num('power', 0, 100),
+    h('label', {}, t('Min. Leistung (%)')), num('minPower', 0, 100),
+    h('label', {}, t('Durchgänge')), num('passes', 1, 100, true),
+    h('label', {}, t('Überfahrweg (%)')), num('overscan', 0, 50),
   ];
 }
 
