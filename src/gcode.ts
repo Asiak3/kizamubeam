@@ -1173,6 +1173,7 @@ const FLIP = (h: number): Mat => [1, 0, 0, -1, 0, h];
 type CutEntry = Omit<CutSettings, 'air' | 'look' | 'sub'>;
 
 /** Bearbeitungen eines Layers in Ausgabereihenfolge: erst der Layer, dann seine eingeschalteten Sub-Layer */
+/** Bearbeitungen eines Layers in Ausgabereihenfolge: der Layer selbst, dann eingeschaltete Sub-Layer. Durchgänge laufen pro Bearbeitung (#218): Jede Entry beendet ihre eigenen passes, bevor die nächste startet; es gibt keinen globalen Repeat. */
 const entriesOf = (L: Layer): CutEntry[] => [L, ...(L.sub ?? []).filter((s: SubLayer) => s.output)];
 
 /** Bewegungen einer Bearbeitung; pass(p) setzt vor jedem Durchgang den Z-Versatz */
