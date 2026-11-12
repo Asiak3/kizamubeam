@@ -188,6 +188,7 @@
     "lead": "Ein eigenes, kostenloses Programm, das sich wie ein Laser mit FluidNC verhält. Schick deinen Auftrag hin und sieh in Echtzeit zu, wie er graviert und schneidet – ohne Material zu verbrauchen und ohne Risiko für deine Maschine.",
     "b": [
       "Emuliert einen FluidNC-Controller per Telnet (Port 2323) und WebSocket (Port 8181) – KizamuBeam verbindet sich über die Gerätevorlage „KizamuBeam Virtual Machine“, andere Programme als GRBL- oder FluidNC-Netzwerkgerät",
+      "Antwortet auch wie eine Ruida-DSP-Steuerung per UDP (Ports 50200/50207): LightBurn, RDWorks, MeerK40t oder Rayforge können CO2-Aufträge senden, mit Rahmen, Joggen und Status",
       "Fährt mit echter Beschleunigung und Planer: Laufzeit, Rahmen, Referenzfahrt und Fehlermeldungen wie an der Maschine",
       "3D-Ansicht des Bettes mit Lasermodul, Draufsicht in 2D",
       "Material einlegen: Sperrholz, Acryl, Pappe und mehr – Linien brennen sich je nach Leistung und Tempo ein",

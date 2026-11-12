@@ -14,3 +14,9 @@ Third-party components bundled with the app include:
   for sketches with relations. Derived from FreeCAD's Sketcher solver.
   Licensed under the GNU Lesser General Public License, version 2 or later.
   Source: https://github.com/Salusoft89/planegcs
+
+Protocol knowledge used for the Ruida emulation of the KizamuBeam Virtual
+Machine (vm/src-tauri/core/src/ruida.rs, an independent implementation) comes
+from the MeerK40t project (MIT, https://github.com/meerk40t/meerk40t) and the
+Ruida Protocol Analyzer by Steve Isaacs (MIT,
+https://github.com/StevenIsaacs/ruida-protocol-analyzer).

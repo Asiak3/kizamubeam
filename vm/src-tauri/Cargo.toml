@@ -1,6 +1,6 @@
 [package]
 name = "kizamubeam-vm"
-version = "0.4.0"
+version = "0.5.0"
 description = "KizamuBeam Virtual Machine: virtuelle Lasermaschine (GRBL/FluidNC) zum Testen ohne Hardware"
 authors = ["Hanjo Winter"]
 license = "GPL-3.0-or-later"
