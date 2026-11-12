@@ -1397,6 +1397,9 @@ export async function openPreview(ed: Editor, src?: JobSource) {
     ...stat(t('Bereich'), `${(b.x1 - b.x0).toFixed(1)} × ${(b.y1 - b.y0).toFixed(1)} mm`),
     ...stat(t('Bewegungen'), mv.n.toLocaleString(locale)),
     ...(rotaryOn(device) ? stat(t('Drehachse'), t('Achse {axis}, Umfang {c} mm', { axis: device.rotary.axis, c: (Math.PI * device.rotary.objectDiam).toFixed(1) })) : []),
+    ...((job.dedup?.length
+      ? stat(t('Doppelte Linien'), t('{len} mm zusammengefasst', { len: job.dedup.reduce((s, d) => s + d.len, 0).toFixed(1) }))
+      : [])),
   );
   const warn = h('div', { class: 'note' }, ...job.warnings.map((w) => h('div', {}, w)));
   const dlg = h('dialog', { class: 'preview-dialog' },
@@ -1506,6 +1509,21 @@ export async function openPreview(ed: Editor, src?: JobSource) {
       c.lineWidth = 1;
       c.setLineDash([3, 3]);
       c.stroke(rapids);
+      c.setLineDash([]);
+    }
+    // Zusammengefasste Doppel-Linien (Issue #221): gestrichelt orange über der Bahn
+    if (job.dedup?.length) {
+      c.strokeStyle = 'rgba(230,130,0,0.9)';
+      c.lineWidth = Math.max(1.5, Math.min(3.5, view.z * 0.15));
+      c.setLineDash([5, 3]);
+      c.beginPath();
+      for (const d of job.dedup)
+        for (const l of d.lines) {
+          if (l.length < 2) continue;
+          c.moveTo(sx(l[0].x), sy(l[0].y));
+          for (let k = 1; k < l.length; k++) c.lineTo(sx(l[k].x), sy(l[k].y));
+        }
+      c.stroke();
       c.setLineDash([]);
     }
     accN = n;

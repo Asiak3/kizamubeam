@@ -8,6 +8,7 @@ import { loadFont, textToSubs } from './fonts';
 import { nativeScanLines, outputGrid, processImage } from './images';
 import { hasNative, native } from './native';
 import { locale, t, tn } from './i18n';
+import { dedupPolys } from './dedup';
 import { jobOutputsOff, jobOutputsOn } from './fluidnc';
 import { parkedObjs } from './parking';
 
@@ -613,6 +614,8 @@ export interface Job {
   offset: Pt;
   /** Layer, bei denen Air Assist läuft */
   air: number[];
+  /** Zusammengefasste Doppel-Linien je Layer (Bettkoordinaten, für die Vorschau-Markierung) */
+  dedup?: { layer: number; len: number; lines: Pt[][] }[];
 }
 
 export interface JobInput {
@@ -1498,6 +1501,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   };
   const bounds = emptyBox();
   let skippedOpen = 0;
+  const dedupInfo = new Map<number, { len: number; lines: Pt[][] }>();
   for (const [o, world] of laserLeaves(roots)) {
     if (o.reg) continue; // Passermarken nur drucken, nicht lasern
     const L = layerOf(o.layer);
@@ -1532,7 +1536,8 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     const anyLine = ents.some((e) => e.mode === 'line');
     const firstFill = ents.findIndex((e) => e.mode === 'fill');
     b.sets = ents.map((e, k) => {
-      const out: Poly[] = [];
+      const outPush: Poly[] = [];
+      const list: Poly[] = [];
       for (const own of b.objs) {
         let polys = own;
         if (e.mode === 'fill') {
@@ -1541,12 +1546,29 @@ export async function buildJob(inp: JobInput): Promise<Job> {
         }
         // Kerf je Objekt, damit sich benachbarte Objekte nicht zu einer Fläche verbinden
         if (e.kerf) polys = [...polys.filter((p) => !p.closed), ...kerfOffset(polys.filter((p) => p.closed), e.kerf)];
-        for (const p of polys) {
-          out.push(p);
+        for (const p of polys) list.push(p);
+      }
+      // Doppelte Linien beim Export (Issue #221, opt-in pro Bearbeitung): vor Tabs/Perfo/Lead,
+      // damit Stege erst auf der bereinigten Geometrie entstehen und Fix-Starts erhalten bleiben.
+      if (e.mode === 'line' && (e as CutSettings).dedup && list.length > 1) {
+        const r = dedupPolys(list, (e as CutSettings).dedupTol, e.kerf);
+        if (r.len > 0.001) {
+          const cur = dedupInfo.get(li) ?? { len: 0, lines: [] as Pt[][] };
+          cur.len += r.len;
+          for (const l of r.lines) cur.lines.push(l);
+          dedupInfo.set(li, cur);
+        }
+        for (const p of r.polys) {
+          outPush.push(p);
           for (const q of p.pts) addPt(bounds, q.x, q.y);
         }
+        return outPush;
       }
-      return out;
+      for (const p of list) {
+        outPush.push(p);
+        for (const q of p.pts) addPt(bounds, q.x, q.y);
+      }
+      return outPush;
     });
   }
   if (skippedOpen) warnings.push(tn('{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', '{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', skippedOpen));
@@ -1661,7 +1683,13 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     py = mv.y[i];
   }
   const air = order.filter((li) => layerOf(li).air);
-  return { moves: mv, bounds: ob, travel: finite(travel), hull: convexHull(dedupe(hullPts)), warnings, offset, air };
+  const dedup = [...dedupInfo.entries()].map(([layer, d]) => ({ layer, len: d.len, lines: d.lines }));
+  for (const d of dedup) {
+    const L = layerOf(d.layer);
+    const name = (L as { name?: string }).name ?? String(d.layer);
+    warnings.push(t('{len} mm doppelte Linien zusammengefasst (Layer {name}).', { len: d.len < 10 ? d.len.toFixed(2) : d.len.toFixed(1), name }));
+  }
+  return { moves: mv, bounds: ob, travel: finite(travel), hull: convexHull(dedupe(hullPts)), warnings, offset, air, dedup };
 }
 
 function dedupe(pts: Pt[]): Pt[] {
