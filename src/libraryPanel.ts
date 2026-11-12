@@ -11,6 +11,7 @@ import {
   ASSET_CATEGORIES, ASSET_EXT, AssetCategory, AssetData, assetJson, categoryLabel, categoryPlural, parseAsset, parseTags, searchAssets,
 } from './assetFormat';
 import { groupLabel } from './builtinLibrary';
+import { openPatternDialog } from './patternDialog';
 import {
   addToLibrary, hasLibraryFolder, LibraryItem, libraryItems, loadLibraryAsset, onLibraryChanged, openLibraryFolder, reloadLibrary, removeFromLibrary,
   updateLibraryAsset,
@@ -57,7 +58,10 @@ function previewOf(it: LibraryItem): Promise<string> | string | null {
 /** Eintrag aus der Bibliothek einfügen (at: Weltpunkt, sonst Mitte der Ansicht) */
 export async function insertLibraryItem(ed: Editor, key: string, at?: { x: number; y: number }) {
   try {
-    ed.insertAsset(await loadLibraryAsset(key), at);
+    const a = await loadLibraryAsset(key);
+    // a pattern fills the selected shape (pattern fill dialog) instead of being placed as a motif
+    if (a.pattern) openPatternDialog(ed, { pattern: { name: a.name, spec: a.pattern } });
+    else ed.insertAsset(a, at);
   } catch (e) {
     alert(errText(e));
   }
@@ -116,7 +120,9 @@ async function pickFiles(ed: Editor) {
 
 function editDialog(title: string, a: AssetData, okLabel: string, onSave: (a: AssetData) => Promise<void>) {
   const name = h('input', { type: 'text', id: 'asset-name', value: a.name }) as HTMLInputElement;
-  const cat = h('select', { id: 'asset-cat' }, ...ASSET_CATEGORIES.map((c) => h('option', { value: c, selected: c === a.category }, categoryLabel(c)))) as HTMLSelectElement;
+  // patterns stay patterns; other entries cannot become one (they have no repeat settings)
+  const cats = ASSET_CATEGORIES.filter((c) => (c === 'pattern') === !!a.pattern);
+  const cat = h('select', { id: 'asset-cat' }, ...cats.map((c) => h('option', { value: c, selected: c === a.category }, categoryLabel(c)))) as HTMLSelectElement;
   const tags = h('input', { type: 'text', id: 'asset-tags', value: a.tags.join(', '), placeholder: t('z. B. Blume, Ranke, Hochzeit') }) as HTMLInputElement;
   const err = h('div', { class: 'error' });
   const save = async () => {

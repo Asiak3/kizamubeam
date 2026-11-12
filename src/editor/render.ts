@@ -297,6 +297,12 @@ export class EditorRender {
       ctx.lineWidth = 1.2 * px;
       ctx.stroke(subsToPath2D(this.hingePreview));
     }
+    // Preview of the pattern fill
+    if (this.patternPreview) {
+      ctx.strokeStyle = '#ff6020';
+      ctx.lineWidth = 1.2 * px;
+      ctx.stroke(subsToPath2D(this.patternPreview));
+    }
 
     // Offset-Vorschau
     if (this.outlinePreview) {

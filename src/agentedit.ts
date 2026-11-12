@@ -12,6 +12,10 @@ import { BoolOp, OffsetOptions } from './ops';
 import { WARP_KINDS } from './warp';
 import { circularMatrices, DEFAULT_GRID, gridMatrices, GridOptions } from './arrays';
 import { DEFAULT_HINGE, HingeKind, HingeOptions, suggestHinge } from './hinges';
+import { DEFAULT_PATTERN_OPTIONS, PatternOptions } from './pattern';
+import { PATTERN_EDGES, PATTERN_MIRRORS, PATTERN_OUTPUTS, PATTERN_REPEATS, PatternSpec } from './patternFormat';
+import { builtinPatterns } from './patternLibrary';
+import type { PatternPick } from './editor/pattern';
 import { DEFAULT_JOINT, EdgePick, isStraight, JointKind, JointOptions } from './joints';
 import { importSvg, parsePathData, transformSubs } from './importers';
 import { buildDxfText, buildPdfBytes, buildSvg, bytesToBase64, importBytesOrThrow } from './files';
@@ -24,7 +28,7 @@ import { coerce, ParamType, ProjectParam } from './params';
 import { genLeaves } from './editor/generators';
 import { builtinTemplates } from './builtinTemplates';
 import { packTemplates } from './packs';
-import { addToLibrary, loadLibraryAsset } from './assetLibrary';
+import { addToLibrary, libraryItems, loadLibraryAsset } from './assetLibrary';
 import { ASSET_CATEGORIES, AssetCategory, parseTags } from './assetFormat';
 import { defaultTemplate, guessColumns, tableRows, listTemplates, readTemplate, templateFields, templateFileName, templateJson, writeTemplate } from './templates';
 import { DEFAULT_NEST_SETTINGS, NestSettings } from './editor/nest';
@@ -1708,6 +1712,75 @@ export const EDIT_TOOLS: ToolDef[] = [
         if (v !== undefined) opt[k] = v;
       }
       if (!ed.applyHinge(opt)) throw new ToolError(ed.hint);
+      return result(ed, before);
+    },
+  },
+  {
+    name: 'pattern_fill',
+    title: 'Muster füllen',
+    description:
+      'Füllt eine geschlossene Form (target) nahtlos mit einem Muster aus Vektoren, zum Verzieren von Flächen. Kachel: motif = Objekt-ids des Motivs (optional frame = id eines Rechtecks als Kachelrahmen, sonst der Rahmen des Motivs) oder pattern = mitgeliefertes Muster (honeycomb, scales, waves, truchet, rings, diamonds, herringbone, basket, stars, dots, circles, chevron, ogee) bzw. Name eines Musters aus der Bibliothek (dessen Wiederholung wird übernommen, einzelne Werte überschreiben sie). holes: Objekt-ids, deren Fläche frei bleibt (Texte, Bilder, Codes: ihr Rahmen). repeat: grid, brick, halfdrop, mirror, rotate, hex; shift (0–1, Versatz bei brick/halfdrop), mirror (xy, x, y), gap_x/gap_y (mm zwischen den Kacheln), scale (Faktor), angle (Grad gegen den Uhrzeigersinn), offset_x/offset_y (mm, verschiebt das Muster gegen die Mitte der Zielform), wrap (Kanten umbrechen, Standard true), edge: clip (am Rand abschneiden), whole (nur ganze Kacheln), touch (berührende behalten); margin (mm Abstand zum Rand und zu holes), output: lines (Linien, doppelte werden entfernt) oder areas (Flächen für Füll-Layer), dedupe, min_fragment (mm). keep_target (Standard true), remove_motif (Standard false). Das Ergebnis ist ein parametrisches Objekt; später ändern mit edit_generator (gleiche Werte in camelCase, z. B. gapX, offsetX; offsetY dort nach unten positiv).',
+    tier: Tier.Edit,
+    inputSchema: obj({
+      target: { type: 'integer', description: 'id der geschlossenen Form, die gefüllt wird' },
+      motif: { ...IDS, description: 'Objekt-ids des Motivs (Kachel)' },
+      frame: { type: 'integer', description: 'id eines Rechtecks als Kachelrahmen (optional)' },
+      pattern: { type: 'string', description: 'Mitgeliefertes Muster oder Name eines Bibliotheks-Musters (statt motif)' },
+      holes: { ...IDS, description: 'Objekt-ids, deren Fläche frei bleibt' },
+      repeat: { type: 'string', enum: PATTERN_REPEATS }, shift: { type: 'number' }, mirror: { type: 'string', enum: PATTERN_MIRRORS },
+      gap_x: { type: 'number' }, gap_y: { type: 'number' }, scale: { type: 'number' }, angle: { type: 'number' },
+      offset_x: { type: 'number' }, offset_y: { type: 'number' }, wrap: { type: 'boolean' }, edge: { type: 'string', enum: PATTERN_EDGES },
+      margin: { type: 'number' }, output: { type: 'string', enum: PATTERN_OUTPUTS }, dedupe: { type: 'boolean' }, min_fragment: { type: 'number' },
+      keep_target: { type: 'boolean' }, remove_motif: { type: 'boolean' }, layer: LAYER,
+    }, ['target']),
+    run: async (ed, a) => {
+      const before = snapshotIds(ed);
+      const [target] = topObjs(ed, [num(a, 'target', { int: true })]);
+      const picks: PatternPick[] = [{ obj: target, role: 'target' }];
+      const add = (key: string, role: PatternPick['role']) => {
+        if (a[key] === undefined) return;
+        for (const o of topObjs(ed, ids(a, key))) if (!picks.some((p) => p.obj === o)) picks.push({ obj: o, role });
+      };
+      add('motif', 'motif');
+      add('holes', 'hole');
+      if (a.frame !== undefined) picks.push({ obj: topObjs(ed, [num(a, 'frame', { int: true })])[0], role: 'frame' });
+      const o: PatternOptions = { ...DEFAULT_PATTERN_OPTIONS };
+      let spec: PatternSpec | null = null;
+      let name: string | undefined;
+      if (typeof a.pattern === 'string' && a.pattern) {
+        const want = a.pattern.trim().toLowerCase();
+        const b = builtinPatterns().find((p) => p.id === want || p.name.some((n) => n.toLowerCase() === want));
+        if (b) (spec = b.spec), (name = b.name[0]);
+        else {
+          const it = (await libraryItems()).find((x) => x.meta.category === 'pattern' && x.meta.name.toLowerCase() === want);
+          if (!it) throw new ToolError(`Kein Muster „${a.pattern}“ (mitgeliefert: ${builtinPatterns().map((p) => p.id).join(', ')})`);
+          const asset = await loadLibraryAsset(it.key);
+          if (!asset.pattern) throw new ToolError(`„${a.pattern}“ ist kein Muster`);
+          (spec = asset.pattern), (name = asset.name);
+        }
+        Object.assign(o, spec.settings);
+      } else if (!picks.some((p) => p.role === 'motif')) throw new ToolError('motif oder pattern angeben');
+      if (a.repeat !== undefined) o.repeat = oneOf(a, 'repeat', PATTERN_REPEATS);
+      if (a.mirror !== undefined) o.mirror = oneOf(a, 'mirror', PATTERN_MIRRORS);
+      if (a.edge !== undefined) o.edge = oneOf(a, 'edge', PATTERN_EDGES);
+      if (a.output !== undefined) o.output = oneOf(a, 'output', PATTERN_OUTPUTS);
+      o.shift = num(a, 'shift', { def: o.shift, min: 0, max: 1 });
+      o.gapX = num(a, 'gap_x', { def: o.gapX, min: -500, max: 500 });
+      o.gapY = num(a, 'gap_y', { def: o.gapY, min: -500, max: 500 });
+      o.scale = num(a, 'scale', { def: o.scale, min: 0.05, max: 20 });
+      o.angle = num(a, 'angle', { def: o.angle, min: -360, max: 360 });
+      o.offsetX = num(a, 'offset_x', { def: 0 });
+      o.offsetY = -num(a, 'offset_y', { def: 0 });
+      o.margin = num(a, 'margin', { def: o.margin, min: 0, max: 500 });
+      o.minFragment = num(a, 'min_fragment', { def: o.minFragment, min: 0, max: 50 });
+      o.wrap = bool(a, 'wrap', o.wrap);
+      o.dedupe = bool(a, 'dedupe', o.dedupe);
+      const tile = spec ? spec.tile : ed.patternTile(picks);
+      if (typeof tile === 'string') throw new ToolError(tile);
+      const setup = ed.patternSetup(picks, tile, name);
+      if (typeof setup === 'string') throw new ToolError(setup);
+      if (spec && !picks.some((p) => p.role === 'motif')) setup.layer = num(a, 'layer', { def: ed.currentLayer, min: 0, max: 31, int: true });
+      if (!ed.insertPattern(picks, setup, o, bool(a, 'keep_target', true), bool(a, 'remove_motif', false))) throw new ToolError(ed.hint);
       return result(ed, before);
     },
   },

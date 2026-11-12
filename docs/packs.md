@@ -86,9 +86,10 @@ Motifs, images and design elements for the Library window (Window → Library). 
 | --- | --- | --- |
 | `id` | recommended | Short id that stays the same between versions of the pack (otherwise the position in the list) |
 | `name` | yes | Localised name, at most 80 characters |
-| `category` | no | `motif`, `image` or `element` (design element); without it `image` for pure images, otherwise `motif` |
+| `category` | no | `motif`, `image`, `element` (design element) or `pattern` (fill pattern); without it `image` for pure images, otherwise `motif` |
 | `tags` | no | List of localised keywords for the search |
 | `w`, `h` | no | Size in mm, shown in the Library window |
+| `pattern` | for patterns | Fill pattern for Pattern fill: `tile` (`w`, `h` in mm and `subs`, the paths centred on 0, 0) and optional `settings` (`repeat`, `shift`, `mirror`, `gapX`, `gapY`, `scale`, `angle`, `wrap`, `output`) |
 | `objs` | yes | Objects as in a project file (`m` matrix, `layer` 0 to 31, `shape`), best with their bounding box starting at 0, 0 |
 | `images` | for images | Image data by asset id, as `data:image/png;base64,…` (also JPEG, GIF, WebP, BMP); nothing else is accepted |
 | `fill` | no | Layers drawn filled in the preview |

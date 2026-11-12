@@ -1682,6 +1682,25 @@ table.layers td:nth-child(2) {
 .hinge-dialog {
   width: min(440px, 95vw);
 }
+.pattern-dialog {
+  width: min(460px, 95vw);
+}
+.pattern-dialog .form {
+  max-height: min(62vh, 640px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.pattern-dialog .pattern-section {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--line);
+}
+.pattern-dialog .pattern-role-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* KI-Agenten */
 .agent-status {
