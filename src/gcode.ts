@@ -137,7 +137,12 @@ export interface Device {
   /** Job-Ursprung 0 … 8: Zeilen von oben nach unten, je links → rechts */
   jobOrigin: number;
   cutSelected: boolean;
-  optimize: boolean;
+  /** Schnittreihenfolge je Schritt (Issue #222): innere Formen zuerst (Containment-Gatter) … */
+  optInnerFirst: boolean;
+  /** … kurze Leerwege (Nearest-Neighbor + Startknoten-Wahl, Alternative für manuelle Reihenfolge #153) … */
+  optTravel: boolean;
+  /** … Formen einer Gruppe zusammenhängend schneiden (Tie-Break unter gleichrangigen Formen) */
+  optGroup: boolean;
   /** Nach dem Job zum Startpunkt zurückfahren */
   returnHome: boolean;
   homeOnConnect: boolean;
@@ -200,7 +205,9 @@ export const DEFAULT_DEVICE: Device = {
   startFrom: 'absolute',
   jobOrigin: 6,
   cutSelected: false,
-  optimize: true,
+  optInnerFirst: true,
+  optTravel: true,
+  optGroup: false,
   returnHome: true,
   homeOnConnect: false,
   limitSwitches: 'unknown',
@@ -297,7 +304,17 @@ export function loadDevices(): DeviceStore {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const st = JSON.parse(raw) as DeviceStore;
-      st.devices = st.devices.map((d) => ({ ...DEFAULT_DEVICE, ...d, rotary: { ...DEFAULT_ROTARY, ...d.rotary }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset, ...d.pointerOffset } }));
+      st.devices = st.devices.map((d) => {
+        // Einmalige Migration vom alten Einzelschalter (Issue #222): aus = beide Schritte aus
+        const legacy = (d as { optimize?: boolean }).optimize;
+        const migrated = { ...DEFAULT_DEVICE, ...d, rotary: { ...DEFAULT_ROTARY, ...d.rotary }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset, ...d.pointerOffset } };
+        if (legacy === false) {
+          migrated.optInnerFirst = false;
+          migrated.optTravel = false;
+        }
+        delete (migrated as { optimize?: boolean }).optimize;
+        return migrated;
+      });
       if (st.devices.length) {
         if (!st.devices.some((d) => d.id === st.current)) st.current = st.devices[0].id;
         return st;
@@ -305,7 +322,12 @@ export function loadDevices(): DeviceStore {
     }
     // Früher gab es nur ein Gerät
     const old = localStorage.getItem(OLD_KEY);
-    if (old) return { devices: [{ ...DEFAULT_DEVICE, ...JSON.parse(old), id: 'standard', rotary: { ...DEFAULT_ROTARY }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset } }], current: 'standard' };
+    if (old) {
+      const single = JSON.parse(old) as Partial<Device> & { optimize?: boolean };
+      const legacyOff = single.optimize === false;
+      delete single.optimize;
+      return { devices: [{ ...DEFAULT_DEVICE, ...single, id: 'standard', rotary: { ...DEFAULT_ROTARY }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset }, optInnerFirst: legacyOff ? false : (single.optInnerFirst ?? true), optTravel: legacyOff ? false : (single.optTravel ?? true) }], current: 'standard' };
+    }
   } catch {
     /* Standardwerte */
   }
@@ -639,6 +661,8 @@ interface Poly {
   fixed?: boolean;
   /** Loch (liegt in einer ungeraden Zahl anderer Formen): Anschnitt und Auslauf liegen innen */
   hole?: boolean;
+  /** Top-Level-Objekt (Gruppen-ID für „Gruppen zusammenhalten“, Issue #222) */
+  grp?: string | number;
 }
 
 const FLATTEN_TOL = 0.01;
@@ -724,13 +748,68 @@ export function anchorOf(b: Box, k: number): Pt {
  * Optimierte Reihenfolge: Innere Formen vor den umgebenden, sonst immer die nächstgelegene Form.
  * Geschlossene Formen beginnen am nächsten Knoten, offene am näheren Ende.
  */
-function orderPolys(polys: Poly[], from: Pt): Poly[] {
+/** Schritte der Schnittreihenfolge (Issue #222); der Leerweg-Schritt ist der Haken für manuelle Reihenfolge (#153) */
+export interface OrderOpts {
+  /** innere Formen zuerst (Containment-Gatter); aus = Dokumentreihenfolge ohne Vorfahrtsregel */
+  innerFirst: boolean;
+  /** kurze Leerwege (Nearest-Neighbor + Startknoten-Wahl/Umkehr); aus = keine Umsortierung, kein Umdrehen */
+  travel: boolean;
+  /** Formen desselben Top-Level-Objekts bevorzugt nacheinander (Tie-Break, Containment schlägt Kohäsion) */
+  group: boolean;
+}
+
+/** Leerweg-Schritt der Reihenfolge (Nearest-Neighbor); separater Haken für manuelle Reihenfolge (#153) */
+function orderTravel(polys: Poly[], from: Pt, avail: (i: number) => boolean, lastGrp: string | number | undefined): { idx: number; at: number; rev: boolean } {
   const n = polys.length;
+  const boxes = orderBoxes.get(polys) ?? [];
+  let best = -1,
+    bestD = Infinity,
+    bestIdx = 0,
+    bestRev = false,
+    bestSame = false;
+  for (let i = 0; i < n; i++) {
+    if (!avail(i)) continue;
+    const p = polys[i];
+    const same = lastGrp !== undefined && p.grp !== undefined && p.grp === lastGrp;
+    if (best >= 0 && bestSame && !same) continue;
+    const b = boxes[i];
+    // Untergrenze über den Rahmen: weiter entfernte Formen gar nicht erst durchsuchen
+    const dx = Math.max(b.x0 - from.x, 0, from.x - b.x1),
+      dy = Math.max(b.y0 - from.y, 0, from.y - b.y1);
+    if (same === bestSame && dx * dx + dy * dy >= bestD) continue;
+    if (p.fixed) {
+      // gesetzter Startpunkt: nur dort beginnen, Richtung bleibt
+      const d = (p.pts[0].x - from.x) ** 2 + (p.pts[0].y - from.y) ** 2;
+      if (same !== bestSame || d < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [d, i, 0, false, same];
+    } else if (p.closed) {
+      for (let j = 0; j < p.pts.length; j++) {
+        const d = (p.pts[j].x - from.x) ** 2 + (p.pts[j].y - from.y) ** 2;
+        if (same !== bestSame || d < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [d, i, j, false, same];
+      }
+    } else {
+      const a = p.pts[0],
+        e = p.pts[p.pts.length - 1];
+      const da = (a.x - from.x) ** 2 + (a.y - from.y) ** 2,
+        de = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
+      if (same !== bestSame || da < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [da, i, 0, false, same];
+      if (same !== bestSame || de < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [de, i, 0, true, same];
+    }
+  }
+  return { idx: best, at: bestIdx, rev: bestRev };
+}
+
+// Rahmen je Poly-Array für den Leerweg-Schritt (pro Aufruf einmal berechnet)
+const orderBoxes = new WeakMap<readonly Poly[], Box[]>();
+
+function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
+  const n = polys.length;
+  if (!o.innerFirst && !o.travel && !o.group) return polys;
   const boxes = polys.map((p) => {
     const b = emptyBox();
     for (const q of p.pts) addPt(b, q.x, q.y);
     return b;
   });
+  orderBoxes.set(polys, boxes);
   // Für jede Form: wie viele noch ungeschnittene Formen liegen in ihr?
   const pending = new Int32Array(n);
   const containers: number[][] = polys.map(() => []);
@@ -750,48 +829,38 @@ function orderPolys(polys: Poly[], from: Pt): Poly[] {
   const done = new Uint8Array(n);
   const out: Poly[] = [];
   let cur = from;
+  let lastGrp: string | number | undefined;
   for (let k = 0; k < n; k++) {
-    let best = -1,
-      bestD = Infinity,
-      bestIdx = 0,
-      bestRev = false;
-    for (let i = 0; i < n; i++) {
-      if (done[i] || pending[i] > 0) continue;
-      const b = boxes[i];
-      // Untergrenze über den Rahmen: weiter entfernte Formen gar nicht erst durchsuchen
-      const dx = Math.max(b.x0 - cur.x, 0, cur.x - b.x1),
-        dy = Math.max(b.y0 - cur.y, 0, cur.y - b.y1);
-      if (dx * dx + dy * dy >= bestD) continue;
-      const p = polys[i];
-      if (p.fixed) {
-        // gesetzter Startpunkt: nur dort beginnen, Richtung bleibt
-        const d = (p.pts[0].x - cur.x) ** 2 + (p.pts[0].y - cur.y) ** 2;
-        if (d < bestD) [bestD, best, bestIdx, bestRev] = [d, i, 0, false];
-      } else if (p.closed) {
-        for (let j = 0; j < p.pts.length; j++) {
-          const d = (p.pts[j].x - cur.x) ** 2 + (p.pts[j].y - cur.y) ** 2;
-          if (d < bestD) [bestD, best, bestIdx, bestRev] = [d, i, j, false];
-        }
-      } else {
-        const a = p.pts[0],
-          e = p.pts[p.pts.length - 1];
-        const da = (a.x - cur.x) ** 2 + (a.y - cur.y) ** 2,
-          de = (e.x - cur.x) ** 2 + (e.y - cur.y) ** 2;
-        if (da < bestD) [bestD, best, bestIdx, bestRev] = [da, i, 0, false];
-        if (de < bestD) [bestD, best, bestIdx, bestRev] = [de, i, 0, true];
-      }
+    const avail = (i: number) => !done[i] && (!o.innerFirst || pending[i] <= 0);
+    let pick: number, at: number, rev: boolean;
+    if (o.travel) {
+      ({ idx: pick, at, rev } = orderTravel(polys, cur, avail, o.group ? lastGrp : undefined));
+    } else if (o.group && lastGrp !== undefined) {
+      // ohne Leerweg-Optik: Dokumentreihenfolge, bevorzugt aus derselben Gruppe
+      pick = -1;
+      at = 0;
+      rev = false;
+      for (let i = 0; i < n; i++) if (avail(i)) { pick = i; break; }
+      for (let i = 0; i < n; i++)
+        if (avail(i) && polys[i].grp !== undefined && polys[i].grp === lastGrp) { pick = i; break; }
+    } else {
+      pick = -1;
+      at = 0;
+      rev = false;
+      for (let i = 0; i < n; i++) if (avail(i)) { pick = i; break; }
     }
-    if (best < 0) {
+    if (pick! < 0) {
       // Zyklus (sollte nicht vorkommen): Rest in Dokumentreihenfolge
       for (let i = 0; i < n; i++) if (!done[i]) ((done[i] = 1), out.push(polys[i]));
       break;
     }
-    done[best] = 1;
-    for (const c of containers[best]) pending[c]--;
-    const p = polys[best];
-    let q = p.closed && bestIdx ? startAt(p, bestIdx) : p;
-    if (bestRev) q = { pts: [...q.pts].reverse(), closed: false, ...(q.off ? { off: q.off.slice().reverse() } : {}) };
+    done[pick!] = 1;
+    for (const c of containers[pick!]) pending[c]--;
+    const p = polys[pick!];
+    let q = o.travel && p.closed && at ? startAt(p, at) : p;
+    if (o.travel && rev) q = { pts: [...q.pts].reverse(), closed: false, grp: q.grp, ...(q.off ? { off: q.off.slice().reverse() } : {}) };
     out.push(q);
+    lastGrp = q.grp;
     const pts = q.pts;
     const last = p.closed ? pts[0] : pts[pts.length - 1];
     cur = last;
@@ -803,11 +872,11 @@ const midOf = (b: Box): Pt => ({ x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 });
 /** Geschlossene Form ab Punkt k beginnen lassen (Haltestege wandern mit) */
 function startAt(p: Poly, k: number): Poly {
   const pts = p.pts.slice(k).concat(p.pts.slice(0, k));
-  if (!p.off) return { pts, closed: p.closed, fixed: p.fixed, hole: p.hole };
+  if (!p.off) return { pts, closed: p.closed, fixed: p.fixed, hole: p.hole, grp: p.grp };
   const off = new Uint8Array(p.off.length);
   off.set(p.off.subarray(k));
   off.set(p.off.subarray(0, k), p.off.length - k);
-  return { pts, closed: p.closed, off, fixed: p.fixed, hole: p.hole };
+  return { pts, closed: p.closed, off, fixed: p.fixed, hole: p.hole, grp: p.grp };
 }
 
 // ---------- Kerf und Haltestege ----------
@@ -972,7 +1041,7 @@ export function addTabs(p: Poly, T: TabSettings): Poly {
     }
     off.push(inTab((last + d1) / 2) ? 1 : 0);
   }
-  return { pts, closed: true, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole };
+  return { pts, closed: true, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole, grp: p.grp };
 }
 
 /** Haltestege für alle geschlossenen Formen eines Layers; innere Formen auf Wunsch auslassen */
@@ -1176,7 +1245,7 @@ type CutEntry = Omit<CutSettings, 'air' | 'look' | 'sub'>;
 const entriesOf = (L: Layer): CutEntry[] => [L, ...(L.sub ?? []).filter((s: SubLayer) => s.output)];
 
 /** Bewegungen einer Bearbeitung; pass(p) setzt vor jedem Durchgang den Z-Versatz */
-function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v: boolean }, pass: (p: number) => void, optimize: boolean) {
+function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v: boolean }, pass: (p: number) => void, ord: OrderOpts) {
   const s = e.power / 100;
   const passes = Math.max(1, e.passes);
   if (e.mode === 'fill' && e.fillStyle === 'offset') {
@@ -1210,7 +1279,7 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v:
   const sMin = Math.max(0, e.minPower) / 100;
   for (let p = 0; p < passes; p++) {
     pass(p);
-    const order = optimize ? orderPolys(cuts, { x: mv.lastX(), y: mv.lastY() }) : cuts;
+    const order = ord.innerFirst || ord.travel || ord.group ? orderPolys(cuts, { x: mv.lastX(), y: mv.lastY() }, ord) : cuts;
     for (let poly of order) {
       // Nicht in einem Steg beginnen, sonst fährt der Laser ihn zuerst ohne Leistung ab
       if (poly.off?.[0]) poly = startAt(poly, Math.max(0, poly.off.indexOf(0)));
@@ -1296,7 +1365,7 @@ export function perforate(p: Poly, P: PerfSettings): Poly {
     }
   }
   if (!p.closed) pts.push(src[n - 1]);
-  return { pts, closed: p.closed, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole };
+  return { pts, closed: p.closed, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole, grp: p.grp };
 }
 
 /**
@@ -1482,6 +1551,20 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   }
   const toBed = FLIP(doc.bed.h);
 
+  // Top-Level-ID je Blatt für „Gruppen zusammenhalten“ (Issue #222): Blätter desselben
+  // obersten Objekts (inkl. Gruppenkinder) teilen sich die Gruppen-ID.
+  const topOf = new Map<Obj, string | number>();
+  {
+    const walk = (top: Obj, o: Obj) => {
+      if (o.shape.kind === 'group') {
+        for (const c of o.shape.children) walk(top, c);
+        return;
+      }
+      topOf.set(o, top.id);
+    };
+    for (const o of roots) walk(o, o);
+  }
+
   // 1. Geometrie je Layer sammeln (Bettkoordinaten, y nach oben)
   interface Bucket {
     /** Konturen je Objekt (Kerf wird je Objekt gerechnet) */
@@ -1519,10 +1602,12 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     } else subs = shapeSubs(s);
     const M = mul(toBed, world);
     const own: Poly[] = [];
+    const grp = topOf.get(o);
     for (const sp of subs) {
       if (sp.nodes.length < 2) continue;
       const p = flatten(sp, M);
       if (p.pts.length < 2) continue;
+      if (grp !== undefined) p.grp = grp;
       own.push(p);
     }
     if (own.length) bucket(o.layer).objs.push(own);
@@ -1540,7 +1625,13 @@ export async function buildJob(inp: JobInput): Promise<Job> {
           if (!anyLine && k === firstFill) skippedOpen += own.length - polys.length;
         }
         // Kerf je Objekt, damit sich benachbarte Objekte nicht zu einer Fläche verbinden
-        if (e.kerf) polys = [...polys.filter((p) => !p.closed), ...kerfOffset(polys.filter((p) => p.closed), e.kerf)];
+        if (e.kerf) {
+          const open = polys.filter((p) => !p.closed);
+          const koff = kerfOffset(polys.filter((p) => p.closed), e.kerf);
+          // Kerf läuft je Blatt-Objekt: alle Eingänge teilen die Gruppen-ID, sie gilt weiter
+          const g = polys.length && polys.every((p) => p.grp === polys[0].grp) ? polys[0].grp : undefined;
+          polys = [...open, ...koff.map((p) => (g !== undefined ? { ...p, grp: g } : p))];
+        }
         for (const p of polys) {
           out.push(p);
           for (const q of p.pts) addPt(bounds, q.x, q.y);
@@ -1550,6 +1641,30 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     });
   }
   if (skippedOpen) warnings.push(tn('{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', '{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', skippedOpen));
+  if (!device.optInnerFirst) {
+    // „Innere Formen zuerst“ ist aus: warnen, wenn ein Loch nach seiner Außenkontur geschnitten würde (Issue #222)
+    let nested = false;
+    outer: for (const b of buckets.values())
+      for (const set of b.sets) {
+        const closed = set.filter((p) => p.closed);
+        for (let i = 0; i < closed.length && !nested; i++)
+          for (let j = 0; j < closed.length; j++) {
+            if (i === j) continue;
+            const a = closed[i],
+              c = closed[j];
+            let bx = emptyBox();
+            for (const q of a.pts) addPt(bx, q.x, q.y);
+            let by = emptyBox();
+            for (const q of c.pts) addPt(by, q.x, q.y);
+            if (bx.x0 < by.x0 || bx.y0 < by.y0 || bx.x1 > by.x1 || bx.y1 > by.y1) continue;
+            if (pointInPoly(a.pts[0], c.pts) || pointInPoly(midOf(bx), c.pts)) {
+              nested = true;
+              break outer;
+            }
+          }
+      }
+    if (nested) warnings.push(t('„Innere Formen zuerst“ ist aus: Löcher werden ggf. nach ihrer Außenkontur geschnitten und fallen mit dem Reststück.'));
+  }
 
   // 2. Verschiebung nach „Starten ab“
   const jb = finite(bounds);
@@ -1622,7 +1737,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
       if (!useZ && (e.zOffset || e.zStep)) zSkipped = true;
       // Z je Durchgang: erster Durchgang beim Z-Versatz, jeder weitere um zStep tiefer
       const pass = (p: number) => (mv.zCur = useZ ? e.zOffset + p * e.zStep : 0);
-      emitEntry(mv, e, polys, li, flip, pass, device.optimize);
+      emitEntry(mv, e, polys, li, flip, pass, { innerFirst: device.optInnerFirst, travel: device.optTravel, group: device.optGroup });
       mv.zCur = 0;
     });
   }
