@@ -2,6 +2,8 @@ import type { Editor } from './editor';
 import { t } from './i18n';
 import { ContextAction, showEditorMenu, closeEditorMenu } from './contextMenu';
 import { RULER } from './editor/shared';
+import { defaultLayer, homeLayer, layerLabel } from './model';
+import { selectAssembly } from './asmSelect';
 
 export interface ContextCallbacks {
   adjust: () => void; trace: () => void; background: () => void; saveBitmap: () => void | Promise<unknown>;
@@ -37,6 +39,8 @@ export function editorContextGroups(ed: Editor, callbacks: ContextCallbacks, bla
   const common = [isolation, action('cut', t('Ausschneiden'), () => ed.cut(), editable), action('copy', t('Kopieren'), () => ed.copy(), count > 0),
     ...paste, action('duplicate', t('Duplizieren'), () => ed.duplicate(), editable), action('delete', t('Löschen'), () => ed.deleteSel(), editable)];
   const organize = [action('selectall', t('Alles auswählen'), () => ed.selectAll()),
+    ...(ed.selAsms().length ? [action('asm-select', t('Baugruppe auswählen'), () => selectAssembly(ed))] : []),
+    action('layer-objects', t('Objekte dieses Layers auswählen'), () => ed.selectLayerObjects(), count > 0),
     action('group', t('Gruppieren'), () => ed.group(), editable && count > 1),
     action('ungroup', t('Gruppierung aufheben'), () => ed.ungroup(), editable && ed.sel.some((o) => o.shape.kind === 'group')),
     action('lock', t('Auswahl sperren'), () => ed.setObjProps(ed.sel, { locked: true }), editable)];
@@ -62,10 +66,43 @@ export function editorContextGroups(ed: Editor, callbacks: ContextCallbacks, bla
     action('alignl', t('Links ausrichten'), () => ed.align('left'), editable && count > 1),
     action('alignhc', t('Mitten horizontal'), () => ed.align('hcenter'), editable && count > 1)] };
   const stacking: ContextAction = { id: 'stacking', label: t('Reihenfolge'), run: () => {}, items: stackingActions(ed, editable) };
-  return [common, organize, images.length ? imageActions : vectorActions, [arrange, stacking,
+  return [common, organize, moveActions(ed, editable), images.length ? imageActions : vectorActions, [arrange, stacking,
     action('library', t('Zur Bibliothek hinzufügen …'), callbacks.library, count > 0),
     { ...action('no-laser', t('Nicht lasern'), () => ed.toggleNoLaser(), editable), checked: !!count && ed.sel.every((o) => o.noLaser) }],
   [action('preview', t('Vorschau …'), callbacks.preview), windows]];
+}
+
+/** Layers offered by the "move to layer" submenus: the used ones in output order, plus the current one */
+const layerChoices = (ed: Editor): number[] => [...new Set([...ed.layerOrder(), ed.currentLayer])];
+
+/** Ids of the move block; the Objects window shows it at the top and drops it from the copied canvas menu */
+export const MOVE_IDS = new Set(['move-layer', 'asm-layer', 'move-page', 'asm-page']);
+
+/**
+ * "Move to layer / page" for the selection, each followed by the same for the whole assembly when the selection
+ * holds assembly parts. Shared by the canvas menu and the Objects window.
+ */
+export function moveActions(ed: Editor, editable: boolean): ContextAction[] {
+  const sel = ed.sel, asms = ed.selAsms();
+  const item = (id: string, label: string, run: ContextAction['run'], enabled = true, checked = false): ContextAction =>
+    ({ id, label, run, enabled: editable && enabled, checked });
+  const layerItems = (prefix: string, assign: (i: number) => void, on: (i: number) => boolean): ContextAction[] => {
+    const free = ed.freeLayer(ed.currentLayer);
+    // Read without ed.layer(): opening the menu must not store settings for the empty layer
+    const name = (i: number) => `${layerLabel(i)} · ${(ed.doc.layers[i] ?? defaultLayer(i)).name}`;
+    return [...layerChoices(ed).map((i) => item(`${prefix}:${i}`, name(i), () => assign(i), true, on(i))),
+      item(`${prefix}:empty`, t('Leerer Layer: {layer}', { layer: free < 0 ? '–' : name(free) }), () => assign(free), free >= 0)];
+  };
+  const out: ContextAction[] = [{ id: 'move-layer', label: t('Auf Layer verschieben'), run: () => {},
+    items: layerItems('layer', (i) => ed.assignLayer(i), (i) => sel.every((o) => homeLayer(o) === i)) }];
+  if (asms.length) out.push({ id: 'asm-layer', label: t('Baugruppe auf Layer verschieben'), run: () => {},
+    items: layerItems('asm-layer', (i) => ed.assignAsmLayer(asms, i), (i) => ed.asmOnLayer(asms, i)) });
+  if (ed.doc.pages.length > 1) out.push({ id: 'move-page', label: t('Auf Seite verschieben'), run: () => {},
+    items: ed.doc.pages.map((p, i) => item(`page:${i}`, p.name, () => ed.moveToPage(sel, i), i !== ed.doc.page)) });
+  if (asms.length) out.push({ id: 'asm-page', label: t('Baugruppe auf Seite verschieben'), run: () => {},
+    items: [...ed.doc.pages.map((p, i) => item(`asm-page:${i}`, p.name, () => ed.moveAsmToPage(asms, i), !ed.asmOnPage(asms, i), ed.asmOnPage(asms, i))),
+      item('asm-page:new', t('Neue Seite'), () => ed.moveAsmToPage(asms, 'new'))] });
+  return out;
 }
 
 /** Stacking order commands; shared by the canvas menu, the Objects window and the main menu. No default shortcuts. */
@@ -90,7 +127,9 @@ export function openEditorContextMenu(ed: Editor, x: number, y: number, groups: 
       catch (error) { ed.hint = error instanceof Error ? error.message : String(error); ed.emit('tool'); }
     } }));
   let close: () => void;
-  const changed = () => close?.();
+  // Pointer moves, zoom and panning only emit 'view'; they must not close the menu when the pointer leaves it.
+  // Real changes still close it, and the guard above refuses actions after any change of document or selection.
+  const changed = (what: 'doc' | 'sel' | 'view' | 'tool') => { if (what !== 'view') close?.(); };
   close = showEditorMenu(x, y, groups.map(guard), () => ed.off(changed));
   ed.on(changed);
 }

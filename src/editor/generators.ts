@@ -4,7 +4,7 @@ import { defaultCutSettings, GenShape, IDENT, leaves, mul, newAsmId, newId, Obj,
 import { boundsOf, type Box } from '../geom';
 import { BuildResult, GenPart, genLabel, getGenerator, normalizeParams } from '../generators';
 import type { PlanSheet } from '../generators/types';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 import type { Editor } from '../editor';
 import { findFreeSpot, fitsArea } from '../placement';
 import { DEFAULT_NEST_SETTINGS } from './nest';
@@ -31,6 +31,46 @@ interface Member {
   list: Obj[];
 }
 
+/** Oberstes Objekt einer Seite, das Teile einer Baugruppe enthält, und wie viele */
+export interface AsmTop {
+  top: Obj;
+  page: number;
+  parts: number;
+}
+
+/** Wo die Teile von Baugruppen liegen und ob sie sich auswählen lassen (Baugruppe auswählen, #237) */
+export interface AsmStatus {
+  /** Auf dieser Seite und auswählbar */
+  ready: AsmTop[];
+  /** Auf dieser Seite, nur durch eigenes Ausblenden oder Sperren nicht auswählbar */
+  hidden: AsmTop[];
+  /** Auf anderen Seiten */
+  away: AsmTop[];
+  /** Nicht auswählbar wegen Layer, Bedingung oder Isolation; bleiben, wie sie sind */
+  blocked: AsmTop[];
+}
+
+/** Anzahl der Teile in den Einträgen */
+export const asmParts = (list: AsmTop[]) => list.reduce((n, x) => n + x.parts, 0);
+
+const isAsmPart = (o: Obj, asms: Set<string>) => o.shape.kind === 'gen' && !!o.shape.asm && asms.has(o.shape.asm);
+const countAsmParts = (o: Obj, asms: Set<string>) => [...leaves([o])].filter(([l]) => isAsmPart(l, asms)).length;
+
+/** Kopie bzw. Änderung: Ausblenden der Teile und der Gruppen um sie herum aufheben, oben auch das Sperren */
+function revealed(o: Obj, asms: Set<string>, top = true): Obj {
+  const c: Obj = { ...o };
+  delete c.hidden;
+  if (top) delete c.locked;
+  if (c.shape.kind === 'group')
+    c.shape = { ...c.shape, children: c.shape.children.map((x) => (countAsmParts(x, asms) ? revealed(x, asms, false) : x)) };
+  return c;
+}
+function reveal(o: Obj, asms: Set<string>, top = true) {
+  delete o.hidden;
+  if (top) delete o.locked;
+  if (o.shape.kind === 'group') for (const x of o.shape.children) if (countAsmParts(x, asms)) reveal(x, asms, false);
+}
+
 export class EditorGenerators {
   selGens(this: Editor): Obj[] {
     return this.sel.filter((o) => o.shape.kind === 'gen');
@@ -47,6 +87,123 @@ export class EditorGenerators {
     for (const pg of this.doc.pages) walk(pg.objs);
     return out;
   }
+  /** Kennungen der Baugruppen, zu denen ausgewählte Teile gehören */
+  selAsms(this: Editor): string[] {
+    return [...new Set(genLeaves(this.sel).map((o) => (o.shape as GenShape).asm).filter((a): a is string => !!a))];
+  }
+  /** Namen der Baugruppen, z. B. „Box 200 × 150 × 100“ */
+  asmLabel(this: Editor, asms: string[]): string {
+    return asms.map((a) => this.asmMembers(a)[0]).filter((m) => !!m).map((m) => groupLabel(m.o.shape as GenShape)).join(', ');
+  }
+  /** Teile der Baugruppen nach ihrem obersten Objekt einordnen: auswählbar, ausgeblendet/gesperrt, andere Seite, blockiert */
+  asmStatus(this: Editor, asms: string[]): AsmStatus {
+    const set = new Set(asms);
+    const st: AsmStatus = { ready: [], hidden: [], away: [], blocked: [] };
+    this.doc.pages.forEach((pg, page) => {
+      for (const top of pg.objs) {
+        const parts = countAsmParts(top, set);
+        if (!parts) continue;
+        const entry = { top, page, parts };
+        if (page !== this.doc.page) st.away.push(entry);
+        else if (this.selectable(top)) st.ready.push(entry);
+        else if (this.selectable(revealed(top, set))) st.hidden.push(entry);
+        else st.blocked.push(entry);
+      }
+    });
+    return st;
+  }
+  /**
+   * Alle Teile der Baugruppen auf dieser Seite auswählen (das oberste Objekt, wie bei „Objekte dieses Layers auswählen“).
+   * bring: vorher Teile anderer Seiten an dieselbe Stelle dieser Seite holen und ihr Ausblenden/Sperren aufheben.
+   * Layer bleiben, wie sie sind. Gibt die Zahl der nicht ausgewählten Teile zurück.
+   */
+  selectAsm(this: Editor, asms: string[], bring = false): number {
+    const set = new Set(asms);
+    const st = this.asmStatus(asms);
+    const total = asmParts([...st.ready, ...st.hidden, ...st.away, ...st.blocked]);
+    if (bring && (st.hidden.length || st.away.length)) {
+      this.snapshot(t('Teile der Baugruppe zusammenholen'));
+      for (const { top, page } of st.away) {
+        const list = this.doc.pages[page].objs;
+        list.splice(list.indexOf(top), 1);
+        this.doc.objs.push(top);
+      }
+      for (const { top } of [...st.hidden, ...st.away]) reveal(top, set);
+      this.emit('doc');
+    }
+    const picked = this.doc.objs.filter((o) => this.selectable(o) && countAsmParts(o, set) > 0);
+    this.setSel(picked);
+    const missing = total - picked.reduce((n, o) => n + countAsmParts(o, set), 0);
+    if (missing) {
+      this.hint = tn('{n} Teil der Baugruppe ist nicht ausgewählt (andere Seite, ausgeblendet, gesperrt oder außerhalb der Isolation).',
+        '{n} Teile der Baugruppe sind nicht ausgewählt (andere Seite, ausgeblendet, gesperrt oder außerhalb der Isolation).', missing);
+      this.emit('tool');
+    }
+    return missing;
+  }
+  /**
+   * Alle Teile der Baugruppen auf allen Seiten auf einen Layer legen, ohne sie auszuwählen.
+   * Die Gravur (z. B. Teilnummer) bleibt auf ihrem Layer; die Gruppe aus Teil und Gravur folgt dem Teil.
+   */
+  assignAsmLayer(this: Editor, asms: string[], layer: number) {
+    const set = new Set(asms);
+    const parts: [Obj, Obj | null][] = [];
+    const walk = (list: Obj[], parent: Obj | null) => {
+      for (const o of list) {
+        if (o.shape.kind === 'group') walk(o.shape.children, o);
+        else if (isAsmPart(o, set)) parts.push([o, parent]);
+      }
+    };
+    for (const pg of this.doc.pages) walk(pg.objs, null);
+    if (!parts.length || parts.every(([o]) => o.layer === layer)) return;
+    this.snapshot(t('Layer zuweisen'));
+    for (const [o, parent] of parts) {
+      o.layer = layer;
+      if (parent && isMarkGroup(parent)) parent.layer = layer;
+    }
+    this.layer(layer);
+    this.emit('doc');
+  }
+  /** Oberste Objekte mit Teilen der Baugruppen, auf allen Seiten */
+  asmTops(this: Editor, asms: string[]): { top: Obj; page: number }[] {
+    const set = new Set(asms);
+    const out: { top: Obj; page: number }[] = [];
+    this.doc.pages.forEach((pg, page) => {
+      for (const top of pg.objs) if (countAsmParts(top, set)) out.push({ top, page });
+    });
+    return out;
+  }
+  /** Liegen alle Teile der Baugruppen auf dieser Seite? (Häkchen im Menü) */
+  asmOnPage(this: Editor, asms: string[], page: number): boolean {
+    const tops = this.asmTops(asms);
+    return tops.length > 0 && tops.every((x) => x.page === page);
+  }
+  /**
+   * Alle Teile der Baugruppen (mit ihrem obersten Objekt, an derselben Stelle) auf eine Seite verschieben.
+   * 'new': neue Seite hinter der aktuellen anlegen und zu ihr wechseln, wie beim Hinzufügen einer Seite.
+   * Landen die Teile auf der aktuellen Seite, werden sie ausgewählt.
+   */
+  moveAsmToPage(this: Editor, asms: string[], target: number | 'new') {
+    const tops = this.asmTops(asms);
+    if (!tops.length || (target !== 'new' && (!this.doc.pages[target] || tops.every((x) => x.page === target)))) return;
+    this.snapshot(t('Baugruppe auf Seite verschieben'));
+    const moving = target === 'new' ? tops : tops.filter((x) => x.page !== target);
+    for (const { top, page } of moving) {
+      const list = this.doc.pages[page].objs;
+      list.splice(list.indexOf(top), 1);
+    }
+    const dest = target === 'new' ? this.insertPage() : target;
+    this.doc.pages[dest].objs.push(...moving.map((x) => x.top));
+    const set = new Set(asms);
+    if (dest === this.doc.page) this.setSel(this.doc.objs.filter((o) => this.selectable(o) && countAsmParts(o, set) > 0));
+    else this.setSel(this.sel.filter((o) => this.doc.objs.includes(o)));
+    this.emit('doc');
+  }
+  /** Liegen alle Teile der Baugruppen auf diesem Layer? (Häkchen im Menü) */
+  asmOnLayer(this: Editor, asms: string[], layer: number): boolean {
+    const members = asms.flatMap((a) => this.asmMembers(a));
+    return members.length > 0 && members.every((m) => m.o.layer === layer);
+  }
   /**
    * Erzeugte Teile mittig in der sichtbaren Fläche auf dem aktuellen Layer einfügen (lokaler Ursprung = Teilmitte).
    * Teile einer Baugruppe werden einzelne Objekte mit gemeinsamer Kennung, damit sie zusammen neu berechnet werden.
@@ -57,14 +214,22 @@ export class EditorGenerators {
    */
   markLayer(this: Editor, cut: number): number {
     for (const pg of this.doc.pages) for (const [o] of leaves(pg.objs)) if (o.shape.kind === 'path' && o.shape.mark) return o.layer;
-    const used = new Set<number>();
-    for (const pg of this.doc.pages) for (const [o] of leaves(pg.objs)) used.add(o.layer);
-    let i = -1;
-    for (let k = 0; k < 30 && i < 0; k++) if (k !== cut && !used.has(k) && !this.doc.layers[k]) i = k;
-    for (let k = 0; k < 30 && i < 0; k++) if (k !== cut && !used.has(k)) i = k;
+    const i = this.freeLayer(cut, true);
     if (i < 0) return cut;
     Object.assign(this.layer(i), defaultCutSettings('line'), { mode: 'line', speed: 3000, power: 15, name: t('Beschriftung'), output: true });
     return i;
+  }
+  /**
+   * Niedrigster Layer 00–29, den kein Objekt auf irgendeiner Seite benutzt (leerer Layer); -1, wenn keiner frei ist.
+   * exclude: diesen Layer nicht nehmen. fresh: einen ohne gespeicherte Einstellungen bevorzugen (für die Gravur,
+   * deren Einstellungen danach gesetzt werden).
+   */
+  freeLayer(this: Editor, exclude = -1, fresh = false): number {
+    const used = new Set<number>();
+    for (const pg of this.doc.pages) for (const [o] of leaves(pg.objs)) used.add(o.layer);
+    if (fresh) for (let k = 0; k < 30; k++) if (k !== exclude && !used.has(k) && !this.doc.layers[k]) return k;
+    for (let k = 0; k < 30; k++) if (k !== exclude && !used.has(k)) return k;
+    return -1;
   }
   /** Teil (lokal, m = Lage) mit seiner Gravur zu einer Gruppe verbinden; ohne Gravur bleibt es, wie es ist */
   withMark(this: Editor, part: Obj, marks: SubPath[] | undefined, markLayer: number): Obj {
