@@ -17,6 +17,7 @@ import { Tool, RULER, CANVAS_THEMES, HANDLE_OFF, Drag, NodeHover, SegHover, TOOL
 import { EditorCommands } from './editor/commands';
 import { EditorDocument } from './editor/document';
 import { EditorHinges } from './editor/hinges';
+import { EditorPattern } from './editor/pattern';
 import { EditorImages } from './editor/imageops';
 import { EditorJoints } from './editor/joints';
 import { EditorKeyboard } from './editor/keyboard';
@@ -194,6 +195,8 @@ export class Editor {
   // Biegeschnitte (Living Hinges)
   /** Vorschau der Biegeschnitte (Welt) */
   hingePreview: SubPath[] | null = null;
+  /** Preview of the pattern fill (world) */
+  patternPreview: SubPath[] | null = null;
 
   // In Pfad umwandeln, Boolesche Operationen, Offset und Arrays
   /** Basis bei Booleschen Operationen: zuerst gewähltes, hinterstes oder vorderstes Objekt */
@@ -556,6 +559,7 @@ export interface Editor
     EditorShapeOps,
     EditorJoints,
     EditorHinges,
+    EditorPattern,
     EditorCommands,
     EditorObjects,
     EditorText,
@@ -591,6 +595,7 @@ const PARTS = [
   EditorShapeOps,
   EditorJoints,
   EditorHinges,
+  EditorPattern,
   EditorCommands,
   EditorObjects,
   EditorText,

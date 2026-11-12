@@ -23,6 +23,8 @@ import { cameraOverlaysVisible, toggleCameraOverlays } from './cameraOverlayVisi
 import { openBackgroundDialog } from './bgDialog';
 import { openJointDialog } from './jointDialog';
 import { openHingeDialog } from './hingeDialog';
+import { openPatternDialog } from './patternDialog';
+import { PATTERN_GEN_ID } from './pattern';
 import { openSlotDialog } from './slotDialog';
 import { openSlotPlacementDialog } from './slotPlacementDialog';
 import { isSlotGenerator } from './slotPlacement';
@@ -200,7 +202,7 @@ export function buildUI(ed: Editor) {
   onMeshReady(() => ed.emit('doc'));
   ed.onGridArray = () => openGridArrayDialog(ed);
   ed.onBarcodeEdit = (o) => editBarcode(ed, o);
-  ed.onGenEdit = (o) => (o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
+  ed.onGenEdit = (o) => (o.shape.kind === 'gen' && o.shape.gen === PATTERN_GEN_ID ? openPatternDialog(ed, { edit: o }) : o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
   installSketchPanel(ed);
   ed.onGenGuard = askGenConvert;
   ed.onJointDialog = () => openJointDialog(ed);
@@ -1129,6 +1131,7 @@ function buildBars(ed: Editor) {
     { id: 'circarray', cat: M, icon: 'circArray', label: t('Kreisarray: Auswahl im Kreis um einen Mittelpunkt kopieren'), run: () => openCircularArrayDialog(ed), enabled: sel1 },
     { id: 'nest', cat: M, icon: 'nest', label: t('Verschachteln: Auswahl mit ihren echten Konturen platzsparend auf Bett, Material oder Reststück legen'), run: () => openNestDialog(ed), enabled: sel1 },
     { id: 'hinge', cat: M, icon: 'hinge', label: t('Biegeschnitte (Living Hinge): gewählte Form mit einem Schnittmuster füllen, damit sich die Platte dort biegen lässt'), run: () => openHingeDialog(ed) },
+    { id: 'patternfill', cat: M, icon: 'pattern', label: t('Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen'), run: () => openPatternDialog(ed), enabled: sel1 },
     { id: 'adjust', cat: I, icon: 'adjust', label: t('Bild anpassen …'), run: () => openAdjustDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'trace', cat: I, icon: 'trace', label: t('Bild nachzeichnen (Alt+T)'), run: () => openTraceDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'addpage', cat: S, short: t('+ Seite'), label: t('Neue Seite'), run: () => ed.addPage() },

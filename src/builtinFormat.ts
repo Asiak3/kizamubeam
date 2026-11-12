@@ -28,6 +28,7 @@ export const GROUPS: Record<string, { de: string; en: string }> = {
   badges: { de: 'Abzeichen', en: 'Badges' },
   banners: { de: 'Banner & Schilder', en: 'Banners & labels' },
   patterns: { de: 'Muster', en: 'Patterns' },
+  fillpatterns: { de: 'Füllmuster', en: 'Fill patterns' },
   shapes: { de: 'Formen', en: 'Shapes' },
 };
 

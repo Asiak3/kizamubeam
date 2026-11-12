@@ -49,6 +49,7 @@
     "test:3d": "node scripts/run-ts.mjs scripts/view3d-test.ts",
     "test:nest": "node scripts/run-ts.mjs scripts/nest-test.ts",
     "test:boolean": "node scripts/run-ts.mjs scripts/boolean-test.ts",
+    "test:pattern": "node scripts/run-ts.mjs scripts/pattern-test.ts",
     "test:warp": "node scripts/run-ts.mjs scripts/warp-test.ts",
     "test:check": "node scripts/run-ts.mjs scripts/check-test.ts",
     "test:slots": "node scripts/run-ts.mjs scripts/slots-test.ts",
