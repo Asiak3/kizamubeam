@@ -5,6 +5,7 @@
     <xhtml:link rel="alternate" hreflang="de" href="https://negurvulkan.github.io/kizamubeam/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://negurvulkan.github.io/kizamubeam/en/"/>
     <xhtml:link rel="alternate" hreflang="it" href="https://negurvulkan.github.io/kizamubeam/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://negurvulkan.github.io/kizamubeam/pt/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://negurvulkan.github.io/kizamubeam/"/>
   </url>
   <url>
@@ -12,6 +13,7 @@
     <xhtml:link rel="alternate" hreflang="de" href="https://negurvulkan.github.io/kizamubeam/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://negurvulkan.github.io/kizamubeam/en/"/>
     <xhtml:link rel="alternate" hreflang="it" href="https://negurvulkan.github.io/kizamubeam/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://negurvulkan.github.io/kizamubeam/pt/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://negurvulkan.github.io/kizamubeam/"/>
   </url>
   <url>
@@ -19,6 +21,15 @@
     <xhtml:link rel="alternate" hreflang="de" href="https://negurvulkan.github.io/kizamubeam/"/>
     <xhtml:link rel="alternate" hreflang="en" href="https://negurvulkan.github.io/kizamubeam/en/"/>
     <xhtml:link rel="alternate" hreflang="it" href="https://negurvulkan.github.io/kizamubeam/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://negurvulkan.github.io/kizamubeam/pt/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://negurvulkan.github.io/kizamubeam/"/>
+  </url>
+  <url>
+    <loc>https://negurvulkan.github.io/kizamubeam/pt/</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://negurvulkan.github.io/kizamubeam/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://negurvulkan.github.io/kizamubeam/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://negurvulkan.github.io/kizamubeam/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://negurvulkan.github.io/kizamubeam/pt/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://negurvulkan.github.io/kizamubeam/"/>
   </url>
 </urlset>

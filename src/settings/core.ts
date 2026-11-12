@@ -47,7 +47,7 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
     note: appNote,
     fields: [
       {
-        kind: 'select', id: 'general.lang', label: t('Sprache'), keywords: 'language lingua idioma', late: true, def: 'system',
+        kind: 'select', id: 'general.lang', label: t('Sprache'), keywords: 'language lingua idioma português portuguese', late: true, def: 'system',
         options: () => [['system', t('Wie System|Sprache')], ...LANGUAGES],
         get: () => langPref(),
         set: (v) => hooks.setLanguage(v as LangPref),

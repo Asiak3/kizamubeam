@@ -132,7 +132,7 @@
         "Machine actions from agents only start after you confirm – pause and stop always work",
         "Extensions (.kzp) add device presets, templates, materials and motifs – no app update, data only, no code",
         "Transfer settings, devices and libraries as a file or sync them between computers through your own folder (iCloud, Dropbox, Nextcloud)",
-        "Interface in English, German and Italian; new languages are easy to add",
+        "Interface in English, German, Italian, Spanish and Portuguese; new languages are easy to add",
         "GPL-3.0-or-later, open JSON file formats, built with Tauri 2, TypeScript and Rust",
         "Formerly “Laserwerk”: settings, devices and materials carry over, old projects still open"
       ]

@@ -13,7 +13,7 @@ There are four things that can be translated. They are independent of each other
 
 The app matters most. The other three are welcome too, but it's perfectly fine to translate only the app.
 
-Currently available: **German** (the original), **English**, **Italian** and **Spanish**.
+Currently available: **German** (the original), **English**, **Italian**, **Spanish** and **Brazilian Portuguese**.
 
 ## Before you start
 
@@ -157,7 +157,7 @@ A new website language needs a bit more than the app:
 1. Copy `website/i18n/en.json` to `website/i18n/<code>.json` and translate the values. Set `"lang"`, `"locale"` (e.g. `fr_FR`) and `"ui" → "lang_current"` (the language's own name).
 2. Add an entry to `LANGS` in `website/build.mjs`, for example `{ code: 'fr', name: 'Français', path: 'fr/' }`.
 3. Add the new page and its `hreflang` links to `website/sitemap.xml`.
-4. Optional: the automatic redirect for first-time visitors (`REDIRECT` in `website/build.mjs`) currently knows only Italian and English; extend it if you like, or leave it to the maintainers.
+4. Optional: the automatic redirect for first-time visitors (`REDIRECT` in `website/build.mjs`) currently knows Italian, Portuguese and English; extend it if you like, or leave it to the maintainers.
 5. Run `node website/build.mjs` and commit everything, including the new `website/<code>/index.html`.
 
 If this sounds too technical, just translate the JSON file and say so in the pull request; the maintainers will wire it up.
