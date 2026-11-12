@@ -1510,8 +1510,6 @@ function openOffsetDialog(ed: Editor) {
 
 function buildLayers(ed: Editor) {
   const root = $('#layers');
-  /** Gewählter Eintrag: Vektoren oder Bilder des aktiven Layers */
-  let part: 'vec' | 'img' = 'vec';
   const render = () => {
     const used = ed.layerOrder();
     if (ed.activeLayer === null || !used.includes(ed.activeLayer)) ed.activeLayer = used[0] ?? null;
@@ -1525,30 +1523,27 @@ function buildLayers(ed: Editor) {
       { class: 'layers' },
       h('tr', {}, ...[t('Nr.'), t('Layer'), t('Modus'), t('Speed'), t('Leist.'), t('Air'), t('Aus'), t('Zeig.')].map((s) => h('th', {}, s))),
     );
-    const partsOf = new Map(used.map((i) => [i, ed.layerParts(i)]));
-    const ap = partsOf.get(ed.activeLayer!)!;
-    if (part === 'img' && !ap.img) part = 'vec';
-    if (part === 'vec' && !ap.vec && ap.img) part = 'img';
+    // One row per layer: images on it use the same settings as its shapes
     for (const i of used) {
       const L = ed.layer(i);
-      const parts = partsOf.get(i)!;
-      const rows: ('vec' | 'img')[] = [];
-      if (parts.vec) rows.push('vec');
-      if (parts.img) rows.push('img');
-      for (const p of rows) {
-        const isImg = p === 'img';
-        const mode = isImg
-          ? h('span', { class: 'mode-img', title: t('Bilder dieses Layers') }, t('Bild'))
-          : h('select', { onchange: (e: Event) => ed.updateLayer(i, { mode: (e.target as HTMLSelectElement).value as Layer['mode'] }) },
-              h('option', { value: 'line', selected: L.mode === 'line' }, t('Linie')),
-              h('option', { value: 'fill', selected: L.mode === 'fill' }, t('Füllen')),
-            );
+      const parts = ed.layerParts(i);
+      {
+        const imgTag = h('span', { class: 'mode-img', title: t('Auf diesem Layer liegen Bilder; sie nutzen dieselben Einstellungen') }, parts.vec ? t('+ Bild') : t('Bild'));
+        const mode = h('span', { class: 'mode-cell' },
+          parts.vec || !parts.img
+            ? h('select', { onchange: (e: Event) => ed.updateLayer(i, { mode: (e.target as HTMLSelectElement).value as Layer['mode'] }) },
+                h('option', { value: 'line', selected: L.mode === 'line' }, t('Linie')),
+                h('option', { value: 'fill', selected: L.mode === 'fill' }, t('Füllen')),
+              )
+            : null,
+          parts.img ? imgTag : null,
+        );
         const out = h('input', { type: 'checkbox', checked: L.output, onchange: (e: Event) => ed.updateLayer(i, { output: (e.target as HTMLInputElement).checked }) });
         const show = h('input', { type: 'checkbox', checked: L.show, onchange: (e: Event) => ed.updateLayer(i, { show: (e.target as HTMLInputElement).checked }) });
         const air = h('input', { type: 'checkbox', checked: L.air, title: t('Air Assist'), onchange: (e: Event) => ed.updateLayer(i, { air: (e.target as HTMLInputElement).checked }) });
         const row = h(
           'tr',
-          { class: ed.activeLayer === i && part === p ? 'active' : '', title: t('Doppelklick: Layer-Einstellungen') },
+          { class: ed.activeLayer === i ? 'active' : '', title: t('Doppelklick: Layer-Einstellungen') },
           h('td', {}, h('span', { class: 'swatch', style: `background:${PALETTE[i]}` }, layerLabel(i))),
           h('td', {}, L.name),
           h('td', {}, mode),
@@ -1562,7 +1557,6 @@ function buildLayers(ed: Editor) {
           if ((e.target as HTMLElement).closest('select,input')) return;
           ed.activeLayer = i;
           ed.currentLayer = i;
-          part = p;
           render();
           ed.emit('tool');
         });
@@ -1587,6 +1581,7 @@ function buildLayers(ed: Editor) {
       ),
     );
     const L = ed.layer(a);
+    const ap = ed.layerParts(a);
     const name = h('input', { type: 'text', value: L.name, onchange: (e: Event) => ed.updateLayer(a, { name: (e.target as HTMLInputElement).value }) });
     const head = [h('label', {}, h('span', { class: 'swatch', style: `background:${PALETTE[a]}` }, layerLabel(a)), ' ', t('Name')), name];
     const num = (key: 'speed' | 'power' | 'minPower' | 'passes' | 'interval', min: number, max: number, int = false) => {
@@ -1606,18 +1601,19 @@ function buildLayers(ed: Editor) {
         h('label', {}, t('Max. Leistung (%)')), num('power', 0, 100),
         h('label', {}, t('Min. Leistung (%)')), num('minPower', 0, 100),
         h('label', {}, t('Durchgänge')), num('passes', 1, 100, true),
-        ...(L.mode === 'fill' && part === 'vec' ? [h('label', {}, t('Zeilenabstand (mm)')), num('interval', 0.01, 5)] : []),
+        ...(L.mode === 'fill' && ap.vec ? [h('label', {}, t('Zeilenabstand (mm)')), num('interval', 0.01, 5)] : []),
         h('span', { class: 'checks' },
           h('label', { class: 'check', title: t('Luftunterstützung während dieses Layers (M8/M7, aus mit M9)') },
             h('input', { type: 'checkbox', checked: L.air, onchange: (e: Event) => ed.updateLayer(a, { air: (e.target as HTMLInputElement).checked }) }), t('Air Assist')),
         ),
-        // Images use speed, power and passes of the layer; below come their own image settings
-        ...(part === 'img' ? [h('div', { class: 'form-title' }, t('Bilder')), ...imageLayerFields(ed, a, false, undefined, { get: () => ed.layer(a), set: (p) => ed.updateLayer(a, p) })] : []),
+        // Images use the layer's settings; below only what is specific to images (interval comes from Fill when shown above)
+        ...(ap.img
+          ? [h('div', { class: 'form-title' }, t('Bilder')), ...imageLayerFields(ed, a, false, undefined, L.mode === 'fill' && ap.vec ? null : { get: () => ed.layer(a), set: (p) => ed.updateLayer(a, p) })]
+          : []),
       ),
-      part === 'img'
-        ? h('div', { class: 'layer-tools' }, h('button', { onclick: () => openAdjustDialog(ed, a) }, t('Bild anpassen …')))
-        : h('div', { class: 'note' }, layerSummary(L)),
     );
+    if (ap.img) root.append(h('div', { class: 'layer-tools' }, h('button', { onclick: () => openAdjustDialog(ed, a) }, t('Bild anpassen …'))));
+    if (ap.vec) root.append(h('div', { class: 'note' }, layerSummary(L)));
   };
   ed.on((w) => (w === 'doc' || w === 'sel') && schedule());
   let pending = false;

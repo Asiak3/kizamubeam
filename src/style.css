@@ -892,6 +892,7 @@ label.check {
 .mode-img {
   color: var(--muted);
   font-style: italic;
+  white-space: nowrap;
 }
 .icon-inline svg {
   width: 16px;
@@ -4531,4 +4532,9 @@ label.settings-label input {
 }
 .form > .form-title {
   grid-column: 1 / -1;
+}
+.mode-cell {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
 }
