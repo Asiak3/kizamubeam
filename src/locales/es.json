@@ -4474,5 +4474,18 @@
   "{where}: Kachelgröße fehlt oder liegt nicht zwischen 0,05 und 5000 mm": "{where}: falta el tamaño de la baldosa o no está entre 0,05 y 5000 mm",
   "{where}: Die Kachel ist leer": "{where}: la baldosa está vacía",
   "Ungültiges Muster-Rezept.": "Receta de patrón no válida.",
-  "Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen": "Rellenar con patrón: rellena la forma seleccionada con un patrón continuo hecho de vectores"
+  "Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen": "Rellenar con patrón: rellena la forma seleccionada con un patrón continuo hecho de vectores",
+  "Nur Hauptlayer verschieben": "Mover solo la capa principal",
+  "Alle Objekte verschieben": "Mover todos los objetos",
+  "Auf Layer {layer} verschieben": "Mover a la capa {layer}",
+  "{n} Gruppe hat auch Objekte auf anderen Layern, z. B. eine Gravur.": "{n} grupo tiene también objetos en otras capas, p. ej. un grabado.",
+  "{n} Gruppen haben auch Objekte auf anderen Layern, z. B. eine Gravur.": "{n} grupos tienen también objetos en otras capas, p. ej. un grabado.",
+  "Was soll auf {layer}?": "¿Qué quieres mover a {layer}?",
+  "Layer manuell zuweisen": "Asignar capas manualmente",
+  "Manuell zuweisen …": "Asignar manualmente …",
+  "Für jeden Layer der Auswahl das Ziel wählen.": "Elige el destino de cada capa de la selección.",
+  "Herkunft": "Origen",
+  "Ziel": "Destino",
+  "Nur die Objekte auf dem Layer der Gruppe kommen auf {layer}. Die anderen bleiben, z. B. die Gravur.": "Solo los objetos de la capa del grupo pasan a {layer}. Los demás se quedan, p. ej. el grabado.",
+  "Alle Objekte der Gruppe kommen auf {layer}.": "Todos los objetos del grupo pasan a {layer}."
 }

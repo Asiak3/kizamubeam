@@ -1,5 +1,5 @@
 // Editor: Objekte-Fenster: Name, Sichtbarkeit, Sperre, Reihenfolge, Gruppen, Ausrichten, Layer.
-import { IDENT, isOff, Layer, mul, newId, Obj, setLayerDeep, translate, visibleLeaves, homeLayer, defaultLayer } from '../model';
+import { IDENT, isOff, Layer, LayerChoice, mixedLayers, mul, newId, Obj, setLayerMapped, setLayerOf, translate, visibleLeaves, homeLayer, defaultLayer } from '../model';
 import { Box, boundsOf } from '../geom';
 import type { Editor } from '../editor';
 import { t, tn } from '../i18n';
@@ -70,9 +70,9 @@ export class EditorObjects {
   }
   /**
    * Oberste Objekte in der Stapelreihenfolge verschieben: vor (front) oder hinter ein Bezugsobjekt,
-   * ohne Bezug ganz nach vorn. Mit layer wechseln sie dabei auf diesen Layer.
+   * ohne Bezug ganz nach vorn. Mit layer wechseln sie dabei auf diesen Layer; choice wie bei assignLayer.
    */
-  moveObjects(this: Editor, objs: Obj[], ref: Obj | null, front: boolean, layer?: number) {
+  moveObjects(this: Editor, objs: Obj[], ref: Obj | null, front: boolean, layer?: number, choice: LayerChoice = 'preserve') {
     const moving = this.doc.objs.filter((o) => objs.includes(o) && o !== ref);
     if (!moving.length) return;
     this.snapshot(t('Reihenfolge ändern'));
@@ -85,7 +85,7 @@ export class EditorObjects {
     rest.splice(at, 0, ...moving);
     this.doc.objs = rest;
     if (layer !== undefined) {
-      for (const o of moving) if (homeLayer(o) !== layer) setLayerDeep(o, layer);
+      for (const o of moving) if (choice instanceof Map || homeLayer(o) !== layer) this.setLayerChoice(o, layer, choice);
       this.layer(layer);
     }
     this.emit('doc');
@@ -208,13 +208,26 @@ export class EditorObjects {
     this.emit('doc');
     this.emit('sel');
   }
-  /** Klick auf eine Palettenfarbe */
-  assignLayer(this: Editor, i: number) {
+  /** Gruppen mit Objekten auf mehreren Layern, die beim Verschieben auf diesen Layer eine Rückfrage brauchen (#255) */
+  mixedGroups(this: Editor, objs: Obj[], layer: number): Obj[] {
+    return objs.filter((o) => mixedLayers(o) && homeLayer(o) !== layer);
+  }
+  /**
+   * Ein Objekt auf den Layer legen. Gruppen mit mehreren Layern ganz ('all'), nur mit den Objekten auf ihrem Layer
+   * ('preserve', z. B. die Gravur bleibt) oder nach einer Zuordnung je Layer (Map: gilt für die ganze Auswahl,
+   * Layer ohne Eintrag bleiben).
+   */
+  setLayerChoice(this: Editor, o: Obj, layer: number, choice: LayerChoice) {
+    if (choice instanceof Map) setLayerMapped(o, choice);
+    else setLayerOf(o, layer, choice);
+  }
+  /** Klick auf eine Palettenfarbe; choice wie bei setLayerChoice, layerAssign.ts fragt vorher nach */
+  assignLayer(this: Editor, i: number, choice: LayerChoice = 'preserve') {
     this.currentLayer = i;
     this.activeLayer = i;
     if (this.sel.length) {
       this.snapshot(t('Layer zuweisen'));
-      this.sel.forEach((o) => setLayerDeep(o, i));
+      this.sel.forEach((o) => this.setLayerChoice(o, i, choice));
       this.emit('doc');
     }
     this.layer(i);

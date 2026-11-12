@@ -14,6 +14,7 @@
     "test:start-edge": "node scripts/vector-offline-test.mjs scripts/start-on-edge-test.ts",
     "test:context-menu": "node scripts/vector-offline-test.mjs scripts/context-menu-test.ts",
     "test:objects-context": "node scripts/vector-offline-test.mjs scripts/objects-context-test.ts",
+    "test:layer-assign": "node scripts/run-ts.mjs scripts/layer-assign-test.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "vm": "cd vm && tauri dev",

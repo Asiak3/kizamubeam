@@ -1355,13 +1355,15 @@ export const EDIT_TOOLS: ToolDef[] = [
   {
     name: 'assign_layer',
     title: 'Layer zuweisen',
-    description: 'Legt Objekte (samt Gruppeninhalt) auf einen Layer.',
+    description:
+      'Legt Objekte auf einen Layer. Gruppen mit Objekten auf mehreren Layern (z. B. Teil und Gravur): childLayers "preserve" (Standard) verschiebt nur die Objekte auf dem Layer der Gruppe, die anderen (z. B. die Gravur) bleiben; "all" legt den ganzen Gruppeninhalt auf den Layer.',
     tier: Tier.Edit,
-    inputSchema: obj({ ids: IDS, layer: { ...LAYER, description: 'Layer 0–29' } }, ['ids', 'layer']),
+    inputSchema: obj({ ids: IDS, layer: { ...LAYER, description: 'Layer 0–29' },
+      childLayers: { type: 'string', enum: ['preserve', 'all'], description: 'Gruppen mit mehreren Layern: preserve (Standard) oder all' } }, ['ids', 'layer']),
     run: (ed, a) => {
       const objs = topObjs(ed, ids(a));
       ed.setSel(objs);
-      ed.assignLayer(num(a, 'layer', { min: 0, max: 31, int: true }));
+      ed.assignLayer(num(a, 'layer', { min: 0, max: 31, int: true }), a.childLayers === 'all' ? 'all' : 'preserve');
       return { objects: describeAll(ed, objs) };
     },
   },
