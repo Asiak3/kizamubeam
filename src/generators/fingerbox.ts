@@ -5,8 +5,9 @@ import { fingerboxParts, fingerboxSegments, horizontalSegments, type FingerboxPa
 import { defaultDistribution, distributeGaps } from './fingerbox-distribution';
 import { makeDividers, type DividerParams } from './fingerbox-dividers';
 import { panelPolys, offsetOrtho } from './box';
+import { layoutParts } from './build';
 
-type FingerParams = FingerboxParams & { slotClearance: number; compartmentsX: number; compartmentsY: number; ratiosX: string; ratiosY: string; dividerDrop: number; kerf: number; clearance: number };
+type FingerParams = FingerboxParams & { partLayout: string; slotClearance: number; compartmentsX: number; compartmentsY: number; ratiosX: string; ratiosY: string; dividerDrop: number; kerf: number; clearance: number };
 // clearance/kerf kommen aus dem Dialog; slotClearance folgt dem Steckspiel (Standard der Trennwand-Geometrie).
 const values = (p: Params) => ({ ...p, clearance: Number(p.clearance ?? 0), kerf: Number(p.kerf ?? 0) }) as unknown as FingerParams;
 const names: Record<string, () => string> = {
@@ -96,14 +97,16 @@ function adjustedParts(p: FingerParams): GenPart[] {
   }
   // Kerf: Außenkontur um kerf/2 nach außen, Ausschnitte (Schlitze) um kerf/2 nach innen versetzen.
   if (p.kerf) for (const part of parts) part.subs = part.subs.map((sub, i) => ({ ...sub, nodes: offsetOrtho(dropCollinear(sub.nodes), i === 0 ? p.kerf / 2 : -p.kerf / 2) }));
-  return parts;
+  // Saved boxes keep their row layout ('rows', set by migrate); new boxes are nested compactly.
+  return layoutParts(parts, 5 + p.kerf, p.partLayout);
 }
 
 export const FINGERBOX: Generator = {
-  id: 'box-divided', version: 2, kind: 'assembly', icon: 'box',
+  id: 'box-divided', version: 3, kind: 'assembly', icon: 'box',
   name: t('Box mit Fingerzinken und Trennwänden'),
   schema: [
     { key: 'jointLayout', type: 'data', label: '', def: 'current' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'width', type: 'length', label: t('Breite'), min: 5, max: 3000, def: 100 },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 5, max: 3000, def: 80 },
     { key: 'height', type: 'length', label: t('Höhe'), min: 5, max: 3000, def: 50 },
@@ -151,7 +154,7 @@ export const FINGERBOX: Generator = {
     }
     return out;
   },
-  migrate(p, from) { return from < 2 ? { ...p, jointLayout: 'legacy' } : p; },
+  migrate(p, from) { return { ...p, ...(from < 2 ? { jointLayout: 'legacy' } : {}), ...(from < 3 ? { partLayout: 'rows' } : {}) }; },
   generate(raw) {
     const p = values(raw), parts = adjustedParts(p);
     const gx = distributeGaps(p.width,p.thickness,p.compartmentsX,p.ratiosX).gaps;

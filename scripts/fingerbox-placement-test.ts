@@ -40,7 +40,7 @@ for (let i = 0; i < 300; i++) {
 }
 assert.ok(checked > 200, `only ${checked} cases were valid`);
 
-// Through the generator, including dividers placed below the walls
+// Through the generator (packed layout by default), including dividers
 const g = getGenerator('box-divided')!;
 for (const top of ['open', 'closed']) for (const [h, cx, cy] of [[60, 1, 1], [60, 3, 2], [150, 2, 3], [20, 4, 1]] as const) {
   const params = { ...defaultParams(g), width: 100, depth: 40, height: h, thickness: 3, finger: 6, top, compartmentsX: cx, compartmentsY: cy, ratiosX: '', ratiosY: '', dividerDrop: 5 };

@@ -18,7 +18,7 @@
 // Spiel und Durchmesser ab und werden numerisch gesucht.
 import type { Pt, SubPath } from '../model';
 import { t } from '../i18n';
-import { packParts, PathBuilder } from './build';
+import { arrangeParts, PathBuilder } from './build';
 import type { Generator, Issue, Params } from './types';
 
 export type V3 = [number, number, number];
@@ -401,11 +401,12 @@ const maxHole = (disc: Disc, th: number) => 2 * Math.min(...disc.slots.map((s) =
 
 export const DISCSPHERE: Generator = {
   id: 'discsphere',
-  version: 1,
+  version: 2,
   kind: 'assembly',
   name: t('Scheibenkugel'),
   icon: 'discsphere',
   schema: [
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'diameter', type: 'length', label: t('Durchmesser'), min: 40, max: 2000, def: 250, title: t('Außendurchmesser der fertigen Kugel') },
     {
       key: 'shape',
@@ -430,6 +431,8 @@ export const DISCSPHERE: Generator = {
     { key: 'play', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0.1, title: t('Die Schlitze werden um so viel breiter als die Materialdicke; negativ = Presspassung') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.1, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Schlitze werden schmaler. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],
+  // Saved objects keep their packParts layout; new ones are nested compactly.
+  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'packed' } : p; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -455,7 +458,7 @@ export const DISCSPHERE: Generator = {
     const L = sphereLayout(raw);
     if (!L) return { parts: [], info: [] };
     const items = L.discs.map((disc) => ({ key: disc.key, subs: discOutline(disc, L.r, p.kerf) }));
-    const parts = packParts(items, 3 + p.kerf);
+    const parts = arrangeParts(items, 3 + p.kerf, raw.partLayout);
     const angles = [...new Set(L.discs.flatMap((d) => d.slots.map((s) => Math.round(s.angle * 10) / 10)))].sort((a, b) => a - b);
     const widths = [...new Set(L.discs.flatMap((d) => d.slots.map((s) => Math.round((s.w - p.kerf) * 100) / 100)))].sort((a, b) => a - b);
     const slots = L.discs.reduce((s, d) => s + d.slots.length, 0) / 2;

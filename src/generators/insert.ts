@@ -3,7 +3,7 @@
 // jeweils bis zur halben Höhe. Die Fächer sind gleich groß. Die Stege sind um die Endluft kürzer als das Innenmaß.
 import type { Pt } from '../model';
 import { t } from '../i18n';
-import { packParts, polySub } from './build';
+import { arrangeParts, polySub } from './build';
 import { offsetOrtho } from './box';
 import type { Generator, Issue, Params } from './types';
 
@@ -60,11 +60,12 @@ export function insertStrips(p: InsertParams): { key: string; L: number; pts: Pt
 
 export const INSERT: Generator = {
   id: 'insert',
-  version: 1,
+  version: 2,
   kind: 'assembly',
   name: t('Einsatz'),
   icon: 'insert',
   schema: [
+    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'width', type: 'length', label: t('Innenbreite'), min: 10, max: 3000, def: 150, title: t('Innenmaß der Box oder Schublade, in die der Einsatz kommt') },
     { key: 'depth', type: 'length', label: t('Innentiefe'), min: 10, max: 3000, def: 100 },
     { key: 'height', type: 'length', label: t('Höhe der Stege'), min: 4, max: 1000, def: 40 },
@@ -75,6 +76,8 @@ export const INSERT: Generator = {
     { key: 'endPlay', type: 'length', label: t('Endluft'), min: 0, max: 20, def: 0.5, title: t('Die Stege werden um so viel kürzer als das Innenmaß, damit sie sich leicht einsetzen lassen') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Schlitze werden schmaler. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],
+  // Saved objects keep their packParts layout; new ones are nested compactly.
+  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'packed' } : p; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -89,7 +92,7 @@ export const INSERT: Generator = {
   generate(raw) {
     const p = P(raw);
     const strips = insertStrips(p);
-    const parts = packParts(strips.map((s) => ({ key: s.key, subs: [polySub(s.pts)] })), 5 + p.kerf);
+    const parts = arrangeParts(strips.map((s) => ({ key: s.key, subs: [polySub(s.pts)] })), 5 + p.kerf, raw.partLayout);
     const cx = (p.width - (p.cellsX - 1) * p.thickness) / p.cellsX,
       cy = (p.depth - (p.cellsY - 1) * p.thickness) / p.cellsY;
     return {
