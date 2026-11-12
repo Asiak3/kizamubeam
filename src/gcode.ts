@@ -2,7 +2,7 @@
 // Maschinenausgabe: aus dem Dokument einen Job berechnen (Linien, Füllen, Bilder), G-Code schreiben,
 // Laufzeit schätzen und Rahmenfahrten erzeugen. Alles in Maschinenkoordinaten (mm, Ursprung unten links, y nach oben).
 import ClipperLib from 'clipper-lib';
-import { apply, CutSettings, Doc, ImageLayer, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
+import { apply, CutSettings, Doc, ImageLayer, ImageOutput, imageOutput, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
 import { bezierPt, segments, shapeSubs } from './geom';
 import { loadFont, textToSubs } from './fonts';
 import { nativeScanLines, outputGrid, processImage } from './images';
@@ -1086,7 +1086,7 @@ function fillLines(polys: Poly[], interval: number, s: number): { y: number; run
  * Bildzeilen: Ausgabepunkte des geditherten Bildes je Zeile zu Läufen gleicher Leistung zusammenfassen.
  * In der Desktop-App rechnet das der Rust-Kern (src-tauri/core/src/raster.rs, scan_lines) nach denselben Regeln.
  */
-async function imageLines(shape: ImageShape, world: Mat, toOut: Mat, L: ImageLayer): Promise<{ y: number; runs: Run[] }[] | null> {
+async function imageLines(shape: ImageShape, world: Mat, toOut: Mat, L: ImageOutput): Promise<{ y: number; runs: Run[] }[] | null> {
   const { cols, rows } = outputGrid(shape, world, L.interval);
   const M = mul(toOut, world); // lokal (mm) → Ausgabe
   const IM = inv(M);
@@ -1112,7 +1112,7 @@ function unpackLines(p: Float64Array): { y: number; runs: Run[] }[] {
 }
 
 /** Rasterzeilen aus dem verarbeiteten Bild v (cols × rows) der Größe w × h mm; M: lokal → Ausgabe, IM: Umkehrung */
-export function scanLines(v: Uint8Array | Uint8ClampedArray, w: number, h: number, L: ImageLayer, cols: number, rows: number, M: Mat, IM: Mat): { y: number; runs: Run[] }[] {
+export function scanLines(v: Uint8Array | Uint8ClampedArray, w: number, h: number, L: ImageOutput, cols: number, rows: number, M: Mat, IM: Mat): { y: number; runs: Run[] }[] {
   const b = emptyBox();
   for (const [x, y] of [[0, 0], [w, 0], [w, h], [0, h]]) {
     const q = apply(M, x, y);
@@ -1599,7 +1599,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     mv.zCur = 0;
     // Bilder zuerst (gravieren), dann Vektoren
     if (bk.images.length) {
-      const IL = inp.imgLayer(li);
+      const IL = imageOutput(L, inp.imgLayer(li));
       const ov = (IL.overscan / 100) * (IL.speed / 60);
       for (const im of bk.images) {
         const lines = await imageLines(im.shape, im.world, toOut, IL);

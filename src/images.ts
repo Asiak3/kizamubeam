@@ -1,6 +1,6 @@
 // Rasterbilder: Asset-Speicher (Bilddaten außerhalb von Undo und Dokument-JSON),
 // Bildverarbeitung (Helligkeit, Kontrast, Gamma, Schärfen, Negativ, Dithering) und Zwischenspeicher der Ergebnisse.
-import { DEFAULT_ADJUST, defaultImageLayer, DitherMode, ImageAdjust, ImageLayer, ImageShape, Mat } from './model';
+import { DEFAULT_ADJUST, defaultImageLayer, DitherMode, ImageAdjust, ImageOutput, ImageShape, Mat } from './model';
 import { t } from './i18n';
 import { hasNative, native } from './native';
 
@@ -456,7 +456,7 @@ export function outputGrid(s: ImageShape, m: Mat, interval: number): { cols: num
 }
 
 /** Vollständige Verarbeitung: Ausgabewerte (0 = brennen … 255 = aus) im Raster cols × rows. */
-export function processImage(s: ImageShape, L: ImageLayer, cols: number, rows: number): Uint8ClampedArray | null {
+export function processImage(s: ImageShape, L: ImageOutput, cols: number, rows: number): Uint8ClampedArray | null {
   const a = assets.get(s.asset);
   if (!a) return null;
   const src = sourceGray(a);
@@ -468,7 +468,7 @@ export function processImage(s: ImageShape, L: ImageLayer, cols: number, rows: n
 }
 
 /** Einstellungen für den Rust-Kern; fehlende Felder (ältere Dateien) mit den Standardwerten */
-const nativeLayer = (L: ImageLayer) => {
+const nativeLayer = (L: ImageOutput) => {
   const d = { ...defaultImageLayer(), ...L };
   return { power: d.power, minPower: d.minPower, interval: d.interval, dither: d.dither, negative: d.negative, cells: d.cells, angle: d.angle, threshold: d.threshold };
 };
@@ -484,7 +484,7 @@ async function nativeAsset(s: ImageShape): Promise<boolean> {
  * Wie processImage, aber in der Desktop-App im Rust-Kern (mehrere Kerne, blockiert die Oberfläche nicht).
  * Ist das Bild dort nicht lesbar, rechnet TypeScript.
  */
-export async function processImageAsync(s: ImageShape, L: ImageLayer, cols: number, rows: number): Promise<Uint8Array | Uint8ClampedArray | null> {
+export async function processImageAsync(s: ImageShape, L: ImageOutput, cols: number, rows: number): Promise<Uint8Array | Uint8ClampedArray | null> {
   if (await nativeAsset(s)) {
     try {
       const buf = await native<ArrayBuffer>('image_process', { id: s.asset, cols, rows, adjust: nativeAdjust(s), layer: nativeLayer(L) });
@@ -500,7 +500,7 @@ export async function processImageAsync(s: ImageShape, L: ImageLayer, cols: numb
  * Rasterzeilen eines Bildes aus dem Rust-Kern: je Zeile y, Anzahl der Läufe, dann x0, x1, Leistung je Lauf.
  * m bildet lokale mm des Bildes auf Ausgabekoordinaten ab, im ist die Umkehrung. null = im Rust-Kern nicht möglich.
  */
-export async function nativeScanLines(s: ImageShape, L: ImageLayer, cols: number, rows: number, m: Mat, im: Mat): Promise<Float64Array | null> {
+export async function nativeScanLines(s: ImageShape, L: ImageOutput, cols: number, rows: number, m: Mat, im: Mat): Promise<Float64Array | null> {
   if (!(await nativeAsset(s))) return null;
   try {
     const buf = await native<ArrayBuffer>('image_scan', { id: s.asset, cols, rows, adjust: nativeAdjust(s), layer: nativeLayer(L), w: s.w, h: s.h, m, im });
@@ -552,7 +552,7 @@ const results = new WeakMap<ImageShape, Cached>();
 const queue = new Map<ImageShape, () => void>();
 let queueTimer = 0;
 
-function resultKey(s: ImageShape, L: ImageLayer, cols: number, rows: number) {
+function resultKey(s: ImageShape, L: ImageOutput, cols: number, rows: number) {
   return JSON.stringify([s.asset, s.adjust, L.interval, L.dither, L.negative, L.threshold, L.cells, L.angle, cols, rows]);
 }
 
@@ -560,7 +560,7 @@ function resultKey(s: ImageShape, L: ImageLayer, cols: number, rows: number) {
  * Verarbeitetes Bild für die Anzeige. Ändern sich Größe oder Einstellungen, wird kurz das alte Ergebnis
  * (gestreckt) gezeigt und das neue nach einer Pause berechnet, damit Ziehen und Schieberegler flüssig bleiben.
  */
-export function displayCanvas(s: ImageShape, m: Mat, L: ImageLayer, immediate = false): HTMLCanvasElement | null {
+export function displayCanvas(s: ImageShape, m: Mat, L: ImageOutput, immediate = false): HTMLCanvasElement | null {
   const a = assets.get(s.asset);
   if (!a?.img) return null;
   const { cols, rows } = outputGrid(s, m, L.interval);
@@ -596,7 +596,7 @@ export function displayCanvas(s: ImageShape, m: Mat, L: ImageLayer, immediate = 
  * danach zeichnen alle, die sich mit onImageReady angemeldet haben, neu. Während einer Rechnung wartet höchstens
  * ein neuer Auftrag je Bild, Zwischenstände beim Ziehen werden übersprungen.
  */
-function nativeDisplay(s: ImageShape, L: ImageLayer, cols: number, rows: number, key: string, c: Cached | undefined, immediate: boolean) {
+function nativeDisplay(s: ImageShape, L: ImageOutput, cols: number, rows: number, key: string, c: Cached | undefined, immediate: boolean) {
   let entry = c;
   if (!entry) results.set(s, (entry = { key: '', canvas: null, pending: null }));
   if (entry.pending === key) return entry.canvas;
@@ -636,7 +636,7 @@ const waiting = new WeakMap<ImageShape, () => void>();
 const nativeTimers = new WeakMap<ImageShape, number>();
 
 /** Verarbeitetes Bild als PNG-Daten (für „Bearbeitetes Bild speichern“). */
-export async function processedPng(s: ImageShape, m: Mat, L: ImageLayer): Promise<string | null> {
+export async function processedPng(s: ImageShape, m: Mat, L: ImageOutput): Promise<string | null> {
   const { cols, rows } = outputGrid(s, m, L.interval);
   const v = await processImageAsync(s, L, cols, rows);
   return v ? toCanvas(v, cols, rows).toDataURL('image/png') : null;

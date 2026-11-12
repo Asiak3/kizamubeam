@@ -202,7 +202,7 @@ export class EditorImages {
     w *= f;
     h *= f;
     const shape: ImageShape = { kind: 'image', asset: a.id, w, h, pxW: a.w, pxH: a.h, name, adjust: { ...DEFAULT_ADJUST } };
-    this.imgLayer(this.currentLayer);
+    this.prepareImageLayer(this.currentLayer);
     return { id: newId(), m: translate((bed.w - w) / 2, (bed.h - h) / 2), layer: this.currentLayer, shape };
   }
 
@@ -211,7 +211,7 @@ export class EditorImages {
     const a = await addAsset(dataUrl);
     const shape: ImageShape = { kind: 'image', asset: a.id, w, h, pxW: a.w, pxH: a.h, name, adjust: { ...DEFAULT_ADJUST } };
     const o: Obj = { id: newId(), m: translate(x, y), layer, shape };
-    this.imgLayer(layer);
+    this.prepareImageLayer(layer);
     this.placeNew([o], hint);
   }
 
