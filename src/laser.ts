@@ -876,6 +876,29 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   const bw = num(t('Breite (mm)'), () => bed.w, (v) => (bed.w = v), t('Arbeitsbereich X'));
   const bh = num(t('Höhe (mm)'), () => bed.h, (v) => (bed.h = v), t('Arbeitsbereich Y'));
   sMaxRef.el = num(t('S-Wert für 100 %'), () => d.sMax, (v) => (d.sMax = v), t('GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1'));
+  head(t('Bewegung (für die Zeitschätzung)'));
+  const rapid = num(t('Eilgang (mm/min)'), () => d.rapid, (v) => (d.rapid = v));
+  const accel = num(t('Beschleunigung (mm/s²)'), () => d.accel, (v) => (d.accel = v));
+  bool(t('Nach dem Job zurück zum Start'), () => d.returnHome, (v) => (d.returnHome = v));
+  head(t('Achsen'));
+  bool(t('Motorische Z-Achse vorhanden'), () => d.zAxis, (v) => (d.zAxis = v), t('Layer dürfen den Fokus verschieben (Z-Versatz, tiefer je Durchgang). Z fährt relativ zur Höhe beim Start und am Ende zurück.'));
+  bool(t('Z+ fährt Richtung Material'), () => d.zFlip, (v) => (d.zFlip = v), t('Einschalten, wenn bei dieser Maschine positive Z-Werte den Tisch anheben oder den Kopf absenken'));
+  rows.push(h('label', {}, t('Drehachse')), h('span', {}, h('button', { class: 'btn small', onclick: () => openRotaryDialog() }, t('Drehachse (Rotary) …'))));
+  head(t('Air Assist & Ausgänge'));
+  rows.push(h('label', { title: t('Wird auf Layern mit „Air Assist“ vor dem Lasern gesendet, ausgeschaltet wird mit M9') }, t('Einschalten mit')), h('select', { onchange: (e: Event) => (d.airCmd = (e.target as HTMLSelectElement).value as Device['airCmd']) },
+    h('option', { value: 'M8', selected: d.airCmd !== 'M7' }, t('M8 (Flood, üblich)')),
+    h('option', { value: 'M7', selected: d.airCmd === 'M7' }, 'M7 (Mist)'),
+  ));
+  const outsIn = h('input', {
+    type: 'text', value: d.jobOutputs.join(', '), placeholder: t('z. B. 0, 1'),
+    onchange: (e: Event) => {
+      const el = e.target as HTMLInputElement;
+      d.jobOutputs = [...new Set(el.value.split(/[\s,;]+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < 8))];
+      el.value = d.jobOutputs.join(', ');
+    },
+  }) as HTMLInputElement;
+  rows.push(h('label', { title: t('Digitale Ausgänge (user_outputs, M64/M65 P…), die während jedes Jobs an sind, z. B. Absaugung') }, t('Ausgänge im Job')), outsIn);
+  rows.push(h('div', { class: 'note wide' }, t('Startreferenz und Job-Ursprung stehen im Laser-Fenster.')));
   newTab(t('Verbindung'));
   const connSel: HTMLSelectElement = h('select', { onchange: (e: Event) => (d.conn = (e.target as HTMLSelectElement).value as Device['conn']) },
     h('option', { value: 'serial', selected: d.conn === 'serial' }, t('USB (seriell)')),
@@ -975,12 +998,6 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     h('option', { value: 'yes', selected: d.limitSwitches === 'yes' }, t('Vorhanden')),
     h('option', { value: 'no', selected: d.limitSwitches === 'no' }, t('Keine')),
   ));
-  newTab(t('Bewegung'));
-  head(t('Bewegung (für die Zeitschätzung)'));
-  const rapid = num(t('Eilgang (mm/min)'), () => d.rapid, (v) => (d.rapid = v));
-  const accel = num(t('Beschleunigung (mm/s²)'), () => d.accel, (v) => (d.accel = v));
-  bool(t('Nach dem Job zurück zum Start'), () => d.returnHome, (v) => (d.returnHome = v));
-  rows.push(h('div', { class: 'note wide' }, t('Startreferenz und Job-Ursprung stehen im Laser-Fenster.')));
   newTab(t('Rahmen & Zeiger'));
   head(t('Rahmen'));
   num(t('Geschwindigkeit (mm/min)'), () => d.frameSpeed, (v) => (d.frameSpeed = v));
@@ -1034,26 +1051,6 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   rows.push(poDiagram, poSentence, poRotNote);
   rows.push(h('div', { class: 'note wide' }, t('Nur für Positionieren, Startreferenz (Aktuelle Position/Benutzer-Ursprung) und Rotpunkt-Framing. Geometrie, Schnitt und G-Code-Export bleiben Werkzeuglaser.')));
   updatePointer();
-  newTab(t('Achsen'));
-  head(t('Z-Achse'));
-  bool(t('Motorische Z-Achse vorhanden'), () => d.zAxis, (v) => (d.zAxis = v), t('Layer dürfen den Fokus verschieben (Z-Versatz, tiefer je Durchgang). Z fährt relativ zur Höhe beim Start und am Ende zurück.'));
-  bool(t('Z+ fährt Richtung Material'), () => d.zFlip, (v) => (d.zFlip = v), t('Einschalten, wenn bei dieser Maschine positive Z-Werte den Tisch anheben oder den Kopf absenken'));
-  rows.push(h('label', {}, t('Drehachse')), h('span', {}, h('button', { class: 'btn small', onclick: () => openRotaryDialog() }, t('Drehachse (Rotary) …'))));
-  newTab(t('Air & Ausgänge'));
-  head(t('Air Assist'));
-  rows.push(h('label', { title: t('Wird auf Layern mit „Air Assist“ vor dem Lasern gesendet, ausgeschaltet wird mit M9') }, t('Einschalten mit')), h('select', { onchange: (e: Event) => (d.airCmd = (e.target as HTMLSelectElement).value as Device['airCmd']) },
-    h('option', { value: 'M8', selected: d.airCmd !== 'M7' }, t('M8 (Flood, üblich)')),
-    h('option', { value: 'M7', selected: d.airCmd === 'M7' }, 'M7 (Mist)'),
-  ));
-  const outsIn = h('input', {
-    type: 'text', value: d.jobOutputs.join(', '), placeholder: t('z. B. 0, 1'),
-    onchange: (e: Event) => {
-      const el = e.target as HTMLInputElement;
-      d.jobOutputs = [...new Set(el.value.split(/[\s,;]+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < 8))];
-      el.value = d.jobOutputs.join(', ');
-    },
-  }) as HTMLInputElement;
-  rows.push(h('label', { title: t('Digitale Ausgänge (user_outputs, M64/M65 P…), die während jedes Jobs an sind, z. B. Absaugung') }, t('Ausgänge im Job')), outsIn);
   newTab(t('G-Code'));
   head('FluidNC');
   rows.push(h('label', { title: t('Bei WLAN-Aussetzern läuft ein Job von SD-Karte oder Flash weiter; er wird vor dem Start über die Weboberfläche hochgeladen') }, t('Job ausführen')),
@@ -1173,6 +1170,20 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   dlg.addEventListener('keydown', (e) => e.stopPropagation());
   document.body.append(dlg);
   dlg.showModal();
+  // Stabile Dialoggröße: größter Tab als Referenz, kein Springen beim Wechsel.
+  {
+    const prevVis = dlg.style.visibility;
+    dlg.style.visibility = 'hidden';
+    let max = 0;
+    panels.forEach((_p, i) => {
+      panels.forEach((q, k) => (q.hidden = k !== i));
+      const p = panels[i] as HTMLElement;
+      max = Math.max(max, p.offsetHeight, p.scrollHeight);
+    });
+    panels.forEach((q, k) => (q.hidden = k !== activeTab));
+    if (max > 0) panels.forEach((p) => ((p as HTMLElement).style.minHeight = `${max}px`));
+    dlg.style.visibility = prevVis;
+  }
 }
 
 // ---------- Drehachse ----------
