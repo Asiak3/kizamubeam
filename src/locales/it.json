@@ -3809,6 +3809,8 @@
   "{n} Objekt wird wieder gelasert.": "{n} oggetto verrà inciso nuovamente.",
   "{n} Objekte werden wieder gelasert.": "{n} oggetti verranno incisi nuovamente.",
   "{n} Objekt liegt ganz außerhalb des Arbeitsbereichs (geparkt) und wird nicht gelasert.": "{n} oggetto si trova completamente fuori dall'area di lavoro (parcheggiato) e non viene inciso.",
+  "{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).": "{n} oggetto nascosto partecipa al lavoro (output attivato).",
+  "{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).": "{n} oggetti nascosti partecipano al lavoro (output attivato).",
   "{n} Objekte liegen ganz außerhalb des Arbeitsbereichs (geparkt) und werden nicht gelasert.": "{n} oggetti si trovano completamente fuori dall'area di lavoro (parcheggiati) e non vengono incisi.",
   "Wieder lasern": "Incidi nuovamente",
   "Nicht lasern (bleibt sichtbar)": "Non incidere (rimane visibile)",
