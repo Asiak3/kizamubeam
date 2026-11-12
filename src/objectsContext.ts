@@ -3,10 +3,10 @@
 // This module builds the entries only; objectsPanel.ts decides the selection and opens the menu.
 import type { Editor } from './editor';
 import { t } from './i18n';
-import { homeLayer, layerLabel, Obj } from './model';
+import { homeLayer, Obj } from './model';
 import { canEnterIsolation } from './isolation';
 import { ContextAction } from './contextMenu';
-import { ContextCallbacks, editorContextGroups } from './editorContext';
+import { ContextCallbacks, editorContextGroups, MOVE_IDS, moveActions } from './editorContext';
 
 /** Panel features the menu needs but which live in dialogs or in the panel's own state */
 export interface ObjectsMenuHooks {
@@ -45,12 +45,7 @@ function objectGroups(ed: Editor, callbacks: ContextCallbacks, hooks: ObjectsMen
   head.push(child
     ? { ...action('obj-hide', t('Ausblenden'), () => ed.setObjProps([obj], { hidden: !obj.hidden })), checked: !!obj.hidden }
     : action('obj-hide', t('Ausblenden'), () => ed.setObjProps(sel, { hidden: true })));
-  const layers = [...new Set([...ed.layerOrder(), ed.currentLayer])];
-  head.push({ id: 'move-layer', label: t('Auf Layer verschieben'), run: () => {}, items: layers.map((i) => ({
-    ...action(`layer:${i}`, `${layerLabel(i)} · ${ed.layer(i).name}`, () => ed.assignLayer(i)),
-    checked: sel.every((o) => homeLayer(o) === i) })) });
-  if (ed.doc.pages.length > 1) head.push({ id: 'move-page', label: t('Auf Seite verschieben'), run: () => {},
-    items: ed.doc.pages.map((p, i) => action(`page:${i}`, p.name, () => ed.moveToPage(sel, i), i !== ed.doc.page)) });
+  head.push(...moveActions(ed, true));
   head.push(action('showif', t('Sichtbar, wenn …'), () => hooks.showIf(sel)));
   const group: ContextAction[] = [];
   if (target.group) {
@@ -59,7 +54,7 @@ function objectGroups(ed: Editor, callbacks: ContextCallbacks, hooks: ObjectsMen
   }
   if (!child || target.group) group.push(action('isolate', t('Auswahl isolieren'), () => ed.isolateSelection(), canEnterIsolation(ed)));
   const canvas = editorContextGroups(ed, callbacks)
-    .map((items) => items.filter((item) => item.id !== 'objects'))
+    .map((items) => items.filter((item) => item.id !== 'objects' && !MOVE_IDS.has(item.id)))
     .filter((items) => items.length);
   return [head, group, ...canvas];
 }

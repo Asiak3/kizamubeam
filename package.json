@@ -43,7 +43,7 @@
     "test:history": "node scripts/run-ts.mjs scripts/history-test.ts",
     "test:joints": "node scripts/run-ts.mjs scripts/joints-test.ts",
     "test:fingerbox": "node scripts/run-ts.mjs scripts/fingerbox-experiment-test.ts && node scripts/run-ts.mjs scripts/fingerbox-layout-test.ts && node scripts/run-ts.mjs scripts/fingerbox-dividers-test.ts && node scripts/run-ts.mjs scripts/fingerbox-distribution-test.ts && node scripts/run-ts.mjs scripts/fingerbox-divider-integration-test.ts && node scripts/run-ts.mjs scripts/fingerbox-resize-test.ts && node scripts/run-ts.mjs scripts/fingerbox-integration-test.ts && node scripts/run-ts.mjs scripts/fingerbox-joints-test.ts && node scripts/run-ts.mjs scripts/fingerbox-dialog-layout-test.ts && node scripts/run-ts.mjs scripts/fingerbox-placement-test.ts && node scripts/run-ts.mjs scripts/fingerbox-kerf-test.ts",
-    "test:generators": "node scripts/run-ts.mjs scripts/generators-test.ts && node scripts/run-ts.mjs scripts/single-part-marks-test.ts && node scripts/run-ts.mjs scripts/box-corner-clearance-test.ts && node scripts/run-ts.mjs scripts/part-layout-test.ts",
+    "test:generators": "node scripts/run-ts.mjs scripts/generators-test.ts && node scripts/run-ts.mjs scripts/single-part-marks-test.ts && node scripts/run-ts.mjs scripts/box-corner-clearance-test.ts && node scripts/run-ts.mjs scripts/part-layout-test.ts && node scripts/vector-offline-test.mjs scripts/asm-select-test.ts",
     "test:params": "node scripts/run-ts.mjs scripts/params-test.ts",
     "test:templates": "node scripts/run-ts.mjs scripts/templates-test.ts",
     "test:3d": "node scripts/run-ts.mjs scripts/view3d-test.ts",
