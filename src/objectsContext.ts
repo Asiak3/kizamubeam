@@ -4,7 +4,6 @@
 import type { Editor } from './editor';
 import { t } from './i18n';
 import { homeLayer, Obj } from './model';
-import { canEnterIsolation } from './isolation';
 import { ContextAction } from './contextMenu';
 import { ContextCallbacks, editorContextGroups, MOVE_IDS, moveActions } from './editorContext';
 
@@ -52,7 +51,7 @@ function objectGroups(ed: Editor, callbacks: ContextCallbacks, hooks: ObjectsMen
     const g = target.group;
     group.push(action('group-toggle', g.open ? t('Gruppe zuklappen') : t('Gruppe aufklappen'), g.toggle));
   }
-  if (!child || target.group) group.push(action('isolate', t('Auswahl isolieren'), () => ed.isolateSelection(), canEnterIsolation(ed)));
+  // "Isolate selection" comes with the canvas menu below; it also offers "Leave isolation" while isolated
   const canvas = editorContextGroups(ed, callbacks)
     .map((items) => items.filter((item) => item.id !== 'objects' && !MOVE_IDS.has(item.id)))
     .filter((items) => items.length);
