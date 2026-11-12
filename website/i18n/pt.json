@@ -1,0 +1,244 @@
+{
+  "lang": "pt",
+  "locale": "pt_BR",
+  "version": "2.8.0",
+  "meta": {
+    "title": "KizamuBeam – Software gratuito de gravação e corte a laser",
+    "description": "Software a laser gratuito e de código aberto para macOS, Windows e Linux. Desenhe, grave fotos, gere caixas e engrenagens e envie trabalhos direto para lasers FluidNC, GRBL, grblHAL, Marlin e Smoothieware.",
+    "og_title": "KizamuBeam – Desenhe, grave, corte. Grátis.",
+    "og_image_alt": "Logo do KizamuBeam com um feixe de laser em fundo escuro"
+  },
+  "ui": {
+    "skip": "Ir para o conteúdo",
+    "nav_label": "Navegação principal",
+    "home_label": "KizamuBeam – início",
+    "lang_label": "Escolher idioma",
+    "lang_current": "Português",
+    "github_label": "KizamuBeam no GitHub",
+    "discord_label": "KizamuBeam no Discord",
+    "recommended": "Para o seu sistema",
+    "more_formats": "Mais formatos",
+    "back_top": "Voltar ao topo"
+  },
+  "nav": {
+    "features": "Recursos",
+    "hardware": "Hardware",
+    "vm": "Máquina virtual",
+    "download": "Baixar",
+    "faq": "FAQ",
+    "github": "GitHub"
+  },
+  "hero": {
+    "title": "Seu laser. Seu software. Grátis.",
+    "subtitle": "KizamuBeam é um software de código aberto para desenhar, gravar e cortar – feito para lasers de diodo com FluidNC, GRBL e afins. Grátis no macOS, Windows e Linux.",
+    "cta_primary": "Baixar grátis",
+    "cta_secondary": "Ver no GitHub",
+    "meta_line": "GPL-3.0 · macOS · Windows · Linux",
+    "name_note": "Kizamu (刻む) em japonês significa “entalhar, gravar, cortar com precisão”."
+  },
+  "why": {
+    "label": "Por que o KizamuBeam",
+    "items": [
+      { "icon": "free", "title": "Não custa nada", "text": "Sem assinatura, sem chave de licença, sem conta. Instale e comece." },
+      { "icon": "open", "title": "Aberto de verdade", "text": "GPL-3.0-or-later. O código está no GitHub – contribuições são bem-vindas." },
+      { "icon": "build", "title": "Mais do que gravar", "text": "Caixas, gavetas, engrenagens e dobradiças geradas parametricamente – com encaixe certo e prévia 3D." },
+      { "icon": "safe", "title": "Seguro na máquina", "text": "Assistente de configuração, verificação da área de trabalho antes de cada job e alarmes em linguagem clara." }
+    ]
+  },
+  "feat": {
+    "eyebrow": "Recursos",
+    "title": "Tudo da ideia à peça pronta",
+    "subtitle": "Um app para desenho, imagens, geração de peças e controle da máquina.",
+    "design": {
+      "title": "Desenho e edição",
+      "lead": "Desenhe, combine e ajuste fino – em um layout familiar desde o primeiro clique.",
+      "b": [
+        "Linhas, curvas de Bézier, retângulos arredondados, elipses, polígonos, estrelas e texto com várias linhas",
+        "Operações booleanas, offset, edição de nós em vários objetos ao mesmo tempo, aparar e magnetismo a nós, pontos médios e interseções",
+        "Simplifique e suavize caminhos com prévia ao vivo, menus de contexto que oferecem o que combina com o objeto e isolamento da seleção para trabalhar sem distração",
+        "Texto em caminho, letras soldadas e contornos verdadeiros das fontes do sistema",
+        "Gerenciador de fontes: busque todas as Google Fonts com prévia e instale com um clique, adicione seus próprios arquivos TTF/OTF, favoritos – fontes faltando no projeto são baixadas para você",
+        "Distorça texto, formas e imagens em arco, ondulação, bandeira ou perspectiva, como curvas de Bézier limpas",
+        "Matrizes em grade e circulares com prévia ao vivo, projetos com várias páginas e um histórico pelo qual você pode voltar",
+        "Importe SVG, DXF, PDF, Illustrator (.ai), imagens e projetos LightBurn (.lbrn2) – as cores vão direto para a camada correspondente",
+        "Exporte como SVG, DXF, PDF e Illustrator (.ai) – curvas permanecem curvas, camadas permanecem separadas",
+        "Janelas acopláveis, barras de ferramentas personalizáveis, grade totalmente ajustável, tema claro e escuro"
+      ]
+    },
+    "image": {
+      "title": "Imagens e gravação",
+      "lead": "Leve fotos, logos e artes para o material do jeito que você imaginou.",
+      "b": [
+        "Dez modos de imagem, incluindo Floyd-Steinberg, Jarvis, Stucki, retícula, jornal, esboço e escala de cinza",
+        "Brilho, contraste, gama, nitidez e redução de ruído com comparação antes/depois e vista 1:1",
+        "A área de trabalho mostra o resultado rasterizado na resolução do laser",
+        "Recorte, máscara e remoção de fundo localmente, vetorize imagens em caminhos de Bézier limpos",
+        "Preenchimento de gravação com ângulo de varredura, hachura cruzada, overscan e modo bidirecional, ou preenchimento em anéis por offset",
+        "Sobreposição de câmera: calibre uma câmera USB, de rede (p. ex. ESP32-CAM) ou montada na cabeça, veja o material na área de trabalho e posicione um desenho automaticamente em cada peça detectada"
+      ]
+    },
+    "machine": {
+      "title": "Máquina e saída",
+      "lead": "Conecte, verifique, faça o frame e grave – sem precisar de um segundo programa.",
+      "b": [
+        "Configuração do laser em cinco passos: conectar, detectar firmware, conferir ajustes, testar eixos, rodar um job de teste seguro",
+        "USB, Telnet ou WebSocket – com posição ao vivo e alarmes em linguagem clara",
+        "Prévia com estimativa de tempo e scrubber; “Começar daqui” retoma um job interrompido",
+        "Verificação da área de trabalho antes de cada job e frame, incluindo o deslocamento de trabalho informado",
+        "Grade de teste de material com avaliação por foto, teste de foco (rampa ou série em Z), suporte a rotary (rolo ou mandril), scripts G-code personalizados por dispositivo",
+        "Print and Cut: imprima marcas de registro, meça-as com um ponto de laser de baixa potência ou com a câmera e alinhe o desenho com precisão na impressão",
+        "Gerador de gabaritos: placas de fixação com recortes precisos para peças a partir de arquivo vetorial, foto ou câmera, com numeração de slots e marcas de registro",
+        "Salve G-code ou envie em streaming direto – o streaming roda no núcleo Rust",
+        "Ajuste potência e velocidade durante um job; FluidNC: envie jobs para cartão SD ou flash e execute lá, edite config.yaml com backups, encontre o controlador no Wi-Fi",
+        "Laser em outro cômodo: controle pela instância do KizamuBeam no laser pela rede doméstica ou VPN – aquele computador calcula e executa o job; você inicia, acompanha (também pela câmera do host) e para da sua mesa; dispositivo, materiais e câmeras podem ser herdados do host, e o KizamuBeam encontra o host na rede sozinho"
+      ]
+    },
+    "gen": {
+      "title": "Geradores e 3D",
+      "lead": "Informe as medidas, obtenha as peças. Clique duas vezes, altere, tudo recalcula.",
+      "b": [
+        "Caixas com juntas de dedo, gavetas, divisórias e prateleiras de encaixe como conjuntos completos",
+        "Engrenagens cilíndricas de evolvente, pares de engrenagens, cremalheiras, polias sincronizadoras GT2/HTD e cames",
+        "Ferramenta de juntas: juntas de dedo, aba e fenda, meio-a-meio, snap-fit e gancho, espigas em cunha, T-slots, dobradiça de tampa",
+        "Dobradiças vivas em sete padrões",
+        "Preenchimento de padrão: decore superfícies com padrões vetoriais contínuos do seu próprio motivo ou 13 padrões embutidos, com repetição espelhada, tijolo, hexagonal e cata-vento, bordas enroladas e sem linha laserada duas vezes",
+        "Esfera de discos: uma cúpula de lâmpada feita de discos redondos com fendas anguladas, de 6 a 32 discos, sem cola",
+        "Modelo em camadas: fatie um modelo STL ou OBJ em folhas empilhadas e numeradas",
+        "Modelo de nervuras: nervuras com meio encaixe em uma espinha, a partir de STL ou OBJ; corpo, pernas e cauda curva como seções separadas, sugeridas com um botão, com página de plano de montagem e nervuras mais densas nos detalhes",
+        "Vista 3D com controle de explosão – colisões aparecem em vermelho antes de você desperdiçar material; gravações aparecem nas peças",
+        "Aparência de materiais em 3D: veio de madeira, ardósia, acrílico com refração, metal – gravações como ficarão no material, também como mockup com sombras e exportação PNG para clientes",
+        "Verificação do desenho e calibração de encaixe: encontre e corrija pontes finas, contornos abertos e fendas apertadas demais"
+      ]
+    },
+    "prod": {
+      "title": "Produção",
+      "lead": "Do unitário ao lote pequeno – tags, chaveiros, etiquetas.",
+      "b": [
+        "Nesting automático pelos contornos verdadeiros, peças dentro de furos, overflow em novas páginas, retalhos como chapas; exclua peças individuais do laser ou estacioná-las ao lado da mesa",
+        "Modelos com parâmetros de projeto e fórmulas – chaveiro, tag de nome e caixa rotulada inclusos",
+        "Séries a partir de tabela ou CSV: cada linha vira uma cópia pronta; edite a tabela direto no diálogo",
+        "QR codes (link, Wi-Fi, vCard), códigos de barras (Code 128, EAN, UPC, Code 39, ITF) e texto variável com números de série, datas e colunas CSV",
+        "Biblioteca com 400 motivos e elementos de design embutidos (animais, plantas, feriados, molduras, bordas, ornamentos …) mais espaço para os seus – com prévias e busca, inserção por duplo clique ou arrastar",
+        "Ajustes de corte por camada com subcamadas, perfuração, lead-in/lead-out, overcut, rampa de potência nas esquinas e passo Z por passagem",
+        "Biblioteca de materiais para ajustes de corte e imagem; bibliotecas LightBurn (.clb) podem ser importadas",
+        "Caixa de ferramentas: cada gerador e ferramenta como um azulejo, com busca em inglês e alemão, favoritos, ferramentas usadas recentemente e modelos de extensões"
+      ]
+    },
+    "open": {
+      "title": "Aberto e extensível",
+      "lead": "Software livre que cresce com você – e conversa com suas ferramentas.",
+      "b": [
+        "Servidor MCP para agentes de IA: ler, desenhar, gerar peças. Só local, desligado por padrão, protegido por token",
+        "Ações na máquina pedidas por agentes só começam depois da sua confirmação – pausa e parada sempre funcionam",
+        "Extensões (.kzp) adicionam presets de dispositivo, modelos, materiais e motivos – sem atualizar o app, só dados, sem código",
+        "Transfira ajustes, dispositivos e bibliotecas como arquivo ou sincronize entre computadores pela sua própria pasta (iCloud, Dropbox, Nextcloud)",
+        "Interface em português, inglês, alemão, italiano e espanhol; novos idiomas são fáceis de adicionar",
+        "GPL-3.0-or-later, formatos de arquivo JSON abertos, feito com Tauri 2, TypeScript e Rust",
+        "Antes “Laserwerk”: ajustes, dispositivos e materiais são aproveitados; projetos antigos ainda abrem"
+      ]
+    }
+  },
+  "gallery": {
+    "title": "Um olhar por dentro",
+    "gearpair": "Gerador de par de engrenagens com prévia ao vivo: 14 e 28 dentes, módulo 3, distância entre centros 63 mm",
+    "check": "Verificação do desenho: erros e avisos com correções em um clique"
+  },
+  "alt": {
+    "logo": "Logo do KizamuBeam",
+    "hero": "Janela principal do KizamuBeam com a área de trabalho, lista de camadas à direita e ferramentas à esquerda",
+    "gen": "Gerador de gaveta na vista 3D: peças com junta de dedo afastadas, sem colisões",
+    "prod": "Diálogo de nesting sobre as peças selecionadas de uma caixa na área de trabalho",
+    "gearpair": "Diálogo Criar par de engrenagens com campos de entrada e prévia das duas engrenagens",
+    "check": "Painel Verificar à direita com um erro e vários avisos, cada um com botão de correção",
+    "vm": "KizamuBeam Virtual Machine na vista 3D: peças cortadas ao lado da chapa de compensado, estado da máquina e material à direita"
+  },
+  "hw": {
+    "eyebrow": "Hardware",
+    "title": "Funciona com o seu laser",
+    "lead": "O KizamuBeam conversa com os controladores encontrados na maioria dos lasers de diodo e CNC amadores.",
+    "firmware_label": "Firmware",
+    "firmware": ["FluidNC", "GRBL 1.1", "grblHAL", "Marlin", "Smoothieware"],
+    "conn_label": "Conexão",
+    "conn": ["USB (serial)", "Wi-Fi via Telnet", "Wi-Fi via WebSocket"],
+    "presets_label": "Presets de dispositivo",
+    "presets_text": "Presets para máquinas populares da Swiitol, Ortur, Atomstack, Sculpfun, xTool, Creality Falcon, Two Trees, Longer e Comgrow – ou genéricos por controlador.",
+    "tested": "Testado no dia a dia em um Swiitol E6 Pro com FluidNC.",
+    "not_supported": "Não suportado: lasers galvo e controladores Ruida/DSP.",
+    "disclaimer": "Os nomes dos fabricantes só identificam máquinas compatíveis; sem afiliação com os fabricantes."
+  },
+  "dl": {
+    "eyebrow": "Download",
+    "title": "Baixar o KizamuBeam",
+    "lead": "Versão atual: {version}. Grátis, sem cadastro.",
+    "mac_title": "macOS",
+    "mac_detail": "Universal (Apple Silicon e Intel) · .dmg",
+    "win_title": "Windows",
+    "win_detail": "Instalador (.exe)",
+    "linux_title": "Linux",
+    "linux_detail": "AppImage · .deb · .rpm",
+    "button": "Baixar",
+    "button_mac": "Baixar para macOS",
+    "button_win": "Baixar para Windows",
+    "button_linux": "Baixar para Linux",
+    "all_releases": "Todos os lançamentos no GitHub",
+    "source": "Prefere compilar você mesmo? Veja o README."
+  },
+  "vm": {
+    "eyebrow": "Teste sem um laser",
+    "title": "KizamuBeam Virtual Machine",
+    "lead": "Um programa separado e gratuito que se comporta como um laser com FluidNC. Envie seu job e veja gravar e cortar em tempo real – sem gastar material e sem risco para a máquina.",
+    "b": [
+      "Emula um controlador FluidNC via Telnet (porta 2323) e WebSocket (porta 8181) – o KizamuBeam conecta pelo preset “KizamuBeam Virtual Machine”; outros programas como dispositivo de rede GRBL ou FluidNC",
+      "Também responde como um controlador Ruida DSP via UDP (portas 50200/50207): LightBurn, RDWorks, MeerK40t ou Rayforge podem enviar jobs de CO₂, incluindo framing, jog e status",
+      "Movimentos com aceleração real e planejador de trajetória: tempo de execução, framing, homing e mensagens de erro como na máquina",
+      "Vista 3D da mesa com o módulo laser, mais uma vista superior 2D",
+      "Coloque material: compensado, acrílico, papelão e mais – as linhas queimam conforme potência e velocidade",
+      "Retire peças cortadas, vire-as e inspecione de todos os lados; peças ainda ligadas são sinalizadas",
+      "Câmera virtual acima da mesa ou na cabeça – usável no KizamuBeam como câmera de rede, inclusive calibração"
+    ],
+    "dl_title": "Baixar a Virtual Machine",
+    "dl_lead": "Prévia para macOS, Windows e Linux. Instala independentemente do KizamuBeam.",
+    "dl_lead_tpl": "Prévia {version} para macOS, Windows e Linux. Instala independentemente do KizamuBeam.",
+    "button_mac": "Baixar a Virtual Machine para macOS",
+    "button_win": "Baixar a Virtual Machine para Windows",
+    "button_linux": "Baixar a Virtual Machine para Linux",
+    "all_releases": "Todos os lançamentos da Virtual Machine no GitHub",
+    "note": "Sem assinatura de código como o próprio KizamuBeam: no macOS escolha “Abrir mesmo assim”, no Windows “Mais informações → Executar assim mesmo”."
+  },
+  "beta": {
+    "title": "Estável – e ainda crescendo",
+    "text": "A versão 2.2.0 é o primeiro lançamento estável: cada recurso foi testado em hardware real e é usado todo dia. Quer novidades mais cedo? Mude para o canal Beta em Ajuda → Verificar atualizações. Relate bugs e ideias no GitHub.",
+    "unsigned_title": "Aviso na primeira abertura",
+    "unsigned_text": "Os instaladores ainda não têm assinatura de código, então macOS (Gatekeeper) e Windows (SmartScreen) mostram um aviso na primeira vez.",
+    "unsigned_mac": "macOS: arraste o app para a pasta Aplicativos e abra. No diálogo clique em “Concluído” (não “Mover para o Lixo”), depois Ajustes do Sistema → Privacidade e Segurança → role para baixo → “Abrir mesmo assim” → confirme com a senha. Ou no Terminal: xattr -cr /Applications/KizamuBeam.app",
+    "unsigned_win": "Windows: “Mais informações” → “Executar assim mesmo”.",
+    "safety": "Lasers não são brinquedo: use proteção ocular, ligue a exaustão e fique junto da máquina."
+  },
+  "faq": {
+    "title": "Perguntas frequentes",
+    "items": [
+      { "q": "O KizamuBeam é realmente gratuito?", "a": "Sim. O KizamuBeam é licenciado sob GPL-3.0-or-later: sem taxa de licença, sem assinatura, sem conta – uso comercial incluso." },
+      { "q": "Vai funcionar com o meu laser?", "a": "Se ele roda FluidNC, GRBL, grblHAL, Marlin ou Smoothieware, muito provavelmente – isso cobre a maioria dos lasers de diodo. Lasers galvo e controladores Ruida/DSP não são suportados." },
+      { "q": "Por que o computador avisa na instalação?", "a": "Os instaladores ainda não têm assinatura de código, o que é comum em projetos open-source novos. No macOS: Ajustes do Sistema → Privacidade e Segurança → “Abrir mesmo assim”; no Windows: “Mais informações” → “Executar assim mesmo”." },
+      { "q": "Posso trazer meus ajustes de material?", "a": "Sim. Bibliotecas de material LightBurn (.clb) podem ser importadas onde houver campos equivalentes. Projetos LightBurn (.lbrn2) abrem com formas, imagens e ajustes de camada. Projetos e bibliotecas Laserwerk abrem direto, e SVG, DXF, PDF e Illustrator (.ai) importam normalmente." },
+      { "q": "O KizamuBeam é estável o bastante para projetos reais?", "a": "Sim – desde a versão 2.2.0 há lançamentos estáveis, e o KizamuBeam é usado em hardware real todo dia. Como em qualquer software a laser: confira jobs novos com prévia e frame, e faça backup dos projetos importantes." },
+      { "q": "Para que serve o servidor MCP?", "a": "Ele permite que agentes de IA leiam e editem seus projetos. Fica desligado por padrão, só local e protegido por token, e nada chega à máquina sem a sua confirmação no KizamuBeam." },
+      { "q": "Como posso ajudar?", "a": "Teste o KizamuBeam no seu laser, relate bugs e ideias no GitHub, tire dúvidas e compartilhe projetos no Discord, traduza a interface para o seu idioma ou envie um pull request." }
+    ]
+  },
+  "footer": {
+    "tagline": "KizamuBeam – software a laser gratuito. 刻む: gravar, cortar com precisão.",
+    "license": "© 2026 Hanjo Winter · Software livre sob GPL-3.0-or-later · Desenvolvido com assistência do Claude Code.",
+    "link_github": "GitHub",
+    "link_releases": "Lançamentos",
+    "link_issues": "Reportar um problema",
+    "link_discord": "Discord",
+    "link_license": "Licença",
+    "trademark": "LightBurn é marca registrada da LightBurn Software, LLC. KizamuBeam é um projeto independente e não é afiliado nem endossado pela LightBurn Software. Todas as outras marcas pertencem aos respectivos proprietários."
+  },
+  "notfound": {
+    "title": "Página não encontrada",
+    "text": "Esta página não existe (mais).",
+    "home": "Ir para a página inicial"
+  }
+}

@@ -132,7 +132,7 @@
         "Le azioni sulla macchina richieste dagli agenti partono solo dopo la tua conferma – pausa e stop funzionano sempre",
         "Le estensioni (.kzp) aggiungono profili di dispositivo, modelli, materiali e motivi – senza aggiornare l’app, solo dati, nessun codice",
         "Trasferisci impostazioni, dispositivi e librerie come file o sincronizzali tra computer tramite una tua cartella (iCloud, Dropbox, Nextcloud)",
-        "Interfaccia in italiano, inglese e tedesco; nuove lingue si aggiungono facilmente",
+        "Interfaccia in italiano, inglese, tedesco, spagnolo e portoghese; nuove lingue si aggiungono facilmente",
         "GPL-3.0-or-later, formati di file JSON aperti, realizzato con Tauri 2, TypeScript e Rust",
         "Precedentemente “Laserwerk”: impostazioni, dispositivi e materiali vengono ripresi, i vecchi progetti si aprono ancora"
       ]
