@@ -74,7 +74,7 @@ test('Schlitze in Rückwand und Deckel, Knöchel als neue Teile', () => {
   // Deckel-Schlitze an den Stellen dazwischen (30 und 70 mm)
   const mids = r.changes.get(lid)!.subs.slice(1).map((sp) => (Math.min(...sp.nodes.map((p) => p.x)) + Math.max(...sp.nodes.map((p) => p.x))) / 2);
   assert.deepEqual(mids.map((m) => Math.round(m * 1000) / 1000).sort((a, b) => a - b), [30, 70]);
-  assert.match(r.info, /3 knuckles for the box, 2 for the lid; pin Ø 3 mm, about 87 mm long/);
+  assert.match(r.info, /3 Knöchel für den Kasten, 2 für den Deckel; Stift Ø 3 mm, etwa 87 mm lang/);
 });
 
 test('Gerade Knöchelzahl wird ungerade, eine Kante allein geht nicht', () => {
