@@ -1962,8 +1962,10 @@ function buildPalette(ed: Editor) {
     const b = h('button', {
       class: i >= 30 ? 'tool' : '',
       style: `background:${c}`,
-      title: i >= 30 ? t('Werkzeug-Layer {layer} (wird nicht gelasert)', { layer: layerLabel(i) }) : t('Layer {layer}: Auswahl zuordnen', { layer: layerLabel(i) }),
-      onclick: () => ed.assignLayer(i),
+      title: i >= 30 ? t('Werkzeug-Layer {layer} (wird nicht gelasert). Doppelklick: Layer-Einstellungen', { layer: layerLabel(i) }) : t('Layer {layer}: Auswahl zuordnen. Doppelklick: Layer-Einstellungen', { layer: layerLabel(i) }),
+      // The second click of a double-click does not assign again (no extra undo step)
+      onclick: (e: MouseEvent) => e.detail < 2 && ed.assignLayer(i),
+      ondblclick: () => openLayerDialog(ed, i),
     }, layerLabel(i));
     btns.push(b);
     root.append(b);

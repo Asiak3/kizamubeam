@@ -1448,8 +1448,6 @@
   "Glättung": "Smoothing",
   "Bild danach löschen": "Elimina immagine successivamente",
   "Dunkler als der Schwellwert wird zur Fläche. Helligkeit, Kontrast und Gamma aus „Bild anpassen“ wirken mit.": "Ciò che è più scuro della soglia viene riempito. Anche luminosità, contrasto e gamma di “Modifica immagine” vengono applicati.",
-  "Werkzeug-Layer {layer} (wird nicht gelasert)": "Livello strumento {layer} (non inciso)",
-  "Layer {layer}: Auswahl zuordnen": "Livello {layer}: assegna selezione",
   "Rasterweite (mm)": "Dimensione griglia (mm)",
   "An Knoten, Mittelpunkten, Zentren, Schnittpunkten und Linien fangen (Ctrl beim Ziehen: umkehren, Alt: stärker und Ausrichtungshilfen)": "Aggancia a nodi, punti medi, centri, intersezioni e linee (Ctrl durante il trascinamento: inverti, Alt: più forte e guide di allineamento)",
   "Fang": "Aggancia",
@@ -4484,5 +4482,7 @@
   "Alle Teile zusammenholen und auswählen": "Riunisci tutte le parti e seleziona",
   "Teile der Baugruppe zusammenholen": "Riunisci le parti dell'assieme",
   "Baugruppe auf Seite verschieben": "Sposta l'assieme sulla pagina",
-  "Leerer Layer: {layer}": "Livello vuoto: {layer}"
+  "Leerer Layer: {layer}": "Livello vuoto: {layer}",
+  "Werkzeug-Layer {layer} (wird nicht gelasert). Doppelklick: Layer-Einstellungen": "Livello strumento {layer} (non inciso). Doppio clic: impostazioni del livello",
+  "Layer {layer}: Auswahl zuordnen. Doppelklick: Layer-Einstellungen": "Livello {layer}: assegna la selezione. Doppio clic: impostazioni del livello"
 }
