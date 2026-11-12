@@ -899,7 +899,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   }) as HTMLInputElement;
   rows.push(h('label', { title: t('Digitale Ausgänge (user_outputs, M64/M65 P…), die während jedes Jobs an sind, z. B. Absaugung') }, t('Ausgänge im Job')), outsIn);
   rows.push(h('div', { class: 'note wide' }, t('Startreferenz und Job-Ursprung stehen im Laser-Fenster.')));
-  newTab(t('Verbindung'));
+  newTab(t('Verbindung|Gerät'));
   const connSel: HTMLSelectElement = h('select', { onchange: (e: Event) => (d.conn = (e.target as HTMLSelectElement).value as Device['conn']) },
     h('option', { value: 'serial', selected: d.conn === 'serial' }, t('USB (seriell)')),
     h('option', { value: 'tcp', selected: d.conn === 'tcp' }, t('WLAN (Telnet)')),
@@ -1087,7 +1087,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   limit(t('Kleinste Geschwindigkeit (mm/min)'), t('Jobs, die ein KI-Agent anfordert, dürfen nirgends langsamer sein (0 = keine Grenze)'),
     () => d.agentMinSpeed, (v) => (d.agentMinSpeed = Math.max(0, v)));
   rows.push(h('div', { class: 'note wide' }, t('Gerätevorlagen für neue Geräte stehen im Dialog „Geräte …“.')));
-  const readNote = h('div', { class: 'note' });
+  const readNote = h('div', { class: 'note wide' });
   // Lesen nur vom verbundenen Gerät und nur bei FluidNC und GRBL-artigen Steuerungen
   const canRead = () => isCurrent && machine.connected && !machine.running && FIRMWARES[d.fw].read !== null;
   const readBtn: HTMLButtonElement = h('button', {
@@ -1171,6 +1171,9 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   document.body.append(dlg);
   dlg.showModal();
   // Stabile Dialoggröße: größter Tab als Referenz, kein Springen beim Wechsel.
+  // Nur offsetHeight (durch max-height begrenzt): min-height darf die innere
+  // Scrollbegrenzung nicht aushebeln, sonst scrollt der ganze Dialog und
+  // Abbrechen/Übernehmen rutschen bei niedrigen Fenstern aus dem Sichtfeld.
   {
     const prevVis = dlg.style.visibility;
     dlg.style.visibility = 'hidden';
@@ -1178,7 +1181,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     panels.forEach((_p, i) => {
       panels.forEach((q, k) => (q.hidden = k !== i));
       const p = panels[i] as HTMLElement;
-      max = Math.max(max, p.offsetHeight, p.scrollHeight);
+      max = Math.max(max, p.offsetHeight);
     });
     panels.forEach((q, k) => (q.hidden = k !== activeTab));
     if (max > 0) panels.forEach((p) => ((p as HTMLElement).style.minHeight = `${max}px`));
