@@ -38,7 +38,7 @@ export function openEntryDialog(init: EntryDraft, onSave: (e: EntryDraft) => voi
             h('input', { type: 'checkbox', checked: withImg, onchange: (ev: Event) => (withImg = (ev.target as HTMLInputElement).checked) }), t('Bild-Einstellungen mitspeichern')))
         : null,
     ),
-    h('div', { class: 'note' }, e.img
+    h('div', { class: 'note' }, e.img?.speed !== undefined && e.img.power !== undefined
       ? t('Einstellungen: {settings}; Bilder: {speed} mm/min, {power} %.', { settings: settingsSummary(e.settings), speed: e.img.speed, power: e.img.power })
       : t('Einstellungen: {settings}.', { settings: settingsSummary(e.settings) })),
     err,
@@ -74,7 +74,8 @@ export function materialTab(ed: Editor): HTMLElement {
 
   const assign = (e: MaterialEntry) => {
     const i = target();
-    ed.updateLayer(i, layerPatch(e));
+    const parts = ed.layerParts(i);
+    ed.updateLayer(i, layerPatch(e, parts.img && !parts.vec));
     ed.hint = t('Layer {layer} nutzt jetzt „{entry}“.', { layer: layerLabel(i), entry: entryLabel(e) });
     ed.emit('tool');
   };

@@ -194,7 +194,7 @@ export class EditorRender {
     // Bilder liegen unter den Vektoren und zeigen das Ergebnis der Bildverarbeitung
     for (const [o, m, selected] of images) {
       const s = o.shape as ImageShape;
-      const cv = displayCanvas(s, m, this.imgLayer(o.layer));
+      const cv = displayCanvas(s, m, this.imgOutput(o.layer));
       ctx.save();
       if (faded.has(o)) ctx.globalAlpha = FADE;
       ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);

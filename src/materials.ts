@@ -2,7 +2,7 @@
 // Ein Eintrag hält die Bearbeitungseinstellungen eines Layers und wahlweise die Bild-Einstellungen.
 // Gespeichert wird im Browser-Speicher der App; Austausch über .kzm-Dateien (JSON, früher .lwm). LightBurn-
 // Bibliotheken (.clb) lassen sich einlesen, soweit ihre Felder hier eine Entsprechung haben.
-import { CutSettings, cutSettings, defaultCutSettings, normalizeCut, defaultImageLayer, defaultTabs, DitherMode, ImageLayer, Layer, LayerMode } from './model';
+import { CutSettings, cutSettings, defaultCutSettings, normalizeCut, defaultImageLayer, stripImageOutput, defaultTabs, DitherMode, ImageLayer, Layer, LayerMode } from './model';
 import { dec, t } from './i18n';
 import { cleanLook } from './view3d/looks';
 
@@ -190,18 +190,24 @@ export function entryFromLayer(L: Layer, withImg: boolean): Pick<MaterialEntry, 
   return { settings: cutSettings(L), img: withImg && L.img ? structuredClone(L.img) : undefined };
 }
 
-/** Änderung für einen Layer, der einen Eintrag übernimmt */
-export function layerPatch(e: MaterialEntry): Partial<Layer> {
+/**
+ * Änderung für einen Layer, der einen Eintrag übernimmt. imagesOnly: the layer holds only images, so
+ * older entries that kept image speed and power separately apply those to the layer
+ */
+export function layerPatch(e: MaterialEntry, imagesOnly = false): Partial<Layer> {
   // Ohne eigenes Aussehen im Eintrag gilt wieder das automatische (aus dem Materialnamen)
   const p: Partial<Layer> = { look: undefined, sub: undefined, ...structuredClone(e.settings), material: e.id, name: entryLabel(e) };
-  if (e.img) p.img = structuredClone(e.img);
+  if (e.img) {
+    if (imagesOnly) for (const k of ['speed', 'power', 'minPower', 'passes'] as const) if (typeof e.img[k] === 'number') p[k] = e.img[k];
+    p.img = stripImageOutput(e.img);
+  }
   return p;
 }
 
 /** Weichen die Einstellungen des Layers vom Eintrag ab? */
 export function differsFrom(L: Layer, e: MaterialEntry): boolean {
   if (JSON.stringify(cutSettings(L)) !== JSON.stringify(cutSettings(e.settings))) return true;
-  return !!e.img && JSON.stringify(L.img) !== JSON.stringify(e.img);
+  return !!e.img && JSON.stringify(L.img) !== JSON.stringify(stripImageOutput(e.img));
 }
 
 // ---------- Import ----------
