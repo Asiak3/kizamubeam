@@ -3770,8 +3770,6 @@
   "Umrisse": "Contornos",
   "Mittellinien": "Líneas centrales",
   "Bild danach löschen": "Eliminar la imagen después",
-  "Werkzeug-Layer {layer} (wird nicht gelasert)": "Capa de herramienta {layer} (no se envía al láser)",
-  "Layer {layer}: Auswahl zuordnen": "Capa {layer}: asignar selección",
   "Rasterweite (mm)": "Tamaño de cuadrícula (mm)",
   "An Knoten, Mittelpunkten, Zentren, Schnittpunkten und Linien fangen (Ctrl beim Ziehen: umkehren, Alt: stärker und Ausrichtungshilfen)": "Imán a nodos, puntos medios, centros, intersecciones y líneas (Ctrl al arrastrar: invertir, Alt: más fuerte y guías de alineación)",
   "Fang": "Imán",
@@ -4361,5 +4359,7 @@
   "Alle Teile zusammenholen und auswählen": "Reunir todas las piezas y seleccionar",
   "Teile der Baugruppe zusammenholen": "Reunir las piezas del conjunto",
   "Baugruppe auf Seite verschieben": "Mover el conjunto a la página",
-  "Leerer Layer: {layer}": "Capa vacía: {layer}"
+  "Leerer Layer: {layer}": "Capa vacía: {layer}",
+  "Werkzeug-Layer {layer} (wird nicht gelasert). Doppelklick: Layer-Einstellungen": "Capa de herramienta {layer} (no se graba). Doble clic: ajustes de la capa",
+  "Layer {layer}: Auswahl zuordnen. Doppelklick: Layer-Einstellungen": "Capa {layer}: asignar la selección. Doble clic: ajustes de la capa"
 }

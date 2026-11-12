@@ -1716,8 +1716,6 @@
   "Glättung": "Smoothing",
   "Bild danach löschen": "Delete image afterwards",
   "Dunkler als der Schwellwert wird zur Fläche. Helligkeit, Kontrast und Gamma aus „Bild anpassen“ wirken mit.": "Darker than the threshold becomes filled. Brightness, contrast and gamma from “Adjust Image” also apply.",
-  "Werkzeug-Layer {layer} (wird nicht gelasert)": "Tool layer {layer} (not lasered)",
-  "Layer {layer}: Auswahl zuordnen": "Layer {layer}: assign selection",
   "Rasterweite (mm)": "Grid size (mm)",
   "An Knoten, Mittelpunkten, Zentren, Schnittpunkten und Linien fangen (Ctrl beim Ziehen: umkehren, Alt: stärker und Ausrichtungshilfen)": "Snap to nodes, midpoints, centers, intersections and lines (Ctrl while dragging: invert, Alt: stronger and alignment guides)",
   "Fang": "Snap",
@@ -4577,5 +4575,7 @@
   "Alle Teile zusammenholen und auswählen": "Gather all parts and select",
   "Teile der Baugruppe zusammenholen": "Gather assembly parts",
   "Baugruppe auf Seite verschieben": "Move assembly to page",
-  "Leerer Layer: {layer}": "Empty layer: {layer}"
+  "Leerer Layer: {layer}": "Empty layer: {layer}",
+  "Werkzeug-Layer {layer} (wird nicht gelasert). Doppelklick: Layer-Einstellungen": "Tool layer {layer} (not lasered). Double-click: cut settings",
+  "Layer {layer}: Auswahl zuordnen. Doppelklick: Layer-Einstellungen": "Layer {layer}: assign selection. Double-click: cut settings"
 }
