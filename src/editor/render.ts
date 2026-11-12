@@ -69,8 +69,7 @@ export class EditorRender {
       canvas: this.canvas, ctx: this.ctx, dpr: this.dpr, view: this.view, sel: this.sel,
       nodeHover: this.nodeHover, segHover: this.segHover, snapHit: this.snapHit, alignGuides: this.alignGuides, draft: this.draft,
       centerMarks: this.centerMarks,
-      isolation: this.isolation,
-      overlapHover: this.overlapHover,
+      isolation: this.isolation, builderSession: this.builderSession, overlapHover: this.overlapHover,
     };
     try {
       this.canvas = off;
@@ -82,8 +81,7 @@ export class EditorRender {
       this.alignGuides = [];
       this.draft = null;
       this.centerMarks = 'off';
-      this.isolation = null;
-      this.overlapHover = null;
+      this.isolation = null; this.builderSession = null; this.overlapHover = null;
       this.render();
       return off.toDataURL('image/png');
     } finally {
@@ -271,6 +269,17 @@ export class EditorRender {
       ctx.stroke(worldPath(tmp.shape, IDENT));
     }
 
+    if (this.builderSession) {
+      const s = this.builderSession;
+      ctx.save();
+      ctx.fillStyle = s.erase ? 'rgba(220,40,40,0.35)' : 'rgba(255,140,20,0.35)';
+      ctx.strokeStyle = s.erase ? '#e04040' : '#ff8c20'; ctx.lineWidth = 1.5 * px;
+      s.faces.forEach((f, index) => {
+        if (s.hover !== index && !s.picked.has(index)) return;
+        const p = subsToPath2D(f.subs); ctx.fill(p, 'evenodd'); ctx.stroke(p);
+      });
+      ctx.restore();
+    }
     if (this.drag?.type === 'pencil') {
       ctx.strokeStyle = this.layerDrawColor(this.currentLayer);
       ctx.lineWidth = 1.2 * px;
@@ -311,6 +320,10 @@ export class EditorRender {
       if (preview.excluded?.length) {
         ctx.strokeStyle = '#ff465b'; ctx.lineWidth = 3 * px;
         ctx.setLineDash([]); ctx.stroke(subsToPath2D(preview.excluded));
+      for (const p of preview.markers ?? []) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, 5 * px, 0, Math.PI * 2);
+        ctx.fillStyle = '#e74757'; ctx.fill();
+      }
       }
       ctx.restore();
     }

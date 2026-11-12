@@ -48,6 +48,7 @@ export class EditorPointer {
   }
 
   onDown(this: Editor, e: PointerEvent) {
+    // A second pointer must not replace an in-progress freehand stroke.
     if (this.drag?.type === 'pencil' || this.drag?.type === 'freehand-edit') return;
     if(this.drag?.type==='lasso')return;
     const { sx, sy } = this.evPt(e);
@@ -93,6 +94,12 @@ export class EditorPointer {
     switch (this.tool) {
       case 'freehand-edit':this.beginFreehandEdit(wp,e.pointerId);return;
       case 'lasso':this.beginLasso(wp,e,false);return;
+      case 'builder':
+        if (!this.builderSession) return;
+        this.builderSession.picked.clear(); this.builderSession.erase = e.altKey;
+        this.builderStroke(wp, wp);
+        this.drag = { type: 'builder', last: wp, pointerId: e.pointerId };
+        return;
       case 'select': {
         if (this.hitPivot(sx, sy)) {
           this.drag = { type: 'pivot' };
@@ -303,7 +310,8 @@ export class EditorPointer {
   /** Right click: finish the line or sketch draft, or let the context menu open (see suppressContextMenu) */
   rightPress(this: Editor) {
     if (this.outlinePreview) { this.suppressContextMenu = true; return; }
-    this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || !!this.pickHandler || !!this.drag;
+    this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || this.tool === 'builder' || !!this.pickHandler || !!this.drag;
+    if (this.tool === 'builder') this.setTool('select');
     if (this.draft) this.finishLine();
     if (this.sketchEdit && this.sketchEdit.draft.length) {
       this.sketchEdit.draft = [];
@@ -325,6 +333,7 @@ export class EditorPointer {
   onMove(this: Editor, e: PointerEvent) {
     if(this.drag?.type==='freehand-edit' && this.drag.pointerId!==e.pointerId)return;
     if(this.drag?.type==='lasso'&&this.drag.pointerId!==e.pointerId)return;
+    if((this.drag?.type==='freehand-edit'||this.drag?.type==='lasso') && this.drag.pointerId!==e.pointerId)return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     this.cursor = wp;
@@ -377,7 +386,8 @@ export class EditorPointer {
                     ? 'row-resize'
                     : 'col-resize'
                   : 'default';
-      } else if (this.tool === 'node') this.updateNodeHover(sx, sy);
+      } else if (this.tool === 'builder') this.builderHover(wp.x, wp.y);
+      else if (this.tool === 'node') this.updateNodeHover(sx, sy);
       else if (this.tool === 'joint') this.updateJointHover(sx, sy);
       else if (this.tool === 'relate') this.updateRelHover(sx, sy);
       else if (this.tool === 'trim') this.updateTrimHover(sx, sy);
@@ -385,6 +395,13 @@ export class EditorPointer {
       return;
     }
     switch (d.type) {
+      case 'freehand-edit': this.sampleFreehandEdit(wp,e.pointerId); return;
+      case 'lasso':
+        if(Math.hypot(wp.x-d.points.at(-1)!.x,wp.y-d.points.at(-1)!.y)*this.view.zoom>=2){if(d.points.length<4096)d.points.push(wp);else d.overflow=true;}
+        this.redraw();return;
+      case 'builder':
+        if (d.pointerId !== e.pointerId) return;
+        this.builderStroke(d.last, wp); d.last = wp; return;
       case 'pencil': {
         if (e.pointerId !== d.pointerId || d.overflow) return;
         const samples = e.getCoalescedEvents?.() ?? [];
@@ -397,10 +414,6 @@ export class EditorPointer {
         }
         this.redraw(); return;
       }
-      case 'freehand-edit':this.sampleFreehandEdit(wp,e.pointerId);return;
-      case 'lasso':
-        if(Math.hypot(wp.x-d.points.at(-1)!.x,wp.y-d.points.at(-1)!.y)*this.view.zoom>=2){if(d.points.length<4096)d.points.push(wp);else d.overflow=true;}
-        this.redraw();return;
       case 'pan':
         this.view.ox = d.ox + sx - d.sx;
         this.view.oy = d.oy + sy - d.sy;
@@ -634,6 +647,9 @@ export class EditorPointer {
   }
 
   onUp(this: Editor, e: PointerEvent) {
+    if((this.drag?.type==='freehand-edit'||this.drag?.type==='lasso') && this.drag.pointerId!==e.pointerId)return;
+    // Ignore unrelated releases before clearing the active drag. In particular,
+    // a second touch/pen can otherwise make a Pencil stroke silently disappear.
     if (this.drag && 'pointerId' in this.drag && this.drag.pointerId !== e.pointerId) return;
     if (this.tool === 'sketch') this.sketchUp();
     const d = this.drag;
@@ -643,6 +659,11 @@ export class EditorPointer {
     this.alignGuides = [];
     this.redraw();
     switch (d.type) {
+      case 'builder': {
+        if (d.pointerId !== e.pointerId) return;
+        const p = this.evPt(e), end = this.toWorld(p.sx, p.sy);
+        this.builderStroke(d.last, end); this.commitShapeBuilder(); return;
+      }
       case 'pencil': {
         if (e.pointerId !== d.pointerId || d.overflow) return;
         const p = this.evPt(e), end = this.toWorld(p.sx, p.sy);
@@ -768,6 +789,7 @@ export class EditorPointer {
 
   onDouble(this: Editor, e: MouseEvent) {
     if (this.outlinePreview) return;
+    if (this.tool === 'builder') return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     if (this.tool === 'sketch') {
@@ -848,6 +870,7 @@ export class EditorPointer {
   }
 
   cancelDrag(this: Editor) {
+    if (this.builderSession) this.builderSession.picked.clear();
     const d = this.drag;
     if (!d) return;
     this.drag = null;

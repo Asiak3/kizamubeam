@@ -1,7 +1,7 @@
 // Bounded region decomposition for selectable outline faces, using existing Clipper.
 import ClipperLib from 'clipper-lib';
 import { execute, Paths, SCALE } from './clip';
-import { homeLayer, Obj, SubPath } from './model';
+import { homeLayer, Obj, SubPath, IDENT } from './model';
 import { region } from './ops';
 export interface ShapeRegion { subs: SubPath[]; layer: number }
 const { ClipType: C, PolyFillType: F, Clipper } = ClipperLib;
@@ -42,6 +42,10 @@ export function shapeRegions(objects: Obj[]): ShapeRegion[] {
   return faces;
 }
 
+export function mergeRegions(faces: ShapeRegion[]): SubPath[][] {
+  return components(faces.reduce((paths, f) => clip(C.ctUnion, paths, pathsOf(f.subs)), [] as Paths));
+}
+
 /** Inclusive boundary hit; holes toggle parity instead of becoming clickable fill. */
 export function regionContains(face: ShapeRegion, x: number, y: number): boolean {
   let inside = false;
@@ -52,3 +56,23 @@ export function regionContains(face: ShapeRegion, x: number, y: number): boolean
   }
   return inside;
 }
+
+/** Hit all regions crossed by a stroke, even when pointer events skip a narrow face. */
+export function regionsAlong(faces: ShapeRegion[], a: { x: number; y: number }, b: { x: number; y: number }): number[] {
+  const d = { x: b.x - a.x, y: b.y - a.y };
+  return faces.flatMap((face, index) => {
+    if (regionContains(face, a.x, a.y) || regionContains(face, b.x, b.y)) return [index];
+    for (const sp of face.subs) for (let i = 0; i < sp.nodes.length; i++) {
+      const p = sp.nodes[i], q = sp.nodes[(i + 1) % sp.nodes.length], e = { x: q.x - p.x, y: q.y - p.y };
+      const cross = d.x * e.y - d.y * e.x;
+      if (Math.abs(cross) < 1e-12) continue;
+      const t = ((p.x - a.x) * e.y - (p.y - a.y) * e.x) / cross;
+      const u = ((p.x - a.x) * d.y - (p.y - a.y) * d.x) / cross;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return [index];
+    }
+    return [];
+  });
+}
+
+export const regionObject = (face: ShapeRegion, id: number): Obj => ({ id, m: [...IDENT], layer: face.layer,
+  shape: { kind: 'path', subs: structuredClone(face.subs) } });

@@ -1,5 +1,4 @@
 import { openOutlineDialog } from './outlineDialog';
-import { cameraOverlaysVisible, toggleCameraOverlays } from './cameraOverlayVisibility';
 import { canEnterIsolation } from './isolation';
 // Oberfläche: Menü, Leisten, Panels, Palette, Statusleiste.
 import { Editor, Tool } from './editor';
@@ -20,10 +19,15 @@ import { $, evalExpr, f2, h, iconBtn, numInput, sep, setVal } from './dom';
 import { openCircularArrayDialog, openGridArrayDialog } from './arrayDialogs';
 import { openNestDialog } from './nestDialog';
 import { openWorkpieceDialog } from './workpieceDialog';
+import { cameraOverlaysVisible, toggleCameraOverlays } from './cameraOverlayVisibility';
 import { openBackgroundDialog } from './bgDialog';
 import { openJointDialog } from './jointDialog';
 import { openHingeDialog } from './hingeDialog';
 import { openSlotDialog } from './slotDialog';
+import { openSlotPlacementDialog } from './slotPlacementDialog';
+import { isSlotGenerator } from './slotPlacement';
+import { isContourOffsetGenerator } from './contourOffset';
+import { openContourOffsetDialog } from './contourOffsetDialog';
 import { openWarpDialog } from './warpDialog';
 import { openVectorFitDialog } from './vectorDialog';
 import { installEditorContext } from './editorContext';
@@ -37,7 +41,7 @@ import { maybeOfferSetup, openSetupWizard } from './setupWizard';
 import { maybeCheckForUpdates, openUpdateDialog } from './updateDialog';
 import { openPacksDialog } from './packsDialog';
 import { openGridDialog } from './gridDialog';
-import { buildLaser, frameJob, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob } from './laser';
+import { buildLaser, frameJob, isPositionPick, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob, togglePositionPick } from './laser';
 import { openLayerDialog } from './layerdialog';
 import { openMaterialTestDialog } from './materialtest';
 import { openTestPhotoDialog } from './testphotoDialog';
@@ -66,6 +70,7 @@ import { installSketchPanel } from './sketchPanel';
 import { isSketchObj } from './editor/sketch';
 import { loadRightPan } from './editor/pointer';
 import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, showWindow, windowList } from './dock';
+
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
 import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
 import { dec, LangPref, langPref, LANGUAGES, setLangPref, t, tn } from './i18n';
@@ -154,7 +159,7 @@ export function buildUI(ed: Editor) {
   buildLayers(ed);
   const contextCallbacks = {
     adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
-    saveBitmap: () => saveProcessedBitmap(ed),
+    saveBitmap: () => saveProcessedBitmap(ed), vectorFit: () => openVectorFitDialog(ed), builder: () => beginShapeBuilder(ed),
     library: () => openAddSelectionDialog(ed), preview: () => openPreview(ed), objects: () => showWindow('objects'),
   };
   buildObjectsPanel(ed, contextCallbacks);
@@ -177,6 +182,7 @@ export function buildUI(ed: Editor) {
     shortcuts: helpRows,
   });
   buildMenu(ed);
+
   const isolationBadge = h('div', { class: 'editor-isolation-badge', hidden: true },
     h('span', {}, t('Isolation aktiv – kein Ausgabefilter')),
     h('button', { type: 'button', class: 'btn', onclick: () => ed.leaveIsolation() }, t('Isolation verlassen')));
@@ -193,7 +199,7 @@ export function buildUI(ed: Editor) {
   onMeshReady(() => ed.emit('doc'));
   ed.onGridArray = () => openGridArrayDialog(ed);
   ed.onBarcodeEdit = (o) => editBarcode(ed, o);
-  ed.onGenEdit = (o) => (isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
+  ed.onGenEdit = (o) => (o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
   installSketchPanel(ed);
   ed.onGenGuard = askGenConvert;
   ed.onJointDialog = () => openJointDialog(ed);
@@ -208,6 +214,13 @@ export function buildUI(ed: Editor) {
       openTraceDialog(ed);
     }
   });
+}
+
+async function beginShapeBuilder(ed: Editor): Promise<void> {
+  if (ed.tool === 'builder' && ed.builderSession) return;
+  if (!ed.sel.length) return;
+  if (!confirm(t('Formerstellung als lokalen Test starten? Die erste Bearbeitung erstellt unabhängige Pfade und setzt die erhaltenen Originale auf „Nicht lasern“. Parametrische Originale bleiben editierbar; Ergebnisse aktualisieren sich nicht automatisch. Offene Linien und Lückenerkennung sind noch nicht unterstützt.'))) return;
+  await ed.startShapeBuilder();
 }
 
 // ---------- Sprache ----------
@@ -291,6 +304,9 @@ function buildMenu(ed: Editor) {
       [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
       [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
       [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
+      [t('Formerstellung …'), '', () => beginShapeBuilder(ed)],
+      [t('Außenkontur und Inseln ableiten …'), '', () => void openOutlineDialog(ed)],
+      [t('Schlitze / Ausklinkungen platzieren …'), '', () => openSlotPlacementDialog(ed)],
       [t('Rechteck'), 'Ctrl+R', () => ed.setTool('rect')],
       [t('Ellipse'), 'Ctrl+E', () => ed.setTool('ellipse')],
       [t('Polygon'), '', () => ed.setTool('polygon')],
@@ -308,6 +324,7 @@ function buildMenu(ed: Editor) {
       ] },
       [t('Außenkontur und Inseln ableiten …'), '', () => void openOutlineDialog(ed)],
       [t('Offset …'), 'Alt+O', () => openOffsetDialog(ed)],
+      [t('Lokaler Konturversatz …'), '', () => openContourOffsetDialog(ed)],
       [t('Verformen …'), '', () => openWarpDialog(ed)],
       { sub: t('Pfad'), items: [
         [t('Pfad schließen'), '', () => ed.closeSel()],
@@ -316,6 +333,7 @@ function buildMenu(ed: Editor) {
         [t('Zerlegen'), 'Alt+B', () => ed.breakApartSel()],
         [t('Freihandpfad bearbeiten …'), '', () => openFreehandEditDialog(ed)],
         [t('Lasso-Auswahl'), '', () => ed.setTool('lasso')],
+        [t('Pfadinseln trennen …'), '', () => openPathIslandsDialog(ed)],
         [t('Richtung umkehren'), '', () => ed.reverseSel()],
         [t('Ecken runden oder fasen …'), '', () => openCornerDialog(ed)],
         'sep',
@@ -834,7 +852,6 @@ function buildNumbar(ed: Editor) {
     nodeBtn(t('Ecken …'), t('Ausgewählte Ecken runden, innen runden oder fasen'), () => openCornerDialog(ed)),
   );
   const sepNode = sep();
-
   const pencilTolerance = h('input', { type: 'number', min: 0.001, max: 100, step: 0.01, value: String(ed.pencilTolerance),
     'aria-label': t('Freihandtoleranz in Millimetern'), style: 'width: 7ch' });
   pencilTolerance.addEventListener('change', () => {
@@ -1019,6 +1036,7 @@ function buildBars(ed: Editor) {
     { id: 'breakapart', cat: M, short: t('Zerlegen'), label: t('Zerlegen (Alt+B)'), run: () => ed.breakApartSel(), enabled: sel1 },
     { id: 'freehand-edit', cat: W, icon:'line', label:t('Freihandpfad bearbeiten …'), run:()=>openFreehandEditDialog(ed), enabled:sel1, on:()=>ed.tool==='freehand-edit' },
     tool('lasso','select',t('Lasso-Auswahl')),
+    { id: 'path-islands', cat: M, label: t('Pfadinseln trennen …'), run: () => openPathIslandsDialog(ed), enabled: sel1 },
     { id: 'reverse', cat: M, short: t('Umkehren'), label: t('Richtung umkehren'), run: () => ed.reverseSel(), enabled: sel1 },
     { id: 'corners', cat: M, short: t('Ecken'), label: t('Ecken runden oder fasen …'), run: () => openCornerDialog(ed), enabled: sel1 },
     { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern (+)'), run: () => ed.zoomAt(1.25) },
@@ -1054,6 +1072,7 @@ function buildBars(ed: Editor) {
     tool('line', 'line', t('Linien zeichnen (Ctrl+L)')),
     { id: 'isolate', cat: W, icon: 'isolate', label: t('Auswahl isolieren / Isolation verlassen'), run: () => { if (ed.isolation) ed.leaveIsolation(); else ed.isolateSelection(); }, enabled: () => !!ed.isolation || canEnterIsolation(ed), on: () => !!ed.isolation, dyn: () => ed.isolation ? { icon: 'isolateExit', label: t('Isolation verlassen') } : { icon: 'isolate', label: t('Auswahl isolieren') } },
     { id: 'vectorfit', cat: W, icon: 'vectorfit', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
+    { id: 'shape-builder', cat: W, icon: 'shapeBuilder', label: t('Formerstellung …'), run: () => beginShapeBuilder(ed), enabled: sel1, on: () => ed.tool === 'builder' },
     tool('pencil', 'pencil', t('Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad')),
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
     tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),
@@ -1119,6 +1138,7 @@ function buildBars(ed: Editor) {
     { id: 'start', cat: L, icon: 'play', label: t('Job starten'), run: () => startJob(ed) },
     { id: 'frame', cat: L, icon: 'frame', label: t('Rahmen: Rechteck um den Job abfahren'), run: () => frameJob(ed, false) },
     { id: 'contour', cat: L, icon: 'contour', label: t('Kontur-Rahmen: Umriss des Jobs abfahren'), run: () => frameJob(ed, true) },
+    { id: 'laserpos', cat: L, icon: 'target', label: t('Laser positionieren: Klick auf die Arbeitsfläche fährt den Laser dorthin'), run: () => togglePositionPick(ed), on: () => isPositionPick(ed) },
     { id: 'gcode', cat: L, icon: 'gcode', label: t('G-Code speichern'), run: () => saveGCode(ed) },
     { id: 'setup', cat: L, icon: 'setup', short: t('Einrichten'), label: t('Laser einrichten: Schritt für Schritt von der Verbindung bis zum ersten Testauftrag'), run: () => openSetupWizard(ed) },
     { id: 'materialtest', cat: L, icon: 'mattest', short: t('Test'), label: t('Materialtest …'), run: () => openMaterialTestDialog(ed) },
@@ -1130,6 +1150,8 @@ function buildBars(ed: Editor) {
     { id: 'devices', cat: L, short: t('Geräte'), label: t('Geräte …'), run: () => openDevicesDialog(ed) },
     { id: 'rotary', cat: L, icon: 'rotary', short: t('Rotary'), label: t('Drehachse (Rotary) …'), run: () => openRotaryDialog() },
     { id: 'slots', cat: M, icon: 'slots', label: t('Schlitze an Materialdicke anpassen …'), run: () => openSlotDialog(ed) },
+    { id: 'slotplace', cat: M, icon: 'slots', label: t('Schlitze / Ausklinkungen platzieren …'), run: () => openSlotPlacementDialog(ed), enabled: () => n() === 1 },
+    { id: 'contouroffset', cat: M, icon: 'offset', label: t('Lokaler Konturversatz …'), run: () => openContourOffsetDialog(ed), enabled: () => n() > 0 },
     { id: 'jigfill', cat: A, icon: 'jigfill', label: t('Auf Jig-Fächer legen: gewähltes Design in jedes Fach eines Jigs kopieren, auf Wunsch mit Seriennummer je Fach'), run: () => openJigFillDialog(ed), enabled: sel1 },
     { id: 'workpiece', cat: A, icon: 'workpiece', label: t('Auf Werkstücke übertragen (Kamera) …'), run: () => openWorkpieceDialog(ed), enabled: sel1 },
     { id: 'bgremove', cat: I, icon: 'bgremove', label: t('Hintergrund entfernen …'), run: () => openBackgroundDialog(ed), enabled: () => ed.selImages().length > 0 },
@@ -1160,8 +1182,8 @@ function buildBars(ed: Editor) {
         'group', 'ungroup', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'tool:select', 'tool:node', 'vectorfit', 'isolate', SEP, 'tool:line', 'tool:pencil', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
-        'grp:bool', 'outline' ,'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure',
+        'tool:select', 'tool:node', 'vectorfit', 'shape-builder', 'isolate', SEP, 'tool:line', 'tool:pencil', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', 'apps', SEP,
+        'grp:bool', 'outline' ,'offset', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure', 'laserpos',
       ],
     },
     // Gespeicherte Leisten von vor den Knopfgruppen: die alten Standardfolgen durch die Gruppe ersetzen
@@ -2114,3 +2136,4 @@ function buildTextEditor(ed: Editor) {
 import { openSettings } from './settings/dialog';
 import { registerCoreSettings } from './settings/core';
 import { openFreehandEditDialog } from './freehandEditDialog';
+import { openPathIslandsDialog } from './pathIslandsDialog';

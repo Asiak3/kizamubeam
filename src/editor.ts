@@ -51,6 +51,8 @@ import { EditorIsolation, IsolationState } from './editor/isolation';
 import { EditorVector, VectorPlan } from './editor/vector';
 
 import { EditorOutline, type OutlinePreview } from './editor/outline';
+import { EditorInteraction, BuilderSession } from './editor/interaction';
+import { EditorContourOffset } from './editor/contourOffset';
 
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
@@ -126,6 +128,7 @@ export class Editor {
   vectorPreview: VectorPlan[] | null = null;
   pencilTolerance = 0.2;
   pencilClosed = false;
+  builderSession: BuilderSession | null = null;
   suppressContextMenu = false;
   /** Drag with the right mouse button pans the view (opt-in, Edit → Settings → Mouse and keyboard) */
   rightPan = loadRightPan();
@@ -321,6 +324,7 @@ export class Editor {
   }
   emit(what: 'doc' | 'sel' | 'view' | 'tool') {
     this.updateIsolation(what);
+    this.updateInteraction(what);
     this.dirty = true;
     if (what !== 'view') this.snapVer++;
     if (what === 'doc') this.syncTextLinks();
@@ -516,6 +520,7 @@ export class Editor {
   // ---------- Werkzeuge ----------
 
   setTool(t: Tool) {
+    if (t !== 'builder') this.builderSession = null;
     if (this.drag) this.cancelDrag();
     if (this.draft) this.finishLine();
     this.tool = t;
@@ -569,6 +574,8 @@ export interface Editor
     EditorIsolation,
     EditorVector,
     EditorOutline,
+    EditorInteraction,
+    EditorContourOffset,
     EditorRender {}
 
 const PARTS = [
@@ -602,6 +609,8 @@ const PARTS = [
   EditorIsolation,
   EditorVector,
   EditorOutline,
+  EditorInteraction,
+  EditorContourOffset,
   EditorRender,
 ];
 for (const part of PARTS) {

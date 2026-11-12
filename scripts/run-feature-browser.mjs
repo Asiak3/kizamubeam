@@ -62,7 +62,7 @@ try {
   clearTimeout(timeout);
   if (result.exceptionDetails) throw Error(result.exceptionDetails.exception?.description ?? 'Fixture failed');
   const report = result.result.value;
-  if(suite==='prepareTrustedOverlap') {
+  if(suite==='prepareTrustedOverlap'||suite==='prepareTrustedOverlapSelected') {
     const {x,y}=report;
     await call('Input.dispatchMouseEvent',{type:'mousePressed',x,y,button:'right',buttons:2,clickCount:1});
     await delay(700);

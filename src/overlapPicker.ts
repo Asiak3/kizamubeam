@@ -51,7 +51,7 @@ export function installOverlapPicker(ed: Editor): () => void {
     clearPending();menu?.remove();menu=null;ed.overlapHover=null;ed.redraw();
     if(oldFocus?.isConnected)oldFocus.focus({preventScroll:true});oldFocus=null;
   };
-  const valid=(p:NonNullable<typeof pending>)=>ed.doc===p.doc && ed.tool==='select' && !ed.drag && !ed.pickHandler && !ed.draft &&
+  const valid=(p:NonNullable<typeof pending>)=>ed.doc===p.doc && ed.tool==='select' && !ed.drag && !ed.pickHandler && !ed.draft && !ed.outlinePreview &&
     JSON.stringify(ed.view)===p.view && ed.sel.length===p.sel.length && ed.sel.every((o,i)=>o===p.sel[i]);
   const open=(p:NonNullable<typeof pending>)=>{
     if(!valid(p)){clearPending();return}
@@ -83,7 +83,7 @@ export function installOverlapPicker(ed: Editor): () => void {
     if(pending){if(event.pointerId!==pending.event.pointerId){close();return}clearPending()}
     const settings=loadOverlapSettings();
     const ctrlSecondary=settings.trigger==='right' && /Mac/i.test(navigator.platform || navigator.userAgent) && event.button===0 && event.ctrlKey && !event.shiftKey && !event.metaKey && !event.altKey;
-    if(settings.trigger==='off' || (!ctrlSecondary && event.button!==(settings.trigger==='right'?2:0)) || event.isPrimary===false || ed.tool!=='select' || ed.space || ed.drag || ed.draft || ed.pickHandler ||
+    if(settings.trigger==='off' || (!ctrlSecondary && event.button!==(settings.trigger==='right'?2:0)) || event.isPrimary===false || ed.tool!=='select' || ed.space || ed.drag || ed.draft || ed.pickHandler || ed.outlinePreview ||
        event.shiftKey || (event.ctrlKey && !ctrlSecondary) || event.metaKey || event.altKey)return;
     const {sx,sy}=ed.evPt(event);
     if(sx<22 || sy<22 || ed.hitPivot(sx,sy) || ed.hitHandle(sx,sy)>=0 || ed.hitRotateZone(sx,sy))return;

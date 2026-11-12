@@ -13,6 +13,8 @@ configured left holds resume ordinary dragging at that threshold. The tolerance
 allows small trackpad jitter and is independent of display pixel density.
 Escape while waiting cancels only the hold, without clearing selection or leaving
 isolation; a subsequent ordinary Escape retains the editor's usual behavior.
+Short right click preserves the existing editor context menu. Motion of 3 px
+cancels the waiting hold; no interference with ordinary left-click dragging.
 Selection respects visibility, locks and isolation. Groups are listed as their
 normal selectable top-level objects, not silently ungrouped or bypassed. A group
 can be opened/ungrouped through established commands for leaf editing. Subpaths
@@ -62,3 +64,20 @@ was launched; no machine behavior, serialized project formats or dependencies ch
 Substantial AI assistance: **GPT 6.1 Sol (OpenAI) via OpenCode**, including these
 review fixes, regressions and documentation. Automated checks are not human review
 or native-platform certification.
+## Executed verification
+
+- `node scripts/overlap-browser-fixture.mjs` then
+  `node scripts/run-feature-browser.mjs artifacts/feature-browser`: 14 browser
+  checks: defaults, opening, safe labels, hover, lower-object selection, context
+  preservation, motion/Escape/stale-source cancellation, persisted settings,
+  configured left hold and disabled mode.
+- `node scripts/run-feature-browser.mjs artifacts/feature-browser prepareTrustedOverlap`:
+  trusted Chromium right press/hold/release and lower-row mouse hover/click,
+  without a context action, Undo entry or premature menu dismissal. Synthetic
+  fixture checks stub pointer capture; this separate trusted test does not.
+- `test:nodes`, `test:refit`, `test:isolation`, `test:context-menu`, `test:paths`,
+  `test:apps`, `test:history`, `test:gcode`, `i18n:check`, `build`.
+
+Independent upstream `73e75cb`/2.8.0. Native WebView2/other OS and accessibility
+acceptance remains separate. No hardware, app/installer startup or machine edits.
+Substantial AI assistance: **GPT 6.1 Sol (OpenAI) via OpenCode**.

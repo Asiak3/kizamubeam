@@ -85,6 +85,7 @@ export class EditorKeyboard {
     if (k === 'escape')
       return run(() => {
         if (this.drag) return this.cancelDrag();
+        if (this.tool === 'builder') return this.setTool('select');
         if (this.isolation && !this.draft && !this.sketchEdit) return this.leaveIsolation();
         if (this.tool === 'joint' && this.jointPicks.length) return this.clearJointPicks();
         if (this.tool === 'relate' && this.relPicks.length) return this.clearRelPicks();

@@ -8,6 +8,8 @@ Editor.prototype.restore=function(){};Editor.prototype.scheduleSave=function(){}
 const ed=new Editor(document.querySelector('canvas'));window.editorPrototype=ed;
 
 import {openFreehandEditDialog} from './src/freehandEditDialog';
+import {openPathIslandsDialog} from './src/pathIslandsDialog';
+const ring=(x,w,y=40)=>({closed:true,start:true,nodes:[{x,y},{x:x+w,y},{x:x+w,y:y+w},{x,y:y+w}]});
 window.runFeatureChecks=async()=>{
  await new Promise(r=>setTimeout(r,50));const errors=[],passed=[],check=(v,n)=>(v?passed:errors).push(n);
  ed.doc=newDoc();ed.history=new History();ed.doc.layers[0]=defaultLayer(0);ed.view={zoom:1,ox:0,oy:0};
@@ -34,6 +36,23 @@ window.runFeatureChecks=async()=>{
  check(ed.history.position===1,'multi-handle drag is one Undo');ed.doUndo();check(ed.state()===before,'Undo exact multi-handle restoration');
  ed.setTool('lasso');ed.onDown(event(25,25));for(const p of [[100,25],[100,100],[25,100],[25,25]])ed.onMove(event(...p));ed.onUp(event(25,25));check(ed.sel.length===1,'object lasso selects enclosed object');
  }
+{
+ for(const d of [...document.querySelectorAll('dialog')]){try{d.close()}catch{};d.remove()}
+ ed.doc=newDoc();ed.history=new History();ed.doc.layers[0]=defaultLayer(0);
+ const obj2={id:newId(),m:[1,0,0,1,0,0],layer:0,name:'retained',shape:{kind:'path',subs:[ring(40,40),ring(50,10,50),ring(82,40)]}};
+ ed.doc.objs=[obj2];ed.setSel([obj2]);const before2=ed.state();openPathIslandsDialog(ed);
+ let dialog2=[...document.querySelectorAll('dialog')].at(-1),inputs=dialog2.querySelectorAll('input');
+ check(dialog2.querySelectorAll('svg path').length===2,'preview groups holes with exterior: '+dialog2.querySelector('[role=status]').textContent);
+ check(ed.state()===before2&&ed.history.position===0,'preview does not modify source/history');
+ inputs[0].value='3';inputs[0].dispatchEvent(new Event('input'));check(dialog2.querySelectorAll('svg path').length===1,'distance setting keeps nearby islands together');
+ inputs[0].value='0';inputs[0].dispatchEvent(new Event('input'));
+ [...dialog2.querySelectorAll('button')].find(b=>b.textContent==='Abbrechen').click();check(ed.state()===before2,'Cancel preserves exact source');
+ openPathIslandsDialog(ed);dialog2=[...document.querySelectorAll('dialog')].at(-1);[...dialog2.querySelectorAll('button')].find(b=>b.textContent==='Übernehmen').click();
+ check(ed.doc.objs.length===2&&ed.doc.objs[0].shape.subs.length===2&&ed.history.position===1,'Apply creates separate islands with holes and one Undo');
+ ed.doUndo();check(ed.state()===before2,'Undo exact restoration');ed.doRedo();check(ed.doc.objs.length===2,'Redo restores split');
+ ed.setSel([ed.doc.objs[0]]);openPathIslandsDialog(ed);dialog2=[...document.querySelectorAll('dialog')].at(-1);ed.emit('doc');check([...dialog2.querySelectorAll('button')].find(b=>b.textContent==='Übernehmen').disabled,'changed source invalidates preview');dialog2.close();
+ }
+
  return {errors,passed};};`;
 const result=await build({stdin:{contents,resolveDir:process.cwd(),loader:'ts'},bundle:true,write:false,outfile:'fixture.js',format:'esm',external:['node:module'],metafile:true,loader:{'.woff':'empty','.woff2':'empty'},plugins:[{name:'offline',setup(b){
 b.onResolve({filter:/(?:^|\/)files$/},()=>({path:'files',namespace:'offline'}));b.onResolve({filter:/(?:^|\/)native$/},()=>({path:'native',namespace:'offline'}));

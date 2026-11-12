@@ -7,6 +7,7 @@ import { objectPaths } from './ops';
 import { outlineNetwork, OUTLINE_JOIN_TOL, type OutlineNetwork } from './outlineNetwork';
 import { outlineBoundary } from './outlineBoundary';
 import { outlineApproximation } from './outlineApproximation';
+import { validateContourTopology } from './contourTopology';
 
 const { Clipper, ClipType: C, PolyType, PolyFillType: F, PolyTree } = ClipperLib;
 const clip = (op: ClipperLib.ClipType, a: Paths, b: Paths) => execute(op, a, b, F.pftNonZero);
@@ -50,7 +51,7 @@ function restoredBoundary(plan: OutlinePlan, polygon: ClipperLib.Path): SubPath 
     const failure=plan.boundaryFailures?.get(key);
     if(failure?.edges===plan.network!.edges)throw failure.error;
     const connections: SubPath[]=[];
-    try{boundary = outlineBoundary(polygon, plan.network!, connections);}
+    try{boundary = outlineBoundary(polygon, plan.network!, connections);validateContourTopology([boundary]);}
     catch(error){const failures=plan.boundaryFailures??=new Map();if(failures.size<4096)failures.set(key,{edges:plan.network!.edges,error});throw error;}
     if(cache.size<4096)cache.set(key, boundary);
     for(const connection of connections) if(!plan.connections!.some(p=>JSON.stringify(p.nodes)===JSON.stringify(connection.nodes)||JSON.stringify([...p.nodes].reverse())===JSON.stringify(connection.nodes)))plan.connections!.push(connection);
@@ -143,7 +144,8 @@ export function outlineResult(plan: OutlinePlan, selected: ReadonlySet<number>, 
     approved.push(...polygons);
   }
   if ((mode !== 'islands' && plan.outerError) || (mode !== 'outer' && [...selected].some(i => plan.islandErrors?.[i]&&!approximateIslands.has(i)))) throw new Error('outline-boundary');
-  const restore = (polygons: Paths) => plan.network ? polygons.map(p => {
+  const restore = (polygons: Paths) => {
+    const result=plan.network ? polygons.map(p => {
     try{return restoredBoundary(plan,p);}
     catch(error){
       // Only the expressly approved complete boundary may use the polygon.
@@ -152,7 +154,12 @@ export function outlineResult(plan: OutlinePlan, selected: ReadonlySet<number>, 
       if(!outlineApproximation({layer:0,subs:subs([p])}))throw new Error('outline-approximation-unsafe');
       return subs([p])[0];
     }
-  }) : subs(polygons);
+    }) : subs(polygons);
+    // Validate the actual final collection too: individually simple boundaries
+    // may touch/cross after a different combination of islands is restored.
+    validateContourTopology(result);
+    return result;
+  };
   if (mode === 'outer' || !selected.size) return mode === 'islands' ? [] : restore(paths(plan.outer));
   // Precision-plan regions already have consistent outer/hole winding. Union
   // them once, rather than rebuilding the growing arrangement for every island.
