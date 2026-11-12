@@ -2367,7 +2367,6 @@
   "Leistung in Ecken (Leistungsrampe) und bei Bildern in Graustufen": "Potencia en esquinas (rampa de potencia) y en imágenes en escala de grises",
   "Durchgänge": "Pasadas",
   "Kerf-Versatz (mm)": "Offset de kerf (mm)",
-  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden.": "Positivo: los contornos exteriores se desplazan hacia fuera y los agujeros hacia dentro. Introduce aproximadamente la mitad del ancho de corte para que las piezas salgan a medida.",
   "Fokus beim ersten Durchgang verschieben, positiv = tiefer ins Material. Braucht eine Z-Achse (Geräteeinstellungen); bezogen auf die Höhe beim Start.": "Desplaza el enfoque en la primera pasada; positivo = más profundo en el material. Necesita eje Z (ajustes del dispositivo); respecto a la altura inicial.",
   "Je Durchgang tiefer (mm)": "Más profundo por pasada (mm)",
   "Fokus nach jedem Durchgang um diesen Wert tiefer setzen, z. B. bei dickem Material. Am Ende fährt Z zurück.": "Baja el enfoque este valor tras cada pasada, p. ej. en material grueso. Al final Z vuelve.",
@@ -4487,5 +4486,15 @@
   "Herkunft": "Origen",
   "Ziel": "Destino",
   "Nur die Objekte auf dem Layer der Gruppe kommen auf {layer}. Die anderen bleiben, z. B. die Gravur.": "Solo los objetos de la capa del grupo pasan a {layer}. Los demás se quedan, p. ej. el grabado.",
-  "Alle Objekte der Gruppe kommen auf {layer}.": "Todos los objetos del grupo pasan a {layer}."
+  "Alle Objekte der Gruppe kommen auf {layer}.": "Todos los objetos del grupo pasan a {layer}.",
+  "Kerf-Vertrag: {n} offene Kontur läuft ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).": "Contrato del kerf: {n} contorno abierto sin compensación de kerf (solo se compensan las formas cerradas).",
+  "Kerf-Vertrag: {n} offene Konturen laufen ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).": "Contrato del kerf: {n} contornos abiertos sin compensación de kerf (solo se compensan las formas cerradas).",
+  "Kerf-Vertrag: {n} degenerierte Kontur (< 3 Punkte) entfallen.": "Contrato del kerf: {n} contorno degenerado (< 3 puntos) descartado.",
+  "Kerf-Vertrag: {n} degenerierte Konturen (< 3 Punkte) entfallen.": "Contrato del kerf: {n} contornos degenerados (< 3 puntos) descartados.",
+  "Kerf-Vertrag: {n} Kontur vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).": "Contrato del kerf: {n} contorno disuelto por la compensación (p. ej. agujero más pequeño que el kerf).",
+  "Kerf-Vertrag: {n} Konturen vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).": "Contrato del kerf: {n} contornos disueltos por la compensación (p. ej. agujero más pequeño que el kerf).",
+  "Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.": "Contrato del kerf: {n} contorno en contacto unido mediante unión.",
+  "Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.": "Contrato del kerf: {n} contornos en contacto unidos mediante unión.",
+  "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Contrato del kerf: en el relleno, el kerf actúa sobre la geometría del contorno antes del sombreado.",
+  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: los contornos exteriores se desplazan hacia fuera, los agujeros hacia dentro. Indica aprox. la mitad del ancho de corte para que las piezas mantengan su medida. Solo contornos cerrados (kerf → puentes → perforación; el relleno compensa el contorno, imágenes sin kerf)."
 }

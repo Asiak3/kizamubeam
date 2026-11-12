@@ -1141,7 +1141,6 @@
   "Min. Leistung (%)": "Min Power (%)",
   "Durchgänge": "Passes",
   "Kerf-Versatz (mm)": "Kerf Offset (mm)",
-  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden.": "Positive: outer contours move outwards, holes inwards. Enter about half the cut width so parts come out true to size.",
   "Ausgabe": "Output",
   "Layer beim Lasern ausgeben": "Output layer when lasering",
   "Haltestege (Tabs) setzen": "Add tabs",
@@ -4702,5 +4701,15 @@
   "Herkunft": "Source",
   "Ziel": "Target",
   "Nur die Objekte auf dem Layer der Gruppe kommen auf {layer}. Die anderen bleiben, z. B. die Gravur.": "Only the objects on the group’s layer go to {layer}. The others stay, e.g. the engraving.",
-  "Alle Objekte der Gruppe kommen auf {layer}.": "All objects of the group go to {layer}."
+  "Alle Objekte der Gruppe kommen auf {layer}.": "All objects of the group go to {layer}.",
+  "Kerf-Vertrag: {n} offene Kontur läuft ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).": "Kerf contract: {n} open contour runs without kerf compensation (only closed shapes are offset).",
+  "Kerf-Vertrag: {n} offene Konturen laufen ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).": "Kerf contract: {n} open contours run without kerf compensation (only closed shapes are offset).",
+  "Kerf-Vertrag: {n} degenerierte Kontur (< 3 Punkte) entfallen.": "Kerf contract: {n} degenerate contour (< 3 points) dropped.",
+  "Kerf-Vertrag: {n} degenerierte Konturen (< 3 Punkte) entfallen.": "Kerf contract: {n} degenerate contours (< 3 points) dropped.",
+  "Kerf-Vertrag: {n} Kontur vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).": "Kerf contract: {n} contour dissolved by the offset (e.g. hole smaller than the kerf).",
+  "Kerf-Vertrag: {n} Konturen vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).": "Kerf contract: {n} contours dissolved by the offset (e.g. hole smaller than the kerf).",
+  "Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.": "Kerf contract: {n} touching contour merged via union.",
+  "Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.": "Kerf contract: {n} touching contours merged via union.",
+  "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Kerf contract: for fill, kerf offsets the hull geometry before hatching.",
+  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positive: outer contours move outward, holes inward. Enter about half the cut width so parts keep their nominal size. Closed contours only (kerf → tabs → perforation; fill offsets the hull, images without kerf)."
 }

@@ -622,6 +622,50 @@ await test('Images use speed, power, passes, interval, direction and overscan of
   assert.equal(loadDoc(JSON.parse(JSON.stringify(doc))).layers[0].speed, 700);
 });
 
+// ---------- Kerf-Vertrag (Issue #220) ----------
+
+await test('Kerf-Vertrag: offen läuft ohne Kerf durch + Warnung', async () => {
+  const job = await cutJob([hLine(), square()], { kerf: 0.2 });
+  assert.ok(job.warnings.some((w) => w.includes('offene Kontur')), JSON.stringify(job.warnings));
+});
+
+await test('Kerf-Vertrag: Loch vom Versatz aufgelöst + Warnung', async () => {
+  const tiny: Obj = {
+    id: 2, m: [1, 0, 0, 1, 0, 0], layer: 1,
+    shape: { kind: 'path', subs: [
+      { closed: true, nodes: [{ x: 100, y: 100 }, { x: 100.3, y: 100 }, { x: 100.3, y: 100.3 }, { x: 100, y: 100.3 }] },
+    ] },
+  };
+  const job = await cutJob([tiny], { kerf: -0.5 });
+  assert.ok(job.warnings.some((w) => w.includes('aufgelöst')), JSON.stringify(job.warnings));
+});
+
+await test('Kerf-Vertrag: berührend per Union zusammengefasst + Warnung', async () => {
+  const touch: Obj = {
+    id: 3, m: [1, 0, 0, 1, 0, 0], layer: 1,
+    shape: { kind: 'path', subs: [
+      { closed: true, nodes: [{ x: 100, y: 100 }, { x: 110, y: 100 }, { x: 110, y: 110 }, { x: 100, y: 110 }] },
+      { closed: true, nodes: [{ x: 110, y: 100 }, { x: 120, y: 100 }, { x: 120, y: 110 }, { x: 110, y: 110 }] },
+    ] },
+  };
+  const job = await cutJob([touch], { kerf: 0.1 });
+  assert.ok(job.warnings.some((w) => w.includes('zusammengefasst')), JSON.stringify(job.warnings));
+});
+
+await test('Kerf-Vertrag: Fill kerft Hülle + Warnung, Bild ohne Kerf', async () => {
+  const fillJob = await cutJob([square()], { mode: 'fill' as const, kerf: 0.2 });
+  assert.ok(fillJob.warnings.some((w) => w.includes('Hüll-Geometrie')), JSON.stringify(fillJob.warnings));
+  const img: Obj = { id: 7, m: [1, 0, 0, 1, 100, 100], layer: 1, shape: { kind: 'image', w: 10, h: 10, asset: 'a' } as never };
+  const imgJob = await cutJob([img], { kerf: 0.2 });
+  assert.ok(!imgJob.warnings.some((w) => w.includes('Kerf-Vertrag')), JSON.stringify(imgJob.warnings));
+});
+
+await test('Kerf-Vertrag: Tabs nach Kerf auf kompensierter Kontur', async () => {
+  const plain = lengths((await cutJob([square()], { kerf: 0.2 })).moves).on;
+  const tabs = lengths((await cutJob([square()], { kerf: 0.2, tabs: { enabled: true, size: 2, useCount: true, count: 2, spacing: 10, skipInner: false } })).moves).on;
+  assert.ok(tabs < plain, `tabs ${tabs} < plain ${plain}`);
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

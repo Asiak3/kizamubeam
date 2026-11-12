@@ -819,11 +819,33 @@ const KSCALE = 10000;
  * Kerf-Versatz der geschlossenen Konturen eines Objekts: Fläche nach Gerade-Ungerade-Regel bilden,
  * dann um d versetzen. Positiv vergrößert Außenkonturen und verkleinert Löcher, sodass ausgeschnittene
  * Teile die gezeichneten Maße behalten. Runde Ecken entsprechen dem runden Laserfleck.
+ *
+ * Vertrag (Issue #220): nur geschlossene Konturen mit >= 3 Punkten werden versetzt. Offene Konturen
+ * laufen ohne Kerf durch (werden gezählt, siehe buildJob), degenerierte (< 3 Punkte) entfallen,
+ * berührende Flächen werden per Union zusammengefasst (merged-Zähler), vollständig aufgelöste
+ * Flächen (z. B. Loch kleiner als der Versatz) entfallen (vanished). Reihenfolge im Job ist immer
+ * Kerf → Tabs → Perforation → Reihenfolge → Anschnitt (Tabs werden auf der kompensierten Kontur neu
+ * verteilt); bei Füllen wirkt Kerf auf die Hüll-Geometrie vor der Schraffur, Bilder ignorieren Kerf.
  */
-export function kerfOffset(polys: Poly[], d: number): Poly[] {
-  if (!polys.length || !d) return polys;
+export interface KerfReport {
+  polys: Poly[];
+  /** geschlossene Eingänge mit >= 3 Punkten */
+  valid: number;
+  /** degenerierte geschlossene Eingänge (< 3 Punkte), entfallen */
+  degenerate: number;
+  /** per Union zusammengefasste Konturen (valid - Ausgabe, soweit Ausgabe nicht leer) */
+  merged: number;
+  /** true, wenn trotz gültiger Eingänge nichts übrig blieb (z. B. Loch vom Versatz verschluckt) */
+  vanished: boolean;
+}
+
+export function kerfOffsetReport(polys: Poly[], d: number): KerfReport {
+  const closed = polys.filter((p) => p.closed);
+  const degenerate = closed.length - closed.filter((p) => p.pts.length > 2).length;
+  const validSrc = closed.filter((p) => p.pts.length > 2);
+  if (!validSrc.length || !d) return { polys, valid: validSrc.length, degenerate, merged: 0, vanished: false };
   const { Clipper, ClipperOffset, ClipType, PolyType, PolyFillType, JoinType, EndType } = ClipperLib;
-  const paths = polys.map((p) => p.pts.map((q) => ({ X: Math.round(q.x * KSCALE), Y: Math.round(q.y * KSCALE) })));
+  const paths = validSrc.map((p) => p.pts.map((q) => ({ X: Math.round(q.x * KSCALE), Y: Math.round(q.y * KSCALE) })));
   const c = new Clipper();
   c.AddPaths(paths, PolyType.ptSubject, true);
   const area: ClipperLib.Paths = [];
@@ -833,7 +855,14 @@ export function kerfOffset(polys: Poly[], d: number): Poly[] {
   const out: ClipperLib.Paths = [];
   co.Execute(out, d * KSCALE);
   const res: Poly[] = out.filter((p) => p.length > 2).map((p) => ({ pts: p.map((q) => ({ x: q.X / KSCALE, y: q.Y / KSCALE })), closed: true }));
-  return keepStarts(polys, res);
+  const kept = keepStarts(validSrc, res);
+  const vanished = kept.length === 0;
+  const merged = vanished ? 0 : Math.max(0, validSrc.length - kept.length);
+  return { polys: kept, valid: validSrc.length, degenerate, merged, vanished };
+}
+
+export function kerfOffset(polys: Poly[], d: number): Poly[] {
+  return kerfOffsetReport(polys, d).polys;
 }
 
 /**
@@ -1498,6 +1527,11 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   };
   const bounds = emptyBox();
   let skippedOpen = 0;
+  let kerfOpen = 0;
+  let kerfDegenerate = 0;
+  let kerfVanished = 0;
+  let kerfMerged = 0;
+  let kerfFillOps = 0;
   for (const [o, world] of laserLeaves(roots)) {
     if (o.reg) continue; // Passermarken nur drucken, nicht lasern
     const L = layerOf(o.layer);
@@ -1539,8 +1573,22 @@ export async function buildJob(inp: JobInput): Promise<Job> {
           polys = own.filter((p) => p.closed);
           if (!anyLine && k === firstFill) skippedOpen += own.length - polys.length;
         }
-        // Kerf je Objekt, damit sich benachbarte Objekte nicht zu einer Fläche verbinden
-        if (e.kerf) polys = [...polys.filter((p) => !p.closed), ...kerfOffset(polys.filter((p) => p.closed), e.kerf)];
+        // Kerf je Objekt, damit sich benachbarte Objekte nicht zu einer Fläche verbinden (Issue #220).
+        // Vertrag: offen läuft ohne Kerf durch (gezählt), degeneriert entfällt, Union merged, Aufgelöstes entfällt.
+        // Reihenfolge: Kerf → Tabs → Perforation → Reihenfolge → Anschnitt; Fill kerft die Hülle vor der Schraffur.
+        if (e.kerf) {
+          const open = polys.filter((p) => !p.closed);
+          if (open.length && e.mode === 'line') kerfOpen += open.length;
+          if (e.mode === 'fill') kerfFillOps++;
+          const rep = kerfOffsetReport(
+            polys.filter((p) => p.closed),
+            e.kerf,
+          );
+          kerfDegenerate += rep.degenerate;
+          kerfMerged += rep.merged;
+          if (rep.vanished && rep.valid > 0) kerfVanished += rep.valid;
+          polys = [...open, ...rep.polys];
+        }
         for (const p of polys) {
           out.push(p);
           for (const q of p.pts) addPt(bounds, q.x, q.y);
@@ -1550,6 +1598,11 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     });
   }
   if (skippedOpen) warnings.push(tn('{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', '{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', skippedOpen));
+  if (kerfOpen) warnings.push(tn('Kerf-Vertrag: {n} offene Kontur läuft ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).', 'Kerf-Vertrag: {n} offene Konturen laufen ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).', kerfOpen));
+  if (kerfDegenerate) warnings.push(tn('Kerf-Vertrag: {n} degenerierte Kontur (< 3 Punkte) entfallen.', 'Kerf-Vertrag: {n} degenerierte Konturen (< 3 Punkte) entfallen.', kerfDegenerate));
+  if (kerfVanished) warnings.push(tn('Kerf-Vertrag: {n} Kontur vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).', 'Kerf-Vertrag: {n} Konturen vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).', kerfVanished));
+  if (kerfMerged) warnings.push(tn('Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.', 'Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.', kerfMerged));
+  if (kerfFillOps) warnings.push(t('Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.'));
 
   // 2. Verschiebung nach „Starten ab“
   const jb = finite(bounds);
