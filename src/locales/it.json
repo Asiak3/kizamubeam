@@ -1400,7 +1400,6 @@
   "Air": "Aria",
   "Aus": "uscita",
   "Zeig.": "Mostra",
-  "Bilder dieses Layers": "Immagini su questo livello",
   "Doppelklick: Layer-Einstellungen": "Doppio clic: impostazioni di taglio",
   "Nach oben (früher ausgeben)": "Sposta su (uscita prima)",
   "Nach unten (später ausgeben)": "Sposta giù (uscita dopo)",
@@ -4465,5 +4464,7 @@
   "Verschobene oder vergrößerte Dialoge öffnen wieder in der Mitte und in Standardgröße. Wirkt sofort.": "Le finestre di dialogo spostate o ingrandite si riaprono al centro e nella dimensione predefinita. Effetto immediato.",
   "Dialoge öffnen wieder in der Mitte und in Standardgröße.": "Le finestre di dialogo si riaprono al centro e nella dimensione predefinita.",
   "Helligkeit, Kontrast, Schärfen und Vorschau; die Layer-Einstellungen werden dabei übernommen": "Luminosità, contrasto, nitidezza e anteprima; le impostazioni del livello vengono applicate prima",
-  "Zeilenabstand, Bidirektional und Überfahrweg unter „Füllen“ gelten auch für die Bilder.": "Intervallo di riga, bidirezionale e overscan in “Riempimento” valgono anche per le immagini."
+  "Zeilenabstand, Bidirektional und Überfahrweg unter „Füllen“ gelten auch für die Bilder.": "Intervallo di riga, bidirezionale e overscan in “Riempimento” valgono anche per le immagini.",
+  "+ Bild": "+ Immagine",
+  "Auf diesem Layer liegen Bilder; sie nutzen dieselben Einstellungen": "Questo livello contiene immagini; usano le stesse impostazioni"
 }
