@@ -55,7 +55,7 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 9;
+const CONFIG_V = 10;
 /** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende) */
 const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 3, bar: 'tools', id: 'apps', after: 'grp:gen' },
@@ -85,6 +85,12 @@ export function upgradeBar(bar: BarId, list: string[], raw: number): string[] {
   const out = [...list];
   // Knöpfe, die mit einer späteren Version dazukamen, einmal aufnehmen
   for (const a of ADDED) if (a.bar === bar && !(raw >= a.v) && !out.includes(a.id)) insertAfter(out, a.id, a.after);
+  // v10: Geräteeinstellungen an den Anfang der Prüf/Vorschau-Gruppe (vor „check")
+  if (bar === 'main' && !(raw >= 10) && !out.includes('devsettings')) {
+    const i = out.indexOf('check');
+    if (i >= 0) out.splice(i, 0, 'devsettings');
+    else out.push('devsettings');
+  }
   for (const r of REMOVED) {
     if (r.bar !== bar || raw >= r.v) continue;
     for (let i = 0; i + r.seq.length <= out.length; i++)

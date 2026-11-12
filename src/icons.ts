@@ -131,6 +131,7 @@ export const ICONS: Record<string, string> = {
   packs: svg('<path d="M9 4h4v2.5a1.5 1.5 0 003 0V4h4v6h-2.5a1.5 1.5 0 000 3H20v7h-6v-2.5a1.5 1.5 0 00-3 0V20H4v-6h2.5a1.5 1.5 0 000-3H4V4z"/>'),
   star: svg('<path d="M12 3.5l2.6 5.5 6 .7-4.5 4.1 1.2 5.9L12 16.8l-5.3 2.9 1.2-5.9-4.5-4.1 6-.7z"/>'),
   search: svg('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/>'),
+  devsettings: svg('<rect x="3" y="4" width="18" height="11" rx="1"/><path d="M9 20h6M12 15v5"/><circle cx="12" cy="9.5" r="2.2"/><path d="M12 5.8v1M12 12.4v1M8.3 9.5h1M14.7 9.5h1M9.4 6.9l.7.7M14.6 12.1l.7.7M9.4 12.1l.7-.7M14.6 6.9l.7-.7"/>'),
   chevup: svg('<path d="M6 15l6-6 6 6"/>'),
   chevdown: svg('<path d="M6 9l6 6 6-6"/>'),
   sketch: svg('<path d="M4 18L11 6h7"/><circle cx="4" cy="18" r="1.6"/><circle cx="11" cy="6" r="1.6"/><circle cx="18" cy="6" r="1.6"/><path d="M14 17.5a3.5 3.5 0 107 0 3.5 3.5 0 00-7 0" stroke-width="1.2"/><path d="M6.5 8.5l2 1.2" stroke-width="1.2"/>'),

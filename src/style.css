@@ -1141,11 +1141,36 @@ label.check {
 }
 
 /* Geräteeinstellungen */
+.device-dialog {
+  width: min(640px, calc(100vw - 48px));
+  box-sizing: border-box;
+}
 .device-dialog .form {
-  grid-template-columns: 190px 220px;
+  grid-template-columns: 190px minmax(0, 280px);
+  justify-content: start;
+  align-content: start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: min(60vh, 560px);
+}
+.device-dialog .form > * {
+  min-width: 0;
+}
+.device-dialog .form textarea.script {
+  width: 100%;
+  max-width: 100%;
+}
+/* Kompakte Felder: Zahlen kurz, Text/Selects auf die Feldspalte begrenzt */
+.device-dialog .form input[type='number'] {
+  max-width: 160px;
+}
+.device-dialog .form input[type='text'],
+.device-dialog .form select {
+  max-width: 100%;
 }
 .device-dialog .form .conn-row {
   margin: 0;
+  flex-wrap: wrap;
 }
 .device-dialog .form .conn-row .btn {
   white-space: nowrap;
@@ -1159,6 +1184,28 @@ label.check {
   display: none;
 }
 
+/* Geräteeinstellungen in Tabs (FR #235) */
+.device-dialog .form .sub {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+.device-dialog .form .sub:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.dtab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0 8px;
+}
+.dtab-bar .btn.cur {
+  background: var(--accent);
+  border-color: var(--accent);
+}
 /* Vorschau */
 .preview-dialog {
   width: min(1200px, 92vw);
