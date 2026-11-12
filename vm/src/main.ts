@@ -12,7 +12,7 @@ import type { Bed3D, BodyState } from './view3d';
 import { LOOK_GROUPS, LOOKS, lookName, resolveLook } from '../../src/view3d/looks';
 import { t as tApp } from '../../src/i18n';
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 const PIECES_KEY = 'kizamubeam-vm.pieces';
 const VIEW_KEY = 'kizamubeam-vm.view';
 
@@ -584,7 +584,7 @@ async function start() {
       if ('Err' in r) return h('span', { class: 'chip err', title: r.Err }, `${label}: ${r.Err}`);
       return h('span', { class: 'chip ok', title: r.Ok }, `${label}: ${prefix}${r.Ok}`);
     };
-    chips.append(chip(t('Telnet'), info.telnet), chip(t('WebSocket'), info.ws, 'ws://'), chip(t('Kamera'), info.camera, 'http://'));
+    chips.append(chip(t('Telnet'), info.telnet), chip(t('WebSocket'), info.ws, 'ws://'), chip(t('Ruida'), info.ruida, 'udp://'), chip(t('Kamera'), info.camera, 'http://'));
     renderCamera(-1);
   };
 
@@ -647,7 +647,7 @@ async function start() {
     if (key === lastClients) return;
     lastClients = key;
     clientsBox.replaceChildren(
-      ...(list.length ? list.map((c) => h('div', { class: 'client' }, h('span', { class: 'tag' }, `#${c.id}`), ` ${c.kind === 'ws' ? 'WebSocket' : 'Telnet'} · ${c.addr}`)) : [h('p', { class: 'muted' }, t('Noch keine Verbindung.'))]),
+      ...(list.length ? list.map((c) => h('div', { class: 'client' }, h('span', { class: 'tag' }, `#${c.id}`), ` ${c.kind === 'ws' ? 'WebSocket' : c.kind === 'ruida' ? 'Ruida (UDP)' : 'Telnet'} · ${c.addr}`)) : [h('p', { class: 'muted' }, t('Noch keine Verbindung.'))]),
     );
   };
 
@@ -779,6 +779,17 @@ async function start() {
       h('option', { value: 'fixed' }, t('fest über dem Bett')),
       h('option', { value: 'head' }, t('am Laserkopf')));
     mountSel.value = c.cameraMount;
+    const originSel = h('select', { onchange: () => (c.ruidaOrigin = originSel.value as Config['ruidaOrigin']) },
+      h('option', { value: 'topRight' }, t('hinten rechts')),
+      h('option', { value: 'topLeft' }, t('hinten links')),
+      h('option', { value: 'bottomLeft' }, t('vorne links')),
+      h('option', { value: 'bottomRight' }, t('vorne rechts')));
+    originSel.value = c.ruidaOrigin;
+    const magicSel = h('select', { onchange: () => (c.ruidaMagic = Number(magicSel.value)) },
+      h('option', { value: String(0x88) }, '0x88 (RDC644x, 654x, 633x, RDLC320)'),
+      h('option', { value: String(0x11) }, '0x11 (RDC634XG)'),
+      h('option', { value: String(0x38) }, '0x38 (RDL9635)'));
+    magicSel.value = String(c.ruidaMagic);
     const RES = [[640, 480], [1280, 720], [1600, 1200], [1920, 1080]];
     const resSel = h('select', {
       onchange: () => {
@@ -828,6 +839,13 @@ async function start() {
         check(t('Telnet-Port'), 'telnetEnabled'), h('input', { type: 'number', min: 1, max: 65535, value: String(c.telnetPort), onchange: (e: Event) => (c.telnetPort = Number((e.target as HTMLInputElement).value)) }),
         check(t('WebSocket-Port'), 'wsEnabled'), h('input', { type: 'number', min: 1, max: 65535, value: String(c.wsPort), onchange: (e: Event) => (c.wsPort = Number((e.target as HTMLInputElement).value)) })),
       check(t('Auch aus dem Netzwerk erreichbar (sonst nur von diesem Rechner)'), 'lan'),
+      h('h3', {}, t('Ruida (DSP)')),
+      h('div', { class: 'grid' },
+        check(t('Datenport (UDP)'), 'ruidaEnabled'), h('input', { type: 'number', min: 1, max: 65535, value: String(c.ruidaPort), onchange: (e: Event) => (c.ruidaPort = Number((e.target as HTMLInputElement).value)) }),
+        h('label', {}, t('Tastenport (UDP)')), h('input', { type: 'number', min: 1, max: 65535, value: String(c.ruidaJogPort), onchange: (e: Event) => (c.ruidaJogPort = Number((e.target as HTMLInputElement).value)) }),
+        h('label', {}, t('Maschinennullpunkt')), originSel,
+        h('label', {}, t('Verwürfelung (Magic)')), magicSel),
+      h('p', { class: 'muted small' }, t('Programme wie LightBurn oder RDWorks verbinden sich mit Ruida-Steuerungen immer über die Ports 50200 und 50207. Die Verwürfelung stellt sich selbst ein, sobald das Programm nach der Karten-ID fragt.')),
       h('h3', {}, t('Kamera')),
       h('div', { class: 'grid' },
         check(t('Kamera-Port'), 'cameraEnabled'), h('input', { type: 'number', min: 1, max: 65535, value: String(c.cameraPort), onchange: (e: Event) => (c.cameraPort = Number((e.target as HTMLInputElement).value)) }),
@@ -844,11 +862,12 @@ async function start() {
           class: 'btn primary',
           onclick: async () => {
             c.statusMask = (mpos.checked ? 1 : 0) | (bf.checked ? 2 : 0);
-            for (const p of [c.telnetPort, c.wsPort, c.cameraPort]) {
+            for (const p of [c.telnetPort, c.wsPort, c.cameraPort, c.ruidaPort, c.ruidaJogPort]) {
               if (!Number.isInteger(p) || p < 1 || p > 65535) return void (note.textContent = t('Port {p} ist ungültig.', { p }));
             }
             const used = [c.telnetEnabled && c.telnetPort, c.wsEnabled && c.wsPort, c.cameraEnabled && c.cameraPort].filter((p) => p !== false);
             if (new Set(used).size < used.length) return void (note.textContent = t('Telnet, WebSocket und Kamera brauchen verschiedene Ports.'));
+            if (c.ruidaEnabled && c.ruidaPort === c.ruidaJogPort) return void (note.textContent = t('Daten- und Tastenport von Ruida müssen verschieden sein.'));
             setTheme(themeSel.value as Theme);
             layout.left = sideSel.value === 'left';
             saveSide(layout);

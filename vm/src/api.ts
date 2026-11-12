@@ -37,6 +37,14 @@ export interface Config {
   cameraFps: number;
   /** barrel distortion: shift at the image corner in % of the half diagonal */
   cameraLens: number;
+  /** Ruida DSP emulation over UDP (data port, keypad port) */
+  ruidaEnabled: boolean;
+  ruidaPort: number;
+  ruidaJogPort: number;
+  /** scramble value expected first (0x88 on most cards); a card ID query switches it */
+  ruidaMagic: number;
+  /** corner of the Ruida machine origin */
+  ruidaOrigin: 'topRight' | 'topLeft' | 'bottomLeft' | 'bottomRight';
 }
 
 export interface Snapshot {
@@ -70,7 +78,7 @@ export type VmEvent =
 
 export interface ClientInfo {
   id: number;
-  kind: 'telnet' | 'ws';
+  kind: 'telnet' | 'ws' | 'ruida';
   addr: string;
 }
 
@@ -90,6 +98,7 @@ export interface ServerInfo {
   telnet: Res;
   ws: Res;
   camera: Res;
+  ruida: Res;
 }
 
 export const hasNative = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
