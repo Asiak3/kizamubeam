@@ -40,6 +40,10 @@ export function initialDialogParams(g: Generator, old: GenShape | null, init?: P
 }
 
 const UNIT: Record<string, string> = { length: 'mm', angle: '°' };
+
+/** Dauert eine Vorschau länger (große Baugruppen), wird sie erst kurz nach der letzten Eingabe neu berechnet */
+const SLOW_PREVIEW_MS = 40;
+const PREVIEW_DELAY_MS = 120;
 const fmtNum = (v: number) => (Number.isInteger(v) ? String(v) : f2(v));
 
 /** Generator-Dialog: neues Bauteil erzeugen (ohne o) oder die Parameter eines vorhandenen ändern */
@@ -220,7 +224,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     update();
   }, ed);
 
-  const update = () => {
+  const render = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde
     // Formeln mit den aktuellen Parameterwerten auswerten (fehlerhafte Formeln sperren Erzeugen)
     const rb = resolveBinds(g, normalizeParams(g, p), binds);
@@ -296,11 +300,32 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
           : t('Ohne Schnittfuge werden die Teile um die Fugenbreite zu klein. Fuge hier oder als Kerf-Versatz am Layer eintragen.');
   };
 
+  // Vorschau sofort, außer die letzte Berechnung war langsam: dann nach einer kurzen Pause im Tippen. Vor jeder
+  // Aktion (Klick, Enter, Übernehmen) wird eine ausstehende Berechnung nachgeholt, damit nichts mit alten Werten entsteht.
+  let pending = 0;
+  let renderMs = 0;
+  const flush = () => {
+    if (pending) clearTimeout(pending);
+    pending = 0;
+    const t0 = performance.now();
+    render();
+    renderMs = performance.now() - t0;
+  };
+  const flushPending = () => {
+    if (pending) flush();
+  };
+  const update = () => {
+    if (renderMs <= SLOW_PREVIEW_MS) return flush();
+    if (pending) clearTimeout(pending);
+    pending = window.setTimeout(flush, PREVIEW_DELAY_MS);
+  };
+
   /**
    * Übernehmen/Erstellen (close) oder Hinzufügen (Dialog bleibt offen). Hinzufügen legt immer ein neues Teil an,
    * auch beim Bearbeiten; das bearbeitete Teil bleibt dann unverändert.
    */
   const commit = async (close: boolean) => {
+    flushPending();
     if (!built) return;
     // Eigene Kopie: Ein zweites Hinzufügen ohne Änderung darf nicht dieselben Formen wiederverwenden
     const r = structuredClone(built);
@@ -353,13 +378,20 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     e.stopPropagation();
     if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
       e.preventDefault();
+      flushPending();
       okBtn.click();
     }
   });
-  dlg.addEventListener('close', () => dlg.remove());
+  // Vor dem Klick: Knöpfe und Vorschau auf den aktuellen Stand bringen
+  dlg.addEventListener('pointerdown', flushPending, true);
+  dlg.addEventListener('close', () => {
+    if (pending) clearTimeout(pending);
+    pending = 0;
+    dlg.remove();
+  });
   document.body.append(dlg);
   dlg.showModal();
-  update();
+  flush();
 }
 
 /**

@@ -69,7 +69,8 @@ export function outlineSegments(polys: Pt[][], th: number, angleDeg = 25): numbe
 export function asmSolids(gen: string, raw: Params, fallbackTh: number, keys?: Set<string>): Solid[] | null {
   const g = getGenerator(gen);
   if (!g) return null;
-  const params = normalizeParams(g, { ...raw, kerf: 0 });
+  // Für die Körper zählt nur die Form der Teile, nicht ihre Lage: ohne das Zusammenschieben (nestParts)
+  const params = normalizeParams(g, { ...raw, kerf: 0, partLayout: 'rows' });
   const th = genThickness(params, fallbackTh);
   const poses = assemblyPoses(gen, params, th);
   if (!poses) return null;

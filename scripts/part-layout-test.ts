@@ -5,6 +5,8 @@ import { buildGen, defaultParams, getGenerator, loadGen, type BuiltPart } from '
 import { flattenSub, SCALE } from '../src/clip';
 import { grow, type Poly } from '../src/nest';
 import { IDENT } from '../src/model';
+import { nestParts } from '../src/generators/build';
+import { asmSolids } from '../src/view3d/solids';
 
 // Multi-part generators nest their parts inside the assembly block ('nest'); saved objects keep their former
 // arrangement: 'rows' (box, box-divided, gearpair) or 'packed' (packParts, the other generators).
@@ -124,6 +126,40 @@ assert.deepEqual(slow, [], 'nesting too slow');
     const rows = new Set(group.map((p) => Math.round(p.at.y * 1000))), cols = new Set(group.map((p) => Math.round(p.at.x * 1000)));
     assert.ok(rows.size + cols.size <= 5, `${prefix} not on a grid: ${rows.size} rows, ${cols.size} columns`);
   }
+}
+
+// Speed: nearly rectangular parts skip the raster nest (exact rectangle placement); measured without the cache by
+// using a gap that no generator uses
+{
+  const times: number[] = [];
+  for (const [id, over] of [['box', {}], ['box', { top: 'closed' }], ['box-divided', { compartmentsX: 3, compartmentsY: 2 }], ['drawer', {}], ['shelf', {}], ['insert', {}]] as const) {
+    const items = build(id, { ...over, partLayout: id === 'box' || id === 'box-divided' ? 'rows' : 'packed' }).map((p) => ({ key: String(p.shape.part), subs: p.shape.subs }));
+    const t0 = performance.now();
+    nestParts(items, 5.123);
+    times.push(performance.now() - t0);
+  }
+  times.sort((a, b) => a - b);
+  assert.ok(times[Math.floor(times.length / 2)] < 25, `rectangular layouts too slow: ${times.map((x) => x.toFixed(1)).join(', ')} ms`);
+}
+
+// Cache: same result again, and changing a returned position does not change the next result
+{
+  const items = build('gearpair', { plate: true, partLayout: 'rows' }).map((p) => ({ key: String(p.shape.part), subs: p.shape.subs }));
+  const a = nestParts(items, 5.321);
+  const copy = a.map((p) => ({ ...p.at }));
+  a[0].at.x += 1000;
+  assert.deepEqual(nestParts(items, 5.321).map((p) => p.at), copy, 'cached layout changed');
+}
+
+// 'rows' for generators without a row layout of their own is the cheap packParts layout (used where positions don't matter)
+for (const id of ['drawer', 'shelf', 'insert']) assert.deepEqual(positions(build(id, { partLayout: 'rows' })), positions(build(id, { partLayout: 'packed' })), `${id} rows`);
+
+// The 3D view and the design check only need the shapes: same solids whatever the layout
+for (const [id, over] of [['box-divided', { compartmentsX: 3, compartmentsY: 2 }], ['drawer', {}], ['gearpair', { plate: true }]] as const) {
+  const g = getGenerator(id)!;
+  const solids = (layout: string) => asmSolids(id, { ...defaultParams(g), ...over, partLayout: layout }, 3);
+  assert.ok(solids('nest')?.length, `${id} 3D`);
+  assert.deepEqual(solids('nest'), solids('rows'), `${id} 3D depends on layout`);
 }
 
 // Saved objects from earlier versions keep their layout and their stored geometry
