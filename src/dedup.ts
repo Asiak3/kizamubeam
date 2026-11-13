@@ -12,6 +12,8 @@ export interface DedupPoly {
   fixed?: boolean;
   hole?: boolean;
   off?: Uint8Array;
+  /** Gruppen-ID für „Gruppen zusammenhalten“ (#222), bleibt an Reststücken erhalten */
+  grp?: string | number;
 }
 
 export interface DedupResult {
@@ -295,7 +297,7 @@ export function dedupPolys(polys: DedupPoly[], tol: number, kerf = 0): DedupResu
       // doppelte Schlusspunkte bei offenen Stücken vermeiden
       const fixed = hadFixed && containsStart;
       if (fixed) hadFixed = false;
-      if (pts.length >= 2) out.push({ pts, closed: false, ...(fixed ? { fixed: true } : {}) });
+      if (pts.length >= 2) out.push({ pts, closed: false, ...(fixed ? { fixed: true } : {}), ...(p.grp !== undefined ? { grp: p.grp } : {}) });
     }
     // Start lag in entfernter Spanne: Flag auf längstes Reststück retten
     if (hadFixed && out.length) {

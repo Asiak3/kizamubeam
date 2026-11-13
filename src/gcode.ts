@@ -1252,6 +1252,10 @@ function countManualViolations(polys: Poly[]): number {
   for (let j = 0; j < polys.length; j++) {
     if (!polys[j].closed) continue;
     for (let i = 0; i < j; i++) {
+      // deckungsgleiche Konturen (gleicher Rahmen) sind Doppellinien, kein innen/außen (#221)
+      const a = boxes[i],
+        b = boxes[j];
+      if (a.x0 === b.x0 && a.y0 === b.y0 && a.x1 === b.x1 && a.y1 === b.y1) continue;
       if (containsStrict(polys, boxes, j, i)) {
         n++;
         break;
