@@ -5,7 +5,7 @@
 All four PRs below have since been **merged upstream**; issue #144 is closed.
 The latest official release checked on 07.11. remains v2.7.0 (05.11.), predating
 these merges. The combined test build includes additional unpublished work; see
-the [current inventory](pr-drafts/README.md#was-unveröffentlicht-aktuell-bedeutet).
+the [current upstream state](slot-placement.md) (working drafts removed).
 
 Local toolbar follow-up: node editing, Pencil, refit, Shape Builder and isolation
 are visible in the default left toolbar, with distinct symbols. Isolation switches
@@ -22,7 +22,7 @@ this toolbar follow-up has not been published as a PR.
 Each was extracted into its own branch against upstream `main` (`9bee124`), built
 and tested independently. They are not stacked. Their documentation/tests describe
 the exact extracted scope; the combined local working tree also includes other
-unpublished prototypes. See [the ledger](pr-drafts/README.md) for current results.
+unpublished prototypes. The working-draft ledger was removed; current slot state: [slot-placement.md](slot-placement.md).
 The sections below retain the original combined-port history and limitations.
 
 Pencil follow-up: [pointer lifecycle and remaining native verification](pencil-follow-up.md).
@@ -68,7 +68,7 @@ shortcut defaults. No configurable-keybinding UI is included. Temporary isolatio
 filters editing/rendering/snapping, not output; groups stay whole. No persistent
 visibility/output flags are changed by isolation.
 
-See the [fresh combined verification and three internal issue drafts](prototype-verification.md).
+The combined prototype verification note was removed with the working drafts; current slot state: [slot-placement.md](slot-placement.md).
 
 ## Vector fitting limits
 

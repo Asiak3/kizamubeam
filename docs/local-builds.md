@@ -281,7 +281,7 @@ below are historical. Sources, diagnostics, PR worktrees and compiler caches kep
 Application/installer not launched or installed; no hardware actions. All prior
 local features retained; separate public PRs remain Draft. Baseline/version stays
 480d5b1/2.7.0, not a full 2.8.0 rebase. User confirms Pencil/Pinch/file-drop tested.
-Manual test entry points: [prototype-manual-checks.de.md](prototype-manual-checks.de.md).
+Manual test entry points: see `docs/slot-placement.md` (the earlier prototype checklist was removed with the working drafts).
 Prior statements that these features are absent from the combined **source**
 are superseded; older binaries still lack them.
 
@@ -382,7 +382,7 @@ Latest feature-tree/group/helper test build:
 `KizamuBeam-slot-features.exe`, installer `KizamuBeam_2.7.0_x64-setup.exe`.
 Windows packaging passed; source hashes rechecked, binary hashes and logs retained.
 47/47 feature UI browser checks and focused regressions passed. Not launched or
-installed; manual/material acceptance ongoing. Scope/limits: `slot-features.md`.
+installed; manual/material acceptance ongoing. Scope/limits: `docs/slot-placement.md`.
 
 For this test branch, local desktop packaging on this host produces the Windows
 x64 executable (and installer when packaging installers). The requester will
@@ -413,15 +413,14 @@ parametric slot/notch placement and the layer-list refresh fix. Application:
 Source/binary SHA-256 manifests and build logs retained; source hashes rechecked.
 Manual local tests ongoing. No application startup/installation or hardware test
 by the agent. `test:joints` has one known failed language assertion in this run;
-see `docs/parametric-slot-placement.md` for actual verification results.
+see `docs/slot-placement.md` for the current state.
 
 Contour-guided follow-up build on 2026-11-06:
 `artifacts/windows-contour-slots-20261106-022609/`, application
 `KizamuBeam-contour-slots.exe` and NSIS installer. Includes depth-reference
 selection and dependent cut references; old free recipes remain readable.
 Build succeeded, source hashes rechecked, not launched or installed. Manual
-tests ongoing; geometry/Browser/regression verification in
-`docs/contour-guided-slots.md`.
+tests ongoing; geometry/browser/regression verification in `docs/slot-placement.md`.
 
 Latest straight-projection/overlay build:
 `artifacts/windows-projection-overlay-20261106-165125/` contains
@@ -429,7 +428,7 @@ Latest straight-projection/overlay build:
 Windows packaging succeeded, source hashes rechecked; application not launched
 or installed. Includes module-worker preview, independent references in resizable
 tool dialog, overlay master toggle and corrected isolation menu state/scrolling.
-Manual tests ongoing; actual verification: `docs/slot-projection.md`.
+Manual tests ongoing; actual verification: `docs/slot-placement.md`.
 ## Pfadinseln-Testbuild — 2026-11-08 21:56
 
 `artifacts/windows-path-islands-20261108-215603/KizamuBeam-path-islands.exe`

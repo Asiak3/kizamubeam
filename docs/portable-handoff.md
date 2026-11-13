@@ -17,7 +17,7 @@ Die geprüfte EXE und ihre ursprünglichen Buildnachweise liegen eine Ebene höh
 - `WISSEN/laser_beam/TODO.md`: kanonischer Gesamt-Backlog.
 - `WISSEN/kizamubeam/docs/handoff-islands-20261108.md`: aktuelle Inselkorrektur,
   Testergebnisse, Einschränkungen und offene Feature-/PR-Arbeit.
-- `WISSEN/kizamubeam/docs/pr-drafts/README.md`: Funktions-/PR-Ledger.
+- `WISSEN/kizamubeam/docs/slot-placement.md`: Schlitz-/Ausklinkungs-Tool (Architektur, Tests, Grenzen).
 - `WISSEN/laser_beam/docs/`: ursprüngliche Analysen, Entscheidungen und Audits.
 - `manifest.json`: exakte Branches,HEADs,Staging-/Dateistände aller Worktrees.
 - `checksums.json`: Integritätsprüfsummen der Paketdateien.

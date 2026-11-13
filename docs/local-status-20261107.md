@@ -194,7 +194,7 @@ kein Merge/Release/Tag. [Nachweis](https://github.com/negurvulkan/kizamubeam/pul
 Die übrigen PRs sind Draft, unabhängig implementiert/geprüft, noch nicht gemergt. Die entsprechenden „noch nicht implementiert“-
 Einträge weiter unten beschreiben damit den vorherigen Stand; aktuell sind
 Review, Integration, genannte Ausbaugrenzen und native Abnahme offen.
-Tests/Dateipfade/Grenzen: [PR-Übersicht](pr-drafts/README.md).
+Tests/Dateipfade/Grenzen: Slot-Tool siehe `docs/slot-placement.md` (PR-Übersicht in `pr-drafts/` entfernt).
 
 Diese konsolidierte Übersicht hat bei Statusfragen Vorrang vor historischen
 Build-/TODO-Abschnitten. „Öffentlich“ bedeutet hier: Implementierung als Branch/PR

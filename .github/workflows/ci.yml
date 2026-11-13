@@ -42,3 +42,22 @@ jobs:
 
       - name: Path tests
         run: npm run test:paths
+
+  slots:
+    name: slots
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Slot and notch placement tests
+        run: npm run test:slot-placement && npm run test:straight-slots && npm run test:contour-slots && npm run test:slot-features && npm run test:slot-worker && npm run test:slots
