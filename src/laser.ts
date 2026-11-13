@@ -558,7 +558,6 @@ function laserTab(ed: Editor): HTMLElement {
     ),
     h('div', { class: 'checks' },
       check(t('Nur Auswahl'), t('Nur die ausgewählten Objekte lasern'), () => device.cutSelected, (v) => (device.cutSelected = v)),
-      check(t('Pfad optimieren'), t('An: innere Formen zuerst, kurze Leerwege. Aus: Stapelreihenfolge aus dem Objekte-Fenster (manuell) — Warnung bei außen-vor-innen.'), () => device.optimize, (v) => (device.optimize = v)),
       check(t('Innere Formen zuerst'), t('Löcher und Innenkonturen vor ihrer Außenkontur schneiden'), () => device.optInnerFirst, (v) => (device.optInnerFirst = v)),
       check(t('Leerwege verkürzen'), t('Nächstgelegene Form als nächste schneiden (Alternative zur manuellen Reihenfolge)'), () => device.optTravel, (v) => (device.optTravel = v)),
       check(t('Gruppen zusammenhalten'), t('Formen eines Objekts bzw. einer Gruppe bevorzugt nacheinander schneiden'), () => device.optGroup, (v) => (device.optGroup = v)),

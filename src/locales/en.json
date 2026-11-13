@@ -995,7 +995,6 @@
   "Job-Ursprung": "Job Origin",
   "Nur Auswahl": "Cut Selected Graphics",
   "Nur die ausgewählten Objekte lasern": "Laser only the selected objects",
-  "Pfad optimieren": "Optimize path",
   "Innere Formen zuerst": "Inner shapes first",
   "Löcher und Innenkonturen vor ihrer Außenkontur schneiden": "Cut holes and inner contours before their outer contour",
   "Leerwege verkürzen": "Reduce travel moves",
@@ -4721,7 +4720,6 @@
   "Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.": "Kerf contract: {n} touching contours merged via union.",
   "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Kerf contract: for fill, kerf offsets the hull geometry before hatching.",
   "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positive: outer contours move outward, holes inward. Enter about half the cut width so parts keep their nominal size. Closed contours only (kerf → tabs → perforation; fill offsets the hull, images without kerf).",
-  "An: innere Formen zuerst, kurze Leerwege. Aus: Stapelreihenfolge aus dem Objekte-Fenster (manuell) — Warnung bei außen-vor-innen.": "On: inner shapes first, short travel moves. Off: stacking order from the Objects panel (manual) — warns on outer-before-inner.",
-  "Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.": "Manual order: {n} inner shape is cut after its outer shape (inner-first violated) — enable “Optimize path” or change the stacking order in the Objects panel.",
-  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.": "Manual order: {n} inner shapes are cut after their outer shape (inner-first violated) — enable “Optimize path” or change the stacking order in the Objects panel."
+  "Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Manual order: {n} inner shape is cut after its outer shape (inner-first violated) — enable “Inner shapes first” or change the stacking order in the Objects panel.",
+  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Manual order: {n} inner shapes are cut after their outer shape (inner-first violated) — enable “Inner shapes first” or change the stacking order in the Objects panel."
 }

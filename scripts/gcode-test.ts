@@ -865,12 +865,12 @@ await test('Topologie: buildContainment liefert Baum und Even-Odd-Tiefe', async 
 
 // ---------- Manuelle Schnittreihenfolge (Issue #153) ----------
 
-await test('Manuell: Stapelreihenfolge wird 1:1 gefahren (optimize aus)', async () => {
+await test('Manuell: Stapelreihenfolge wird 1:1 gefahren (alle Optimierer-Schalter aus)', async () => {
   const a = square(50, 100, 10, 1);
   const b = square(200, 100, 10, 2);
   // Dokumentreihenfolge [B, A]: manuell beginnt bei B (x≈200), auto beim näheren A (x≈50, Start bei 0,0)
-  const man = await cutJob([b, a], {}, { optimize: false });
-  const auto = await cutJob([b, a], {}, { optimize: true });
+  const man = await cutJob([b, a], {}, { optInnerFirst: false, optTravel: false, optGroup: false });
+  const auto = await cutJob([b, a], {}, { optInnerFirst: true, optTravel: true });
   assert.ok(man.moves.x[0] >= 200 && man.moves.x[0] <= 210, `manual first x=${man.moves.x[0]}`);
   assert.ok(auto.moves.x[0] >= 50 && auto.moves.x[0] <= 60, `auto first x=${auto.moves.x[0]}`);
 });
@@ -878,18 +878,20 @@ await test('Manuell: Stapelreihenfolge wird 1:1 gefahren (optimize aus)', async 
 await test('Manuell: außen-vor-innen warnt, innen-vor-außen nicht', async () => {
   const outer: Obj = { id: 3, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 100, h: 100, r: 0 } as never };
   const inner: Obj = { id: 4, m: [1, 0, 0, 1, 80, 80], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } as never };
-  const bad = await cutJob([outer, inner], {}, { optimize: false });
+  const bad = await cutJob([outer, inner], {}, { optInnerFirst: false, optTravel: false, optGroup: false });
   assert.ok(bad.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(bad.warnings));
-  const good = await cutJob([inner, outer], {}, { optimize: false });
+  const good = await cutJob([inner, outer], {}, { optInnerFirst: false, optTravel: false, optGroup: false });
   assert.ok(!good.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(good.warnings));
-  const auto = await cutJob([outer, inner], {}, { optimize: true });
+  // nur eine Warnung: die grobe Prüfung schweigt bei manueller Reihenfolge
+  assert.ok(!good.warnings.some((w) => w.includes('Innere Formen zuerst“ ist aus')), JSON.stringify(good.warnings));
+  const auto = await cutJob([outer, inner], {}, { optInnerFirst: true, optTravel: true });
   assert.ok(!auto.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(auto.warnings));
 });
 
 await test('Manuell: gesetzter Startpunkt gilt auch ohne Optimierung', async () => {
   const sp = { closed: true, nodes: [{ x: 100, y: 300 }, { x: 120, y: 300 }, { x: 120, y: 320 }, { x: 100, y: 320 }], start: true };
   const objs: Obj[] = [{ id: 1, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [sp] } }];
-  const job = await cutJob(objs, {}, { optimize: false });
+  const job = await cutJob(objs, {}, { optInnerFirst: false, optTravel: false, optGroup: false });
   // gesetzter Knoten nodes[0]=(100,300) → Maschine (100,100); ohne fixed wäre es der nächste Knoten
   assert.deepEqual(firstRapid(job.moves), [100, 100]);
 });
