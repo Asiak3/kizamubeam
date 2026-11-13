@@ -19,7 +19,7 @@ assert.equal(bottom.shape.kind, 'gen');
 if (bottom.shape.kind !== 'gen') throw Error('bottom');
 assert.ok(bottom.shape.subs.length > 1, 'Holes remain as subpaths of the same piece');
 const { buildJob, newDevice } = await import('../src/gcode');
-const job = await buildJob({ doc: ed.doc, only: [bottom], layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, kerf: 0 }), imgLayer: () => defaultImageLayer(), device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: false, returnHome: false } });
+const job = await buildJob({ doc: ed.doc, only: [bottom], layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, kerf: 0 }), imgLayer: () => defaultImageLayer(), device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optInnerFirst: false, optTravel: false, returnHome: false } });
 const expectedDistance = bottom.shape.subs.reduce((sum, sub) => sum + sub.nodes.reduce((d, q, i) => {
   const next = sub.nodes[(i + 1) % sub.nodes.length];
   return d + Math.hypot(next.x - q.x, next.y - q.y);

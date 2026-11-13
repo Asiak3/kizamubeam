@@ -106,7 +106,7 @@ for (const fixed of [false, true]) {
       { id: 2, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [ln] } },
     ];
     const doc = loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} });
-    const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: true, returnHome: false };
+    const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optInnerFirst: true, optTravel: true, returnHome: false };
     const job = await buildJob({ doc, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const }), imgLayer: () => defaultImageLayer(), device });
     const mv = job.moves;
     // erste Eilfahrt: zur Ecke des Quadrats
@@ -144,7 +144,7 @@ for (const kerf of [0, 0.2, -0.2]) {
         sp.start = true;
       }
       const doc = loadDoc({ bed: { w: 400, h: 400 }, objs: [{ id: 1, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [sp] } }], layers: {} });
-      const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: true, returnHome: false };
+      const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optInnerFirst: true, optTravel: true, returnHome: false };
       const inp = { doc, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, kerf }), imgLayer: () => defaultImageLayer(), device };
       const prev = await buildJob({ ...inp, forPreview: true });
       const real = await buildJob(inp);
@@ -406,7 +406,7 @@ const cutJob = (objs: Obj[], patch: Partial<Layer>, dev: Partial<Device> = {}) =
     doc: loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} }),
     layer: (i: number) => normalizeLayer({ ...defaultLayer(i), mode: 'line' as const, speed: 600, power: 80, ...patch }),
     imgLayer: () => defaultImageLayer(),
-    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, optimize: false, ...dev },
+    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, optInnerFirst: false, optTravel: false, ...dev },
   });
 const square = (x = 100, y = 100, w = 10, id = 1): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer: 1, shape: { kind: 'rect', w, h: w, r: 0 } as never });
 const hLine = (): Obj => ({ id: 9, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 100, y: 200 }, { x: 110, y: 200 }] }] } });
@@ -639,6 +639,78 @@ await test('Images use speed, power, passes, interval, direction and overscan of
   assert.equal(loadDoc(JSON.parse(JSON.stringify(doc))).layers[0].speed, 700);
 });
 
+// ---------- Optimizer-Schalter (Issue #222) ----------
+
+/** Ziele der Leerwege (f === 0) in der Reihenfolge des Jobs */
+function rapidDests(mv: Moves): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 0; i < mv.n; i++) if (mv.f[i] === 0) out.push([Math.round(mv.x[i] * 100) / 100, Math.round(mv.y[i] * 100) / 100]);
+  return out;
+}
+const optDev = (o: { inner: boolean; travel: boolean; group?: boolean }) => ({ optInnerFirst: o.inner, optTravel: o.travel, optGroup: o.group ?? false });
+
+await test('Optimizer: Defaults entsprechen explizit inner-first + travel (Gruppe aus)', async () => {
+  const objs = [square(50, 50, 100, 1), square(120, 120, 10, 2)];
+  const base = {
+    doc: loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} }),
+    layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const }),
+    imgLayer: () => defaultImageLayer(),
+  };
+  const a = await buildJob({ ...base, device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false } });
+  const b = await buildJob({ ...base, device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, optInnerFirst: true, optTravel: true, optGroup: false } });
+  const sig = (mv: Moves) => JSON.stringify([[...mv.x.slice(0, mv.n)], [...mv.y.slice(0, mv.n)], [...mv.f.slice(0, mv.n)], [...mv.s.slice(0, mv.n)]]);
+  assert.equal(sig(a.moves), sig(b.moves));
+});
+
+await test('Optimizer: Loch vor Hülle mit inner-first, danach ohne', async () => {
+  const objs = [square(50, 50, 100, 1), square(120, 120, 10, 2)];
+  const inner = await cutJob(objs, {}, optDev({ inner: true, travel: true }));
+  assert.deepEqual(rapidDests(inner.moves)[0], [120, 270]);
+  const outer = await cutJob(objs, {}, optDev({ inner: false, travel: true }));
+  assert.deepEqual(rapidDests(outer.moves)[0], [50, 250]);
+  assert.ok(outer.warnings.some((w) => w.includes('Innere Formen zuerst')), JSON.stringify(outer.warnings));
+  assert.ok(!inner.warnings.some((w) => w.includes('Innere Formen zuerst')), JSON.stringify(inner.warnings));
+});
+
+await test('Optimizer: ohne travel gilt die Dokumentreihenfolge (kein Umdrehen)', async () => {
+  const objs = [square(300, 100, 10, 1), square(100, 100, 10, 2)];
+  const nn = await cutJob(objs, {}, optDev({ inner: true, travel: true }));
+  assert.deepEqual(rapidDests(nn.moves)[0], [100, 290]);
+  const doc = await cutJob(objs, {}, optDev({ inner: false, travel: false }));
+  assert.deepEqual(rapidDests(doc.moves)[0], [300, 300]);
+});
+
+await test('Optimizer: Gruppen zusammenhalten bevorzugt die eigene Gruppe', async () => {
+  const g1a: Obj = { id: 11, m: [1, 0, 0, 1, 100, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const g1b: Obj = { id: 12, m: [1, 0, 0, 1, 300, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const solo: Obj = { id: 13, m: [1, 0, 0, 1, 110, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const grp: Obj = { id: 10, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'group', children: [g1a, g1b] } };
+  const objs = [grp, solo];
+  const plain = await cutJob(objs, {}, optDev({ inner: true, travel: true }));
+  const pxs = rapidDests(plain.moves).map(([x]) => x);
+  assert.ok(pxs[0] >= 95 && pxs[0] <= 105 && pxs[1] >= 105 && pxs[1] <= 125 && pxs[2] >= 295, JSON.stringify(pxs));
+  const grouped = await cutJob(objs, {}, optDev({ inner: true, travel: true, group: true }));
+  const gxs = rapidDests(grouped.moves).map(([x]) => x);
+  assert.ok(gxs[0] >= 95 && gxs[0] <= 105 && gxs[1] >= 295 && gxs[2] >= 105 && gxs[2] <= 125, JSON.stringify(gxs));
+});
+
+await test('Optimizer: gesetzter Startpunkt bleibt in allen Kombinationen', async () => {
+  const nodes = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  const fixed: Obj = { id: 20, m: [1, 0, 0, 1, 300, 100], layer: 1, shape: { kind: 'path', subs: [{ closed: true, nodes, start: true }] } };
+  for (const combo of [{ inner: true, travel: true }, { inner: true, travel: false }, { inner: false, travel: true }, { inner: false, travel: false }]) {
+    const job = await cutJob([fixed], {}, optDev(combo));
+    assert.deepEqual(rapidDests(job.moves)[0], [300, 300], JSON.stringify(combo));
+  }
+});
+
+await test('Optimizer: lbrn2-CutOptimize wird toleriert gelesen und gemeldet', async () => {
+  const { convertLbrn } = await import('../src/lbrn');
+  const xml = `<LightBurnProject><CutSetting type="Cut"><index Value="0"/></CutSetting><CutOptimize><InnerFirst Value="1"/><ReduceTravelMoves Value="0"/></CutOptimize></LightBurnProject>`;
+  const res = await convertLbrn(xml, { bedH: 400, assetId: async () => 'a' });
+  assert.deepEqual(res.optimizer, { innerFirst: true, travel: false, group: undefined });
+  assert.equal(res.notes.length, 1);
+  assert.match(res.notes[0], /Optimierer/);
+});
 // Issue #217: Sichtbarkeit vs. Ausgabe — output entscheidet, show nur Anzeige
 const selJob = (objs: Obj[], layerPatch: Partial<Layer> = {}) =>
   buildJob({
