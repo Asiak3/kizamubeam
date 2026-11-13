@@ -1,5 +1,5 @@
 // Editor: Pfad-Werkzeuge: Schließen, Verbinden, Zerlegen, Startpunkt, Trimmen, Ecken.
-import { apply, IDENT, inv, isOff, leaves, Mat, newId, Obj, Pt, SubPath, visibleLeaves } from '../model';
+import { apply, IDENT, inv, isOff, laserLeaves, Layer, leaves, Mat, newId, Obj, Pt, SubPath, visibleLeaves } from '../model';
 import { transformSubs } from '../importers';
 import { loadFont, textToSubs } from '../fonts';
 import { MAX_COPIES } from '../arrays';
@@ -14,6 +14,7 @@ import { shapeCenters, shownMark } from '../arcs';
 import type { Editor } from '../editor';
 import { SNAP_COLOR, TOOL_HINTS } from './shared';
 import { pathIslandPlan, IslandOptions } from '../pathIslands';
+import { flattenSub, LeadMark, leadMarks, Poly } from '../gcode';
 
 /** Formen, die Pfad-Werkzeuge bearbeiten (Grundformen werden dabei zu Pfaden) */
 const VECTOR = ['path', 'rect', 'ellipse', 'polygon'];
@@ -332,6 +333,64 @@ export class EditorPaths {
     const moved = (a: NonNullable<Editor['startHover']>, b: NonNullable<Editor['startHover']>) =>
       a.obj !== b.obj || a.sub !== b.sub || a.idx !== b.idx || a.pt?.x !== b.pt?.x || a.pt?.y !== b.pt?.y;
     if (!h !== !prev || (h && prev && moved(h, prev))) this.redraw();
+    // Inspect the contour under the pointer in the status line: start state and the layer's lead settings
+    if (!h !== !prev || (h && prev && (h.obj !== prev.obj || h.sub !== prev.sub))) {
+      this.hint = h ? this.startInfo(h.obj, h.sub) : TOOL_HINTS.start;
+      this.emit('tool');
+    }
+  }
+
+  /** Status line text for a contour in the start point tool: layer, start point state, lead-in/out and overcut */
+  startInfo(this: Editor, o: Obj, sub: number): string {
+    const L = this.layer(o.layer);
+    const sp = shapeSubs(o.shape)[sub];
+    const parts = [L.name || `${t('Layer')} ${o.layer + 1}`];
+    parts.push(sp?.start ? t('Startpunkt gesetzt') : t('Startpunkt wählt die Optimierung'));
+    const e = [L, ...(L.sub ?? []).filter((x) => x.output)].find((x) => x.mode === 'line') as Layer | undefined;
+    const ld = e?.lead;
+    if (!e) parts.push(t('kein Linien-Layer, kein Anschnitt'));
+    else if (!sp?.closed) parts.push(t('offene Kontur, kein Anschnitt'));
+    else {
+      if (ld && (ld.leadIn || ld.leadOut) && ld.length > 0) {
+        const which = ld.leadIn && ld.leadOut ? t('Anschnitt und Auslauf') : ld.leadIn ? t('Anschnitt') : t('Auslauf');
+        parts.push(t('{which} {len} mm, {kind} {angle}°', { which, len: dec(String(ld.length)), kind: ld.arc ? t('Bogen') : t('Gerade'), angle: dec(String(ld.angle)) }));
+      } else parts.push(t('kein Anschnitt'));
+      if (ld && ld.overcut > 0) parts.push(t('Überschnitt {v} mm', { v: dec(String(ld.overcut)) }));
+      if (e.kerf) parts.push(t('Kerf {v} mm', { v: dec(String(e.kerf)) }));
+    }
+    parts.push(t('Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen'));
+    return parts.join(' · ');
+  }
+
+  /**
+   * Lead-ins and lead-outs of all visible output contours, computed with the job code (gcode.ts leadMarks) in
+   * world coordinates. Cached until the document (or a layer setting) changes. Text and images have none.
+   */
+  leadOverlay(this: Editor): LeadMark[] {
+    if (this.leadCache?.ver === this.docVer) return this.leadCache.marks;
+    const byLayer = new Map<number, Poly[][]>();
+    for (const [o, m] of laserLeaves(this.doc.objs)) {
+      if (o.reg || !VECTOR.includes(o.shape.kind)) continue;
+      const L = this.layer(o.layer);
+      if (!L.output || !L.show) continue;
+      const own: Poly[] = [];
+      for (const sp of shapeSubs(o.shape)) {
+        if (sp.nodes.length < 2) continue;
+        const p = flattenSub(sp, m);
+        if (p.pts.length > 1) own.push(p);
+      }
+      if (!own.length) continue;
+      let list = byLayer.get(o.layer);
+      if (!list) byLayer.set(o.layer, (list = []));
+      list.push(own);
+    }
+    const marks: LeadMark[] = [];
+    for (const [li, objs] of byLayer) {
+      const L = this.layer(li);
+      for (const e of [L, ...(L.sub ?? []).filter((x) => x.output)]) marks.push(...leadMarks(objs, e, this.doc.bed.h));
+    }
+    this.leadCache = { ver: this.docVer, marks };
+    return marks;
   }
 
   /**
@@ -564,15 +623,41 @@ export class EditorPaths {
     this.emit('sel');
   }
 
-  /** Startpfeile: blau = gesetzter Startpunkt, grau = Standard (Optimierung darf ihn verlegen) */
+  /**
+   * Start point tool overlay: lead-ins (solid) and lead-outs (dashed) of all output contours, start markers and
+   * direction arrows of all contours the tool can edit, nodes only for the selection and the hovered object.
+   * Blue = start point set, grey = default (path optimization may move it).
+   */
   drawStartPoints(this: Editor, ctx: CanvasRenderingContext2D, px: number) {
-    const objs = new Set(this.sel.filter((o) => VECTOR.includes(o.shape.kind)));
-    if (this.startHover) objs.add(this.startHover.obj);
+    const withNodes = new Set(this.sel.filter((o) => VECTOR.includes(o.shape.kind)));
+    if (this.startHover) withNodes.add(this.startHover.obj);
+    const objs = new Set([...withNodes, ...this.toolTargets()]);
     ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const lm of this.leadOverlay()) {
+      if (lm.pts.length < 2) continue;
+      ctx.strokeStyle = ctx.fillStyle = lm.fixed ? '#2070ff' : '#8a9099';
+      ctx.lineWidth = 2 * px;
+      ctx.setLineDash(lm.out ? [4 * px, 3 * px] : []);
+      ctx.beginPath();
+      ctx.moveTo(lm.pts[0].x, lm.pts[0].y);
+      for (const q of lm.pts.slice(1)) ctx.lineTo(q.x, q.y);
+      ctx.stroke();
+      // Lead-in: the laser switches on at its outer end
+      if (!lm.out) {
+        ctx.beginPath();
+        ctx.arc(lm.pts[0].x, lm.pts[0].y, 2.5 * px, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.setLineDash([]);
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
     for (const o of objs) {
       shapeSubs(o.shape).forEach((sp, si) => {
         if (!sp.nodes.length) return;
-        for (const [ni, n] of sp.nodes.entries()) {
+        if (withNodes.has(o)) for (const [ni, n] of sp.nodes.entries()) {
           const q = apply(o.m, n.x, n.y);
           const hot = this.startHover?.obj === o && this.startHover.sub === si && this.startHover.idx === ni;
           const r = (hot ? 4.5 : 3) * px;

@@ -656,7 +656,7 @@ export interface JobInput {
 
 // ---------- Geometrie ----------
 
-interface Poly {
+export interface Poly {
   pts: Pt[];
   closed: boolean;
   /** Haltestege: off[i] = 1 heißt, die Strecke von pts[i] zum nächsten Punkt wird ohne Laser gefahren */
@@ -1288,19 +1288,14 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v:
     }
     return;
   }
-  const lead = e.lead.leadIn || e.lead.leadOut || e.lead.overcut > 0 ? e.lead : null;
-  if (lead) markHoles(polys);
-  let cuts = e.tabs.enabled ? withTabs(polys, e.tabs) : polys;
-  if (e.perf.enabled) cuts = cuts.map((p) => perforate(p, e.perf));
+  const { cuts, lead } = lineCuts(polys, e);
   const ramp = e.ramp.enabled && e.ramp.length > 0 && e.minPower < e.power ? e.ramp : null;
   const sMin = Math.max(0, e.minPower) / 100;
   for (let p = 0; p < passes; p++) {
     pass(p);
     const order = ord.innerFirst || ord.travel || ord.group ? orderPolys(cuts, { x: mv.lastX(), y: mv.lastY() }, ord) : cuts;
-    for (let poly of order) {
-      // Nicht in einem Steg beginnen, sonst fährt der Laser ihn zuerst ohne Leistung ab
-      if (poly.off?.[0]) poly = startAt(poly, Math.max(0, poly.off.indexOf(0)));
-      const path = cutPath(poly, lead);
+    for (const poly of order) {
+      const path = contourPath(poly, lead);
       if (path.pts.length < 2) continue;
       mv.push(path.pts[0].x, path.pts[0].y, 0, 0, li);
       if (ramp) {
@@ -1311,10 +1306,76 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v:
   }
 }
 
+/** Settings a line entry needs to build its cut contours (kerf is applied per object before this) */
+export type LineEntry = Pick<CutSettings, 'mode' | 'kerf' | 'tabs' | 'perf' | 'lead'>;
+
+/**
+ * Cut contours of a line entry in output form: holes marked for the lead side, then tabs and perforation.
+ * Shared by the job (emitEntry) and the canvas lead overlay (leadMarks), so both show the same geometry.
+ */
+function lineCuts(polys: Poly[], e: Pick<LineEntry, 'tabs' | 'perf' | 'lead'>): { cuts: Poly[]; lead: LeadSettings | null } {
+  const lead = e.lead.leadIn || e.lead.leadOut || e.lead.overcut > 0 ? e.lead : null;
+  if (lead) markHoles(polys);
+  let cuts = e.tabs.enabled ? withTabs(polys, e.tabs) : polys;
+  if (e.perf.enabled) cuts = cuts.map((p) => perforate(p, e.perf));
+  return { cuts, lead };
+}
+
+/** Cut path of one contour as it is emitted: never start inside a tab (the laser would first run it unpowered) */
+function contourPath(poly: Poly, lead: LeadSettings | null): CutPath {
+  if (poly.off?.[0]) poly = startAt(poly, Math.max(0, poly.off.indexOf(0)));
+  return cutPath(poly, lead);
+}
+
+/** Lead-in or lead-out of one contour for the canvas: pts runs in cutting direction and touches the contour */
+export interface LeadMark {
+  pts: Pt[];
+  out: boolean;
+  /** Start point set by the user; otherwise path optimization may still move it */
+  fixed: boolean;
+}
+
+/**
+ * Lead-ins and lead-outs of a line entry, computed exactly like the job (kerf per object, holes, tabs,
+ * perforation, cutPath). objs = flattened contours per object in document coordinates (y down), bedH = bed
+ * height: the work runs in bed coordinates like the job, because Clipper picks the start of kerf contours there.
+ * The start used is the contour's own start; with path optimization and no fixed start point the job may begin
+ * elsewhere. Also meant for the CAM overlay (#151).
+ */
+export function leadMarks(objs: Poly[][], e: LineEntry, bedH: number): LeadMark[] {
+  if (e.mode !== 'line' || !(e.lead.leadIn || e.lead.leadOut) || e.lead.length <= 0) return [];
+  const flip = (pts: Pt[]) => pts.map((q) => ({ x: q.x, y: bedH - q.y }));
+  const list: Poly[] = [];
+  for (const own0 of objs) {
+    const own = own0.map((p) => ({ ...p, pts: flip(p.pts) }));
+    if (!e.kerf) {
+      list.push(...own);
+      continue;
+    }
+    list.push(...own.filter((p) => !p.closed), ...kerfOffset(own.filter((p) => p.closed), e.kerf));
+  }
+  const { cuts, lead } = lineCuts(list, e);
+  const out: LeadMark[] = [];
+  for (const poly of cuts) {
+    if (!poly.closed) continue;
+    const path = contourPath(poly, lead);
+    const fixed = !!poly.fixed;
+    if (path.nIn) out.push({ pts: flip(path.pts.slice(0, path.nIn + 1)), out: false, fixed });
+    if (path.nOut) out.push({ pts: flip(path.pts.slice(path.pts.length - path.nOut - 1)), out: true, fixed });
+  }
+  return out;
+}
+
+/** Flatten a sub-path into a polyline with matrix m (same tolerance as the job) */
+export const flattenSub = (sp: SubPath, m: Mat): Poly => flatten(sp, m);
+
 /** Schnittweg einer Form als Punktfolge: off[k] = 1 heißt, Strecke k (pts[k] → pts[k+1]) ohne Laser */
 interface CutPath {
   pts: Pt[];
   off: number[];
+  /** Points added in front as lead-in / at the end as lead-out */
+  nIn?: number;
+  nOut?: number;
 }
 
 /** Doppelter Flächeninhalt mit Vorzeichen (positiv = gegen den Uhrzeigersinn bei y nach oben) */
@@ -1422,6 +1483,8 @@ export function cutPath(p: Poly, lead: LeadSettings | null): CutPath {
     return l > 1e-9 ? { x: (b.x - a.x) / l, y: (b.y - a.y) / l } : null;
   };
   const L = Math.max(0, lead.length);
+  let nIn = 0,
+    nOut = 0;
   if (lead.leadIn && L > 0 && !off[0]) {
     let t: Pt | null = null;
     for (let i = 1; i < pts.length && !t; i++) t = dir(pts[0], pts[i]);
@@ -1429,6 +1492,7 @@ export function cutPath(p: Poly, lead: LeadSettings | null): CutPath {
       const q = leadPts(pts[0], t, side(t), L, lead, true);
       pts.unshift(...q);
       off.unshift(...q.map(() => 0));
+      nIn = q.length;
     }
   }
   if (lead.leadOut && L > 0 && !off[off.length - 1]) {
@@ -1439,9 +1503,10 @@ export function cutPath(p: Poly, lead: LeadSettings | null): CutPath {
       const q = leadPts(e, t, side(t), L, lead, false);
       pts.push(...q);
       off.push(...q.map(() => 0));
+      nOut = q.length;
     }
   }
-  return { pts, off };
+  return { pts, off, nIn, nOut };
 }
 
 /**

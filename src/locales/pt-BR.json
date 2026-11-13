@@ -4725,5 +4725,16 @@
   "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Contrato do kerf: no preenchimento, o kerf atua no contorno antes do hachurado.",
   "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: contornos externos deslocam-se para fora, furos para dentro. Informe cerca de metade da largura de corte para que as peças mantenham a medida. Só contornos fechados (kerf → pontes → perfuração; o preenchimento compensa o contorno, imagens sem kerf).",
   "Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Ordem manual: {n} forma interna é cortada após sua forma externa (interior-primeiro violado) — ative “Formas internas primeiro” ou altere a ordem no painel de objetos.",
-  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Ordem manual: {n} formas internas são cortadas após sua forma externa (interior-primeiro violado) — ative “Formas internas primeiro” ou altere a ordem no painel de objetos."
+  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Ordem manual: {n} formas internas são cortadas após sua forma externa (interior-primeiro violado) — ative “Formas internas primeiro” ou altere a ordem no painel de objetos.",
+  "Startpunkt gesetzt": "Ponto inicial definido",
+  "Startpunkt wählt die Optimierung": "Ponto inicial escolhido pela otimização",
+  "kein Linien-Layer, kein Anschnitt": "não é uma camada de linha, sem entrada",
+  "offene Kontur, kein Anschnitt": "contorno aberto, sem entrada",
+  "Anschnitt und Auslauf": "Entrada e saída",
+  "Auslauf": "Saída",
+  "kein Anschnitt": "sem entrada",
+  "{which} {len} mm, {kind} {angle}°": "{which} {len} mm, {kind} {angle}°",
+  "Überschnitt {v} mm": "Sobrecorte {v} mm",
+  "Kerf {v} mm": "Kerf {v} mm",
+  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Clique: começar aqui, Shift: inverter, Ctrl: redefinir"
 }

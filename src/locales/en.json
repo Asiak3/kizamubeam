@@ -4727,5 +4727,16 @@
   "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Kerf contract: for fill, kerf offsets the hull geometry before hatching.",
   "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positive: outer contours move outward, holes inward. Enter about half the cut width so parts keep their nominal size. Closed contours only (kerf → tabs → perforation; fill offsets the hull, images without kerf).",
   "Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Manual order: {n} inner shape is cut after its outer shape (inner-first violated) — enable “Inner shapes first” or change the stacking order in the Objects panel.",
-  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Manual order: {n} inner shapes are cut after their outer shape (inner-first violated) — enable “Inner shapes first” or change the stacking order in the Objects panel."
+  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Manual order: {n} inner shapes are cut after their outer shape (inner-first violated) — enable “Inner shapes first” or change the stacking order in the Objects panel.",
+  "Startpunkt gesetzt": "Start point set",
+  "Startpunkt wählt die Optimierung": "Start point chosen by optimization",
+  "kein Linien-Layer, kein Anschnitt": "not a line layer, no lead-in",
+  "offene Kontur, kein Anschnitt": "open contour, no lead-in",
+  "Anschnitt und Auslauf": "Lead-in and lead-out",
+  "Auslauf": "Lead-out",
+  "kein Anschnitt": "no lead-in",
+  "{which} {len} mm, {kind} {angle}°": "{which} {len} mm, {kind} {angle}°",
+  "Überschnitt {v} mm": "Overcut {v} mm",
+  "Kerf {v} mm": "Kerf {v} mm",
+  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Click: start here, Shift: reverse, Ctrl: reset"
 }
