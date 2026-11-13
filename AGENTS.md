@@ -140,6 +140,8 @@ There are additional focused `test:*` scripts in `package.json`; identify and ru
 - Summarize the user-visible effect, compatibility implications and any safety impact.
 - Include which commands were run and their results, plus any manual checks and limitations.
 - Disclose substantial AI assistance honestly. Do not present automated AI review as independent human review.
+- `main` is squash-merge only: the PR title becomes the commit message, so keep it a plain description without ordering prefixes like `[1/2]`. A PR is accepted or declined as a whole; split independent changes into separate PRs.
+- For a PR that builds on another one, start the description with `Depends on #123 — merge after it.`, keep it a draft until that PR is merged, then rebase onto `main` (`git rebase --onto main <old-base-branch>`) before marking it ready.
 - If requirements are ambiguous and the difference affects hardware safety, file compatibility or data loss, ask before making the risky choice.
 
 When in doubt, prioritize **safe machine behavior**, **preserving existing user work**, and **small reviewable patches** over speed or feature count.
