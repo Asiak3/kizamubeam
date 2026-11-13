@@ -188,6 +188,67 @@ body {
   margin: 4px 0;
 }
 
+/* Schriften-Picker mit Hover-Vorschau (Prototyp) */
+.fontpick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 220px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  padding: 3px 8px;
+  cursor: default;
+}
+.fontpick-btn:hover {
+  background: var(--accent-soft);
+}
+.fontpick-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fontpick-chev {
+  color: var(--muted);
+  font-size: 10px;
+}
+.fontpick-pop {
+  position: fixed;
+  z-index: 120;
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 14px var(--shadow);
+  padding: 4px 0;
+}
+.fontpick-group {
+  padding: 4px 14px 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.fontpick-row {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 5px 14px;
+  font-size: 16px;
+  text-align: left;
+  color: inherit;
+  cursor: default;
+}
+.fontpick-row:hover,
+.fontpick-row.active {
+  background: var(--accent-soft);
+}
+.fontpick-row.missing {
+  color: var(--muted);
+  font-style: italic;
+}
+
 /* Knöpfe */
 .ib {
   width: 30px;

@@ -68,7 +68,7 @@ export async function installGoogleFont(family: string, info?: CatalogFont): Pro
 
 const linked = new Set<string>();
 /** Vorschau einer Google-Schrift im Fenster (Webfont von fonts.googleapis.com, wird nicht installiert) */
-function linkGoogleCss(family: string) {
+export function linkGoogleCss(family: string) {
   if (linked.has(family)) return;
   linked.add(family);
   const href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, '+')}&display=swap`;

@@ -112,6 +112,77 @@ test('Favoriten: hinzufügen, doppelt egal, entfernen', () => {
   assert.deepEqual(fontFavorites(), ['Arial']);
 });
 
+// requestLocalFonts: Browser-API gemockt (window ist hier globalThis, navigator ersetzbar)
+const { requestLocalFonts } = await import('../src/fonts');
+async function atest(name: string, fn: () => Promise<void>) {
+  try {
+    await fn();
+    console.log(`ok   ${name}`);
+  } catch (e) {
+    failed++;
+    console.log(`FAIL ${name}\n${(e as Error).stack}`);
+  }
+}
+const gg = globalThis as Record<string, unknown>;
+const realNavigatorDesc = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+function setNavigator(value: unknown) {
+  Object.defineProperty(globalThis, 'navigator', { value, configurable: true, enumerable: true });
+}
+function mockBrowser(state: 'granted' | 'denied' | 'prompt' | null, query?: () => Promise<unknown[]>) {
+  if (query) gg.queryLocalFonts = query;
+  else delete gg.queryLocalFonts;
+  if (state === null) {
+    setNavigator({ language: 'de', languages: ['de'] });
+  } else {
+    setNavigator({ language: 'de', languages: ['de'], permissions: { query: async () => ({ state }) } });
+  }
+}
+
+await atest('Local-Fonts: ohne API kein Zugriff', async () => {
+  mockBrowser(null);
+  assert.equal(await requestLocalFonts(), false);
+});
+
+await atest('Local-Fonts: abgelehnt bleibt abgelehnt (kein Prompt)', async () => {
+  let called = 0;
+  mockBrowser('denied', async () => {
+    called++;
+    return [];
+  });
+  assert.equal(await requestLocalFonts(), false);
+  assert.equal(called, 0);
+});
+
+await atest('Local-Fonts: erteilt nutzt Zugriff ohne Rückfrage', async () => {
+  let called = 0;
+  mockBrowser('granted', async () => {
+    called++;
+    return [];
+  });
+  assert.equal(await requestLocalFonts(), true);
+  assert.equal(called, 0);
+});
+
+await atest('Local-Fonts: Rückfrage löst Zugriff aus, Abbruch bleibt false', async () => {
+  mockBrowser('prompt', async () => []);
+  assert.equal(await requestLocalFonts(), true);
+  mockBrowser('prompt', async () => {
+    throw new DOMException('aborted', 'AbortError');
+  });
+  assert.equal(await requestLocalFonts(), false);
+});
+
+await atest('Local-Fonts: ohne Permissions-API direkt versuchen', async () => {
+  mockBrowser(null, async () => []);
+  assert.equal(await requestLocalFonts(), true);
+  mockBrowser(null, async () => {
+    throw new Error('kein Zugriff');
+  });
+  assert.equal(await requestLocalFonts(), false);
+});
+if (realNavigatorDesc) Object.defineProperty(globalThis, 'navigator', realNavigatorDesc);
+delete gg.queryLocalFonts;
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
