@@ -1251,6 +1251,24 @@ type CutEntry = Omit<CutSettings, 'air' | 'look' | 'sub'>;
 /** Bearbeitungen eines Layers in Ausgabereihenfolge: der Layer selbst, dann eingeschaltete Sub-Layer. Durchgänge laufen pro Bearbeitung (#218): Jede Entry beendet ihre eigenen passes, bevor die nächste startet; es gibt keinen globalen Repeat. */
 const entriesOf = (L: Layer): CutEntry[] => [L, ...(L.sub ?? []).filter((s: SubLayer) => s.output)];
 
+/** Manuelle Reihenfolge (Issue #153): zählt innere Formen, deren äußere Form früher geschnitten wird.
+ * Manuell = Stapel-/Dokumentreihenfolge (`optimize` aus); `containsStrict` aus dem Topologie-Modul (#219). */
+function countManualViolations(polys: Poly[]): number {
+  if (polys.length < 2) return 0;
+  const boxes = boxesOf(polys);
+  let n = 0;
+  for (let j = 0; j < polys.length; j++) {
+    if (!polys[j].closed) continue;
+    for (let i = 0; i < j; i++) {
+      if (containsStrict(polys, boxes, j, i)) {
+        n++;
+        break;
+      }
+    }
+  }
+  return n;
+}
+
 /** Bewegungen einer Bearbeitung; pass(p) setzt vor jedem Durchgang den Z-Versatz */
 function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v: boolean }, pass: (p: number) => void, ord: OrderOpts) {
   const s = e.power / 100;
@@ -1764,6 +1782,7 @@ for (const [o, world] of effLeaves) {
   // Z-Versatz nur mit Z-Achse; ist Z die Drehachse, bleibt der Fokus, wo er ist
   const useZ = device.zAxis && !(rotaryOn(device) && device.rotary.axis === 'Z');
   let zSkipped = false;
+  let manualViolations = 0;
   for (const li of order) {
     const L = layerOf(li);
     const bk = buckets.get(li)!;
@@ -1794,10 +1813,28 @@ for (const [o, world] of effLeaves) {
       if (!useZ && (e.zOffset || e.zStep)) zSkipped = true;
       // Z je Durchgang: erster Durchgang beim Z-Versatz, jeder weitere um zStep tiefer
       const pass = (p: number) => (mv.zCur = useZ ? e.zOffset + p * e.zStep : 0);
-      emitEntry(mv, e, polys, li, flip, pass, { innerFirst: device.optInnerFirst, travel: device.optTravel, group: device.optGroup });
+      const orderOpts = {
+        innerFirst: device.optInnerFirst,
+        travel: device.optTravel,
+        group: device.optGroup,
+      };
+
+      if (!orderOpts.innerFirst && e.mode === 'line') {
+        manualViolations += countManualViolations(polys);
+      }
+
+      emitEntry(mv, e, polys, li, flip, pass, orderOpts);
       mv.zCur = 0;
     });
   }
+  if (manualViolations)
+    warnings.push(
+      tn(
+        'Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.',
+        'Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.',
+        manualViolations,
+      ),
+    );
   if (zSkipped)
     warnings.push(
       device.zAxis

@@ -995,6 +995,7 @@
   "Job-Ursprung": "Origem do job",
   "Nur Auswahl": "Cortar gráficos selecionados",
   "Nur die ausgewählten Objekte lasern": "Laserar somente os objetos selecionados",
+  "Pfad optimieren": "Otimizar caminho",
   "Innere Formen zuerst": "Formas internas primeiro",
   "Löcher und Innenkonturen vor ihrer Außenkontur schneiden": "Cortar furos e contornos internos antes do seu contorno externo",
   "Leerwege verkürzen": "Reduzir trajetos vazios",
@@ -4717,5 +4718,8 @@
   "Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.": "Contrato do kerf: {n} contorno em contato unido via união.",
   "Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.": "Contrato do kerf: {n} contornos em contato unidos via união.",
   "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Contrato do kerf: no preenchimento, o kerf atua no contorno antes do hachurado.",
-  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: contornos externos deslocam-se para fora, furos para dentro. Informe cerca de metade da largura de corte para que as peças mantenham a medida. Só contornos fechados (kerf → pontes → perfuração; o preenchimento compensa o contorno, imagens sem kerf)."
+  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: contornos externos deslocam-se para fora, furos para dentro. Informe cerca de metade da largura de corte para que as peças mantenham a medida. Só contornos fechados (kerf → pontes → perfuração; o preenchimento compensa o contorno, imagens sem kerf).",
+  "An: innere Formen zuerst, kurze Leerwege. Aus: Stapelreihenfolge aus dem Objekte-Fenster (manuell) — Warnung bei außen-vor-innen.": "Ativado: formas internas primeiro, trajetos curtos. Desativado: ordem de empilhamento do painel de objetos (manual) — avisa se exterior antes do interior.",
+  "Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.": "Ordem manual: {n} forma interna é cortada após sua forma externa (interior-primeiro violado) — ative “Otimizar caminho” ou altere a ordem no painel de objetos.",
+  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.": "Ordem manual: {n} formas internas são cortadas após sua forma externa (interior-primeiro violado) — ative “Otimizar caminho” ou altere a ordem no painel de objetos."
 }
