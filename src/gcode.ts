@@ -10,6 +10,7 @@ import { hasNative, native } from './native';
 import { locale, t, tn } from './i18n';
 import { jobOutputsOff, jobOutputsOn } from './fluidnc';
 import { parkedObjs } from './parking';
+import { addPt, boxesOf, buildContainment, containsStrict, emptyBox } from './polyTopology';
 
 // ---------- Geräte und Firmware ----------
 
@@ -693,26 +694,7 @@ function flatten(sp: SubPath, m: Mat): Poly {
   return { pts, closed: sp.closed && pts.length > 2, ...(sp.start ? { fixed: true } : {}) };
 }
 
-function emptyBox(): Box {
-  return { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
-}
-function addPt(b: Box, x: number, y: number) {
-  if (x < b.x0) b.x0 = x;
-  if (y < b.y0) b.y0 = y;
-  if (x > b.x1) b.x1 = x;
-  if (y > b.y1) b.y1 = y;
-}
 const finite = (b: Box) => (isFinite(b.x0) ? b : null);
-
-function pointInPoly(p: Pt, poly: Pt[]): boolean {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i],
-      b = poly[j];
-    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
-  }
-  return inside;
-}
 
 /** Konvexe Hülle (monotone Kette) */
 export function convexHull(pts: Pt[]): Pt[] {
@@ -803,25 +785,31 @@ const orderBoxes = new WeakMap<readonly Poly[], Box[]>();
 
 function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
   const n = polys.length;
+function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
+  const n = polys.length;
+
   if (!o.innerFirst && !o.travel && !o.group) return polys;
-  const boxes = polys.map((p) => {
-    const b = emptyBox();
-    for (const q of p.pts) addPt(b, q.x, q.y);
-    return b;
-  });
+
+  const boxes = boxesOf(polys);
   orderBoxes.set(polys, boxes);
+
+  // Für jede Form: wie viele noch ungeschnittene Formen liegen in ihr?
+  const pending = new Int32Array(n);
+  const containers: number[][] = polys.map(() => []);
+
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (!containsStrict(polys, boxes, i, j)) continue;
+      containers[i].push(j);
+      pending[j]++;
+    }
+  }
   // Für jede Form: wie viele noch ungeschnittene Formen liegen in ihr?
   const pending = new Int32Array(n);
   const containers: number[][] = polys.map(() => []);
   for (let i = 0; i < n; i++) {
-    const bi = boxes[i];
     for (let j = 0; j < n; j++) {
-      if (i === j || !polys[j].closed) continue;
-      const bj = boxes[j];
-      if (bi.x0 < bj.x0 || bi.y0 < bj.y0 || bi.x1 > bj.x1 || bi.y1 > bj.y1) continue;
-      // gleich große Rahmen: nur eine Richtung zählen, sonst blockieren sich deckungsgleiche Formen
-      if (bi.x0 === bj.x0 && bi.y0 === bj.y0 && bi.x1 === bj.x1 && bi.y1 === bj.y1 && i < j) continue;
-      if (!pointInPoly(polys[i].pts[0], polys[j].pts) && !pointInPoly(midOf(bi), polys[j].pts)) continue;
+      if (!containsStrict(polys, boxes, i, j)) continue;
       containers[i].push(j);
       pending[j]++;
     }
@@ -867,8 +855,6 @@ function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
   }
   return out;
 }
-const midOf = (b: Box): Pt => ({ x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 });
-
 /** Geschlossene Form ab Punkt k beginnen lassen (Haltestege wandern mit) */
 function startAt(p: Poly, k: number): Poly {
   const pts = p.pts.slice(k).concat(p.pts.slice(0, k));
@@ -1075,19 +1061,10 @@ export function addTabs(p: Poly, T: TabSettings): Poly {
 
 /** Haltestege für alle geschlossenen Formen eines Layers; innere Formen auf Wunsch auslassen */
 function withTabs(polys: Poly[], T: TabSettings): Poly[] {
-  const boxes = polys.map((p) => {
-    const b = emptyBox();
-    for (const q of p.pts) addPt(b, q.x, q.y);
-    return b;
-  });
-  const inner = (i: number) =>
-    polys.some((o, j) => {
-      if (j === i || !o.closed) return false;
-      const a = boxes[i],
-        c = boxes[j];
-      if (a.x0 < c.x0 || a.y0 < c.y0 || a.x1 > c.x1 || a.y1 > c.y1) return false;
-      return pointInPoly(polys[i].pts[0], o.pts);
-    });
+  const boxes = boxesOf(polys);
+  // Haltesteg-Ausschluss für Innenformen nach derselben Regel wie die Schnittreihenfolge (Issue #219):
+  // erster Punkt oder Rahmenmitte im Container, identische Rahmen einseitig gezählt.
+  const inner = (i: number) => polys.some((_, j) => containsStrict(polys, boxes, i, j));
   return polys.map((p, i) => (p.closed && !(T.skipInner && inner(i)) ? addTabs(p, T) : p));
 }
 
@@ -1339,23 +1316,10 @@ function signedArea(pts: Pt[]): number {
 
 /** Formen, die in einer ungeraden Zahl anderer geschlossener Formen liegen, als Loch markieren */
 function markHoles(polys: Poly[]) {
-  const boxes = polys.map((p) => {
-    const b = emptyBox();
-    for (const q of p.pts) addPt(b, q.x, q.y);
-    return b;
-  });
+  const { depth } = buildContainment(polys);
   for (let i = 0; i < polys.length; i++) {
     if (!polys[i].closed) continue;
-    const a = boxes[i];
-    let depth = 0;
-    for (let j = 0; j < polys.length; j++) {
-      if (i === j || !polys[j].closed) continue;
-      const c = boxes[j];
-      if (a.x0 < c.x0 || a.y0 < c.y0 || a.x1 > c.x1 || a.y1 > c.y1) continue;
-      if (a.x0 === c.x0 && a.y0 === c.y0 && a.x1 === c.x1 && a.y1 === c.y1 && i < j) continue;
-      if (pointInPoly(polys[i].pts[0], polys[j].pts) || pointInPoly(midOf(a), polys[j].pts)) depth++;
-    }
-    polys[i].hole = depth % 2 === 1;
+    polys[i].hole = depth[i] % 2 === 1;
   }
 }
 
