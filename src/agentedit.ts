@@ -163,7 +163,7 @@ const LAYER_KEYS: Record<string, string> = {
   perforate: 'boolean', perfLength: 'number', perfGap: 'number',
   leadIn: 'boolean', leadOut: 'boolean', leadLength: 'number', leadAngle: 'number', leadArc: 'boolean', overcut: 'number',
   powerRamp: 'boolean', rampLength: 'number', rampAngle: 'number', rampEnds: 'boolean',
-  zOffset: 'number', zStep: 'number',
+  zOffset: 'number', zStep: 'number', dedup: 'boolean', dedupTol: 'number',
 };
 
 /** Felder, die auch Sub-Layer haben (alles außer Name, Sichtbarkeit, Sperre und Air Assist) */
@@ -191,6 +191,8 @@ function cutPatch(a: Args, base: Pick<CutSettings, 'perf' | 'lead' | 'ramp'>): R
   n('overscan', { min: 0, max: 50 });
   n('zOffset', { min: -50, max: 50 });
   n('zStep', { min: -20, max: 20 });
+  n('dedupTol', { min: 0.01, max: 0.5 });
+  if (a.dedup !== undefined) p.dedup = a.dedup === true;
   if (a.crossHatch !== undefined) p.crossHatch = a.crossHatch === true;
   if (a.bidirectional !== undefined) p.bidirectional = a.bidirectional === true;
   if (a.output !== undefined) p.output = a.output === true;

@@ -4,6 +4,7 @@ import { strict as assert } from 'node:assert';
 import { buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
+import { dedupPolys } from '../src/dedup';
 
 let failed = 0;
 async function test(name: string, fn: () => void | Promise<void>) {
@@ -637,6 +638,78 @@ await test('Images use speed, power, passes, interval, direction and overscan of
   // Loading again does not move anything (the legacy fields are gone)
   doc.layers[0].speed = 700;
   assert.equal(loadDoc(JSON.parse(JSON.stringify(doc))).layers[0].speed, 700);
+});
+
+// ---------- Doppelte Linien beim Export (Issue #221) ----------
+
+await test('Dedup aus (Standard): identische Quadrate werden zweimal geschnitten', async () => {
+  const job = await cutJob([square(100, 100, 10, 1), square(100, 100, 10, 2)], {});
+  const { on } = lengths(job.moves);
+  assert.ok(Math.abs(on - 80) < 0.5, `on=${on}`);
+  assert.equal(job.dedup?.length ?? 0, 0);
+  assert.equal(job.warnings.length, 0);
+});
+
+await test('Dedup an: identisches Quadrat nur einmal, Warnung + Markierung', async () => {
+  const job = await cutJob([square(100, 100, 10, 1), square(100, 100, 10, 2)], { dedup: true, dedupTol: 0.05 });
+  const { on } = lengths(job.moves);
+  assert.ok(Math.abs(on - 40) < 0.5, `on=${on}`);
+  assert.equal(job.warnings.length, 1);
+  assert.ok((job.dedup?.[0].len ?? 0) > 39, JSON.stringify(job.dedup?.[0]?.len));
+  assert.ok((job.dedup?.[0].lines.length ?? 0) >= 1);
+});
+
+await test('Dedup an: Teilüberlappung (5 mm Kante) wird einmal abgezogen', async () => {
+  const objs = [square(100, 100, 10, 1), square(105, 100, 10, 2)];
+  const plain = await cutJob(objs, {});
+  const ded = await cutJob(objs, { dedup: true, dedupTol: 0.05 });
+  const a = lengths(plain.moves),
+    b = lengths(ded.moves);
+  assert.ok(Math.abs(a.on - 80) < 0.5, `plain on=${a.on}`);
+  // obere + untere Kante je 5 mm doppelt
+  assert.ok(Math.abs(b.on - 70) < 0.6, `dedup on=${b.on}`);
+  assert.equal(ded.warnings.length, 1);
+});
+
+await test('Dedup: nur Ecke berührt → kein Abzug', async () => {
+  const job = await cutJob([square(100, 100, 10, 1), square(110, 110, 10, 2)], { dedup: true, dedupTol: 0.05 });
+  const { on } = lengths(job.moves);
+  assert.ok(Math.abs(on - 80) < 0.5, `on=${on}`);
+  assert.equal(job.warnings.length, 0);
+});
+
+await test('Dedup: layerübergreifend wird nichts zusammengefasst', async () => {
+  const o1 = square(100, 100, 10, 1);
+  const o2 = { ...square(100, 100, 10, 2), layer: 2 };
+  const job = await buildJob({
+    doc: loadDoc({ bed: { w: 400, h: 400 }, objs: [o1, o2], layers: {} }),
+    layer: (i: number) => normalizeLayer({ ...defaultLayer(i), mode: 'line' as const, speed: 600, power: 80, dedup: true, dedupTol: 0.05 }),
+    imgLayer: () => defaultImageLayer(),
+    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, optimize: false },
+  });
+  const { on } = lengths(job.moves);
+  assert.ok(Math.abs(on - 80) < 0.5, `on=${on}`);
+});
+
+await test('Dedup + Kerf: Teilspannen bleiben (Versatz), ganze Doppel fallen', async () => {
+  const objs = [square(100, 100, 10, 1), square(105, 100, 10, 2)];
+  const kerfPlain = await cutJob(objs, { kerf: 0.2 });
+  const kerfDed = await cutJob(objs, { kerf: 0.2, dedup: true, dedupTol: 0.05 });
+  assert.ok(Math.abs(lengths(kerfPlain.moves).on - lengths(kerfDed.moves).on) < 0.5, 'Teil bleibt bei Kerf');
+  // ganze Doppel fallen trotz Kerf
+  const fullPlain = await cutJob([square(100, 100, 10, 1), square(100, 100, 10, 2)], { kerf: 0.2 });
+  const fullDed = await cutJob([square(100, 100, 10, 1), square(100, 100, 10, 2)], { kerf: 0.2, dedup: true, dedupTol: 0.05 });
+  assert.ok(lengths(fullDed.moves).on < lengths(fullPlain.moves).on - 30, 'ganz fällt bei Kerf');
+});
+
+await test('Dedup: Fix-Start wandert auf die überlebende Kontur', () => {
+  const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  const r = dedupPolys(
+    [{ pts: pts.map((p) => ({ ...p })), closed: true }, { pts: pts.map((p) => ({ ...p })), closed: true, fixed: true }],
+    0.05,
+  );
+  assert.equal(r.polys.length, 1);
+  assert.equal(r.polys[0].fixed, true);
 });
 
 // ---------- Kerf-Vertrag (Issue #220) ----------

@@ -142,8 +142,16 @@ export function openLayerDialog(ed: Editor, i: number) {
       );
     };
     fill();
-    return h('div', {}, h('div', { class: 'form-title' }, t('Linie')), box, perfSection(c), leadSection(c), rampSection(c));
+    return h('div', {}, h('div', { class: 'form-title' }, t('Linie')), box, dedupSection(c), perfSection(c), leadSection(c), rampSection(c));
   };
+
+  const dedupSection = (c: Entry) =>
+    fold(t('Doppelte Linien'), c.dedup, t('Beim Export deckungsgleiche Linien nur einmal schneiden (opt-in pro Bearbeitung). Die zusammengefassten Stellen zeigt die Vorschau markiert.'),
+      h('div', { class: 'form' },
+        h('span', { class: 'checks' }, check(t('Doppelte Linien beim Export entfernen'), () => c.dedup, (v) => (c.dedup = v))),
+        ...row(t('Toleranz (mm)'), num(() => c.dedupTol, (v) => (c.dedupTol = v), 0.01, 0.5, false, t('Abstand, unter dem Linien als deckungsgleich gelten (wie in der Konstruktionsprüfung).'))),
+      ),
+    );
 
   /** Aufklappbarer Abschnitt, offen, wenn die Funktion eingeschaltet ist */
   const fold = (title: string, open: boolean, tip: string, ...body: HTMLElement[]) =>

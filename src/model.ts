@@ -467,6 +467,10 @@ export interface CutSettings {
   lead: LeadSettings;
   /** Nur Linie: Leistung in Ecken auf Min. Leistung absenken */
   ramp: RampSettings;
+  /** Nur Linie: doppelte/überlappende Schnittlinien beim Export nur einmal schneiden (opt-in pro Bearbeitung) */
+  dedup: boolean;
+  /** Nur Linie: Abstand in mm, unter dem Linien als deckungsgleich gelten (wie in der Konstruktionsprüfung) */
+  dedupTol: number;
   /** Z-Versatz in mm beim ersten Durchgang, positiv = Fokus tiefer ins Material (braucht eine Z-Achse am Gerät) */
   zOffset: number;
   /** Je weiterem Durchgang um so viele mm tiefer fokussieren */
@@ -515,7 +519,7 @@ export type SubLayer = Omit<CutSettings, 'air' | 'look' | 'sub'> & { output: boo
 
 export const CUT_KEYS: (keyof CutSettings)[] = [
   'mode', 'speed', 'power', 'minPower', 'passes', 'air', 'kerf', 'tabs', 'fillStyle', 'interval', 'angle', 'crossHatch', 'bidirectional', 'overscan',
-  'perf', 'lead', 'ramp', 'zOffset', 'zStep', 'sub', 'look',
+  'perf', 'lead', 'ramp', 'dedup', 'dedupTol', 'zOffset', 'zStep', 'sub', 'look',
 ];
 
 /** Felder eines Sub-Layers (alles außer Air Assist, Aussehen und weiteren Sub-Layern) */
@@ -570,6 +574,8 @@ export function defaultCutSettings(mode: LayerMode = 'line'): CutSettings {
     perf: defaultPerf(),
     lead: defaultLead(),
     ramp: defaultRamp(),
+    dedup: false,
+    dedupTol: 0.05,
     zOffset: 0,
     zStep: 0,
   };
@@ -602,7 +608,7 @@ export const isCutLayer = (L: Layer) => L.mode === 'line' || !!L.sub?.some((s) =
 
 /** Ältere Dateien kennen nicht alle Einstellungen: fehlende mit Standardwerten auffüllen */
 export function normalizeLayer(L: Layer): Layer {
-  if (L.tabs && L.fillStyle !== undefined && L.ramp && L.zStep !== undefined && (!L.sub || L.sub.every((s) => s.ramp && s.output !== undefined))) return L;
+  if (L.tabs && L.fillStyle !== undefined && L.ramp && L.dedup !== undefined && L.dedupTol !== undefined && L.zStep !== undefined && (!L.sub || L.sub.every((s) => s.ramp && s.dedup !== undefined && s.dedupTol !== undefined && s.output !== undefined))) return L;
   return normalizeCut(L);
 }
 

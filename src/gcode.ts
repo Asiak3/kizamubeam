@@ -8,6 +8,7 @@ import { loadFont, textToSubs } from './fonts';
 import { nativeScanLines, outputGrid, processImage } from './images';
 import { hasNative, native } from './native';
 import { locale, t, tn } from './i18n';
+import { dedupPolys } from './dedup';
 import { jobOutputsOff, jobOutputsOn } from './fluidnc';
 import { parkedObjs } from './parking';
 import { addPt, boxesOf, buildContainment, containsStrict, emptyBox } from './polyTopology';
@@ -636,6 +637,8 @@ export interface Job {
   offset: Pt;
   /** Layer, bei denen Air Assist läuft */
   air: number[];
+  /** Zusammengefasste Doppel-Linien je Layer (Bettkoordinaten, für die Vorschau-Markierung) */
+  dedup?: { layer: number; len: number; lines: Pt[][] }[];
 }
 
 export interface JobInput {
@@ -1582,32 +1585,40 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   };
   const bounds = emptyBox();
   let skippedOpen = 0;
-let kerfOpen = 0;
-let kerfDegenerate = 0;
-let kerfVanished = 0;
-let kerfMerged = 0;
-let kerfFillOps = 0;
+  const dedupInfo = new Map<
+    number,
+    { len: number; lines: Pt[][] }
+  >();
 
-// Effektive Ausgabe-Auswahl (Issue #217)
-const effLeaves = [...outputLeaves(roots)];
-const laserSet = new Set<Obj>();
+  let kerfOpen = 0;
+  let kerfDegenerate = 0;
+  let kerfVanished = 0;
+  let kerfMerged = 0;
+  let kerfFillOps = 0;
 
-for (const [l] of laserLeaves(roots)) laserSet.add(l);
+  // Effektive Ausgabe-Auswahl (Issue #217)
+  const effLeaves = [...outputLeaves(roots)];
+  const laserSet = new Set<Obj>();
 
-const hiddenOutputs = effLeaves.filter(
-  ([l]) => !laserSet.has(l) && layerOf(l.layer).output
-).length;
+  for (const [l] of laserLeaves(roots)) {
+    laserSet.add(l);
+  }
 
-if (hiddenOutputs)
-  warnings.push(
-    tn(
-      '{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).',
-      '{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).',
-      hiddenOutputs,
-    ),
-  );
+  const hiddenOutputs = effLeaves.filter(
+    ([l]) => !laserSet.has(l) && layerOf(l.layer).output
+  ).length;
 
-for (const [o, world] of effLeaves) {
+  if (hiddenOutputs) {
+    warnings.push(
+      tn(
+        '{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).',
+        '{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).',
+        hiddenOutputs,
+      ),
+    );
+  }
+
+  for (const [o, world] of effLeaves) {
     if (o.reg) continue; // Passermarken nur drucken, nicht lasern
     const L = layerOf(o.layer);
     if (!L.output) continue;
@@ -1643,60 +1654,100 @@ for (const [o, world] of effLeaves) {
     const anyLine = ents.some((e) => e.mode === 'line');
     const firstFill = ents.findIndex((e) => e.mode === 'fill');
     b.sets = ents.map((e, k) => {
-      const out: Poly[] = [];
+      const list: Poly[] = [];
+
+      // Geometrie pro Objekt vorbereiten
       for (const own of b.objs) {
         let polys = own;
+
         if (e.mode === 'fill') {
           polys = own.filter((p) => p.closed);
-          if (!anyLine && k === firstFill) skippedOpen += own.length - polys.length;
+          if (!anyLine && k === firstFill) {
+            skippedOpen += own.length - polys.length;
+          }
         }
-    // Kerf je Objekt, damit sich benachbarte Objekte nicht
-    // zu einer Fläche verbinden (Issue #220).
-    // Reihenfolge: Kerf → Tabs → Perforation → Reihenfolge → Anschnitt.
-    if (e.kerf) {
-      const open = polys.filter((p) => !p.closed);
 
-      if (open.length && e.mode === 'line') {
-        kerfOpen += open.length;
+        // Kerf je Objekt anwenden (#220)
+        if (e.kerf) {
+          const open = polys.filter((p) => !p.closed);
+
+          if (open.length && e.mode === 'line') {
+            kerfOpen += open.length;
+          }
+
+          if (e.mode === 'fill') {
+            kerfFillOps++;
+          }
+
+          const rep = kerfOffsetReport(
+            polys.filter((p) => p.closed),
+            e.kerf,
+          );
+
+          kerfDegenerate += rep.degenerate;
+          kerfMerged += rep.merged;
+
+          if (rep.vanished && rep.valid > 0) {
+            kerfVanished += rep.valid;
+          }
+
+          // Gruppen-ID nach Kerf erhalten (#222)
+          const g =
+            polys.length && polys.every((p) => p.grp === polys[0].grp)
+              ? polys[0].grp
+              : undefined;
+
+          polys = [
+            ...open,
+            ...rep.polys.map((p) =>
+              g !== undefined ? { ...p, grp: g } : p
+            ),
+          ];
+        }
+
+        list.push(...polys);
       }
 
-      if (e.mode === 'fill') {
-        kerfFillOps++;
+      // Doppelte Linien entfernen (#221)
+      // Nach Kerf, vor Tabs, Perforation und Anschnitt
+      let result = list;
+
+      if (
+        e.mode === 'line' &&
+        (e as CutSettings).dedup &&
+        list.length > 1
+      ) {
+        const r = dedupPolys(
+          list,
+          (e as CutSettings).dedupTol,
+          e.kerf,
+        );
+
+        if (r.len > 0.001) {
+          const cur = dedupInfo.get(li) ?? {
+            len: 0,
+            lines: [] as Pt[][],
+          };
+
+          cur.len += r.len;
+          cur.lines.push(...r.lines);
+          dedupInfo.set(li, cur);
+        }
+
+        result = r.polys;
       }
 
-      const rep = kerfOffsetReport(
-        polys.filter((p) => p.closed),
-        e.kerf,
-      );
-
-      kerfDegenerate += rep.degenerate;
-      kerfMerged += rep.merged;
-
-      if (rep.vanished && rep.valid > 0) {
-        kerfVanished += rep.valid;
-      }
-
-      // Gruppen-ID nach dem Kerf-Versatz erhalten (#222).
-      const g =
-        polys.length && polys.every((p) => p.grp === polys[0].grp)
-          ? polys[0].grp
-          : undefined;
-
-      polys = [
-        ...open,
-        ...rep.polys.map((p) =>
-          g !== undefined ? { ...p, grp: g } : p
-        ),
-      ];
-    }
-        for (const p of polys) {
-          out.push(p);
-          for (const q of p.pts) addPt(bounds, q.x, q.y);
+      // Bounds der tatsächlich ausgegebenen Geometrie
+      for (const p of result) {
+        for (const q of p.pts) {
+          addPt(bounds, q.x, q.y);
         }
       }
-      return out;
+
+      return result;
     });
   }
+  
   if (skippedOpen) warnings.push(tn('{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', '{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', skippedOpen));
   if (kerfOpen) warnings.push(tn('Kerf-Vertrag: {n} offene Kontur läuft ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).', 'Kerf-Vertrag: {n} offene Konturen laufen ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).', kerfOpen));
   if (kerfDegenerate) warnings.push(tn('Kerf-Vertrag: {n} degenerierte Kontur (< 3 Punkte) entfallen.', 'Kerf-Vertrag: {n} degenerierte Konturen (< 3 Punkte) entfallen.', kerfDegenerate));
@@ -1853,7 +1904,13 @@ for (const [o, world] of effLeaves) {
     py = mv.y[i];
   }
   const air = order.filter((li) => layerOf(li).air);
-  return { moves: mv, bounds: ob, travel: finite(travel), hull: convexHull(dedupe(hullPts)), warnings, offset, air };
+  const dedup = [...dedupInfo.entries()].map(([layer, d]) => ({ layer, len: d.len, lines: d.lines }));
+  for (const d of dedup) {
+    const L = layerOf(d.layer);
+    const name = (L as { name?: string }).name ?? String(d.layer);
+    warnings.push(t('{len} mm doppelte Linien zusammengefasst (Layer {name}).', { len: d.len < 10 ? d.len.toFixed(2) : d.len.toFixed(1), name }));
+  }
+  return { moves: mv, bounds: ob, travel: finite(travel), hull: convexHull(dedupe(hullPts)), warnings, offset, air, dedup };
 }
 
 function dedupe(pts: Pt[]): Pt[] {
