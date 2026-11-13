@@ -1703,7 +1703,8 @@ for (const [o, world] of effLeaves) {
   if (kerfVanished) warnings.push(tn('Kerf-Vertrag: {n} Kontur vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).', 'Kerf-Vertrag: {n} Konturen vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).', kerfVanished));
   if (kerfMerged) warnings.push(tn('Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.', 'Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.', kerfMerged));
   if (kerfFillOps) warnings.push(t('Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.'));
-  if (!device.optInnerFirst) {
+  // Manuelle Reihenfolge (#153, alle Optimierer-Schalter aus): dort meldet die genauere Prüfung beim Ausgeben
+  if (!device.optInnerFirst && (device.optTravel || device.optGroup)) {
     // Ohne Innere-Formen-Priorisierung auf mögliche Schnittreihenfolge-Probleme hinweisen (#222).
     let nested = false;
     outer: for (const b of buckets.values()) {
