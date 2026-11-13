@@ -666,6 +666,62 @@ await test('Kerf-Vertrag: Tabs nach Kerf auf kompensierter Kontur', async () => 
   assert.ok(tabs < plain, `tabs ${tabs} < plain ${plain}`);
 });
 
+// ---------- Einheitliche Kontur-Topologie (Issue #219) ----------
+
+const tabbed = (skipInner: boolean): Partial<Layer> => ({ kerf: 0, tabs: { enabled: true, size: 2, useCount: true, count: 2, spacing: 10, skipInner } });
+const burnOn = async (objs: Obj[], patch: Partial<Layer>) => lengths((await cutJob(objs, patch)).moves).on;
+
+await test('Topologie: Duplikate — genau eine Form behält die Stege (neu 76, alt 72)', async () => {
+  const dup = [square(100, 100, 10, 1), square(100, 100, 10, 2)];
+  const both = await burnOn(dup, tabbed(true));
+  // neu: Form 0 ist kein Innen (Ident-Regel i<j), Form 1 schon → eine mit, eine ohne Stege
+  assert.equal(both, (await burnOn([dup[0]], tabbed(false))) + (await burnOn([dup[1]], {})));
+  // alt: beide ohne Stege — dieses Verhalten ist weg
+  assert.notEqual(both, 2 * (await burnOn([dup[0]], tabbed(false))));
+});
+
+await test('Topologie: eckberührende Innenform verliert die Stege (neu 596, alt 592)', async () => {
+  const outer: Obj = { id: 3, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 100, h: 100, r: 0 } as never };
+  const corner: Obj = { id: 4, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 50, h: 50, r: 0 } as never };
+  const both = await burnOn([outer, corner], tabbed(true));
+  // neu: Rahmenmitte liegt innen → Stege entfallen (alt: erster Punkt auf der Kante → Stege blieben)
+  assert.equal(both, (await burnOn([outer], tabbed(false))) + (await burnOn([corner], {})));
+});
+
+await test('Topologie: normal verschachtelte Form unverändert ohne Stege', async () => {
+  const outer: Obj = { id: 3, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 100, h: 100, r: 0 } as never };
+  const nested: Obj = { id: 6, m: [1, 0, 0, 1, 80, 80], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } as never };
+  assert.equal(await burnOn([outer, nested], tabbed(true)), (await burnOn([outer], tabbed(false))) + (await burnOn([nested], {})));
+});
+
+await test('Topologie: buildContainment liefert Baum und Even-Odd-Tiefe', async () => {
+  const { buildContainment } = await import('../src/polyTopology');
+  const polys = [
+    { pts: [{ x: 50, y: 50 }, { x: 150, y: 50 }, { x: 150, y: 150 }, { x: 50, y: 150 }], closed: true },
+    { pts: [{ x: 80, y: 80 }, { x: 120, y: 80 }, { x: 120, y: 120 }, { x: 80, y: 120 }], closed: true },
+    { pts: [{ x: 90, y: 90 }, { x: 110, y: 90 }, { x: 110, y: 110 }, { x: 90, y: 110 }], closed: true },
+  ];
+  const { parent, depth } = buildContainment(polys);
+  assert.deepEqual([...parent], [-1, 0, 1]);
+  assert.deepEqual([...depth], [0, 1, 2]);
+  const dup = [
+    { pts: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }], closed: true },
+    { pts: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }], closed: true },
+  ];
+  const d2 = buildContainment(dup);
+  // identische Rahmen: nur eine Richtung zählt (zweite Form liegt in der ersten)
+  assert.deepEqual([...d2.parent], [-1, 0]);
+  assert.deepEqual([...d2.depth], [0, 1]);
+  const open = [
+    { pts: [{ x: 50, y: 50 }, { x: 150, y: 50 }, { x: 150, y: 150 }, { x: 50, y: 150 }], closed: true },
+    { pts: [{ x: 60, y: 60 }, { x: 70, y: 60 }], closed: false },
+  ];
+  const d3 = buildContainment(open);
+  // offen ist nie Container, kann aber enthalten sein
+  assert.deepEqual([...d3.parent], [-1, 0]);
+  assert.deepEqual([...d3.depth], [0, 1]);
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
