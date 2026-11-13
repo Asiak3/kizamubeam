@@ -3,7 +3,8 @@
 // des Arbeitsbereichs und Import-Hinweise. Jeder Befund nennt die betroffenen Objekte, die Stellen zum Markieren
 // (Weltkoordinaten) und, wo es geht, eine Korrektur. Ohne DOM, damit es auch in den Tests läuft.
 import ClipperLib from 'clipper-lib';
-import { apply, IDENT, isOff, Layer, Mat, mul, Obj, Pt, SubPath } from './model';
+import { apply, IDENT, Layer, Mat, mul, Obj, Pt, selfOutputOff, SubPath } from './model';
+import { conditionHolds } from './params';
 import { boundsOf, shapeSubs, textOutline } from './geom';
 import { parkedObjs } from './parking';
 import { bezierPt, segments } from './curves';
@@ -214,11 +215,14 @@ export interface CheckInput {
 function collect(inp: CheckInput): Contour[] {
   const out: Contour[] = [];
   const engrave = new Set(inp.settings.engraveLayers);
-  const walk = (top: Obj, o: Obj, parent: Mat) => {
-    if (isOff(o) || o.noLaser) return;
+  // Ausgabe-Semantik wie outputLeaves (Issue #217): hidden zählt mit, noLaser/showIf-falsch schließt aus (vererbt)
+  const walk = (top: Obj, o: Obj, parent: Mat, noLaserAbove = false, offAbove = false) => {
+    const noLaser = noLaserAbove || !!o.noLaser;
+    const off = offAbove || (!!o.showIf && !conditionHolds(o.showIf));
+    if (noLaser || off) return;
     const m = mul(parent, o.m);
     if (o.shape.kind === 'group') {
-      for (const c of o.shape.children) walk(top, c, m);
+      for (const c of o.shape.children) walk(top, c, m, noLaser, off);
       return;
     }
     if (o.shape.kind === 'image') return;
@@ -679,7 +683,7 @@ function checkBed(inp: CheckInput, cs: Contour[], out: CheckIssue[]) {
   const parked = parkedObjs(inp.objs, inp.bed, inp.layer);
   for (const o of inp.objs) {
     if (parked.has(o)) continue;
-    if (!tops.has(o) && !(o.shape.kind === 'image' && !isOff(o) && !o.noLaser && inp.layer(o.layer).output)) continue;
+    if (!tops.has(o) && !(o.shape.kind === 'image' && !selfOutputOff(o) && inp.layer(o.layer).output)) continue;
     const b = boundsOf([o]);
     if (!b) continue;
     if (b.x >= -eps && b.y >= -eps && b.x + b.w <= w + eps && b.y + b.h <= h + eps) continue;

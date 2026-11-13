@@ -117,6 +117,12 @@ export interface LbrnResult {
   vt?: VarText;
   /** Texte der Datei; bis finishLbrnTexts sie prüft, liegen sie als Pfad (gespeicherte Umrisse) vor */
   texts: LbrnText[];
+  /**
+   * Optimierer-Einstellungen der Datei (Issue #222), soweit mappbar. Die exakten LightBurn-Attributnamen
+   * sind nicht belegt, daher tolerantes Lesen (s. convertLbrn). Wird nur gemeldet, nicht automatisch
+   * auf das Gerät angewendet — im Laser-Panel übernehmen.
+   */
+  optimizer?: { innerFirst?: boolean; travel?: boolean; group?: boolean };
 }
 
 export interface LbrnText {
@@ -627,6 +633,43 @@ export async function convertLbrn(text: string, opts: LbrnOptions): Promise<Lbrn
     };
     const vt: VarText = { start: v('Start', 0), end: v('End', 999), current: v('Current', 0), advance: v('Increment', 1), autoAdvance: v('AutoAdvance', 0) !== 0 };
     if (vt.start !== 0 || vt.end !== 999 || vt.current !== 0 || vt.advance !== 1 || vt.autoAdvance) res.vt = vt;
+  }
+
+  // Optimierer-Einstellungen (Issue #222): CutOptimize-Element tolerantes Lesen — exakte
+  // LightBurn-Namen sind nicht belegt, daher Aliase in Kleinschreibung; Unbekanntes wird ignoriert.
+  {
+    const ox = proj.children.find((c) => /optimiz/i.test(c.tag));
+    if (ox) {
+      const raw: Record<string, string> = {};
+      for (const [k, v] of Object.entries(ox.attrs)) raw[k.toLowerCase()] = v;
+      for (const c of ox.children) {
+        const v = c.attrs.Value;
+        if (v !== undefined && v !== '') raw[c.tag.toLowerCase()] = v;
+      }
+      const b = (...names: string[]): boolean | undefined => {
+        for (const nm of names) {
+          const v = raw[nm];
+          if (v === undefined) continue;
+          if (v === '1' || v.toLowerCase() === 'true') return true;
+          if (v === '0' || v.toLowerCase() === 'false') return false;
+        }
+        return undefined;
+      };
+      const innerFirst = b('innerfirst', 'cutinnerfirst', 'cutinnershapesfirst', 'innershapesfirst');
+      const travel = b('reducetravel', 'reducetravelmoves', 'reducemoves', 'travel', 'travelmoves');
+      const group = b('orderbygroup', 'grouporder', 'group');
+      if (innerFirst !== undefined || travel !== undefined || group !== undefined) {
+        res.optimizer = { innerFirst, travel, group };
+        const f = (v: boolean | undefined) => (v === undefined ? '?' : v ? '1' : '0');
+        res.notes.push(
+          t('LightBurn-Optimierer gefunden (innere zuerst: {inner}, Leerwege: {travel}, Gruppen: {group}) — bei Bedarf im Laser-Panel übernehmen.', {
+            inner: f(innerFirst),
+            travel: f(travel),
+            group: f(group),
+          }),
+        );
+      }
+    }
   }
 
   // Hinweise

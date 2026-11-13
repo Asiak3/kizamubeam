@@ -65,7 +65,7 @@ await test('Z-Reihe: Werte gleichmäßig, je Linie ein Layer mit Z-Versatz', () 
 await test('Z-Reihe: G-Code fährt Z relativ je Linie und am Ende zurück', async () => {
   const o = { ...defaultFocusOptions(), method: 'z' as const, zFrom: -1, zTo: 1, zCount: 3, labels: false };
   const t = buildFocusDoc(o, bed, 'Arial');
-  const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, zAxis: true, optimize: false };
+  const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, zAxis: true, optInnerFirst: false, optTravel: false };
   const job = await buildJob({ doc: t.doc, layer: (i) => t.doc.layers[i], imgLayer: () => defaultImageLayer(), device });
   assert.equal(job.warnings.length, 0, job.warnings.join('; '));
   const g = writeGCode(job, device, estimate(job.moves, device)).lines;
