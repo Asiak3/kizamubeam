@@ -4,6 +4,7 @@ import { ContextAction, showEditorMenu, closeEditorMenu } from './contextMenu';
 import { RULER } from './editor/shared';
 import { defaultLayer, homeLayer, layerLabel } from './model';
 import { selectAssembly } from './asmSelect';
+import { assignLayerAsk } from './layerAssign';
 
 export interface ContextCallbacks {
   adjust: () => void; trace: () => void; background: () => void; saveBitmap: () => void | Promise<unknown>;
@@ -94,7 +95,7 @@ export function moveActions(ed: Editor, editable: boolean): ContextAction[] {
       item(`${prefix}:empty`, t('Leerer Layer: {layer}', { layer: free < 0 ? '–' : name(free) }), () => assign(free), free >= 0)];
   };
   const out: ContextAction[] = [{ id: 'move-layer', label: t('Auf Layer verschieben'), run: () => {},
-    items: layerItems('layer', (i) => ed.assignLayer(i), (i) => sel.every((o) => homeLayer(o) === i)) }];
+    items: layerItems('layer', (i) => assignLayerAsk(ed, i), (i) => sel.every((o) => homeLayer(o) === i)) }];
   if (asms.length) out.push({ id: 'asm-layer', label: t('Baugruppe auf Layer verschieben'), run: () => {},
     items: layerItems('asm-layer', (i) => ed.assignAsmLayer(asms, i), (i) => ed.asmOnLayer(asms, i)) });
   if (ed.doc.pages.length > 1) out.push({ id: 'move-page', label: t('Auf Seite verschieben'), run: () => {},

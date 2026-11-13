@@ -17,6 +17,7 @@ import { ContextCallbacks, openEditorContextMenu } from './editorContext';
 import { closeEditorMenu } from './contextMenu';
 import { objectsContextGroups, ObjectsRowTarget } from './objectsContext';
 import { openLayerDialog } from './layerdialog';
+import { moveObjectsAsk } from './layerAssign';
 
 /** Mehr Zeilen je Layer werden erst auf Wunsch gezeigt (große Arrays, Nachzeichnungen) */
 const ROW_LIMIT = 300;
@@ -542,12 +543,12 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
       return;
     }
     if (layer !== null && d.kind === 'layer') ed.placeLayer(layer, d.layer, d.before);
-    else if (objs && d.kind === 'obj') ed.moveObjects(objs, d.ref, d.front, homeLayer(d.ref));
+    else if (objs && d.kind === 'obj') void moveObjectsAsk(ed, objs, d.ref, d.front, homeLayer(d.ref));
     else if (objs && d.kind === 'layer') {
       // Auf einen Layer: dorthin verschieben, vor alle Objekte dieses Layers
       const sec = sections().find((s) => s.layer === d.layer);
       const ref = sec?.objs.find((o) => !objs.includes(o)) ?? null;
-      ed.moveObjects(objs, ref, true, d.layer);
+      void moveObjectsAsk(ed, objs, ref, true, d.layer);
     }
   });
 

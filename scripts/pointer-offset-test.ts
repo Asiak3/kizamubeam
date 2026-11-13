@@ -54,7 +54,7 @@ await test('Absolut + Offset: Bahnen unverändert (kein Eingriff in Geometrie/Ex
 
 await test('Aktuell + Offset: nur die Startreferenz verschiebt sich um +Offset', async () => {
   const pos = { x: 123, y: 77 };
-  const off = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'current' as const, jobOrigin: 6, returnHome: false, optimize: false, pointerOffset: { x: 2.5, y: -16.5, enabled: true } };
+  const off = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'current' as const, jobOrigin: 6, returnHome: false, optInnerFirst: false, optTravel: false, pointerOffset: { x: 2.5, y: -16.5, enabled: true } };
   const plain = { ...off, pointerOffset: { x: 0, y: 0, enabled: false } };
   const a = await buildJob(inp(off, pos));
   const b = await buildJob(inp(plain, pos));
@@ -69,7 +69,7 @@ await test('Aktuell + Offset: nur die Startreferenz verschiebt sich um +Offset',
 });
 
 await test('Benutzer-Ursprung + Offset: Geometrie verschiebt sich um +Offset', async () => {
-  const off = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'user' as const, jobOrigin: 6, returnHome: false, optimize: false, pointerOffset: { x: 2.5, y: -16.5, enabled: true } };
+  const off = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'user' as const, jobOrigin: 6, returnHome: false, optInnerFirst: false, optTravel: false, pointerOffset: { x: 2.5, y: -16.5, enabled: true } };
   const plain = { ...off, pointerOffset: { x: 0, y: 0, enabled: false } };
   const a = await buildJob(inp(off));
   const b = await buildJob(inp(plain));

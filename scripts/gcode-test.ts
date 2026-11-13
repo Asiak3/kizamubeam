@@ -107,7 +107,7 @@ for (const fixed of [false, true]) {
       { id: 2, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [ln] } },
     ];
     const doc = loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} });
-    const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: true, returnHome: false };
+    const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optInnerFirst: true, optTravel: true, returnHome: false };
     const job = await buildJob({ doc, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const }), imgLayer: () => defaultImageLayer(), device });
     const mv = job.moves;
     // erste Eilfahrt: zur Ecke des Quadrats
@@ -145,7 +145,7 @@ for (const kerf of [0, 0.2, -0.2]) {
         sp.start = true;
       }
       const doc = loadDoc({ bed: { w: 400, h: 400 }, objs: [{ id: 1, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [sp] } }], layers: {} });
-      const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: true, returnHome: false };
+      const device = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optInnerFirst: true, optTravel: true, returnHome: false };
       const inp = { doc, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, kerf }), imgLayer: () => defaultImageLayer(), device };
       const prev = await buildJob({ ...inp, forPreview: true });
       const real = await buildJob(inp);
@@ -407,7 +407,7 @@ const cutJob = (objs: Obj[], patch: Partial<Layer>, dev: Partial<Device> = {}) =
     doc: loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} }),
     layer: (i: number) => normalizeLayer({ ...defaultLayer(i), mode: 'line' as const, speed: 600, power: 80, ...patch }),
     imgLayer: () => defaultImageLayer(),
-    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, optimize: false, ...dev },
+    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, optInnerFirst: false, optTravel: false, ...dev },
   });
 const square = (x = 100, y = 100, w = 10, id = 1): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer: 1, shape: { kind: 'rect', w, h: w, r: 0 } as never });
 const hLine = (): Obj => ({ id: 9, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 100, y: 200 }, { x: 110, y: 200 }] }] } });
@@ -543,6 +543,23 @@ await test('Sub-Layer: erst füllen, dann ausschneiden; ausgeschaltete Sub-Layer
   for (let i = 1; i < mv.n; i++) if (mv.f[i] === 300 && mv.s[i] > 0) cut += Math.hypot(mv.x[i] - mv.x[i - 1], mv.y[i] - mv.y[i - 1]);
   assert.ok(Math.abs(cut - 40) < 1e-6);
   assert.equal(mv.f[mv.n - 1], 300);
+});
+
+await test('Durchgänge laufen pro Bearbeitung: erst Sub1 fertig, dann Sub2 (#218)', async () => {
+  const sub = [
+    { ...defaultSubLayer('line'), speed: 600, power: 80, passes: 2 },
+    { ...defaultSubLayer('line'), speed: 1200, power: 80, passes: 1 },
+  ];
+  const job = await cutJob([square()], { mode: 'line', speed: 900, power: 80, passes: 1, sub });
+  const mv = job.moves;
+  // Brennstrecken gruppieren: Layer (900), dann Sub1 zweimal (600), dann Sub2 (1200) — kein globaler Repeat
+  const groups: number[] = [];
+  for (let i = 0; i < mv.n; i++) {
+    if (mv.f[i] > 0 && mv.s[i] > 0) {
+      if (!groups.length || groups[groups.length - 1] !== mv.f[i]) groups.push(mv.f[i]);
+    }
+  }
+  assert.deepEqual(groups, [900, 600, 1200]);
 });
 
 await test('Laser zur Klickposition: absolutes Verfahren je Firmware', () => {
@@ -693,6 +710,263 @@ await test('Dedup: Fix-Start wandert auf die überlebende Kontur', () => {
   );
   assert.equal(r.polys.length, 1);
   assert.equal(r.polys[0].fixed, true);
+});
+
+// ---------- Kerf-Vertrag (Issue #220) ----------
+
+await test('Kerf: offen läuft ohne Kerf durch + Warnung', async () => {
+  const job = await cutJob([hLine(), square()], { kerf: 0.2 });
+  assert.ok(job.warnings.some((w) => w.includes('offene Kontur')), JSON.stringify(job.warnings));
+});
+
+await test('Kerf-Vertrag: Loch vom Versatz aufgelöst + Warnung', async () => {
+  const tiny: Obj = {
+    id: 2, m: [1, 0, 0, 1, 0, 0], layer: 1,
+    shape: { kind: 'path', subs: [
+      { closed: true, nodes: [{ x: 100, y: 100 }, { x: 100.3, y: 100 }, { x: 100.3, y: 100.3 }, { x: 100, y: 100.3 }] },
+    ] },
+  };
+  const job = await cutJob([tiny], { kerf: -0.5 });
+  assert.ok(job.warnings.some((w) => w.includes('aufgelöst')), JSON.stringify(job.warnings));
+});
+
+await test('Kerf-Vertrag: berührend per Union zusammengefasst + Warnung', async () => {
+  const touch: Obj = {
+    id: 3, m: [1, 0, 0, 1, 0, 0], layer: 1,
+    shape: { kind: 'path', subs: [
+      { closed: true, nodes: [{ x: 100, y: 100 }, { x: 110, y: 100 }, { x: 110, y: 110 }, { x: 100, y: 110 }] },
+      { closed: true, nodes: [{ x: 110, y: 100 }, { x: 120, y: 100 }, { x: 120, y: 110 }, { x: 110, y: 110 }] },
+    ] },
+  };
+  const job = await cutJob([touch], { kerf: 0.1 });
+  assert.ok(job.warnings.some((w) => w.includes('zusammengefasst')), JSON.stringify(job.warnings));
+});
+
+await test('Kerf-Vertrag: Fill kerft Hülle + Warnung, Bild ohne Kerf', async () => {
+  const fillJob = await cutJob([square()], { mode: 'fill' as const, kerf: 0.2 });
+  assert.ok(fillJob.warnings.some((w) => w.includes('Hüll-Geometrie')), JSON.stringify(fillJob.warnings));
+  const img: Obj = { id: 7, m: [1, 0, 0, 1, 100, 100], layer: 1, shape: { kind: 'image', w: 10, h: 10, asset: 'a' } as never };
+  const imgJob = await cutJob([img], { kerf: 0.2 });
+  assert.ok(!imgJob.warnings.some((w) => w.includes('Kerf-Vertrag')), JSON.stringify(imgJob.warnings));
+});
+
+await test('Kerf-Vertrag: Tabs nach Kerf auf kompensierter Kontur', async () => {
+  const plain = lengths((await cutJob([square()], { kerf: 0.2 })).moves).on;
+  const tabs = lengths((await cutJob([square()], { kerf: 0.2, tabs: { enabled: true, size: 2, useCount: true, count: 2, spacing: 10, skipInner: false } })).moves).on;
+  assert.ok(tabs < plain, `tabs ${tabs} < plain ${plain}`);
+});
+// ---------- Optimizer-Schalter (Issue #222) ----------
+
+/** Ziele der Leerwege (f === 0) in der Reihenfolge des Jobs */
+function rapidDests(mv: Moves): [number, number][] {
+  const out: [number, number][] = [];
+  for (let i = 0; i < mv.n; i++) if (mv.f[i] === 0) out.push([Math.round(mv.x[i] * 100) / 100, Math.round(mv.y[i] * 100) / 100]);
+  return out;
+}
+const optDev = (o: { inner: boolean; travel: boolean; group?: boolean }) => ({ optInnerFirst: o.inner, optTravel: o.travel, optGroup: o.group ?? false });
+
+await test('Optimizer: Defaults entsprechen explizit inner-first + travel (Gruppe aus)', async () => {
+  const objs = [square(50, 50, 100, 1), square(120, 120, 10, 2)];
+  const base = {
+    doc: loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} }),
+    layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const }),
+    imgLayer: () => defaultImageLayer(),
+  };
+  const a = await buildJob({ ...base, device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false } });
+  const b = await buildJob({ ...base, device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, optInnerFirst: true, optTravel: true, optGroup: false } });
+  const sig = (mv: Moves) => JSON.stringify([[...mv.x.slice(0, mv.n)], [...mv.y.slice(0, mv.n)], [...mv.f.slice(0, mv.n)], [...mv.s.slice(0, mv.n)]]);
+  assert.equal(sig(a.moves), sig(b.moves));
+});
+
+await test('Optimizer: Loch vor Hülle mit inner-first, danach ohne', async () => {
+  const objs = [square(50, 50, 100, 1), square(120, 120, 10, 2)];
+  const inner = await cutJob(objs, {}, optDev({ inner: true, travel: true }));
+  assert.deepEqual(rapidDests(inner.moves)[0], [120, 270]);
+  const outer = await cutJob(objs, {}, optDev({ inner: false, travel: true }));
+  assert.deepEqual(rapidDests(outer.moves)[0], [50, 250]);
+  assert.ok(outer.warnings.some((w) => w.includes('Innere Formen zuerst')), JSON.stringify(outer.warnings));
+  assert.ok(!inner.warnings.some((w) => w.includes('Innere Formen zuerst')), JSON.stringify(inner.warnings));
+});
+
+await test('Optimizer: ohne travel gilt die Dokumentreihenfolge (kein Umdrehen)', async () => {
+  const objs = [square(300, 100, 10, 1), square(100, 100, 10, 2)];
+  const nn = await cutJob(objs, {}, optDev({ inner: true, travel: true }));
+  assert.deepEqual(rapidDests(nn.moves)[0], [100, 290]);
+  const doc = await cutJob(objs, {}, optDev({ inner: false, travel: false }));
+  assert.deepEqual(rapidDests(doc.moves)[0], [300, 300]);
+});
+
+await test('Optimizer: Gruppen zusammenhalten bevorzugt die eigene Gruppe', async () => {
+  const g1a: Obj = { id: 11, m: [1, 0, 0, 1, 100, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const g1b: Obj = { id: 12, m: [1, 0, 0, 1, 300, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const solo: Obj = { id: 13, m: [1, 0, 0, 1, 110, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const grp: Obj = { id: 10, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'group', children: [g1a, g1b] } };
+  const objs = [grp, solo];
+  const plain = await cutJob(objs, {}, optDev({ inner: true, travel: true }));
+  const pxs = rapidDests(plain.moves).map(([x]) => x);
+  assert.ok(pxs[0] >= 95 && pxs[0] <= 105 && pxs[1] >= 105 && pxs[1] <= 125 && pxs[2] >= 295, JSON.stringify(pxs));
+  const grouped = await cutJob(objs, {}, optDev({ inner: true, travel: true, group: true }));
+  const gxs = rapidDests(grouped.moves).map(([x]) => x);
+  assert.ok(gxs[0] >= 95 && gxs[0] <= 105 && gxs[1] >= 295 && gxs[2] >= 105 && gxs[2] <= 125, JSON.stringify(gxs));
+});
+
+await test('Optimizer: gesetzter Startpunkt bleibt in allen Kombinationen', async () => {
+  const nodes = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }];
+  const fixed: Obj = { id: 20, m: [1, 0, 0, 1, 300, 100], layer: 1, shape: { kind: 'path', subs: [{ closed: true, nodes, start: true }] } };
+  for (const combo of [{ inner: true, travel: true }, { inner: true, travel: false }, { inner: false, travel: true }, { inner: false, travel: false }]) {
+    const job = await cutJob([fixed], {}, optDev(combo));
+    assert.deepEqual(rapidDests(job.moves)[0], [300, 300], JSON.stringify(combo));
+  }
+});
+
+await test('Optimizer: lbrn2-CutOptimize wird toleriert gelesen und gemeldet', async () => {
+  const { convertLbrn } = await import('../src/lbrn');
+  const xml = `<LightBurnProject><CutSetting type="Cut"><index Value="0"/></CutSetting><CutOptimize><InnerFirst Value="1"/><ReduceTravelMoves Value="0"/></CutOptimize></LightBurnProject>`;
+  const res = await convertLbrn(xml, { bedH: 400, assetId: async () => 'a' });
+  assert.deepEqual(res.optimizer, { innerFirst: true, travel: false, group: undefined });
+  assert.equal(res.notes.length, 1);
+  assert.match(res.notes[0], /Optimierer/);
+});
+// Issue #217: Sichtbarkeit vs. Ausgabe — output entscheidet, show nur Anzeige
+const selJob = (objs: Obj[], layerPatch: Partial<Layer> = {}) =>
+  buildJob({
+    doc: loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} }),
+    layer: (i: number) => normalizeLayer({ ...defaultLayer(i), mode: 'line' as const, ...layerPatch }),
+    imgLayer: () => defaultImageLayer(),
+    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: false, returnHome: false },
+  });
+const selRect = (id: number, x: number, extra: Partial<Obj> = {}): Obj => ({
+  id, m: [1, 0, 0, 1, x, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never, ...extra,
+});
+
+await test('#217: ausgeblendetes Objekt mit Ausgabe nimmt teil + Warnung', async () => {
+  const base = await selJob([selRect(1, 100), selRect(2, 200)]);
+  const job = await selJob([selRect(1, 100), selRect(2, 200, { hidden: true })]);
+  assert.ok(burns(job.moves));
+  assert.equal(job.moves.n, base.moves.n);
+  assert.ok(job.warnings.some((w) => w.includes('ausgeblendet')), job.warnings.join(' | '));
+  assert.ok(!base.warnings.some((w) => w.includes('ausgeblendet')));
+  const prev = await buildJob({
+    doc: loadDoc({ bed: { w: 400, h: 400 }, objs: [selRect(1, 100), selRect(2, 200, { hidden: true })], layers: {} }),
+    layer: (i: number) => normalizeLayer({ ...defaultLayer(i), mode: 'line' as const }),
+    imgLayer: () => defaultImageLayer(),
+    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: false, returnHome: false },
+    forPreview: true,
+  });
+  assert.ok(sameMoves(prev.moves, job.moves, job.offset));
+});
+
+await test('#217: noLaser und showIf-falsch schließen aus (auch vererbt)', async () => {
+  const onlyNoLaser = await selJob([selRect(1, 100, { noLaser: true })]);
+  assert.equal(burns(onlyNoLaser.moves), false);
+  const onlyShowIf = await selJob([selRect(1, 100, { showIf: 'false' })]);
+  assert.equal(burns(onlyShowIf.moves), false);
+  const group: Obj = {
+    id: 7, m: [1, 0, 0, 1, 0, 0], layer: 1, noLaser: true,
+    shape: { kind: 'group', children: [selRect(8, 100), selRect(9, 200)] },
+  };
+  const grp = await selJob([group]);
+  assert.equal(burns(grp.moves), false);
+  // showIf wahr und hidden ohne noLaser: nimmt teil
+  const vis = await selJob([selRect(1, 100, { showIf: 'true' }), selRect(2, 200, { hidden: true })]);
+  assert.ok(burns(vis.moves));
+});
+
+await test('#217: output=false schließt aus, Warnung nur bei Ausgabe', async () => {
+  const job = await selJob([selRect(1, 100)], { output: false });
+  assert.equal(burns(job.moves), false);
+  const hiddenNoOut = await selJob([selRect(1, 100, { hidden: true })], { output: false });
+  assert.equal(burns(hiddenNoOut.moves), false);
+  assert.ok(!hiddenNoOut.warnings.some((w) => w.includes('ausgeblendet')));
+});
+
+// ---------- Einheitliche Kontur-Topologie (Issue #219) ----------
+
+const tabbed = (skipInner: boolean): Partial<Layer> => ({ kerf: 0, tabs: { enabled: true, size: 2, useCount: true, count: 2, spacing: 10, skipInner } });
+const burnOn = async (objs: Obj[], patch: Partial<Layer>) => lengths((await cutJob(objs, patch)).moves).on;
+
+await test('Topologie: Duplikate — genau eine Form behält die Stege (neu 76, alt 72)', async () => {
+  const dup = [square(100, 100, 10, 1), square(100, 100, 10, 2)];
+  const both = await burnOn(dup, tabbed(true));
+  // neu: Form 0 ist kein Innen (Ident-Regel i<j), Form 1 schon → eine mit, eine ohne Stege
+  assert.equal(both, (await burnOn([dup[0]], tabbed(false))) + (await burnOn([dup[1]], {})));
+  // alt: beide ohne Stege — dieses Verhalten ist weg
+  assert.notEqual(both, 2 * (await burnOn([dup[0]], tabbed(false))));
+});
+
+await test('Topologie: eckberührende Innenform verliert die Stege (neu 596, alt 592)', async () => {
+  const outer: Obj = { id: 3, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 100, h: 100, r: 0 } as never };
+  const corner: Obj = { id: 4, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 50, h: 50, r: 0 } as never };
+  const both = await burnOn([outer, corner], tabbed(true));
+  // neu: Rahmenmitte liegt innen → Stege entfallen (alt: erster Punkt auf der Kante → Stege blieben)
+  assert.equal(both, (await burnOn([outer], tabbed(false))) + (await burnOn([corner], {})));
+});
+
+await test('Topologie: normal verschachtelte Form unverändert ohne Stege', async () => {
+  const outer: Obj = { id: 3, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 100, h: 100, r: 0 } as never };
+  const nested: Obj = { id: 6, m: [1, 0, 0, 1, 80, 80], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } as never };
+  assert.equal(await burnOn([outer, nested], tabbed(true)), (await burnOn([outer], tabbed(false))) + (await burnOn([nested], {})));
+});
+
+await test('Topologie: buildContainment liefert Baum und Even-Odd-Tiefe', async () => {
+  const { buildContainment } = await import('../src/polyTopology');
+  const polys = [
+    { pts: [{ x: 50, y: 50 }, { x: 150, y: 50 }, { x: 150, y: 150 }, { x: 50, y: 150 }], closed: true },
+    { pts: [{ x: 80, y: 80 }, { x: 120, y: 80 }, { x: 120, y: 120 }, { x: 80, y: 120 }], closed: true },
+    { pts: [{ x: 90, y: 90 }, { x: 110, y: 90 }, { x: 110, y: 110 }, { x: 90, y: 110 }], closed: true },
+  ];
+  const { parent, depth } = buildContainment(polys);
+  assert.deepEqual([...parent], [-1, 0, 1]);
+  assert.deepEqual([...depth], [0, 1, 2]);
+  const dup = [
+    { pts: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }], closed: true },
+    { pts: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }], closed: true },
+  ];
+  const d2 = buildContainment(dup);
+  // identische Rahmen: nur eine Richtung zählt (zweite Form liegt in der ersten)
+  assert.deepEqual([...d2.parent], [-1, 0]);
+  assert.deepEqual([...d2.depth], [0, 1]);
+  const open = [
+    { pts: [{ x: 50, y: 50 }, { x: 150, y: 50 }, { x: 150, y: 150 }, { x: 50, y: 150 }], closed: true },
+    { pts: [{ x: 60, y: 60 }, { x: 70, y: 60 }], closed: false },
+  ];
+  const d3 = buildContainment(open);
+  // offen ist nie Container, kann aber enthalten sein
+  assert.deepEqual([...d3.parent], [-1, 0]);
+  assert.deepEqual([...d3.depth], [0, 1]);
+});
+
+// ---------- Manuelle Schnittreihenfolge (Issue #153) ----------
+
+await test('Manuell: Stapelreihenfolge wird 1:1 gefahren (alle Optimierer-Schalter aus)', async () => {
+  const a = square(50, 100, 10, 1);
+  const b = square(200, 100, 10, 2);
+  // Dokumentreihenfolge [B, A]: manuell beginnt bei B (x≈200), auto beim näheren A (x≈50, Start bei 0,0)
+  const man = await cutJob([b, a], {}, { optInnerFirst: false, optTravel: false, optGroup: false });
+  const auto = await cutJob([b, a], {}, { optInnerFirst: true, optTravel: true });
+  assert.ok(man.moves.x[0] >= 200 && man.moves.x[0] <= 210, `manual first x=${man.moves.x[0]}`);
+  assert.ok(auto.moves.x[0] >= 50 && auto.moves.x[0] <= 60, `auto first x=${auto.moves.x[0]}`);
+});
+
+await test('Manuell: außen-vor-innen warnt, innen-vor-außen nicht', async () => {
+  const outer: Obj = { id: 3, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 100, h: 100, r: 0 } as never };
+  const inner: Obj = { id: 4, m: [1, 0, 0, 1, 80, 80], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } as never };
+  const bad = await cutJob([outer, inner], {}, { optInnerFirst: false, optTravel: false, optGroup: false });
+  assert.ok(bad.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(bad.warnings));
+  const good = await cutJob([inner, outer], {}, { optInnerFirst: false, optTravel: false, optGroup: false });
+  assert.ok(!good.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(good.warnings));
+  // nur eine Warnung: die grobe Prüfung schweigt bei manueller Reihenfolge
+  assert.ok(!good.warnings.some((w) => w.includes('Innere Formen zuerst“ ist aus')), JSON.stringify(good.warnings));
+  const auto = await cutJob([outer, inner], {}, { optInnerFirst: true, optTravel: true });
+  assert.ok(!auto.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(auto.warnings));
+});
+
+await test('Manuell: gesetzter Startpunkt gilt auch ohne Optimierung', async () => {
+  const sp = { closed: true, nodes: [{ x: 100, y: 300 }, { x: 120, y: 300 }, { x: 120, y: 320 }, { x: 100, y: 320 }], start: true };
+  const objs: Obj[] = [{ id: 1, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [sp] } }];
+  const job = await cutJob(objs, {}, { optInnerFirst: false, optTravel: false, optGroup: false });
+  // gesetzter Knoten nodes[0]=(100,300) → Maschine (100,100); ohne fixed wäre es der nächste Knoten
+  assert.deepEqual(firstRapid(job.moves), [100, 100]);
 });
 
 if (failed) {

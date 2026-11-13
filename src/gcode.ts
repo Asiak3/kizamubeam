@@ -2,7 +2,7 @@
 // Maschinenausgabe: aus dem Dokument einen Job berechnen (Linien, Füllen, Bilder), G-Code schreiben,
 // Laufzeit schätzen und Rahmenfahrten erzeugen. Alles in Maschinenkoordinaten (mm, Ursprung unten links, y nach oben).
 import ClipperLib from 'clipper-lib';
-import { apply, CutSettings, Doc, ImageLayer, ImageOutput, imageOutput, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
+import { apply, CutSettings, Doc, ImageLayer, ImageOutput, imageOutput, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, outputLeaves, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
 import { bezierPt, segments, shapeSubs } from './geom';
 import { loadFont, textToSubs } from './fonts';
 import { nativeScanLines, outputGrid, processImage } from './images';
@@ -11,6 +11,7 @@ import { locale, t, tn } from './i18n';
 import { dedupPolys } from './dedup';
 import { jobOutputsOff, jobOutputsOn } from './fluidnc';
 import { parkedObjs } from './parking';
+import { addPt, boxesOf, buildContainment, containsStrict, emptyBox } from './polyTopology';
 
 // ---------- Geräte und Firmware ----------
 
@@ -138,7 +139,12 @@ export interface Device {
   /** Job-Ursprung 0 … 8: Zeilen von oben nach unten, je links → rechts */
   jobOrigin: number;
   cutSelected: boolean;
-  optimize: boolean;
+  /** Schnittreihenfolge je Schritt (Issue #222): innere Formen zuerst (Containment-Gatter) … */
+  optInnerFirst: boolean;
+  /** … kurze Leerwege (Nearest-Neighbor + Startknoten-Wahl, Alternative für manuelle Reihenfolge #153) … */
+  optTravel: boolean;
+  /** … Formen einer Gruppe zusammenhängend schneiden (Tie-Break unter gleichrangigen Formen) */
+  optGroup: boolean;
   /** Nach dem Job zum Startpunkt zurückfahren */
   returnHome: boolean;
   homeOnConnect: boolean;
@@ -201,7 +207,9 @@ export const DEFAULT_DEVICE: Device = {
   startFrom: 'absolute',
   jobOrigin: 6,
   cutSelected: false,
-  optimize: true,
+  optInnerFirst: true,
+  optTravel: true,
+  optGroup: false,
   returnHome: true,
   homeOnConnect: false,
   limitSwitches: 'unknown',
@@ -298,7 +306,17 @@ export function loadDevices(): DeviceStore {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const st = JSON.parse(raw) as DeviceStore;
-      st.devices = st.devices.map((d) => ({ ...DEFAULT_DEVICE, ...d, rotary: { ...DEFAULT_ROTARY, ...d.rotary }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset, ...d.pointerOffset } }));
+      st.devices = st.devices.map((d) => {
+        // Einmalige Migration vom alten Einzelschalter (Issue #222): aus = beide Schritte aus
+        const legacy = (d as { optimize?: boolean }).optimize;
+        const migrated = { ...DEFAULT_DEVICE, ...d, rotary: { ...DEFAULT_ROTARY, ...d.rotary }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset, ...d.pointerOffset } };
+        if (legacy === false) {
+          migrated.optInnerFirst = false;
+          migrated.optTravel = false;
+        }
+        delete (migrated as { optimize?: boolean }).optimize;
+        return migrated;
+      });
       if (st.devices.length) {
         if (!st.devices.some((d) => d.id === st.current)) st.current = st.devices[0].id;
         return st;
@@ -306,7 +324,12 @@ export function loadDevices(): DeviceStore {
     }
     // Früher gab es nur ein Gerät
     const old = localStorage.getItem(OLD_KEY);
-    if (old) return { devices: [{ ...DEFAULT_DEVICE, ...JSON.parse(old), id: 'standard', rotary: { ...DEFAULT_ROTARY }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset } }], current: 'standard' };
+    if (old) {
+      const single = JSON.parse(old) as Partial<Device> & { optimize?: boolean };
+      const legacyOff = single.optimize === false;
+      delete single.optimize;
+      return { devices: [{ ...DEFAULT_DEVICE, ...single, id: 'standard', rotary: { ...DEFAULT_ROTARY }, pointerOffset: { ...DEFAULT_DEVICE.pointerOffset }, optInnerFirst: legacyOff ? false : (single.optInnerFirst ?? true), optTravel: legacyOff ? false : (single.optTravel ?? true) }], current: 'standard' };
+    }
   } catch {
     /* Standardwerte */
   }
@@ -642,6 +665,8 @@ interface Poly {
   fixed?: boolean;
   /** Loch (liegt in einer ungeraden Zahl anderer Formen): Anschnitt und Auslauf liegen innen */
   hole?: boolean;
+  /** Top-Level-Objekt (Gruppen-ID für „Gruppen zusammenhalten“, Issue #222) */
+  grp?: string | number;
 }
 
 const FLATTEN_TOL = 0.01;
@@ -672,26 +697,7 @@ function flatten(sp: SubPath, m: Mat): Poly {
   return { pts, closed: sp.closed && pts.length > 2, ...(sp.start ? { fixed: true } : {}) };
 }
 
-function emptyBox(): Box {
-  return { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
-}
-function addPt(b: Box, x: number, y: number) {
-  if (x < b.x0) b.x0 = x;
-  if (y < b.y0) b.y0 = y;
-  if (x > b.x1) b.x1 = x;
-  if (y > b.y1) b.y1 = y;
-}
 const finite = (b: Box) => (isFinite(b.x0) ? b : null);
-
-function pointInPoly(p: Pt, poly: Pt[]): boolean {
-  let inside = false;
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    const a = poly[i],
-      b = poly[j];
-    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
-  }
-  return inside;
-}
 
 /** Konvexe Hülle (monotone Kette) */
 export function convexHull(pts: Pt[]): Pt[] {
@@ -727,90 +733,128 @@ export function anchorOf(b: Box, k: number): Pt {
  * Optimierte Reihenfolge: Innere Formen vor den umgebenden, sonst immer die nächstgelegene Form.
  * Geschlossene Formen beginnen am nächsten Knoten, offene am näheren Ende.
  */
-function orderPolys(polys: Poly[], from: Pt): Poly[] {
+/** Schritte der Schnittreihenfolge (Issue #222); der Leerweg-Schritt ist der Haken für manuelle Reihenfolge (#153) */
+export interface OrderOpts {
+  /** innere Formen zuerst (Containment-Gatter); aus = Dokumentreihenfolge ohne Vorfahrtsregel */
+  innerFirst: boolean;
+  /** kurze Leerwege (Nearest-Neighbor + Startknoten-Wahl/Umkehr); aus = keine Umsortierung, kein Umdrehen */
+  travel: boolean;
+  /** Formen desselben Top-Level-Objekts bevorzugt nacheinander (Tie-Break, Containment schlägt Kohäsion) */
+  group: boolean;
+}
+
+/** Leerweg-Schritt der Reihenfolge (Nearest-Neighbor); separater Haken für manuelle Reihenfolge (#153) */
+function orderTravel(polys: Poly[], from: Pt, avail: (i: number) => boolean, lastGrp: string | number | undefined): { idx: number; at: number; rev: boolean } {
   const n = polys.length;
-  const boxes = polys.map((p) => {
-    const b = emptyBox();
-    for (const q of p.pts) addPt(b, q.x, q.y);
-    return b;
-  });
+  const boxes = orderBoxes.get(polys) ?? [];
+  let best = -1,
+    bestD = Infinity,
+    bestIdx = 0,
+    bestRev = false,
+    bestSame = false;
+  for (let i = 0; i < n; i++) {
+    if (!avail(i)) continue;
+    const p = polys[i];
+    const same = lastGrp !== undefined && p.grp !== undefined && p.grp === lastGrp;
+    if (best >= 0 && bestSame && !same) continue;
+    const b = boxes[i];
+    // Untergrenze über den Rahmen: weiter entfernte Formen gar nicht erst durchsuchen
+    const dx = Math.max(b.x0 - from.x, 0, from.x - b.x1),
+      dy = Math.max(b.y0 - from.y, 0, from.y - b.y1);
+    if (same === bestSame && dx * dx + dy * dy >= bestD) continue;
+    if (p.fixed) {
+      // gesetzter Startpunkt: nur dort beginnen, Richtung bleibt
+      const d = (p.pts[0].x - from.x) ** 2 + (p.pts[0].y - from.y) ** 2;
+      if (same !== bestSame || d < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [d, i, 0, false, same];
+    } else if (p.closed) {
+      for (let j = 0; j < p.pts.length; j++) {
+        const d = (p.pts[j].x - from.x) ** 2 + (p.pts[j].y - from.y) ** 2;
+        if (same !== bestSame || d < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [d, i, j, false, same];
+      }
+    } else {
+      const a = p.pts[0],
+        e = p.pts[p.pts.length - 1];
+      const da = (a.x - from.x) ** 2 + (a.y - from.y) ** 2,
+        de = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
+      if (same !== bestSame || da < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [da, i, 0, false, same];
+      if (same !== bestSame || de < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [de, i, 0, true, same];
+    }
+  }
+  return { idx: best, at: bestIdx, rev: bestRev };
+}
+
+// Rahmen je Poly-Array für den Leerweg-Schritt (pro Aufruf einmal berechnet)
+const orderBoxes = new WeakMap<readonly Poly[], Box[]>();
+
+function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
+  const n = polys.length;
+
+  if (!o.innerFirst && !o.travel && !o.group) return polys;
+
+  const boxes = boxesOf(polys);
+  orderBoxes.set(polys, boxes);
+
   // Für jede Form: wie viele noch ungeschnittene Formen liegen in ihr?
   const pending = new Int32Array(n);
   const containers: number[][] = polys.map(() => []);
+
   for (let i = 0; i < n; i++) {
-    const bi = boxes[i];
     for (let j = 0; j < n; j++) {
-      if (i === j || !polys[j].closed) continue;
-      const bj = boxes[j];
-      if (bi.x0 < bj.x0 || bi.y0 < bj.y0 || bi.x1 > bj.x1 || bi.y1 > bj.y1) continue;
-      // gleich große Rahmen: nur eine Richtung zählen, sonst blockieren sich deckungsgleiche Formen
-      if (bi.x0 === bj.x0 && bi.y0 === bj.y0 && bi.x1 === bj.x1 && bi.y1 === bj.y1 && i < j) continue;
-      if (!pointInPoly(polys[i].pts[0], polys[j].pts) && !pointInPoly(midOf(bi), polys[j].pts)) continue;
+      if (!containsStrict(polys, boxes, i, j)) continue;
       containers[i].push(j);
       pending[j]++;
     }
   }
+  
   const done = new Uint8Array(n);
   const out: Poly[] = [];
   let cur = from;
+  let lastGrp: string | number | undefined;
   for (let k = 0; k < n; k++) {
-    let best = -1,
-      bestD = Infinity,
-      bestIdx = 0,
-      bestRev = false;
-    for (let i = 0; i < n; i++) {
-      if (done[i] || pending[i] > 0) continue;
-      const b = boxes[i];
-      // Untergrenze über den Rahmen: weiter entfernte Formen gar nicht erst durchsuchen
-      const dx = Math.max(b.x0 - cur.x, 0, cur.x - b.x1),
-        dy = Math.max(b.y0 - cur.y, 0, cur.y - b.y1);
-      if (dx * dx + dy * dy >= bestD) continue;
-      const p = polys[i];
-      if (p.fixed) {
-        // gesetzter Startpunkt: nur dort beginnen, Richtung bleibt
-        const d = (p.pts[0].x - cur.x) ** 2 + (p.pts[0].y - cur.y) ** 2;
-        if (d < bestD) [bestD, best, bestIdx, bestRev] = [d, i, 0, false];
-      } else if (p.closed) {
-        for (let j = 0; j < p.pts.length; j++) {
-          const d = (p.pts[j].x - cur.x) ** 2 + (p.pts[j].y - cur.y) ** 2;
-          if (d < bestD) [bestD, best, bestIdx, bestRev] = [d, i, j, false];
-        }
-      } else {
-        const a = p.pts[0],
-          e = p.pts[p.pts.length - 1];
-        const da = (a.x - cur.x) ** 2 + (a.y - cur.y) ** 2,
-          de = (e.x - cur.x) ** 2 + (e.y - cur.y) ** 2;
-        if (da < bestD) [bestD, best, bestIdx, bestRev] = [da, i, 0, false];
-        if (de < bestD) [bestD, best, bestIdx, bestRev] = [de, i, 0, true];
-      }
+    const avail = (i: number) => !done[i] && (!o.innerFirst || pending[i] <= 0);
+    let pick: number, at: number, rev: boolean;
+    if (o.travel) {
+      ({ idx: pick, at, rev } = orderTravel(polys, cur, avail, o.group ? lastGrp : undefined));
+    } else if (o.group && lastGrp !== undefined) {
+      // ohne Leerweg-Optik: Dokumentreihenfolge, bevorzugt aus derselben Gruppe
+      pick = -1;
+      at = 0;
+      rev = false;
+      for (let i = 0; i < n; i++) if (avail(i)) { pick = i; break; }
+      for (let i = 0; i < n; i++)
+        if (avail(i) && polys[i].grp !== undefined && polys[i].grp === lastGrp) { pick = i; break; }
+    } else {
+      pick = -1;
+      at = 0;
+      rev = false;
+      for (let i = 0; i < n; i++) if (avail(i)) { pick = i; break; }
     }
-    if (best < 0) {
+    if (pick! < 0) {
       // Zyklus (sollte nicht vorkommen): Rest in Dokumentreihenfolge
       for (let i = 0; i < n; i++) if (!done[i]) ((done[i] = 1), out.push(polys[i]));
       break;
     }
-    done[best] = 1;
-    for (const c of containers[best]) pending[c]--;
-    const p = polys[best];
-    let q = p.closed && bestIdx ? startAt(p, bestIdx) : p;
-    if (bestRev) q = { pts: [...q.pts].reverse(), closed: false, ...(q.off ? { off: q.off.slice().reverse() } : {}) };
+    done[pick!] = 1;
+    for (const c of containers[pick!]) pending[c]--;
+    const p = polys[pick!];
+    let q = o.travel && p.closed && at ? startAt(p, at) : p;
+    if (o.travel && rev) q = { pts: [...q.pts].reverse(), closed: false, grp: q.grp, ...(q.off ? { off: q.off.slice().reverse() } : {}) };
     out.push(q);
+    lastGrp = q.grp;
     const pts = q.pts;
     const last = p.closed ? pts[0] : pts[pts.length - 1];
     cur = last;
   }
   return out;
 }
-const midOf = (b: Box): Pt => ({ x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 });
-
 /** Geschlossene Form ab Punkt k beginnen lassen (Haltestege wandern mit) */
 function startAt(p: Poly, k: number): Poly {
   const pts = p.pts.slice(k).concat(p.pts.slice(0, k));
-  if (!p.off) return { pts, closed: p.closed, fixed: p.fixed, hole: p.hole };
+  if (!p.off) return { pts, closed: p.closed, fixed: p.fixed, hole: p.hole, grp: p.grp };
   const off = new Uint8Array(p.off.length);
   off.set(p.off.subarray(k));
   off.set(p.off.subarray(0, k), p.off.length - k);
-  return { pts, closed: p.closed, off, fixed: p.fixed, hole: p.hole };
+  return { pts, closed: p.closed, off, fixed: p.fixed, hole: p.hole, grp: p.grp };
 }
 
 // ---------- Kerf und Haltestege ----------
@@ -822,11 +866,33 @@ const KSCALE = 10000;
  * Kerf-Versatz der geschlossenen Konturen eines Objekts: Fläche nach Gerade-Ungerade-Regel bilden,
  * dann um d versetzen. Positiv vergrößert Außenkonturen und verkleinert Löcher, sodass ausgeschnittene
  * Teile die gezeichneten Maße behalten. Runde Ecken entsprechen dem runden Laserfleck.
+ *
+ * Vertrag (Issue #220): nur geschlossene Konturen mit >= 3 Punkten werden versetzt. Offene Konturen
+ * laufen ohne Kerf durch (werden gezählt, siehe buildJob), degenerierte (< 3 Punkte) entfallen,
+ * berührende Flächen werden per Union zusammengefasst (merged-Zähler), vollständig aufgelöste
+ * Flächen (z. B. Loch kleiner als der Versatz) entfallen (vanished). Reihenfolge im Job ist immer
+ * Kerf → Tabs → Perforation → Reihenfolge → Anschnitt (Tabs werden auf der kompensierten Kontur neu
+ * verteilt); bei Füllen wirkt Kerf auf die Hüll-Geometrie vor der Schraffur, Bilder ignorieren Kerf.
  */
-export function kerfOffset(polys: Poly[], d: number): Poly[] {
-  if (!polys.length || !d) return polys;
+export interface KerfReport {
+  polys: Poly[];
+  /** geschlossene Eingänge mit >= 3 Punkten */
+  valid: number;
+  /** degenerierte geschlossene Eingänge (< 3 Punkte), entfallen */
+  degenerate: number;
+  /** per Union zusammengefasste Konturen (valid - Ausgabe, soweit Ausgabe nicht leer) */
+  merged: number;
+  /** true, wenn trotz gültiger Eingänge nichts übrig blieb (z. B. Loch vom Versatz verschluckt) */
+  vanished: boolean;
+}
+
+export function kerfOffsetReport(polys: Poly[], d: number): KerfReport {
+  const closed = polys.filter((p) => p.closed);
+  const degenerate = closed.length - closed.filter((p) => p.pts.length > 2).length;
+  const validSrc = closed.filter((p) => p.pts.length > 2);
+  if (!validSrc.length || !d) return { polys, valid: validSrc.length, degenerate, merged: 0, vanished: false };
   const { Clipper, ClipperOffset, ClipType, PolyType, PolyFillType, JoinType, EndType } = ClipperLib;
-  const paths = polys.map((p) => p.pts.map((q) => ({ X: Math.round(q.x * KSCALE), Y: Math.round(q.y * KSCALE) })));
+  const paths = validSrc.map((p) => p.pts.map((q) => ({ X: Math.round(q.x * KSCALE), Y: Math.round(q.y * KSCALE) })));
   const c = new Clipper();
   c.AddPaths(paths, PolyType.ptSubject, true);
   const area: ClipperLib.Paths = [];
@@ -836,7 +902,14 @@ export function kerfOffset(polys: Poly[], d: number): Poly[] {
   const out: ClipperLib.Paths = [];
   co.Execute(out, d * KSCALE);
   const res: Poly[] = out.filter((p) => p.length > 2).map((p) => ({ pts: p.map((q) => ({ x: q.X / KSCALE, y: q.Y / KSCALE })), closed: true }));
-  return keepStarts(polys, res);
+  const kept = keepStarts(validSrc, res);
+  const vanished = kept.length === 0;
+  const merged = vanished ? 0 : Math.max(0, validSrc.length - kept.length);
+  return { polys: kept, valid: validSrc.length, degenerate, merged, vanished };
+}
+
+export function kerfOffset(polys: Poly[], d: number): Poly[] {
+  return kerfOffsetReport(polys, d).polys;
 }
 
 /**
@@ -975,24 +1048,15 @@ export function addTabs(p: Poly, T: TabSettings): Poly {
     }
     off.push(inTab((last + d1) / 2) ? 1 : 0);
   }
-  return { pts, closed: true, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole };
+  return { pts, closed: true, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole, grp: p.grp };
 }
 
 /** Haltestege für alle geschlossenen Formen eines Layers; innere Formen auf Wunsch auslassen */
 function withTabs(polys: Poly[], T: TabSettings): Poly[] {
-  const boxes = polys.map((p) => {
-    const b = emptyBox();
-    for (const q of p.pts) addPt(b, q.x, q.y);
-    return b;
-  });
-  const inner = (i: number) =>
-    polys.some((o, j) => {
-      if (j === i || !o.closed) return false;
-      const a = boxes[i],
-        c = boxes[j];
-      if (a.x0 < c.x0 || a.y0 < c.y0 || a.x1 > c.x1 || a.y1 > c.y1) return false;
-      return pointInPoly(polys[i].pts[0], o.pts);
-    });
+  const boxes = boxesOf(polys);
+  // Haltesteg-Ausschluss für Innenformen nach derselben Regel wie die Schnittreihenfolge (Issue #219):
+  // erster Punkt oder Rahmenmitte im Container, identische Rahmen einseitig gezählt.
+  const inner = (i: number) => polys.some((_, j) => containsStrict(polys, boxes, i, j));
   return polys.map((p, i) => (p.closed && !(T.skipInner && inner(i)) ? addTabs(p, T) : p));
 }
 
@@ -1176,10 +1240,29 @@ const FLIP = (h: number): Mat => [1, 0, 0, -1, 0, h];
 type CutEntry = Omit<CutSettings, 'air' | 'look' | 'sub'>;
 
 /** Bearbeitungen eines Layers in Ausgabereihenfolge: erst der Layer, dann seine eingeschalteten Sub-Layer */
+/** Bearbeitungen eines Layers in Ausgabereihenfolge: der Layer selbst, dann eingeschaltete Sub-Layer. Durchgänge laufen pro Bearbeitung (#218): Jede Entry beendet ihre eigenen passes, bevor die nächste startet; es gibt keinen globalen Repeat. */
 const entriesOf = (L: Layer): CutEntry[] => [L, ...(L.sub ?? []).filter((s: SubLayer) => s.output)];
 
+/** Manuelle Reihenfolge (Issue #153): zählt innere Formen, deren äußere Form früher geschnitten wird.
+ * Manuell = Stapel-/Dokumentreihenfolge (alle drei Optimierungen aus); `containsStrict` aus dem Topologie-Modul (#219). */
+function countManualViolations(polys: Poly[]): number {
+  if (polys.length < 2) return 0;
+  const boxes = boxesOf(polys);
+  let n = 0;
+  for (let j = 0; j < polys.length; j++) {
+    if (!polys[j].closed) continue;
+    for (let i = 0; i < j; i++) {
+      if (containsStrict(polys, boxes, j, i)) {
+        n++;
+        break;
+      }
+    }
+  }
+  return n;
+}
+
 /** Bewegungen einer Bearbeitung; pass(p) setzt vor jedem Durchgang den Z-Versatz */
-function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v: boolean }, pass: (p: number) => void, optimize: boolean) {
+function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v: boolean }, pass: (p: number) => void, ord: OrderOpts) {
   const s = e.power / 100;
   const passes = Math.max(1, e.passes);
   if (e.mode === 'fill' && e.fillStyle === 'offset') {
@@ -1213,7 +1296,7 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v:
   const sMin = Math.max(0, e.minPower) / 100;
   for (let p = 0; p < passes; p++) {
     pass(p);
-    const order = optimize ? orderPolys(cuts, { x: mv.lastX(), y: mv.lastY() }) : cuts;
+    const order = ord.innerFirst || ord.travel || ord.group ? orderPolys(cuts, { x: mv.lastX(), y: mv.lastY() }, ord) : cuts;
     for (let poly of order) {
       // Nicht in einem Steg beginnen, sonst fährt der Laser ihn zuerst ohne Leistung ab
       if (poly.off?.[0]) poly = startAt(poly, Math.max(0, poly.off.indexOf(0)));
@@ -1243,23 +1326,10 @@ function signedArea(pts: Pt[]): number {
 
 /** Formen, die in einer ungeraden Zahl anderer geschlossener Formen liegen, als Loch markieren */
 function markHoles(polys: Poly[]) {
-  const boxes = polys.map((p) => {
-    const b = emptyBox();
-    for (const q of p.pts) addPt(b, q.x, q.y);
-    return b;
-  });
+  const { depth } = buildContainment(polys);
   for (let i = 0; i < polys.length; i++) {
     if (!polys[i].closed) continue;
-    const a = boxes[i];
-    let depth = 0;
-    for (let j = 0; j < polys.length; j++) {
-      if (i === j || !polys[j].closed) continue;
-      const c = boxes[j];
-      if (a.x0 < c.x0 || a.y0 < c.y0 || a.x1 > c.x1 || a.y1 > c.y1) continue;
-      if (a.x0 === c.x0 && a.y0 === c.y0 && a.x1 === c.x1 && a.y1 === c.y1 && i < j) continue;
-      if (pointInPoly(polys[i].pts[0], polys[j].pts) || pointInPoly(midOf(a), polys[j].pts)) depth++;
-    }
-    polys[i].hole = depth % 2 === 1;
+    polys[i].hole = depth[i] % 2 === 1;
   }
 }
 
@@ -1299,7 +1369,7 @@ export function perforate(p: Poly, P: PerfSettings): Poly {
     }
   }
   if (!p.closed) pts.push(src[n - 1]);
-  return { pts, closed: p.closed, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole };
+  return { pts, closed: p.closed, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole, grp: p.grp };
 }
 
 /**
@@ -1485,6 +1555,20 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   }
   const toBed = FLIP(doc.bed.h);
 
+  // Top-Level-ID je Blatt für „Gruppen zusammenhalten“ (Issue #222): Blätter desselben
+  // obersten Objekts (inkl. Gruppenkinder) teilen sich die Gruppen-ID.
+  const topOf = new Map<Obj, string | number>();
+  {
+    const walk = (top: Obj, o: Obj) => {
+      if (o.shape.kind === 'group') {
+        for (const c of o.shape.children) walk(top, c);
+        return;
+      }
+      topOf.set(o, top.id);
+    };
+    for (const o of roots) walk(o, o);
+  }
+
   // 1. Geometrie je Layer sammeln (Bettkoordinaten, y nach oben)
   interface Bucket {
     /** Konturen je Objekt (Kerf wird je Objekt gerechnet) */
@@ -1501,8 +1585,40 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   };
   const bounds = emptyBox();
   let skippedOpen = 0;
-  const dedupInfo = new Map<number, { len: number; lines: Pt[][] }>();
-  for (const [o, world] of laserLeaves(roots)) {
+  const dedupInfo = new Map<
+    number,
+    { len: number; lines: Pt[][] }
+  >();
+
+  let kerfOpen = 0;
+  let kerfDegenerate = 0;
+  let kerfVanished = 0;
+  let kerfMerged = 0;
+  let kerfFillOps = 0;
+
+  // Effektive Ausgabe-Auswahl (Issue #217)
+  const effLeaves = [...outputLeaves(roots)];
+  const laserSet = new Set<Obj>();
+
+  for (const [l] of laserLeaves(roots)) {
+    laserSet.add(l);
+  }
+
+  const hiddenOutputs = effLeaves.filter(
+    ([l]) => !laserSet.has(l) && layerOf(l.layer).output
+  ).length;
+
+  if (hiddenOutputs) {
+    warnings.push(
+      tn(
+        '{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).',
+        '{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).',
+        hiddenOutputs,
+      ),
+    );
+  }
+
+  for (const [o, world] of effLeaves) {
     if (o.reg) continue; // Passermarken nur drucken, nicht lasern
     const L = layerOf(o.layer);
     if (!L.output) continue;
@@ -1523,10 +1639,12 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     } else subs = shapeSubs(s);
     const M = mul(toBed, world);
     const own: Poly[] = [];
+    const grp = topOf.get(o);
     for (const sp of subs) {
       if (sp.nodes.length < 2) continue;
       const p = flatten(sp, M);
       if (p.pts.length < 2) continue;
+      if (grp !== undefined) p.grp = grp;
       own.push(p);
     }
     if (own.length) bucket(o.layer).objs.push(own);
@@ -1536,42 +1654,126 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     const anyLine = ents.some((e) => e.mode === 'line');
     const firstFill = ents.findIndex((e) => e.mode === 'fill');
     b.sets = ents.map((e, k) => {
-      const outPush: Poly[] = [];
       const list: Poly[] = [];
+
+      // Geometrie pro Objekt vorbereiten
       for (const own of b.objs) {
         let polys = own;
+
         if (e.mode === 'fill') {
           polys = own.filter((p) => p.closed);
-          if (!anyLine && k === firstFill) skippedOpen += own.length - polys.length;
+          if (!anyLine && k === firstFill) {
+            skippedOpen += own.length - polys.length;
+          }
         }
-        // Kerf je Objekt, damit sich benachbarte Objekte nicht zu einer Fläche verbinden
-        if (e.kerf) polys = [...polys.filter((p) => !p.closed), ...kerfOffset(polys.filter((p) => p.closed), e.kerf)];
-        for (const p of polys) list.push(p);
+
+        // Kerf je Objekt anwenden (#220)
+        if (e.kerf) {
+          const open = polys.filter((p) => !p.closed);
+
+          if (open.length && e.mode === 'line') {
+            kerfOpen += open.length;
+          }
+
+          if (e.mode === 'fill') {
+            kerfFillOps++;
+          }
+
+          const rep = kerfOffsetReport(
+            polys.filter((p) => p.closed),
+            e.kerf,
+          );
+
+          kerfDegenerate += rep.degenerate;
+          kerfMerged += rep.merged;
+
+          if (rep.vanished && rep.valid > 0) {
+            kerfVanished += rep.valid;
+          }
+
+          // Gruppen-ID nach Kerf erhalten (#222)
+          const g =
+            polys.length && polys.every((p) => p.grp === polys[0].grp)
+              ? polys[0].grp
+              : undefined;
+
+          polys = [
+            ...open,
+            ...rep.polys.map((p) =>
+              g !== undefined ? { ...p, grp: g } : p
+            ),
+          ];
+        }
+
+        list.push(...polys);
       }
-      // Doppelte Linien beim Export (Issue #221, opt-in pro Bearbeitung): vor Tabs/Perfo/Lead,
-      // damit Stege erst auf der bereinigten Geometrie entstehen und Fix-Starts erhalten bleiben.
-      if (e.mode === 'line' && (e as CutSettings).dedup && list.length > 1) {
-        const r = dedupPolys(list, (e as CutSettings).dedupTol, e.kerf);
+
+      // Doppelte Linien entfernen (#221)
+      // Nach Kerf, vor Tabs, Perforation und Anschnitt
+      let result = list;
+
+      if (
+        e.mode === 'line' &&
+        (e as CutSettings).dedup &&
+        list.length > 1
+      ) {
+        const r = dedupPolys(
+          list,
+          (e as CutSettings).dedupTol,
+          e.kerf,
+        );
+
         if (r.len > 0.001) {
-          const cur = dedupInfo.get(li) ?? { len: 0, lines: [] as Pt[][] };
+          const cur = dedupInfo.get(li) ?? {
+            len: 0,
+            lines: [] as Pt[][],
+          };
+
           cur.len += r.len;
-          for (const l of r.lines) cur.lines.push(l);
+          cur.lines.push(...r.lines);
           dedupInfo.set(li, cur);
         }
-        for (const p of r.polys) {
-          outPush.push(p);
-          for (const q of p.pts) addPt(bounds, q.x, q.y);
+
+        result = r.polys;
+      }
+
+      // Bounds der tatsächlich ausgegebenen Geometrie
+      for (const p of result) {
+        for (const q of p.pts) {
+          addPt(bounds, q.x, q.y);
         }
-        return outPush;
       }
-      for (const p of list) {
-        outPush.push(p);
-        for (const q of p.pts) addPt(bounds, q.x, q.y);
-      }
-      return outPush;
+
+      return result;
     });
   }
+  
   if (skippedOpen) warnings.push(tn('{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', '{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).', skippedOpen));
+  if (kerfOpen) warnings.push(tn('Kerf-Vertrag: {n} offene Kontur läuft ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).', 'Kerf-Vertrag: {n} offene Konturen laufen ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).', kerfOpen));
+  if (kerfDegenerate) warnings.push(tn('Kerf-Vertrag: {n} degenerierte Kontur (< 3 Punkte) entfallen.', 'Kerf-Vertrag: {n} degenerierte Konturen (< 3 Punkte) entfallen.', kerfDegenerate));
+  if (kerfVanished) warnings.push(tn('Kerf-Vertrag: {n} Kontur vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).', 'Kerf-Vertrag: {n} Konturen vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).', kerfVanished));
+  if (kerfMerged) warnings.push(tn('Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.', 'Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.', kerfMerged));
+  if (kerfFillOps) warnings.push(t('Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.'));
+  // Manuelle Reihenfolge (#153, alle Optimierer-Schalter aus): dort meldet die genauere Prüfung beim Ausgeben
+  if (!device.optInnerFirst && (device.optTravel || device.optGroup)) {
+    // Ohne Innere-Formen-Priorisierung auf mögliche Schnittreihenfolge-Probleme hinweisen (#222).
+    let nested = false;
+    outer: for (const b of buckets.values()) {
+      for (const set of b.sets) {
+        const closed = set.filter((p) => p.closed);
+        const boxes = boxesOf(closed);
+        for (let i = 0; i < closed.length; i++) {
+          for (let j = 0; j < closed.length; j++) {
+            if (i !== j && containsStrict(closed, boxes, i, j)) {
+              nested = true;
+              break outer;
+            }
+          }
+        }
+      }
+    }
+    if (nested) warnings.push(t('„Innere Formen zuerst“ ist aus: Löcher werden ggf. nach ihrer Außenkontur geschnitten und fallen mit dem Reststück.'));
+  }
 
   // 2. Verschiebung nach „Starten ab“
   const jb = finite(bounds);
@@ -1614,6 +1816,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   // Z-Versatz nur mit Z-Achse; ist Z die Drehachse, bleibt der Fokus, wo er ist
   const useZ = device.zAxis && !(rotaryOn(device) && device.rotary.axis === 'Z');
   let zSkipped = false;
+  let manualViolations = 0;
   for (const li of order) {
     const L = layerOf(li);
     const bk = buckets.get(li)!;
@@ -1644,10 +1847,28 @@ export async function buildJob(inp: JobInput): Promise<Job> {
       if (!useZ && (e.zOffset || e.zStep)) zSkipped = true;
       // Z je Durchgang: erster Durchgang beim Z-Versatz, jeder weitere um zStep tiefer
       const pass = (p: number) => (mv.zCur = useZ ? e.zOffset + p * e.zStep : 0);
-      emitEntry(mv, e, polys, li, flip, pass, device.optimize);
+      const orderOpts = {
+        innerFirst: device.optInnerFirst,
+        travel: device.optTravel,
+        group: device.optGroup,
+      };
+
+      if (!orderOpts.innerFirst && !orderOpts.travel && !orderOpts.group && e.mode === 'line') {
+        manualViolations += countManualViolations(polys);
+      }
+
+      emitEntry(mv, e, polys, li, flip, pass, orderOpts);
       mv.zCur = 0;
     });
   }
+  if (manualViolations)
+    warnings.push(
+      tn(
+        'Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.',
+        'Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.',
+        manualViolations,
+      ),
+    );
   if (zSkipped)
     warnings.push(
       device.zAxis

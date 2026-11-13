@@ -343,17 +343,20 @@ export interface Obj {
   shape: Shape;
   /** Eigener Name aus dem Objekte-Fenster (sonst wird er aus der Form abgeleitet) */
   name?: string;
-  /** Ausgeblendet: nicht gezeichnet, nicht gelasert, nicht exportiert */
+  /** Ausgeblendet: nicht gezeichnet; nimmt am Laser-Job weiter teil, solange Ausgabe
+   * eingeschaltet und kein noLaser/showIf-Stopp (mit Warnung, siehe Issue #217) */
   hidden?: boolean;
   /** Gesperrt: auf der Arbeitsfläche nicht auswählbar (nur oberste Ebene) */
   locked?: boolean;
-  /** Not lasered (still drawn, faded): e.g. a part that is already cut or parked for later */
+  /** Not lasered (still drawn, faded): e.g. a part that is already cut or parked for later.
+   * Schließt die Laser-Ausgabe immer aus, auch bei sichtbarem Objekt und eingeschalteter Ausgabe. */
   noLaser?: boolean;
   /** Mit dem Verbindungs-Werkzeug angelegte Verbindungen zu anderen Teilen (für die 3D-Ansicht) */
   mates?: Mate[];
   /** Formeln mit Projekt-Parametern für Lage, Größe, Drehung und Formmaße (nur oberste Ebene) */
   bind?: ObjBinds;
-  /** Nur zeigen (und lasern), wenn diese Formel mit Projekt-Parametern wahr ist, z. B. „Deckel“ */
+  /** Nur zeigen (und lasern), wenn diese Formel mit Projekt-Parametern wahr ist, z. B. „Deckel“.
+   * Falsch heißt Modelllogik: weder gezeichnet noch gelasert (ausgenommen ist nur die Anzeige). */
   showIf?: string;
   /** Hinweis aus dem Import (übersprungene Elemente der Quelldatei), für „Konstruktion prüfen“ */
   importNote?: string;
@@ -385,6 +388,10 @@ export type ObjBindKey = (typeof OBJ_BIND_KEYS)[number];
 
 /** Ausgeblendet: von Hand oder weil seine Bedingung (showIf) gerade nicht gilt */
 export const isOff = (o: Obj) => !!o.hidden || (!!o.showIf && !conditionHolds(o.showIf));
+
+/** Eigenes Objekt (ohne Vorfahren) von der Laser-Ausgabe ausgeschlossen: noLaser oder
+ * showIf derzeit falsch. Hidden zählt nicht (Issue #217: Sichtbarkeit steuert nur die Anzeige). */
+export const selfOutputOff = (o: Obj) => !!o.noLaser || (!!o.showIf && !conditionHolds(o.showIf));
 
 /**
  * Verbindung zwischen zwei Teilen, gespeichert beim Teil mit der ersten Kante. Alle Punkte in lokalen Koordinaten
@@ -438,7 +445,7 @@ export interface CutSettings {
   passes: number;
   /** Air Assist während dieses Layers einschalten (M8/M7, aus mit M9) */
   air: boolean;
-  /** Kerf-Versatz in mm: positiv = Außenkonturen nach außen, Löcher nach innen */
+  /** Kerf-Versatz in mm: positiv = Außenkonturen nach außen, Löcher nach innen. Vertrag (#220): nur geschlossene Konturen mit >= 3 Punkten; offen läuft ohne Kerf durch, degeneriert/vom Versatz aufgelöst entfällt, berührend wird per Union zusammengefasst. Reihenfolge Kerf → Tabs → Perforation; Fill kerft die Hülle vor der Schraffur, Bilder ignorieren Kerf. */
   kerf: number;
   /** Nur Linie: Haltestege */
   tabs: TabSettings;
@@ -919,6 +926,25 @@ export function* laserLeaves(objs: Obj[], parent: Mat = IDENT): Generator<[Obj, 
   }
 }
 
+/**
+ * Blätter für die Laser-Ausgabe (Issue #217): Sichtbarkeit (hidden, Layer-show)
+ * entscheidet nur über die Anzeige im Editor, nicht über die Teilnahme am Job.
+ * Ausgeschlossen sind nur noLaser (eigene Markierung oder Gruppe darüber) und
+ * showIf mit derzeit falscher Bedingung (Modelllogik, vererbt wie noLaser).
+ * Im Unterschied zu laserLeaves() sind hier versteckte Objekte enthalten.
+ */
+export function* outputLeaves(objs: Obj[], parent: Mat = IDENT, noLaserAbove = false, offAbove = false): Generator<[Obj, Mat]> {
+  for (const o of objs) {
+    const nl = noLaserAbove || !!o.noLaser;
+    const off = offAbove || (!!o.showIf && !conditionHolds(o.showIf));
+    // Ausgeschlossene Teilbäume ganz überspringen (Kinder wären ebenfalls ausgeschlossen)
+    if (nl || off) continue;
+    const m = mul(parent, o.m);
+    if (o.shape.kind === 'group') yield* outputLeaves(o.shape.children, m, nl, off);
+    else yield [o, m];
+  }
+}
+
 /** Leaves that are not lasered because they or a group above them are marked noLaser */
 export function noLaserLeaves(objs: Obj[], out = new Set<Obj>(), off = false): Set<Obj> {
   for (const o of objs) {
@@ -939,4 +965,54 @@ export function homeLayer(o: Obj): number {
 export function setLayerDeep(o: Obj, layer: number) {
   o.layer = layer;
   if (o.shape.kind === 'group') o.shape.children.forEach((c) => setLayerDeep(c, layer));
+}
+
+/**
+ * Moving a group to another layer (#255): 'all' puts every object in it on the new layer (setLayerDeep),
+ * 'preserve' only those on the group's layer (homeLayer) and keeps the other layers, e.g. an engraving.
+ */
+export type ChildLayers = 'preserve' | 'all';
+
+/** Group whose objects (hidden ones included) are on more than one layer */
+export function mixedLayers(o: Obj): boolean {
+  if (o.shape.kind !== 'group') return false;
+  const layers = new Set<number>();
+  for (const [l] of leaves([o])) layers.add(l.layer);
+  return layers.size > 1;
+}
+
+/** Each group (nested ones too) gets the layer of its first object, like homeLayer; innermost groups first */
+export function syncGroupLayers(o: Obj) {
+  if (o.shape.kind !== 'group') return;
+  o.shape.children.forEach(syncGroupLayers);
+  o.layer = homeLayer(o);
+}
+
+/** Move the objects on the group's layer (homeLayer) to the new layer, keep the others, then sync the group layers */
+export function setLayerPreserving(o: Obj, layer: number) {
+  if (o.shape.kind !== 'group') {
+    o.layer = layer;
+    return;
+  }
+  const from = homeLayer(o);
+  for (const [l] of leaves([o])) if (l.layer === from) l.layer = layer;
+  syncGroupLayers(o);
+}
+
+/** Move an object to a layer, keeping or not the other layers inside groups */
+export const setLayerOf = (o: Obj, layer: number, childLayers: ChildLayers) =>
+  childLayers === 'all' ? setLayerDeep(o, layer) : setLayerPreserving(o, layer);
+
+/** Manual assignment per layer inside groups: old layer → new layer; layers not in the map stay */
+export type LayerMap = Map<number, number>;
+/** What to do with groups on several layers: keep, move all, or a manual map */
+export type LayerChoice = ChildLayers | LayerMap;
+
+/** Every object in the group whose layer is in the map goes to the mapped layer, then sync the group layers */
+export function setLayerMapped(o: Obj, map: LayerMap) {
+  for (const [l] of leaves([o])) {
+    const to = map.get(l.layer);
+    if (to !== undefined) l.layer = to;
+  }
+  syncGroupLayers(o);
 }

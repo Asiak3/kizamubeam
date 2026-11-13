@@ -900,7 +900,7 @@ export const EDIT_TOOLS: ToolDef[] = [
     name: 'edit_object',
     title: 'Objekt ändern',
     description:
-      'Ändert Eigenschaften eines Objekts (auch in Gruppen). Alle Typen: name (leer = Standardname), hidden (ausgeblendet: nicht gezeichnet und nicht gelasert), locked (auf der Arbeitsfläche nicht auswählbar; nur oberste Ebene), noLaser (sichtbar, aber nicht gelasert, z. B. schon geschnittene oder geparkte Teile; nur oberste Ebene). Text: text, font, size (mm auf dem Bett), bold, italic, upper, align, letterSpacing, lineSpacing, weld (Buchstaben schweißen); bei Text auf Pfad (apply_path_to_text) pathOffset (Verschiebung entlang der Kurve, mm), pathDistance (Abstand der Grundlinie, mm, positiv nach oben), pathFlip (andere Seite), removePath (wieder gerade), variable (variabler Text mit Platzhaltern, siehe variable_text), variableOffset, maxWidth (mm, breitere Zeilen werden gestaucht, 0 = aus), maxHeight (mm, ein höherer Block wird verkleinert, 0 = aus), fitShrink (zu breiten Text verkleinern statt stauchen), wrap (Textrahmen: Zeilen an maxWidth an Wortgrenzen umbrechen, Höhe wächst mit; ohne maxWidth gilt die jetzige Breite). QR-Code: data, errorCorrection, qrSize (Kantenlänge mm), invert, quietZone, variable, variableOffset. Strichcode: data, barcodeType, barcodeWidth (Breite der Striche mm), barcodeHeight (mm), showText, checkDigit, barWidthReduction (mm), invert, quietZone, variable, variableOffset. Rechteck: cornerRadius. Vieleck: sides, star, innerRatio. Lage und Größe ändert transform.',
+      'Ändert Eigenschaften eines Objekts (auch in Gruppen). Alle Typen: name (leer = Standardname), hidden (ausgeblendet: nicht gezeichnet, wird aber weiter gelasert solange Ausgabe an), locked (auf der Arbeitsfläche nicht auswählbar; nur oberste Ebene), noLaser (sichtbar, aber nicht gelasert, z. B. schon geschnittene oder geparkte Teile; nur oberste Ebene). Text: text, font, size (mm auf dem Bett), bold, italic, upper, align, letterSpacing, lineSpacing, weld (Buchstaben schweißen); bei Text auf Pfad (apply_path_to_text) pathOffset (Verschiebung entlang der Kurve, mm), pathDistance (Abstand der Grundlinie, mm, positiv nach oben), pathFlip (andere Seite), removePath (wieder gerade), variable (variabler Text mit Platzhaltern, siehe variable_text), variableOffset, maxWidth (mm, breitere Zeilen werden gestaucht, 0 = aus), maxHeight (mm, ein höherer Block wird verkleinert, 0 = aus), fitShrink (zu breiten Text verkleinern statt stauchen), wrap (Textrahmen: Zeilen an maxWidth an Wortgrenzen umbrechen, Höhe wächst mit; ohne maxWidth gilt die jetzige Breite). QR-Code: data, errorCorrection, qrSize (Kantenlänge mm), invert, quietZone, variable, variableOffset. Strichcode: data, barcodeType, barcodeWidth (Breite der Striche mm), barcodeHeight (mm), showText, checkDigit, barWidthReduction (mm), invert, quietZone, variable, variableOffset. Rechteck: cornerRadius. Vieleck: sides, star, innerRatio. Lage und Größe ändert transform.',
     tier: Tier.Edit,
     inputSchema: obj({
       id: { type: 'integer' }, name: { type: 'string' }, hidden: { type: 'boolean' }, locked: { type: 'boolean' }, noLaser: { type: 'boolean' }, text: { type: 'string' }, font: { type: 'string' }, size: { type: 'number' }, bold: { type: 'boolean' },
@@ -1357,13 +1357,15 @@ export const EDIT_TOOLS: ToolDef[] = [
   {
     name: 'assign_layer',
     title: 'Layer zuweisen',
-    description: 'Legt Objekte (samt Gruppeninhalt) auf einen Layer.',
+    description:
+      'Legt Objekte auf einen Layer. Gruppen mit Objekten auf mehreren Layern (z. B. Teil und Gravur): childLayers "preserve" (Standard) verschiebt nur die Objekte auf dem Layer der Gruppe, die anderen (z. B. die Gravur) bleiben; "all" legt den ganzen Gruppeninhalt auf den Layer.',
     tier: Tier.Edit,
-    inputSchema: obj({ ids: IDS, layer: { ...LAYER, description: 'Layer 0–29' } }, ['ids', 'layer']),
+    inputSchema: obj({ ids: IDS, layer: { ...LAYER, description: 'Layer 0–29' },
+      childLayers: { type: 'string', enum: ['preserve', 'all'], description: 'Gruppen mit mehreren Layern: preserve (Standard) oder all' } }, ['ids', 'layer']),
     run: (ed, a) => {
       const objs = topObjs(ed, ids(a));
       ed.setSel(objs);
-      ed.assignLayer(num(a, 'layer', { min: 0, max: 31, int: true }));
+      ed.assignLayer(num(a, 'layer', { min: 0, max: 31, int: true }), a.childLayers === 'all' ? 'all' : 'preserve');
       return { objects: describeAll(ed, objs) };
     },
   },

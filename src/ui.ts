@@ -38,6 +38,7 @@ import { openQrDialog, openVarTextDialog } from './qrDialog';
 import { openBarcodeDialog } from './barcodeDialog';
 import { LINEAR_NAMES } from './barcode1d';
 import { askGenConvert, openGenDialog } from './generators/dialog';
+import { assignLayerAsk, needsChildLayersQuestion } from './layerAssign';
 import { genLabel, getGenerator } from './generators';
 import { maybeOfferSetup, openSetupWizard } from './setupWizard';
 import { maybeCheckForUpdates, openUpdateDialog } from './updateDialog';
@@ -1958,17 +1959,28 @@ function openTraceDialog(ed: Editor) {
 
 // ---------- Palette ----------
 
+/** How long the layer bar waits for a second click before asking about groups on several layers */
+const DOUBLE_CLICK_MS = 300;
+
 function buildPalette(ed: Editor) {
   const root = $('#palette');
   const btns: HTMLButtonElement[] = [];
+  // Groups with objects on several layers need a question (#255). Wait for a possible second click first,
+  // so a double click still only opens the layer settings.
+  let pending = 0;
   PALETTE.forEach((c, i) => {
     const b = h('button', {
       class: i >= 30 ? 'tool' : '',
       style: `background:${c}`,
       title: i >= 30 ? t('Werkzeug-Layer {layer} (wird nicht gelasert). Doppelklick: Layer-Einstellungen', { layer: layerLabel(i) }) : t('Layer {layer}: Auswahl zuordnen. Doppelklick: Layer-Einstellungen', { layer: layerLabel(i) }),
       // The second click of a double-click does not assign again (no extra undo step)
-      onclick: (e: MouseEvent) => e.detail < 2 && ed.assignLayer(i),
-      ondblclick: () => openLayerDialog(ed, i),
+      onclick: (e: MouseEvent) => {
+        if (e.detail >= 2) return;
+        clearTimeout(pending);
+        if (needsChildLayersQuestion(ed, i)) pending = window.setTimeout(() => void assignLayerAsk(ed, i), DOUBLE_CLICK_MS);
+        else ed.assignLayer(i);
+      },
+      ondblclick: () => (clearTimeout(pending), openLayerDialog(ed, i)),
     }, layerLabel(i));
     btns.push(b);
     root.append(b);
