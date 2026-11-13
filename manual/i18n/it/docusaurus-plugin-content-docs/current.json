@@ -1,0 +1,22 @@
+{
+  "version.label": {
+    "message": "2.x",
+    "description": "The label for version current"
+  },
+  "sidebar.manual.category.Getting started": {
+    "message": "Primi passi",
+    "description": "The label for category 'Getting started' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Getting started.link.generated-index.description": {
+    "message": "Installa KizamuBeam, orientati nell’interfaccia e incidi il tuo primo pezzo.",
+    "description": "The generated-index page description for category 'Getting started' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Reference and support": {
+    "message": "Riferimento e supporto",
+    "description": "The label for category 'Reference and support' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Reference and support.link.generated-index.description": {
+    "message": "Scorciatoie da tastiera, formati di file, macchine supportate e aiuto per i problemi più comuni.",
+    "description": "The generated-index page description for category 'Reference and support' in sidebar 'manual'"
+  }
+}

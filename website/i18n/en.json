@@ -26,6 +26,8 @@
     "vm": "Virtual Machine",
     "download": "Download",
     "faq": "FAQ",
+    "docs": "Manual",
+    "docs_href": "docs/",
     "github": "GitHub"
   },
   "hero": {

@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://github.com/negurvulkan/kizamubeam/releases"><b>Download</b></a> ·
   <a href="https://negurvulkan.github.io/kizamubeam/it/">Sito web</a> ·
+  <a href="https://negurvulkan.github.io/kizamubeam/docs/it/">Manuale</a> ·
   <a href="docs/features.it.md">Tutte le funzioni</a> ·
   <a href="https://discord.gg/SSr8VHh7EJ">Discord</a> ·
   <a href="README.md">English</a> ·

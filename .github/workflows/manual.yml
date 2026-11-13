@@ -1,0 +1,38 @@
+# Builds the user manual (manual/, Docusaurus) on pull requests that touch it,
+# so broken links and build errors show up before merging. Publishing happens
+# in pages.yml together with the website.
+name: Manual
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'manual/**'
+      - '.github/workflows/manual.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manual-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: manual
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: manual/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build

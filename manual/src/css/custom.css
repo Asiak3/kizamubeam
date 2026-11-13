@@ -1,0 +1,56 @@
+/* KizamuBeam branding for the manual. Colours follow website/styles.css. */
+
+:root {
+  --ifm-color-primary: #c84400;
+  --ifm-color-primary-dark: #b43d00;
+  --ifm-color-primary-darker: #aa3a00;
+  --ifm-color-primary-darkest: #8c3000;
+  --ifm-color-primary-light: #dc4b00;
+  --ifm-color-primary-lighter: #e64e00;
+  --ifm-color-primary-lightest: #ff5e0f;
+  --ifm-background-color: #f7f5f2;
+  --ifm-background-surface-color: #ffffff;
+  --ifm-font-color-base: #1f282f;
+  --ifm-navbar-background-color: #ffffff;
+  --ifm-footer-background-color: #1f282f;
+  --ifm-code-font-size: 95%;
+  --ifm-font-family-base: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 86, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #ff7a33;
+  --ifm-color-primary-dark: #ff6614;
+  --ifm-color-primary-darker: #ff5c05;
+  --ifm-color-primary-darkest: #d64800;
+  --ifm-color-primary-light: #ff8e52;
+  --ifm-color-primary-lighter: #ff9861;
+  --ifm-color-primary-lightest: #ffb48c;
+  --ifm-background-color: #161c21;
+  --ifm-background-surface-color: #1f282f;
+  --ifm-font-color-base: #e8eaed;
+  --ifm-navbar-background-color: #1f282f;
+  --ifm-footer-background-color: #11161a;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 122, 51, 0.15);
+}
+
+.navbar__logo img {
+  height: 2rem;
+}
+
+.navbar__title {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Screenshots: soft frame so light images stand out on the page background. */
+.markdown img {
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.markdown iframe {
+  max-width: 100%;
+  border: 0;
+  border-radius: 8px;
+}

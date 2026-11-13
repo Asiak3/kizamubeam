@@ -37,6 +37,7 @@ Tick what applies and delete lines that do not apply to your change.
 - [ ] New UI text uses `t('…')` / `tn(…)` and is added to `src/locales/en.json` (and other locales where possible).
 - [ ] Undoable edits are recorded with `snapshot(t('…'))`.
 - [ ] New user-facing features are listed in `docs/features.md`, `docs/features.de.md` and `docs/features.it.md`.
+- [ ] The user manual (`manual/`) is updated if the change affects a documented workflow or deserves its own page.
 - [ ] Website texts are updated in `website/i18n/*.json` if needed, and `node website/build.mjs` still runs.
 - [ ] Existing projects, settings and machine profiles stay compatible, or the change is explained.
 - [ ] No version bumps (README, `package.json`, `Cargo.toml`, …) unless a maintainer asked for them.

@@ -26,6 +26,8 @@
     "vm": "Macchina virtuale",
     "download": "Download",
     "faq": "FAQ",
+    "docs": "Manuale",
+    "docs_href": "docs/it/",
     "github": "GitHub"
   },
   "hero": {

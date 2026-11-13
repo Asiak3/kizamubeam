@@ -1,9 +1,13 @@
 # Deploys the static product website in website/ to GitHub Pages, together
-# with the signed catalogue of extension packs (packs/*.kzp → catalog/).
+# with the signed catalogue of extension packs (packs/*.kzp → catalog/) and the
+# user manual (Docusaurus, manual/ → docs/).
 # The generated HTML is committed, so no build is needed to deploy; the
 # check step only makes sure it matches template.html + i18n/*.json.
 # The catalogue is built and signed here with the secret PACKS_SIGNING_KEY
 # (see scripts/catalog-keygen.mjs); without it the app ignores the catalogue.
+# The manual is served under /kizamubeam/docs/. To host it elsewhere later
+# (e.g. its own domain), set the repository variables DOCS_URL and
+# DOCS_BASE_URL (see manual/docusaurus.config.ts) and deploy manual/build there.
 name: Pages
 
 on:
@@ -11,6 +15,7 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      - 'manual/**'
       - 'packs/**'
       - 'src/packs.ts'
       - 'src/catalog.ts'
@@ -40,6 +45,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            manual/package-lock.json
 
       - name: Check that the committed HTML is up to date
         run: |
@@ -58,11 +67,25 @@ jobs:
           node scripts/run-ts.mjs scripts/build-catalog.ts website/catalog
           node scripts/sign-catalog.mjs website/catalog/catalog.json
 
+      - name: Build the user manual
+        env:
+          DOCS_URL: ${{ vars.DOCS_URL }}
+          DOCS_BASE_URL: ${{ vars.DOCS_BASE_URL }}
+        run: |
+          npm ci --prefix manual
+          npm run build --prefix manual
+
+      - name: Assemble the site
+        run: |
+          mkdir _site
+          cp -r website/. _site/
+          cp -r manual/build _site/docs
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: website
+          path: _site
 
       - id: deployment
         uses: actions/deploy-pages@v4

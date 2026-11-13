@@ -6,6 +6,8 @@ KizamuBeam is free software under **GPL-3.0-or-later**. It is maintained as a co
 
 Want to translate the app, the website or the documentation? See **[TRANSLATION.md](TRANSLATION.md)**, no programming needed.
 
+Want to write or improve the [user manual](https://negurvulkan.github.io/kizamubeam/docs/)? It is plain Markdown in [`manual/`](manual/); see **[manual/README.md](manual/README.md)**.
+
 ## Before you start
 
 - Check existing [issues](https://github.com/negurvulkan/kizamubeam/issues) and [pull requests](https://github.com/negurvulkan/kizamubeam/pulls) to avoid duplicating work.

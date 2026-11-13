@@ -1,0 +1,50 @@
+{
+  "link.title.Manual": {
+    "message": "Handbuch",
+    "description": "The title of the footer links column with title=Manual in the footer"
+  },
+  "link.title.KizamuBeam": {
+    "message": "KizamuBeam",
+    "description": "The title of the footer links column with title=KizamuBeam in the footer"
+  },
+  "link.title.Community": {
+    "message": "Community",
+    "description": "The title of the footer links column with title=Community in the footer"
+  },
+  "link.item.label.Getting started": {
+    "message": "Erste Schritte",
+    "description": "The label of footer link with label=Getting started linking to /getting-started/installation"
+  },
+  "link.item.label.Keyboard shortcuts": {
+    "message": "Tastenkürzel",
+    "description": "The label of footer link with label=Keyboard shortcuts linking to /reference/keyboard-shortcuts"
+  },
+  "link.item.label.Contributing to the manual": {
+    "message": "Am Handbuch mitarbeiten",
+    "description": "The label of footer link with label=Contributing to the manual linking to /contributing"
+  },
+  "link.item.label.Website": {
+    "message": "Website",
+    "description": "The label of footer link with label=Website linking to https://negurvulkan.github.io/kizamubeam/"
+  },
+  "link.item.label.Download": {
+    "message": "Download",
+    "description": "The label of footer link with label=Download linking to https://github.com/negurvulkan/kizamubeam/releases"
+  },
+  "link.item.label.Discord": {
+    "message": "Discord",
+    "description": "The label of footer link with label=Discord linking to https://discord.gg/SSr8VHh7EJ"
+  },
+  "link.item.label.GitHub": {
+    "message": "GitHub",
+    "description": "The label of footer link with label=GitHub linking to https://github.com/negurvulkan/kizamubeam"
+  },
+  "link.item.label.Report an issue": {
+    "message": "Fehler melden",
+    "description": "The label of footer link with label=Report an issue linking to https://github.com/negurvulkan/kizamubeam/issues"
+  },
+  "copyright": {
+    "message": "© 2026 Hanjo Winter · Freie Software unter GPL-3.0-or-later · Entwickelt mit Unterstützung von Claude Code.",
+    "description": "The footer copyright"
+  }
+}

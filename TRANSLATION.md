@@ -2,7 +2,7 @@
 
 Thank you for helping bring KizamuBeam to more people! You don't need to be a programmer to translate. If you can edit a text file and open a pull request on GitHub (or are willing to learn, it's not hard), you can contribute. And if you get stuck at any point, ask on [Discord](https://discord.gg/SSr8VHh7EJ) or in an issue.
 
-There are four things that can be translated. They are independent of each other, so you can start with any of them:
+There are five things that can be translated. They are independent of each other, so you can start with any of them:
 
 | What | Where | How big |
 |---|---|---|
@@ -10,8 +10,9 @@ There are four things that can be translated. They are independent of each other
 | [The website](#2-the-website) | `website/i18n/<code>.json` | one page |
 | [The README](#3-the-readme) | `README.<code>.md` | one page |
 | [The feature list](#4-the-feature-list) | `docs/features.<code>.md` | long reference |
+| [The user manual](#5-the-user-manual) | `manual/i18n/<code>/` | a few pages, growing |
 
-The app matters most. The other three are welcome too, but it's perfectly fine to translate only the app.
+The app matters most. The others are welcome too, but it's perfectly fine to translate only the app.
 
 Currently available: **German** (the original), **English**, **Italian**, **Spanish** and **Brazilian Portuguese**.
 
@@ -176,12 +177,16 @@ The README is the first thing people see on GitHub. A translation lives next to 
 
 The feature list is long and changes often. It's fine to skip it.
 
+## 5. The user manual
+
+The [user manual](https://negurvulkan.github.io/kizamubeam/docs/) is built with Docusaurus from [`manual/`](manual/). English pages are in `manual/docs/`; a translation keeps the same file names under `manual/i18n/<code>/docusaurus-plugin-content-docs/current/`, plus the label files `manual/i18n/<code>/*.json`. Pages that are not translated yet show the English text, so you can translate one page at a time. A new manual language also needs an entry in `i18n.locales` in `manual/docusaurus.config.ts`. Details, and how to preview the manual locally, are in [Contributing to the manual](https://negurvulkan.github.io/kizamubeam/docs/contributing).
+
 ## Submitting your translation
 
 1. Commit your changes on a branch in your fork, e.g. `translation-fr`.
 2. Open a pull request against `main` of [negurvulkan/kizamubeam](https://github.com/negurvulkan/kizamubeam). A title like “Add French translation” or “Update Italian translation” is perfect.
 3. In the description, mention:
-   - the language and what you translated (app, website, README, feature list),
+   - the language and what you translated (app, website, README, feature list, manual),
    - roughly how complete it is (the line from `npm run i18n:check`),
    - anything you were unsure about, and whether you tested it in the app,
    - whether you used machine translation or AI tools (that's fine, see [AI-assisted contributions](CONTRIBUTING.md#ai-assisted-contributions); please review the result yourself).

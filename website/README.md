@@ -50,7 +50,9 @@ key `kb-lang`) and always wins. To test the redirect again, clear that key.
 ## Deployment
 
 `.github/workflows/pages.yml` deploys `website/` to GitHub Pages on every push to
-`main` that touches `website/**` (or manually via *Actions → Pages → Run workflow*).
-It first runs the build and fails if the committed HTML is stale.
+`main` that touches `website/**` or `manual/**` (or manually via *Actions → Pages → Run workflow*).
+It first runs the build and fails if the committed HTML is stale. The same workflow
+builds the user manual from `manual/` (Docusaurus) and publishes it under `docs/`, so
+`website/` must not contain a `docs/` folder of its own.
 
 One-time setup: *Settings → Pages → Build and deployment → Source: GitHub Actions*.

@@ -52,7 +52,8 @@
         <li><a href="#hardware">{{nav.hardware}}</a></li>
         <li class="nav-wide"><a href="#vm">{{nav.vm}}</a></li>
         <li><a href="#download">{{nav.download}}</a></li>
-        <li><a href="#faq">{{nav.faq}}</a></li>
+        <li class="nav-mid"><a href="#faq">{{nav.faq}}</a></li>
+        <li><a href="{{base}}{{nav.docs_href}}">{{nav.docs}}</a></li>
       </ul>
     </nav>
     <div class="header-actions">
@@ -344,6 +345,7 @@
       <ul>
         <li><a href="{{repo}}">{{footer.link_github}}</a></li>
         <li><a href="{{releases}}">{{footer.link_releases}}</a></li>
+        <li><a href="{{base}}{{nav.docs_href}}">{{nav.docs}}</a></li>
         <li><a href="{{repo}}/issues">{{footer.link_issues}}</a></li>
         <li><a href="{{discord}}">{{footer.link_discord}}</a></li>
         <li><a href="{{license_url}}">{{footer.link_license}}</a></li>{{#each langs_other}}

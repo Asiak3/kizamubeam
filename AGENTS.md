@@ -28,6 +28,7 @@ These instructions apply to AI coding agents working in this repository. Read [C
 | `vm/src/`, `vm/src-tauri/`, `vm/src-tauri/core/` | Separate Virtual Machine UI, native app and controller engine |
 | `scripts/` | Focused regression and feature tests |
 | `docs/` | Developer and user documentation |
+| `manual/` | User manual (Docusaurus, published under `/kizamubeam/docs/`) |
 
 Consult the current source and `package.json` rather than assuming this map or a command list is exhaustive.
 

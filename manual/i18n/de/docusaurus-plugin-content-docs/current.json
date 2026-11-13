@@ -1,0 +1,22 @@
+{
+  "version.label": {
+    "message": "2.x",
+    "description": "The label for version current"
+  },
+  "sidebar.manual.category.Getting started": {
+    "message": "Erste Schritte",
+    "description": "The label for category 'Getting started' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Getting started.link.generated-index.description": {
+    "message": "KizamuBeam installieren, sich zurechtfinden und das erste Stück lasern.",
+    "description": "The generated-index page description for category 'Getting started' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Reference and support": {
+    "message": "Referenz und Hilfe",
+    "description": "The label for category 'Reference and support' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Reference and support.link.generated-index.description": {
+    "message": "Tastenkürzel, Dateiformate, unterstützte Maschinen und Hilfe bei häufigen Problemen.",
+    "description": "The generated-index page description for category 'Reference and support' in sidebar 'manual'"
+  }
+}

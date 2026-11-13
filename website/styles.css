@@ -161,6 +161,7 @@ main:focus { outline: none; }
 .main-nav a:hover { color: var(--text); background: var(--surface-2); }
 .main-nav a { white-space: nowrap; }
 @media (max-width: 1099px) { .main-nav .nav-wide { display: none; } }
+@media (max-width: 979px) { .main-nav .nav-mid { display: none; } }
 .header-actions { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
 .lang-switch {
   display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 12px;
