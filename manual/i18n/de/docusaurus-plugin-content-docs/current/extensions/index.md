@@ -29,7 +29,13 @@ Ein Paket enthält nur Daten, nie Programmcode. KizamuBeam prüft jeden Eintrag 
 
 ## Offizielle Erweiterungen und Erweiterungen von Dritten
 
-Der offizielle Katalog wird zusammen mit diesem Handbuch und der Website veröffentlicht. Eine Liste offizieller und geprüfter Erweiterungen von Dritten, mit Angaben zur Kompatibilität, folgt hier.
+Der offizielle Katalog wird zusammen mit diesem Handbuch und der Website veröffentlicht, und **Datei → Erweiterungen …** zeigt immer seinen aktuellen Stand. Er enthält diese Pakete:
+
+| Paket | Inhalt | Braucht |
+|---|---|---|
+| **Beispielpaket** (`org.kizamubeam.example`) | Von jeder Inhaltsart ein Eintrag: eine Gerätevorlage (GRBL-Laser 300 × 200), zwei Materialeinträge (Schneiden und Gravieren für Pappelsperrholz), eine Vorlage (runder Untersetzer mit einer Textzeile) und drei Bibliothekselemente (Herz, Doppelrahmen, Stern). Die Werte sind Beispiele, keine gemessenen Einstellungen. | KizamuBeam 1.2.1 oder neuer |
+
+Das Beispielpaket ist als Ausgangspunkt für eigene Pakete gedacht. Pakete anderer Macher stehen hier, sobald sie geprüft und in den Katalog aufgenommen sind. Bis dahin installierst du Pakete von Dritten nur aus Quellen, denen du vertraust: KizamuBeam prüft ihren Inhalt, kann aber nicht beurteilen, ob die Einstellungen zu deiner Maschine passen.
 
 ## Ein eigenes Paket bauen
 

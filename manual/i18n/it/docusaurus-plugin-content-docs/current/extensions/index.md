@@ -29,7 +29,13 @@ Un pacchetto contiene solo dati, mai codice. KizamuBeam controlla ogni voce prim
 
 ## Estensioni ufficiali e di terze parti
 
-Il catalogo ufficiale viene pubblicato insieme a questo manuale e al sito web. Qui seguirà un elenco delle estensioni ufficiali e di quelle di terze parti verificate, con informazioni sulla compatibilità.
+Il catalogo ufficiale viene pubblicato insieme a questo manuale e al sito web, e **File → Estensioni …** ne mostra sempre lo stato attuale. Contiene questi pacchetti:
+
+| Pacchetto | Contenuto | Richiede |
+|---|---|---|
+| **Example pack** (`org.kizamubeam.example`) | Un elemento per ogni tipo di contenuto: un profilo dispositivo (laser GRBL 300 × 200), due voci di materiale (taglio e incisione per compensato di pioppo), un modello (sottobicchiere rotondo con una riga di testo) e tre elementi della libreria (cuore, doppia cornice, stella). I valori sono esempi, non impostazioni misurate. | KizamuBeam 1.2.1 o successivo |
+
+Il pacchetto di esempio è pensato come punto di partenza per i tuoi pacchetti. I pacchetti di altri autori compaiono qui quando sono stati verificati e aggiunti al catalogo. Fino ad allora installa pacchetti di terze parti solo da fonti di cui ti fidi: KizamuBeam ne controlla il contenuto, ma non può sapere se le impostazioni sono adatte alla tua macchina.
 
 ## Creare un pacchetto
 

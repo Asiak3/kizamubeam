@@ -1,49 +1,50 @@
 ---
-sidebar_position: 3
 title: Funktionen und Werkzeuge
-description: Überblick über das, was KizamuBeam kann, vom Zeichnen bis zur Maschinensteuerung.
+description: Überblick über das, was KizamuBeam kann, vom Zeichnen bis zur Maschinensteuerung, mit einer Seite pro Thema.
 ---
 
 # Funktionen und Werkzeuge
 
-Dieses Kapitel bekommt eine Seite pro Thema. Bis diese Seiten geschrieben sind, fasst jeder Abschnitt unten das Thema zusammen und verweist auf den passenden Teil der [vollständigen Funktionsliste](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md), die jede Funktion mit ihrem Menüpfad beschreibt.
+Dieses Kapitel beschreibt jeden Teil von KizamuBeam, eine Seite pro Thema. Bist du neu, beginne mit [Dein erstes Projekt](../getting-started/first-project.md) und komm hierher zurück, wenn du Einzelheiten brauchst.
 
-## Zeichnen und Bearbeiten
+## Entwerfen
 
-Linien und Bézierkurven, Rechtecke mit Eckenradius, Ellipsen, Polygone, Sterne und Text in jeder Schrift. Formen mit booleschen Operationen kombinieren, versetzen, Knoten bearbeiten (auch über mehrere Objekte), Pfade vereinfachen und glätten, Text auf einen Pfad legen und Ecken runden. Fangen, Hilfslinien, Beziehungen wie konzentrisch oder parallel und Skizzen mit Bemaßung halten Entwürfe exakt.
-→ [Zeichnen und Bearbeiten](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#zeichnen-und-bearbeiten), [Text, Formen und Pfade](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#text-formen-und-pfade)
+| Seite | Inhalt |
+|---|---|
+| [Zeichnen und bearbeiten](drawing.md) | Zeichenwerkzeuge, Auswählen, Transformieren, Gruppieren, Knoten bearbeiten, Rückgängig |
+| [Pfade und Formen](paths.md) | Boolesche Operationen, Offset, Verformen, Pfadwerkzeuge, Ecken runden, Vereinfachen |
+| [Fangen, Hilfslinien und Messen](precision.md) | Fangen, Raster, Hilfslinien, Messen, Beziehungen, Skizzen mit Bemaßung |
+| [Text und Codes](text.md) | Text, Schriften, Text auf Pfad, variabler Text, QR-Codes und Strichcodes |
+| [Anordnen und vervielfältigen](arranging.md) | Ausrichten, Arrays, Verschachteln, Muster füllen |
+| [Verbindungen, Scharniere und 3D-Ansicht](construction-3d.md) | Fingerzinken und andere Verbindungen, Scharniere, Schlitze, 3D-Ansicht, Konstruktionsprüfung |
 
-## Layer und Objekte
+## Ordnen und vorbereiten
 
-Die Farbe eines Objekts ist sein Layer, und der Layer enthält alle Lasereinstellungen: Modus, Geschwindigkeit, Leistung, Durchgänge, Füllung, Schnittbreitenausgleich, Haltestege und mehr. Das Fenster Objekte zeigt alle Objekte je Layer, mit Sichtbarkeit, Sperre und „nicht lasern“. Projekte können mehrere Seiten haben.
-→ [Layer, Material und Tests](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#layer-material-und-tests), [Projekte und Seiten](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#projekte-und-seiten)
+| Seite | Inhalt |
+|---|---|
+| [Layer und Schnitteinstellungen](layers.md) | Layer, Linie und Füllen, alle Schnitteinstellungen, Sub-Layer |
+| [Objekte, Seiten und Projekte](objects-pages.md) | Fenster Objekte, Seiten, Projekt-Tabs, Speichern, Verlauf |
+| [Bilder und Nachzeichnen](images.md) | Bildmodi, Anpassen, Hintergrund entfernen, Nachzeichnen |
+| [Import und Export](import-export.md) | Dateiformate hinein und hinaus |
+| [Materialien und Tests](materials-tests.md) | Material-Bibliothek, Materialtest, Fokustest, Passungs-Kalibrierung, Notizen |
+| [Vorlagen, Bibliothek und Erweiterungen](templates-library.md) | Parameter, Vorlagen, Serie aus Tabelle, Werkzeugkasten, Bibliothek, Erweiterungen |
 
-## Import und Export
+## Lasern
 
-SVG-, DXF-, PDF- und Illustrator-Dateien, LightBurn-Projekte (`.lbrn2`) und alle gängigen Bildformate öffnen. Fotos bekommen Rasterung und andere Bildmodi, Hintergrund entfernen, Zuschneiden und Masken, und lassen sich in Vektoren nachzeichnen. Export als SVG, DXF, PDF, Illustrator und G-Code. Siehe auch [Dateiformate](../reference/file-formats.md).
-→ [Import, Bilder und Nachzeichnen](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#import-bilder-und-nachzeichnen)
+| Seite | Inhalt |
+|---|---|
+| [Jobs ausführen und Maschine steuern](machine-control.md) | Vorschau, Rahmen, Start, Startposition, Nachsteuern beim Lasern, Geräte |
+| [Drehachse](rotary.md) | Becher, Gläser und andere runde Gegenstände gravieren |
+| [Kamera](camera.md) | Kamerabild, Kalibrierung, Kopfkamera, Entwürfe auf Werkstücke legen |
+| [Print and Cut und Jigs](print-and-cut.md) | Gedruckte Bögen ausschneiden, Halteplatten für Serien |
+| [Fernsteuerung](remote-control.md) | Einen Laser an einem anderen Rechner nutzen |
+| [Virtuelle Maschine](virtual-machine.md) | Ein simulierter Laser zum Ausprobieren ohne Hardware |
 
-## Verschachteln
+## KizamuBeam anpassen
 
-**Anordnen → Verschachteln …** ordnet Teile nach ihren echten Umrissen an und spart Material, auf dem Arbeitsbereich, auf einer Materialgröße oder in einem Reststück. Kleine Teile können in Löcher großer Teile wandern.
-→ [Zeichnen und Bearbeiten](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#zeichnen-und-bearbeiten)
+| Seite | Inhalt |
+|---|---|
+| [Anpassen und Einstellungen](customizing.md) | Fenster, Leisten, Sprache, Design, Einstellungen übertragen und synchronisieren |
+| [KI-Agenten (MCP)](ai-agents.md) | Einen KI-Assistenten an deinem Entwurf arbeiten lassen |
 
-## 3D-Ansicht und Konstruktion
-
-**Fenster → 3D-Ansicht** zeigt Boxen, Schubladen, Regale und Zahnradpaare zusammengebaut, mit Material und Gravuren, und markiert Teile, die sich überschneiden. Verbindungen, Schlitze und Biegeschnitte lassen sich an jede Form anbringen, und aus 3D-Modellen (STL/OBJ) werden Schicht-, Rippen- oder Scheibenmodelle. Siehe auch [Generatoren](../generators/index.md).
-→ [Verbindungen, Generatoren und 3D](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#verbindungen-generatoren-und-3d)
-
-## Material und Maschinenprofile
-
-Die Materialbibliothek speichert bewährte Einstellungen je Material und Stärke. Materialtest, Fokustest und Passungskalibrierung helfen, sie zu finden. Jeder Laser ist ein Gerät mit eigenem Arbeitsbereich, eigener Verbindung und eigenen Einstellungen, angelegt aus Vorlagen für verbreitete Laser.
-→ [Layer, Material und Tests](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#layer-material-und-tests), [Laser und Maschine](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#laser-und-maschine)
-
-## G-Code und Maschinensteuerung
-
-Per USB oder WLAN verbinden, Rahmen fahren, starten, pausieren und Leistung und Geschwindigkeit während des Laserns anpassen, ab jeder Stelle des Jobs starten. Vor jedem Job prüft KizamuBeam, ob er aufs Bett passt. Drehachsen, motorisierte Z-Achse und Air Assist werden unterstützt. Siehe [Laser verbinden](../getting-started/connect-laser.md).
-→ [Laser und Maschine](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#laser-und-maschine)
-
-## Virtuelle Maschine
-
-Die KizamuBeam Virtual Machine ist ein eigenes Programm, das sich wie ein FluidNC- oder GRBL-Laser verhält. Sie zeigt den Job in 3D, brennt ihn in virtuelles Material und hat eine virtuelle Kamera, sodass du Jobs, Kamerafunktionen und Print and Cut ohne Hardware ausprobieren kannst.
-→ [Laser und Maschine](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md#laser-und-maschine)
+Die parametrischen Teile wie Zahnräder, Boxen und 3D-Modelle haben ein eigenes Kapitel: [Generatoren](../generators/index.md).

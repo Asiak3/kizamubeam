@@ -51,7 +51,7 @@ Su macOS usa **⌘ Cmd** ovunque sia scritto **Ctrl**. Nell’app, **F1** (Aiuto
 | C, E | Allinea i centri in orizzontale, in verticale |
 | Alt++ / Alt+- / Alt+* | Unione / differenza / intersezione |
 | Alt+J | Unisci percorsi |
-| Alt+B | Separa in parti |
+| Alt+B | Separa |
 | Ctrl+Maiusc+C | Converti in percorso |
 | Ctrl+Maiusc+A | Array a griglia |
 

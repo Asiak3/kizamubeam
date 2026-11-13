@@ -18,5 +18,17 @@
   "sidebar.manual.category.Reference and support.link.generated-index.description": {
     "message": "Scorciatoie da tastiera, formati di file, macchine supportate e aiuto per i problemi più comuni.",
     "description": "The generated-index page description for category 'Reference and support' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Features and tools": {
+    "message": "Funzioni e strumenti",
+    "description": "The label for category 'Features and tools' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Generators": {
+    "message": "Generatori",
+    "description": "The label for category 'Generators' in sidebar 'manual'"
+  },
+  "sidebar.manual.category.Tutorials": {
+    "message": "Tutorial",
+    "description": "The label for category 'Tutorials' in sidebar 'manual'"
   }
 }

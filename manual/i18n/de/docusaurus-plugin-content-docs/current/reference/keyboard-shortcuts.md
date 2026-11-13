@@ -51,7 +51,7 @@ Auf dem Mac nimmst du **⌘ Cmd** überall dort, wo **Ctrl** steht. In der App z
 | C, E | Mitten waagerecht, senkrecht ausrichten |
 | Alt++ / Alt+- / Alt+* | Vereinen / Abziehen / Schnittmenge |
 | Alt+J | Pfade verbinden |
-| Alt+B | Aufbrechen |
+| Alt+B | Zerlegen |
 | Ctrl+Shift+C | In Pfad umwandeln |
 | Ctrl+Shift+A | Rasterarray |
 

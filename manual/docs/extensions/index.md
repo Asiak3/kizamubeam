@@ -29,7 +29,13 @@ A pack contains data only, never program code. KizamuBeam checks every entry bef
 
 ## Official and third-party extensions
 
-The official catalogue is published together with this manual and the website. A list of official and verified third-party extensions, with compatibility information, will follow here.
+The official catalogue is published together with this manual and the website, and **File → Extensions …** always shows its current state. It contains these packs:
+
+| Pack | Contents | Needs |
+|---|---|---|
+| **Example pack** (`org.kizamubeam.example`) | One of each kind of content: a device preset (GRBL laser 300 × 200), two material entries (cut and engrave for poplar plywood), a template (round coaster with a line of text) and three library items (heart, double frame, star). The values are examples, not measured settings. | KizamuBeam 1.2.1 or newer |
+
+The example pack is meant as a starting point for your own packs. Packs from other makers are listed here once they have been checked and added to the catalogue. Until then, install third-party packs only from sources you trust: KizamuBeam checks their content, but cannot tell whether settings suit your machine.
 
 ## Making your own pack
 
