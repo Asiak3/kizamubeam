@@ -804,16 +804,7 @@ function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
       pending[j]++;
     }
   }
-  // Für jede Form: wie viele noch ungeschnittene Formen liegen in ihr?
-  const pending = new Int32Array(n);
-  const containers: number[][] = polys.map(() => []);
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      if (!containsStrict(polys, boxes, i, j)) continue;
-      containers[i].push(j);
-      pending[j]++;
-    }
-  }
+  
   const done = new Uint8Array(n);
   const out: Poly[] = [];
   let cur = from;
