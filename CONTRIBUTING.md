@@ -84,6 +84,17 @@ Changes to G-code, streaming, homing, limits, laser power, emergency handling, f
 
 The person submitting the PR remains responsible for reviewing the changes, understanding their intended behavior, checking licensing and attribution, and reporting which tests were *actually* run. Automated AI reviews and AI-generated test reports are not a substitute for human review. Please do not add generated code that you cannot explain or maintain.
 
+## Squash merging and dependent pull requests
+
+Pull requests are merged with **squash merge only**: each PR becomes one commit on `main`, and the PR title becomes its commit message. Keep the title a plain description of the change, without ordering hints such as `[1/2]` or `Part A`.
+
+A PR is always accepted or declined as a whole, so put independent changes into separate PRs. If one PR builds on another:
+
+- Start the description with `Depends on #123 — merge after it.` GitHub links both PRs.
+- Open it as a **draft** until the PR it depends on is merged.
+- After that merge, rebase onto `main` (for example `git rebase --onto main <old-base-branch>`), because the squashed commits of the first PR are not in `main` under their original hashes. Then mark the PR as ready for review.
+- Prefer opening dependent PRs one after another rather than all at once.
+
 ## Pull request checklist
 
 The [pull request template](.github/pull_request_template.md) contains this checklist plus project-specific points (translations, feature docs, website, test fixtures). Before submitting a PR, please check that:
