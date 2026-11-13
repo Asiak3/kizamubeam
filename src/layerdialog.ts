@@ -100,7 +100,7 @@ export function openLayerDialog(ed: Editor, i: number) {
       ...row(t('Max. Leistung (%)'), num(() => e.power, (v) => (e.power = v), 0, 100)),
       ...row(t('Min. Leistung (%)'), num(() => e.minPower, (v) => (e.minPower = v), 0, 100, false, t('Leistung in Ecken (Leistungsrampe) und bei Bildern in Graustufen'))),
       ...row(t('Durchgänge'), num(() => e.passes, (v) => (e.passes = v), 1, 100, true)),
-      ...(!vecs ? [] : row(t('Kerf-Versatz (mm)'), num(() => e.kerf, (v) => (e.kerf = v), -5, 5, false, t('Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden.')))),
+      ...(!vecs ? [] : row(t('Kerf-Versatz (mm)'), num(() => e.kerf, (v) => (e.kerf = v), -5, 5, false, t('Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).')))),
       ...(row(t('Z-Versatz (mm)'), num(() => e.zOffset, (v) => (e.zOffset = v), -50, 50, false, t('Fokus beim ersten Durchgang verschieben, positiv = tiefer ins Material. Braucht eine Z-Achse (Geräteeinstellungen); bezogen auf die Höhe beim Start.')))),
       ...(row(t('Je Durchgang tiefer (mm)'), num(() => e.zStep, (v) => (e.zStep = v), -20, 20, false, t('Fokus nach jedem Durchgang um diesen Wert tiefer setzen, z. B. bei dickem Material. Am Ende fährt Z zurück.')))),
       sub

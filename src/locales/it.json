@@ -879,7 +879,6 @@
   "Min. Leistung (%)": "Potenza min (%)",
   "Durchgänge": "Passaggi",
   "Kerf-Versatz (mm)": "Offset kerf (mm)",
-  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden.": "Positivo: i contorni esterni si spostano verso l'esterno, i fori verso l'interno. Inserisci circa metà della larghezza di taglio affinché le parti risultino delle dimensioni corrette.",
   "Ausgabe": "uscita",
   "Layer beim Lasern ausgeben": "Livello di uscita durante l'incisione",
   "Haltestege (Tabs) setzen": "Aggiungi linguette",
@@ -4618,5 +4617,15 @@
   "Herkunft": "Origine",
   "Ziel": "Destinazione",
   "Nur die Objekte auf dem Layer der Gruppe kommen auf {layer}. Die anderen bleiben, z. B. die Gravur.": "Solo gli oggetti sul livello del gruppo passano a {layer}. Gli altri restano, ad es. l’incisione.",
-  "Alle Objekte der Gruppe kommen auf {layer}.": "Tutti gli oggetti del gruppo passano a {layer}."
+  "Alle Objekte der Gruppe kommen auf {layer}.": "Tutti gli oggetti del gruppo passano a {layer}.",
+  "Kerf-Vertrag: {n} offene Kontur läuft ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).": "Contratto del kerf: {n} contorno aperto senza compensazione del kerf (solo le forme chiuse vengono compensate).",
+  "Kerf-Vertrag: {n} offene Konturen laufen ohne Kerf-Ausgleich (nur geschlossene Formen werden versetzt).": "Contratto del kerf: {n} contorni aperti senza compensazione del kerf (solo le forme chiuse vengono compensate).",
+  "Kerf-Vertrag: {n} degenerierte Kontur (< 3 Punkte) entfallen.": "Contratto del kerf: {n} contorno degenere (< 3 punti) scartato.",
+  "Kerf-Vertrag: {n} degenerierte Konturen (< 3 Punkte) entfallen.": "Contratto del kerf: {n} contorni degeneri (< 3 punti) scartati.",
+  "Kerf-Vertrag: {n} Kontur vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).": "Contratto del kerf: {n} contorno dissolto dalla compensazione (p. es. foro più piccolo del kerf).",
+  "Kerf-Vertrag: {n} Konturen vom Versatz aufgelöst (z. B. Loch kleiner als der Kerf).": "Contratto del kerf: {n} contorni dissolti dalla compensazione (p. es. foro più piccolo del kerf).",
+  "Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.": "Contratto del kerf: {n} contorno a contatto unito tramite unione.",
+  "Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.": "Contratto del kerf: {n} contorni a contatto uniti tramite unione.",
+  "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Contratto del kerf: nel riempimento il kerf agisce sull’involucro prima del tratteggio.",
+  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: i contorni esterni si spostano verso l’esterno, i fori verso l’interno. Inserisci circa metà della larghezza di taglio così i pezzi mantengono la misura. Solo contorni chiusi (kerf → ponticelli → perforazione; il riempimento compensa l’involucro, immagini senza kerf)."
 }

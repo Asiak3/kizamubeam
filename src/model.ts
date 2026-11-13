@@ -445,7 +445,7 @@ export interface CutSettings {
   passes: number;
   /** Air Assist während dieses Layers einschalten (M8/M7, aus mit M9) */
   air: boolean;
-  /** Kerf-Versatz in mm: positiv = Außenkonturen nach außen, Löcher nach innen */
+  /** Kerf-Versatz in mm: positiv = Außenkonturen nach außen, Löcher nach innen. Vertrag (#220): nur geschlossene Konturen mit >= 3 Punkten; offen läuft ohne Kerf durch, degeneriert/vom Versatz aufgelöst entfällt, berührend wird per Union zusammengefasst. Reihenfolge Kerf → Tabs → Perforation; Fill kerft die Hülle vor der Schraffur, Bilder ignorieren Kerf. */
   kerf: number;
   /** Nur Linie: Haltestege */
   tabs: TabSettings;
