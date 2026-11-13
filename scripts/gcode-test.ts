@@ -1,7 +1,7 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode } from '../src/gcode';
+import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
 import { dedupPolys } from '../src/dedup';
@@ -468,6 +468,39 @@ await test('Anschnitt außen bei Außenkonturen, innen bei Löchern', async () =
   assert.ok(hole, `Loch: ${starts}`);
   // Länge: 160 + 80 Konturen + 4 × 2 mm Anschnitt/Auslauf
   assert.ok(Math.abs(lengths(mv).on - 248) < 1e-6, `${lengths(mv).on}`);
+});
+
+await test('Canvas lead overlay (#150) matches the job: same start points and lengths, also with kerf and tabs', async () => {
+  const frame: Obj = {
+    id: 1, m: [1, 0, 0, 1, 0, 0], layer: 1,
+    shape: { kind: 'path', subs: [
+      { closed: true, nodes: [{ x: 100, y: 100 }, { x: 140, y: 100 }, { x: 140, y: 140 }, { x: 100, y: 140 }] },
+      { closed: true, nodes: [{ x: 110, y: 110 }, { x: 130, y: 110 }, { x: 130, y: 130 }, { x: 110, y: 130 }] },
+    ] },
+  };
+  for (const patch of [
+    { lead: { leadIn: true, leadOut: true, length: 2, angle: 90, arc: false, overcut: 0 } },
+    { lead: { leadIn: true, leadOut: true, length: 3, angle: 60, arc: true, overcut: 1 }, kerf: 0.1 },
+    { lead: { leadIn: true, leadOut: false, length: 2, angle: 45, arc: false, overcut: 0 }, tabs: { enabled: true, size: 1, spacing: 20, count: 4, useCount: false, skipInner: false } },
+  ] as Partial<Layer>[]) {
+    const job = await cutJob([frame], patch);
+    const L = normalizeLayer({ ...defaultLayer(1), mode: 'line' as const, ...patch });
+    const own = frame.shape.kind === 'path' ? frame.shape.subs.map((sp) => flattenSub(sp, frame.m)) : [];
+    const marks = leadMarks([own], L, 400);
+    const mv = job.moves;
+    const starts: [number, number][] = [];
+    for (let i = 0; i < mv.n; i++) if (mv.f[i] === 0) starts.push([mv.x[i], mv.y[i]]);
+    const ins = marks.filter((m) => !m.out);
+    assert.equal(ins.length, starts.length, JSON.stringify(patch));
+    // world y down, bed y up (400 − y)
+    for (const m of ins) assert.ok(starts.some(([x, y]) => Math.hypot(x - m.pts[0].x, y - (400 - m.pts[0].y)) < 1e-6), `${JSON.stringify(m.pts[0])} not in ${JSON.stringify(starts)}`);
+    assert.equal(marks.filter((m) => m.out).length, L.lead.leadOut ? 2 : 0);
+    const len = (pts: { x: number; y: number }[]) => pts.slice(1).reduce((a, q, i) => a + Math.hypot(q.x - pts[i].x, q.y - pts[i].y), 0);
+    for (const m of marks) assert.ok(len(m.pts) > L.lead.length * 0.99 && len(m.pts) <= L.lead.length + 1e-9, `length ${len(m.pts)}`);
+  }
+  // no lead, fill mode or open contours: nothing to draw
+  assert.equal(leadMarks([[flattenSub({ closed: false, nodes: [{ x: 0, y: 0 }, { x: 10, y: 0 }] }, [1, 0, 0, 1, 0, 0])]], normalizeLayer({ ...defaultLayer(1), mode: 'line', lead: { leadIn: true, leadOut: true, length: 2, angle: 90, arc: false, overcut: 0 } }), 400).length, 0);
+  assert.equal(leadMarks([[flattenSub(frame.shape.kind === 'path' ? frame.shape.subs[0] : (null as never), frame.m)]], normalizeLayer({ ...defaultLayer(1), mode: 'fill' }), 400).length, 0);
 });
 
 await test('Anschnitt als Bogen hat die eingestellte Länge', async () => {

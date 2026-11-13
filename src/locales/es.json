@@ -4512,5 +4512,16 @@
   "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Contrato del kerf: en el relleno, el kerf actúa sobre la geometría del contorno antes del sombreado.",
   "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: los contornos exteriores se desplazan hacia fuera, los agujeros hacia dentro. Indica aprox. la mitad del ancho de corte para que las piezas mantengan su medida. Solo contornos cerrados (kerf → puentes → perforación; el relleno compensa el contorno, imágenes sin kerf).",
   "Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Orden manual: {n} forma interior se corta después de su forma exterior (se vulnera interior-primero) — active «Primero las formas interiores» o cambie el orden en el panel de objetos.",
-  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Orden manual: {n} formas interiores se cortan después de su forma exterior (se vulnera interior-primero) — active «Primero las formas interiores» o cambie el orden en el panel de objetos."
+  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.": "Orden manual: {n} formas interiores se cortan después de su forma exterior (se vulnera interior-primero) — active «Primero las formas interiores» o cambie el orden en el panel de objetos.",
+  "Startpunkt gesetzt": "Punto de inicio fijado",
+  "Startpunkt wählt die Optimierung": "El punto de inicio lo elige la optimización",
+  "kein Linien-Layer, kein Anschnitt": "no es una capa de línea, sin entrada",
+  "offene Kontur, kein Anschnitt": "contorno abierto, sin entrada",
+  "Anschnitt und Auslauf": "Entrada y salida",
+  "Auslauf": "Salida",
+  "kein Anschnitt": "sin entrada",
+  "{which} {len} mm, {kind} {angle}°": "{which} {len} mm, {kind} {angle}°",
+  "Überschnitt {v} mm": "Sobrecorte {v} mm",
+  "Kerf {v} mm": "Kerf {v} mm",
+  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Clic: empezar aquí, Mayús: invertir, Ctrl: restablecer"
 }

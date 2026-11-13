@@ -6,6 +6,7 @@ import { defaultVarText, setVarTextSource } from './vartext';
 import { setParamSource } from './params';
 import type { Issue } from './generators';
 import type { CheckIssue } from './check';
+import type { LeadMark } from './gcode';
 import { onImageReady } from './images';
 import { BoolBase } from './ops';
 import { onFontLoaded } from './fonts';
@@ -106,6 +107,10 @@ export class Editor {
   onSketchValue: ((title: string, current: number, unit: string, expr?: string) => Promise<{ v: number; expr?: string } | null>) | null = null;
   snapCache: { ver: number; set: SnapSet } | null = null;
   snapVer = 0;
+  /** Counts document changes only ('doc' events); caches that hover hints must not invalidate key on it */
+  docVer = 0;
+  /** Lead-ins/outs shown by the start point tool, rebuilt when the document changes */
+  leadCache: { ver: number; marks: LeadMark[] } | null = null;
   currentLayer = 0;
   activeLayer: number | null = null;
   polySides = 6;
@@ -330,6 +335,7 @@ export class Editor {
     this.updateInteraction(what);
     this.dirty = true;
     if (what !== 'view') this.snapVer++;
+    if (what === 'doc') this.docVer++;
     if (what === 'doc') this.syncTextLinks();
     this.listeners.forEach((f) => f(what));
     if (what === 'doc') this.scheduleSave();
