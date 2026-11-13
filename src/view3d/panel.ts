@@ -18,6 +18,7 @@ import { genLabel } from '../generators';
 import { asmSolids, findOverlaps, Overlap, Solid, solidBounds } from './solids';
 import { flatPose, genThickness } from './poses';
 import { assembleMates, MatePart } from './mates';
+import { Placement, spreadApart } from './spread';
 import { BURN, CanvasPlace, engravings, memberPlace } from './engrave';
 import { cleanLook, DEFAULT_LOOK, layerLook, LookPreset, MaterialLook, resolveLook } from './looks';
 import { lookEditor } from './lookui';
@@ -72,6 +73,7 @@ function collectMultiLayers(ed: Editor, selected: Obj[] | null, fallback: Materi
   const solids: ViewSolid[] = [];
   const ids: string[] = [];
   const used = new Set<number>();
+  const items: Placement[] = [];
   let count = 0;
   for (const a of ed.doc.multiLayerAssemblies ?? []) {
     if (wanted && !a.plates.some((p) => wanted.has(p.object))) continue;
@@ -79,6 +81,7 @@ function collectMultiLayers(ed: Editor, selected: Obj[] | null, fallback: Materi
     if (!live.length) continue;
     if (!wanted && live.every((x) => x.root.o.hidden)) continue;
     count++;
+    const first = solids.length;
     let z = 0;
     for (let pi = 0; pi < live.length; pi++) {
       const { p, root } = live[pi];
@@ -103,8 +106,9 @@ function collectMultiLayers(ed: Editor, selected: Obj[] | null, fallback: Materi
       z += p.thickness;
     }
     ids.push(`ml:${a.id}`);
+    items.push({ parts: solids.slice(first), order: Math.min(...live.map((x) => x.p.object)) });
   }
-  return { solids, ids, used, count };
+  return { solids, ids, used, count, items };
 }
 
 /** Teile für die Ansicht sammeln; liefert auch einen Schlüssel, der sich nur ändert, wenn andere Objekte gezeigt werden */
@@ -142,6 +146,9 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     ids.push(...g.map((x) => x.key));
   }
   asms += mated.groups.length;
+  /** Blöcke der Ansicht, die sich nicht überdecken dürfen (siehe spreadApart) */
+  const items: Placement[] = [...multi.items];
+  mated.groups.forEach((g, i) => items.push({ parts: g, order: mated.orders[i] }));
   for (const [o, m] of all) {
     if (mated.used.has(o.id)) continue;
     const s = o.shape;
@@ -158,14 +165,18 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
       asmDone.add(s.asm);
       asms++;
       placeAssembly(parts, members.map((x) => x.o).filter((x) => onPage(ed, x)));
+      const placed: ViewSolid[] = [];
       for (const p of parts) {
         const key = `${s.asm}:${p.key}`;
         const mem = members.find((x) => ((x.o.shape as GenShape).part ?? 'main') === p.key);
-        solids.push({ ...p, key, group: s.asm, layer: (mem ?? members[0])?.o.layer ?? o.layer });
+        const vs = { ...p, key, group: s.asm, layer: (mem ?? members[0])?.o.layer ?? o.layer };
+        solids.push(vs);
+        placed.push(vs);
         const pl = mem && memberPlace(ed, mem.o);
         if (pl) places.set(key, pl);
       }
       ids.push(s.asm);
+      items.push({ parts: placed, order: Math.min(...members.map((x) => x.o.id)) });
     } else if (s.kind === 'gen') flat(o, m, genThickness(s.params, th));
     else flat(o, m, th);
   }
@@ -182,6 +193,8 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
       solids.push({ key: `f${n}`, label: named?.label ?? t('Teil {n}', { n }), polys, pose: flatPose(), th: thick, group: `f${n}`, layer });
       places.set(`f${n}`, { page: ed.doc.page, toLocal: IDENT });
     }
+  // Blöcke, die sich überdecken (z. B. Baugruppen nach dem Verschachteln), nebeneinanderlegen
+  spreadApart(items);
   // Aussehen je Platte aus ihrem Layer
   const looks = new Map<number, LookPreset>();
   for (const s of solids) {
@@ -209,7 +222,7 @@ const inRegion = (paths: Paths, pt: { X: number; Y: number }) => paths.filter((p
  * Über Verbindungen zusammenhängende Teile: Wird eines gezeigt, kommt die ganze Gruppe dazu. Formen, die ganz in
  * einer solchen Platte liegen (Löcher, Schlitze auf einer Hilfslinie), werden zu Löchern der Platte.
  */
-function collectMates(ed: Editor, shown: [Obj, Mat][], th: number, places: Map<string, CanvasPlace>): { groups: ViewSolid[][]; used: Set<number> } {
+function collectMates(ed: Editor, shown: [Obj, Mat][], th: number, places: Map<string, CanvasPlace>): { groups: ViewSolid[][]; orders: number[]; used: Set<number> } {
   // Verbundene Teile auf allen Seiten (z. B. nach dem Verschachteln auf mehrere Platten verteilt)
   const page = new Map<number, [Obj, Mat]>();
   const pageNo = new Map<number, number>();
@@ -228,7 +241,7 @@ function collectMates(ed: Editor, shown: [Obj, Mat][], th: number, places: Map<s
         link(mt.to, o.id);
       }
   const used = new Set<number>();
-  if (!graph.size) return { groups: [], used };
+  if (!graph.size) return { groups: [], orders: [], used };
   const ids = new Set<number>();
   for (const [o] of shown) {
     if (!graph.has(o.id) || ids.has(o.id)) continue;
@@ -241,7 +254,7 @@ function collectMates(ed: Editor, shown: [Obj, Mat][], th: number, places: Map<s
           queue.push(y);
         }
   }
-  if (!ids.size) return { groups: [], used };
+  if (!ids.size) return { groups: [], orders: [], used };
   const regions = new Map<number, Paths>();
   for (const id of ids) {
     const [o, m] = page.get(id)!;
@@ -286,7 +299,9 @@ function collectMates(ed: Editor, shown: [Obj, Mat][], th: number, places: Map<s
       ys = pts.map((q) => q.y);
     placeAt(g, (Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2);
   }
-  return { groups: [...byGroup.values()], used };
+  const groups = [...byGroup.values()];
+  // Reihenfolge nach der kleinsten Objekt-ID der Gruppe (Schlüssel der Teile: „m“ + ID)
+  return { groups, orders: groups.map((g) => Math.min(...g.map((x) => Number(x.key.slice(1))))), used };
 }
 
 /** Ausdehnung von Clipper-Pfaden (µm): [x0, y0, x1, y1] */

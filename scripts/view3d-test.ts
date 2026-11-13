@@ -463,6 +463,120 @@ test('outline: aligned slots give no stray lines (issue #182)', () => {
   assert.equal(outlineSegments([circle], 3).length / 6, 64 * 2);
 });
 
+// ---------- Issue #260: Baugruppen nach dem Verschachteln nicht ineinander ----------
+const { spreadApart, SPREAD_GAP } = await import('../src/view3d/spread');
+const { EditorGenerators } = await import('../src/editor/generators');
+const { buildGen } = await import('../src/generators/index');
+const { defaultLayer } = await import('../src/model');
+const { boundsOf } = await import('../src/geom');
+
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+const footOf = (parts: Solid[]): Rect => {
+  const b = parts.map(solidBounds);
+  return { x0: Math.min(...b.map((x) => x.min[0])), y0: Math.min(...b.map((x) => x.min[1])), x1: Math.max(...b.map((x) => x.max[0])), y1: Math.max(...b.map((x) => x.max[1])) };
+};
+const closer = (a: Rect, b: Rect, gap: number) => a.x0 < b.x1 + gap && b.x0 < a.x1 + gap && a.y0 < b.y1 + gap && b.y0 < a.y1 + gap;
+
+function boxesEditor(n: number) {
+  const ed: any = Object.create(EditorGenerators.prototype);
+  ed.doc = loadDoc({ bed: { w: 3000, h: 3000 }, objs: [], layers: {} });
+  ed.currentLayer = 0; ed.agentCall = true; ed.sel = [];
+  ed.snapshot = () => {}; ed.touch = () => {}; ed.emit = () => {}; ed.setSel = (o: Obj[]) => (ed.sel = o);
+  ed.layer = (i: number) => ed.doc.layers[i] ?? (ed.doc.layers[i] = defaultLayer(i));
+  const gen = getGenerator('box')!;
+  const roots: Obj[][] = [];
+  for (let i = 0; i < n; i++) {
+    const members: Obj[] = ed.addGen(buildGen(gen, defaultParams(gen)), 0, { x: 150 + i * 450, y: 150 });
+    // Jede Box ist eine eigene Baugruppe (die App vergibt beim Einfügen neue Kennungen)
+    for (const o of members) if (o.shape.kind === 'gen') o.shape = { ...o.shape, asm: 'box' + i };
+    roots.push(members);
+  }
+  // Ohne Auswahl zeigt die Ansicht alle Teile der Seite
+  ed.sel = [];
+  return { ed, roots };
+}
+/** Pro Baugruppe: Grundriss ihrer Platten in der 3D-Szene (in der Reihenfolge, in der die Baugruppen vorkommen) */
+function footprints(solidsList: { group?: string; key: string }[]) {
+  const by = new Map<string, Solid[]>();
+  for (const s of solidsList) {
+    const k = s.group ?? s.key;
+    (by.get(k) ?? by.set(k, []).get(k)!).push(s as unknown as Solid);
+  }
+  return [...by.values()].map(footOf);
+}
+
+test('Baugruppen nebeneinander auf der Arbeitsfläche: Lage bleibt unter der Mitte der Teile (unverändert)', () => {
+  const { ed, roots } = boxesEditor(3);
+  const scene = collectScene(ed, 3, false).scene;
+  const f = footprints(scene.solids);
+  assert.equal(f.length, 3);
+  roots.forEach((members, i) => {
+    const c = boundsOf(members)!;
+    const g = f[i];
+    near((g.x0 + g.x1) / 2, c.x + c.w / 2, 1e-6, 'x ' + i);
+    near((g.y0 + g.y1) / 2, -(c.y + c.h / 2), 1e-6, 'y ' + i);
+  });
+  assert.equal(scene.overlaps.length, 0);
+});
+
+test('Baugruppen nach dem Verschachteln (Teile verschränkt): keine Überdeckung zwischen verschiedenen Baugruppen', () => {
+  const { ed, roots } = boxesEditor(3);
+  // Teil k jeder Box in dieselbe Spalte k: alle Baugruppen haben dann fast dieselbe Mitte auf der Arbeitsfläche
+  roots.forEach((members, i) => members.forEach((o, k) => { o.m = [o.m[0], o.m[1], o.m[2], o.m[3], 100 + k * 160 + i * 12, 100 + i * 9]; }));
+  const scene = collectScene(ed, 3, false).scene;
+  const group = new Map(scene.solids.map((s) => [s.key, s.group]));
+  const cross = scene.overlaps.filter((o) => group.get(o.a) !== group.get(o.b));
+  assert.equal(cross.length, 0, cross.map((o) => o.a + '/' + o.b).join(' '));
+  assert.equal(scene.overlaps.length, 0);
+  const f = footprints(scene.solids);
+  assert.equal(f.length, 3);
+  for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) assert.ok(!closer(f[i], f[j], SPREAD_GAP - 1e-6), `Baugruppe ${i} und ${j} zu nah`);
+  // Zweiter Aufruf mit denselben Daten: gleiche Lagen (kein Springen)
+  const again = collectScene(ed, 3, false).scene;
+  assert.deepEqual(again.solids.map((s) => [s.key, s.pose.o]), scene.solids.map((s) => [s.key, s.pose.o]));
+});
+
+test('spreadApart: berührende Blöcke bleiben, überdeckende werden mit Abstand nebeneinandergelegt', () => {
+  const one = () => solids('box', { top: 'closed' });
+  const w = footOf(one()).x1 - footOf(one()).x0;
+  const shift = (parts: Solid[], dx: number) => parts.forEach((p) => (p.pose = { ...p.pose, o: [p.pose.o[0] + dx, p.pose.o[1], p.pose.o[2]] }));
+  const posOf = (...lists: Solid[][]) => JSON.stringify(lists.map((x) => x.map((p) => p.pose.o)));
+  // Genau berührend: nichts bewegt sich
+  const a = one(), b = one();
+  shift(b, w);
+  const before = posOf(a, b);
+  spreadApart([{ parts: a, order: 1 }, { parts: b, order: 2 }]);
+  assert.equal(posOf(a, b), before);
+  // Vier Blöcke an derselben Stelle: danach nirgends mehr Überdeckung, der Abstand stimmt, fast quadratisch
+  const four = [one(), one(), one(), one()];
+  spreadApart(four.map((parts, i) => ({ parts, order: i + 1 })));
+  const fp = four.map(footOf);
+  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) assert.ok(!closer(fp[i], fp[j], SPREAD_GAP - 1e-6), `${i}/${j}`);
+  const all = footOf(four.flat());
+  assert.ok((all.x1 - all.x0) / (all.y1 - all.y0) < 2.5, 'Anordnung zu langgestreckt');
+});
+
+function cutLayer(ed: any) {
+  ed.doc.layers[1] = { ...defaultLayer(1), mode: 'line' };
+}
+const cutRect = (id: number, x: number, y: number, w: number, h: number): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer: 1, shape: { kind: 'rect', w, h, r: 0 } } as Obj);
+
+test('Gezeichnete Form auf einer Wand: Box und Form bleiben wie bisher (Form an ihrer Stelle der Arbeitsfläche)', () => {
+  const { ed, roots } = boxesEditor(1);
+  const alone = collectScene(ed, 3, false).scene;
+  const front = roots[0].find((o) => o.shape.kind === 'gen' && o.shape.part === 'front')!;
+  const b = boundsOf([front])!;
+  cutLayer(ed);
+  ed.doc.objs.push(cutRect(9001, b.x + b.w / 2 - 10, b.y + b.h / 2 - 5, 20, 10));
+  const sc = collectScene(ed, 3, false).scene;
+  assert.deepEqual(sc.solids.filter((s) => !s.key.startsWith('f')).map((s) => [s.key, s.pose.o]), alone.solids.map((s) => [s.key, s.pose.o]), 'Box bleibt stehen');
+  const f = sc.solids.find((s) => s.key.startsWith('f'))!;
+  assert.ok(f, 'Form als eigene Platte');
+  const bb = solidBounds(f);
+  near(bb.min[0], b.x + b.w / 2 - 10, 1e-6, 'x');
+  near(bb.max[1], -(b.y + b.h / 2 - 5), 1e-6, 'y');
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
