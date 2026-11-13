@@ -88,32 +88,34 @@ test('Zuletzt benutzt: vorne, ohne Doppelte, begrenzt', () => {
 const { upgradeBar } = await import('../src/toolbars');
 
 test('Gespeicherte Leisten: Generatoren und Verbindungen wandern in den Werkzeugkasten', () => {
+  // v9 bringt den Laserpunkt hinter „Messen“ (#213)
   const vectorTools = ['tool:pencil', 'vectorfit', 'shape-builder', 'isolate'];
   const v3 = ['tool:select', 'tool:text', 'qr', 'grp:gen', 'apps', '|', 'grp:bool', 'nest', 'tool:joint', 'lidhinge', 'hinge'];
-  assert.deepEqual(upgradeBar('tools', v3, 3), ['tool:select', 'tool:text', 'qr', 'apps', '|', 'grp:bool', 'nest', 'grp:relate', 'tool:measure', ...vectorTools]);
+  assert.deepEqual(upgradeBar('tools', v3, 3), ['tool:select', 'tool:text', 'qr', 'apps', '|', 'grp:bool', 'nest', 'grp:relate', 'tool:measure', 'laserpos', ...vectorTools]);
   // v2 (ohne Werkzeugkasten-Knopf): erst einfügen, dann die Generatoren-Gruppe entfernen
-  assert.deepEqual(upgradeBar('tools', ['qr', 'grp:gen', '|', 'tool:joint', 'lidhinge', 'hinge'], 2), ['qr', 'apps', '|', 'grp:relate', 'tool:measure', ...vectorTools]);
-  assert.deepEqual(upgradeBar('main', ['check', 'preview', 'devsettings', '|', 'group'], 3), ['check', 'preview', '|', 'group', 'camera-overlays']);
+  assert.deepEqual(upgradeBar('tools', ['qr', 'grp:gen', '|', 'tool:joint', 'lidhinge', 'hinge'], 2), ['qr', 'apps', '|', 'grp:relate', 'tool:measure', 'laserpos', ...vectorTools]);
+  // v4 nahm die Geräteeinstellungen heraus, v10 setzt sie vor „Prüfen“ wieder ein (#235)
+  assert.deepEqual(upgradeBar('main', ['check', 'preview', 'devsettings', '|', 'group'], 3), ['devsettings', 'check', 'preview', '|', 'group', 'camera-overlays']);
   // selbst umgestellt: bleibt
   const own = ['grp:gen', 'tool:select', 'apps', 'hinge', 'tool:joint'];
-  assert.deepEqual(upgradeBar('tools', own, 3), [...own, 'grp:relate', 'tool:measure', ...vectorTools]);
+  assert.deepEqual(upgradeBar('tools', own, 3), [...own, 'grp:relate', 'tool:measure', 'laserpos', ...vectorTools]);
   assert.deepEqual(upgradeBar('main', ['devsettings', 'check'], 3), ['devsettings', 'check', 'camera-overlays']);
   // schon aktuell: nichts ändern
-  assert.deepEqual(upgradeBar('tools', ['grp:gen', 'apps'], 6), ['grp:gen', 'apps']);
+  assert.deepEqual(upgradeBar('tools', ['grp:gen', 'apps'], 10), ['grp:gen', 'apps']);
   // v4 → v5: Beziehungen und Messen kommen hinter Verschachteln dazu
-  assert.deepEqual(upgradeBar('tools', ['tool:select', 'nest', 'apps'], 4), ['tool:select', 'nest', 'grp:relate', 'tool:measure', 'apps', ...vectorTools]);
+  assert.deepEqual(upgradeBar('tools', ['tool:select', 'nest', 'apps'], 4), ['tool:select', 'nest', 'grp:relate', 'tool:measure', 'laserpos', 'apps', ...vectorTools]);
 });
 
 test('Vektorwerkzeuge: v5 ergänzt sichtbare Knöpfe ohne Verlust der Benutzerreihenfolge', () => {
   const before = ['tool:select', 'tool:node', '|', 'tool:line', 'custom-action', 'apps'];
   const after = upgradeBar('tools', before, 5);
   assert.deepEqual(before, ['tool:select', 'tool:node', '|', 'tool:line', 'custom-action', 'apps']);
-  assert.deepEqual(after, ['tool:select', 'tool:node', 'vectorfit', 'shape-builder', 'isolate', '|', 'tool:line', 'tool:pencil', 'custom-action', 'apps']);
+  assert.deepEqual(after, ['tool:select', 'tool:node', 'vectorfit', 'shape-builder', 'isolate', '|', 'tool:line', 'tool:pencil', 'custom-action', 'apps', 'laserpos']);
   assert.deepEqual(after.filter(id => before.includes(id)), before);
   assert.deepEqual(upgradeBar('tools', after, 5), after, 'keine doppelten Knöpfe');
   const removed = after.filter(id => id !== 'vectorfit');
   assert.deepEqual(upgradeBar('tools', removed, 6), removed, 'bewusst entfernte v6-Aktion bleibt entfernt');
-  assert.deepEqual(upgradeBar('main', ['save', 'undo'], 5), ['save', 'undo', 'camera-overlays']);
+  assert.deepEqual(upgradeBar('main', ['save', 'undo'], 5), ['save', 'undo', 'camera-overlays', 'devsettings']);
 });
 
 test('Vektorwerkzeuge: eigene Symbole und sichtbare Standardbelegung', () => {
@@ -131,8 +133,10 @@ test('Vektorwerkzeuge: eigene Symbole und sichtbare Standardbelegung', () => {
 test('Standardleisten ohne Generatoren-Gruppe und Verbindungswerkzeuge', () => {
   const m = /initToolbars\(\s*list,\s*\{([\s\S]*?)\n\s*\},/.exec(ui);
   assert.ok(m, 'Standardbelegung in ui.ts nicht gefunden');
-  for (const id of ['grp:gen', 'tool:joint', 'lidhinge', 'hinge', 'devsettings']) assert.ok(!m[1].includes(`'${id}'`), id);
+  for (const id of ['grp:gen', 'tool:joint', 'lidhinge', 'hinge']) assert.ok(!m[1].includes(`'${id}'`), id);
   assert.ok(m[1].includes(`'apps'`));
+  // Geräteeinstellungen haben seit #235 wieder einen eigenen Knopf in der Hauptleiste
+  assert.ok(m[1].includes(`'devsettings'`));
 });
 
 if (failed) {

@@ -61,14 +61,11 @@ const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 3, bar: 'tools', id: 'apps', after: 'grp:gen' },
   { v: 5, bar: 'tools', id: 'grp:relate', after: 'nest' },
   { v: 5, bar: 'tools', id: 'tool:measure', after: 'grp:relate' },
-  { v: 8, bar: 'tools', id: 'vectorfit', after: 'tool:node' },
   { v: 7, bar: 'main', id: 'camera-overlays', after: 'view3d' },
-  { v: 8, bar: 'tools', id: 'isolate', after: 'vectorfit' },
   { v: 6, bar: 'tools', id: 'tool:pencil', after: 'tool:line' },
   { v: 6, bar: 'tools', id: 'vectorfit', after: 'tool:node' },
   { v: 6, bar: 'tools', id: 'shape-builder', after: 'vectorfit' },
   { v: 6, bar: 'tools', id: 'isolate', after: 'shape-builder' },
-  { v: 7, bar: 'main', id: 'camera-overlays', after: 'view3d' },
   { v: 9, bar: 'tools', id: 'laserpos', after: 'tool:measure' },
 ];
 /** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
@@ -85,12 +82,6 @@ export function upgradeBar(bar: BarId, list: string[], raw: number): string[] {
   const out = [...list];
   // Knöpfe, die mit einer späteren Version dazukamen, einmal aufnehmen
   for (const a of ADDED) if (a.bar === bar && !(raw >= a.v) && !out.includes(a.id)) insertAfter(out, a.id, a.after);
-  // v10: Geräteeinstellungen an den Anfang der Prüf/Vorschau-Gruppe (vor „check")
-  if (bar === 'main' && !(raw >= 10) && !out.includes('devsettings')) {
-    const i = out.indexOf('check');
-    if (i >= 0) out.splice(i, 0, 'devsettings');
-    else out.push('devsettings');
-  }
   for (const r of REMOVED) {
     if (r.bar !== bar || raw >= r.v) continue;
     for (let i = 0; i + r.seq.length <= out.length; i++)
@@ -98,6 +89,13 @@ export function upgradeBar(bar: BarId, list: string[], raw: number): string[] {
         out.splice(i, r.seq.length, ...r.keep);
         break;
       }
+  }
+  // v10: Geräteeinstellungen an den Anfang der Prüf/Vorschau-Gruppe (vor „check");
+  // erst nach REMOVED, sonst nähme die v4-Entfernung den Knopf gleich wieder heraus
+  if (bar === 'main' && !(raw >= 10) && !out.includes('devsettings')) {
+    const i = out.indexOf('check');
+    if (i >= 0) out.splice(i, 0, 'devsettings');
+    else out.push('devsettings');
   }
   return out;
 }
