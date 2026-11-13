@@ -4083,6 +4083,8 @@
   "{n} Objekt wird wieder gelasert.": "{n} object will be lasered again.",
   "{n} Objekte werden wieder gelasert.": "{n} objects will be lasered again.",
   "{n} Objekt liegt ganz außerhalb des Arbeitsbereichs (geparkt) und wird nicht gelasert.": "{n} object lies completely outside the work area (parked) and is not lasered.",
+  "{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).": "{n} hidden object takes part in the job (output enabled).",
+  "{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).": "{n} hidden objects take part in the job (output enabled).",
   "{n} Objekte liegen ganz außerhalb des Arbeitsbereichs (geparkt) und werden nicht gelasert.": "{n} objects lie completely outside the work area (parked) and are not lasered.",
   "Wieder lasern": "Laser again",
   "Nicht lasern (bleibt sichtbar)": "Don't laser (stays visible)",

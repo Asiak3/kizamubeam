@@ -1377,6 +1377,8 @@
   "Marlin mit Laser": "Marlin con láser",
   "Smoothieware-Laser": "Láser Smoothieware",
   "{n} Objekt liegt ganz außerhalb des Arbeitsbereichs (geparkt) und wird nicht gelasert.": "{n} objeto queda totalmente fuera del área de trabajo (aparcado) y no se enviará al láser.",
+  "{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).": "{n} objeto oculto participa en el trabajo (salida activada).",
+  "{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).": "{n} objetos ocultos participan en el trabajo (salida activada).",
   "{n} Objekte liegen ganz außerhalb des Arbeitsbereichs (geparkt) und werden nicht gelasert.": "{n} objetos quedan totalmente fuera del área de trabajo (aparcados) y no se enviarán al láser.",
   "{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).": "{n} línea abierta en capas de relleno omitida (el relleno necesita formas cerradas).",
   "{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).": "{n} líneas abiertas en capas de relleno omitidas (el relleno necesita formas cerradas).",

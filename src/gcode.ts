@@ -2,7 +2,7 @@
 // Maschinenausgabe: aus dem Dokument einen Job berechnen (Linien, Füllen, Bilder), G-Code schreiben,
 // Laufzeit schätzen und Rahmenfahrten erzeugen. Alles in Maschinenkoordinaten (mm, Ursprung unten links, y nach oben).
 import ClipperLib from 'clipper-lib';
-import { apply, CutSettings, Doc, ImageLayer, ImageOutput, imageOutput, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
+import { apply, CutSettings, Doc, ImageLayer, ImageOutput, imageOutput, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, outputLeaves, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
 import { bezierPt, segments, shapeSubs } from './geom';
 import { loadFont, textToSubs } from './fonts';
 import { nativeScanLines, outputGrid, processImage } from './images';
@@ -1242,6 +1242,7 @@ const FLIP = (h: number): Mat => [1, 0, 0, -1, 0, h];
 type CutEntry = Omit<CutSettings, 'air' | 'look' | 'sub'>;
 
 /** Bearbeitungen eines Layers in Ausgabereihenfolge: erst der Layer, dann seine eingeschalteten Sub-Layer */
+/** Bearbeitungen eines Layers in Ausgabereihenfolge: der Layer selbst, dann eingeschaltete Sub-Layer. Durchgänge laufen pro Bearbeitung (#218): Jede Entry beendet ihre eigenen passes, bevor die nächste startet; es gibt keinen globalen Repeat. */
 const entriesOf = (L: Layer): CutEntry[] => [L, ...(L.sub ?? []).filter((s: SubLayer) => s.output)];
 
 /** Bewegungen einer Bearbeitung; pass(p) setzt vor jedem Durchgang den Z-Versatz */
@@ -1581,7 +1582,20 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   };
   const bounds = emptyBox();
   let skippedOpen = 0;
-  for (const [o, world] of laserLeaves(roots)) {
+  // Effektive Ausgabe-Auswahl (Issue #217): versteckte Objekte nehmen teil, noLaser/showIf-falsch nicht
+  const effLeaves = [...outputLeaves(roots)];
+  const laserSet = new Set<Obj>();
+  for (const [l] of laserLeaves(roots)) laserSet.add(l);
+  const hiddenOutputs = effLeaves.filter(([l]) => !laserSet.has(l) && layerOf(l.layer).output).length;
+  if (hiddenOutputs)
+    warnings.push(
+      tn(
+        '{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).',
+        '{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).',
+        hiddenOutputs,
+      ),
+    );
+  for (const [o, world] of effLeaves) {
     if (o.reg) continue; // Passermarken nur drucken, nicht lasern
     const L = layerOf(o.layer);
     if (!L.output) continue;

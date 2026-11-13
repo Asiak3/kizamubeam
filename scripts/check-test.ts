@@ -169,11 +169,12 @@ test('Außerhalb des Arbeitsbereichs: Korrektur schiebt aufs Bett', () => {
   assert.ok(f && f.kind === 'bed');
   assert.equal(f.dx, -30);
   assert.equal(f.dy, 0);
-  // ausgeblendete Objekte und Layer ohne Ausgabe zählen nicht
+  // Issue #217: ausgeblendete Objekte mit Ausgabe zählen als Hindernisse, Layer ohne Ausgabe nicht
   const b = rect(50, 50, 500, 10);
   b.hidden = true;
+  assert.deepEqual(kinds(run([b])), ['bed']);
   const c = rect(50, 50, 500, 10, 30);
-  assert.deepEqual(run([b, c]), []);
+  assert.deepEqual(run([c]), []);
 });
 
 test('Geparkte Teile neben dem Bett und „Nicht lasern“ sind kein Befund', () => {

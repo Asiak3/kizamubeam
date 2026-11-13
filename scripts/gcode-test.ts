@@ -544,6 +544,23 @@ await test('Sub-Layer: erst füllen, dann ausschneiden; ausgeschaltete Sub-Layer
   assert.equal(mv.f[mv.n - 1], 300);
 });
 
+await test('Durchgänge laufen pro Bearbeitung: erst Sub1 fertig, dann Sub2 (#218)', async () => {
+  const sub = [
+    { ...defaultSubLayer('line'), speed: 600, power: 80, passes: 2 },
+    { ...defaultSubLayer('line'), speed: 1200, power: 80, passes: 1 },
+  ];
+  const job = await cutJob([square()], { mode: 'line', speed: 900, power: 80, passes: 1, sub });
+  const mv = job.moves;
+  // Brennstrecken gruppieren: Layer (900), dann Sub1 zweimal (600), dann Sub2 (1200) — kein globaler Repeat
+  const groups: number[] = [];
+  for (let i = 0; i < mv.n; i++) {
+    if (mv.f[i] > 0 && mv.s[i] > 0) {
+      if (!groups.length || groups[groups.length - 1] !== mv.f[i]) groups.push(mv.f[i]);
+    }
+  }
+  assert.deepEqual(groups, [900, 600, 1200]);
+});
+
 await test('Laser zur Klickposition: absolutes Verfahren je Firmware', () => {
   assert.deepEqual(jogToLines(newDevice({ fw: 'fluidnc' }), 12.5, 30, 3000), ['$J=G90 G21 X12.5 Y30 F3000']);
   assert.deepEqual(jogToLines(newDevice({ fw: 'grbl' }), 1, null, 1500), ['$J=G90 G21 X1 F1500']);
@@ -693,6 +710,58 @@ await test('Optimizer: lbrn2-CutOptimize wird toleriert gelesen und gemeldet', a
   assert.deepEqual(res.optimizer, { innerFirst: true, travel: false, group: undefined });
   assert.equal(res.notes.length, 1);
   assert.match(res.notes[0], /Optimierer/);
+});
+// Issue #217: Sichtbarkeit vs. Ausgabe — output entscheidet, show nur Anzeige
+const selJob = (objs: Obj[], layerPatch: Partial<Layer> = {}) =>
+  buildJob({
+    doc: loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} }),
+    layer: (i: number) => normalizeLayer({ ...defaultLayer(i), mode: 'line' as const, ...layerPatch }),
+    imgLayer: () => defaultImageLayer(),
+    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: false, returnHome: false },
+  });
+const selRect = (id: number, x: number, extra: Partial<Obj> = {}): Obj => ({
+  id, m: [1, 0, 0, 1, x, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never, ...extra,
+});
+
+await test('#217: ausgeblendetes Objekt mit Ausgabe nimmt teil + Warnung', async () => {
+  const base = await selJob([selRect(1, 100), selRect(2, 200)]);
+  const job = await selJob([selRect(1, 100), selRect(2, 200, { hidden: true })]);
+  assert.ok(burns(job.moves));
+  assert.equal(job.moves.n, base.moves.n);
+  assert.ok(job.warnings.some((w) => w.includes('ausgeblendet')), job.warnings.join(' | '));
+  assert.ok(!base.warnings.some((w) => w.includes('ausgeblendet')));
+  const prev = await buildJob({
+    doc: loadDoc({ bed: { w: 400, h: 400 }, objs: [selRect(1, 100), selRect(2, 200, { hidden: true })], layers: {} }),
+    layer: (i: number) => normalizeLayer({ ...defaultLayer(i), mode: 'line' as const }),
+    imgLayer: () => defaultImageLayer(),
+    device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, optimize: false, returnHome: false },
+    forPreview: true,
+  });
+  assert.ok(sameMoves(prev.moves, job.moves, job.offset));
+});
+
+await test('#217: noLaser und showIf-falsch schließen aus (auch vererbt)', async () => {
+  const onlyNoLaser = await selJob([selRect(1, 100, { noLaser: true })]);
+  assert.equal(burns(onlyNoLaser.moves), false);
+  const onlyShowIf = await selJob([selRect(1, 100, { showIf: 'false' })]);
+  assert.equal(burns(onlyShowIf.moves), false);
+  const group: Obj = {
+    id: 7, m: [1, 0, 0, 1, 0, 0], layer: 1, noLaser: true,
+    shape: { kind: 'group', children: [selRect(8, 100), selRect(9, 200)] },
+  };
+  const grp = await selJob([group]);
+  assert.equal(burns(grp.moves), false);
+  // showIf wahr und hidden ohne noLaser: nimmt teil
+  const vis = await selJob([selRect(1, 100, { showIf: 'true' }), selRect(2, 200, { hidden: true })]);
+  assert.ok(burns(vis.moves));
+});
+
+await test('#217: output=false schließt aus, Warnung nur bei Ausgabe', async () => {
+  const job = await selJob([selRect(1, 100)], { output: false });
+  assert.equal(burns(job.moves), false);
+  const hiddenNoOut = await selJob([selRect(1, 100, { hidden: true })], { output: false });
+  assert.equal(burns(hiddenNoOut.moves), false);
+  assert.ok(!hiddenNoOut.warnings.some((w) => w.includes('ausgeblendet')));
 });
 
 if (failed) {

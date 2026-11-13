@@ -3,7 +3,7 @@
 // lag. Die Farbe hängt vom Material ab: dunkle Brandspur auf Holz, hell auf Schiefer, milchig auf Acryl.
 import type { Editor } from '../editor';
 import type { ImageShape, Mat, Obj, TextShape } from '../model';
-import { apply, inv, leaves, mul, visibleLeaves } from '../model';
+import { apply, inv, leaves, mul, outputLeaves } from '../model';
 import { boundsOf, drawText, subsToPath2D, worldPath } from '../geom';
 import { displayCanvas } from '../images';
 import { cross, dot } from './poses';
@@ -40,14 +40,14 @@ interface Mark {
   box: [number, number, number, number];
 }
 
-/** Was auf einer Seite gelasert wird und nicht selbst Platte oder Loch ist */
+/** Was auf einer Seite gelasert wird und nicht selbst Platte oder Loch ist (Issue #217: hidden zählt mit) */
 function pageMarks(ed: Editor, page: number): Mark[] {
   const pg = ed.doc.pages[page];
   if (!pg) return [];
   const out: Mark[] = [];
-  for (const [o, m] of visibleLeaves(pg.objs)) {
+  for (const [o, m] of outputLeaves(pg.objs)) {
     const L = ed.layer(o.layer);
-    if (!L.output || !L.show) continue;
+    if (!L.output) continue;
     const s = o.shape;
     let kind: Mark['kind'] | null = null;
     if (s.kind === 'image') kind = 'image';
