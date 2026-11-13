@@ -544,6 +544,23 @@ await test('Sub-Layer: erst füllen, dann ausschneiden; ausgeschaltete Sub-Layer
   assert.equal(mv.f[mv.n - 1], 300);
 });
 
+await test('Durchgänge laufen pro Bearbeitung: erst Sub1 fertig, dann Sub2 (#218)', async () => {
+  const sub = [
+    { ...defaultSubLayer('line'), speed: 600, power: 80, passes: 2 },
+    { ...defaultSubLayer('line'), speed: 1200, power: 80, passes: 1 },
+  ];
+  const job = await cutJob([square()], { mode: 'line', speed: 900, power: 80, passes: 1, sub });
+  const mv = job.moves;
+  // Brennstrecken gruppieren: Layer (900), dann Sub1 zweimal (600), dann Sub2 (1200) — kein globaler Repeat
+  const groups: number[] = [];
+  for (let i = 0; i < mv.n; i++) {
+    if (mv.f[i] > 0 && mv.s[i] > 0) {
+      if (!groups.length || groups[groups.length - 1] !== mv.f[i]) groups.push(mv.f[i]);
+    }
+  }
+  assert.deepEqual(groups, [900, 600, 1200]);
+});
+
 await test('Laser zur Klickposition: absolutes Verfahren je Firmware', () => {
   assert.deepEqual(jogToLines(newDevice({ fw: 'fluidnc' }), 12.5, 30, 3000), ['$J=G90 G21 X12.5 Y30 F3000']);
   assert.deepEqual(jogToLines(newDevice({ fw: 'grbl' }), 1, null, 1500), ['$J=G90 G21 X1 F1500']);
