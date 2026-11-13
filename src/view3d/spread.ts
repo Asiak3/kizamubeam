@@ -1,8 +1,8 @@
-// Baugruppen, Verbindungsgruppen und Mehrlagenarbeiten in der 3D-Ansicht voneinander trennen (Issue #260)
+// Baugruppen, Verbindungsgruppen, Mehrlagenarbeiten und lose Platten in der 3D-Ansicht voneinander trennen (Issue #260)
 import { packParts, polySub } from '../generators/build';
 import { Solid, solidBounds } from './solids';
 
-/** Ein Block, der in der Ansicht zusammenbleibt: Baugruppe, Gruppe verbundener Teile oder Mehrlagenarbeit */
+/** Ein Block, der in der Ansicht zusammenbleibt: Baugruppe, Gruppe verbundener Teile, Mehrlagenarbeit oder eine lose Platte */
 export interface Placement {
   parts: Solid[];
   /** Feste Reihenfolge (kleinste Objekt-ID des Blocks), damit die Anordnung zwischen zwei Aktualisierungen nicht springt */
@@ -47,9 +47,9 @@ function shift(p: Placement, r: Rect, dx: number, dy: number): Rect {
 /**
  * Blöcke, deren Grundrisse sich überdecken, in Reihen fast quadratisch nebeneinanderlegen (wie packParts bei den Teilen
  * einer Baugruppe). Die Gruppe bleibt um ihre bisherige Mitte; wer niemanden überdeckt, bleibt genau, wo er ist.
- * Erwartet mindestens zwei Blöcke.
+ * Liefert die Blöcke in fester Reihenfolge mit ihren Grundrissen.
  */
-function spreadBlocks(items: Placement[], gap: number): void {
+function spreadBlocks(items: Placement[], gap: number): { list: Placement[]; fp: Rect[] } {
   const list = byOrder(items);
   const fp = list.map((it) => footprint(it.parts));
   // Jede Runde fasst mindestens zwei Gruppen zusammen, also höchstens list.length Runden
@@ -87,14 +87,37 @@ function spreadBlocks(items: Placement[], gap: number): void {
       });
     }
   }
+  return { list, fp };
 }
 
 /**
- * Überdeckungen in der Ansicht auflösen: Blöcke, die sich überdecken, werden nebeneinandergelegt (spreadBlocks).
- * Verändert die Lage (pose) der Teile.
+ * Lose Platten (Formen von der Arbeitsfläche, die keine Platte berühren) nur dann beiseiteschieben, wenn sie einen Block
+ * oder eine andere schon verschobene Platte überdecken. Blöcke bewegen sich dafür nie. Zwei lose Platten werden nicht
+ * gegeneinander geprüft: Sie liegen auf der Arbeitsfläche nebeneinander.
  */
-export function spreadApart(items: Placement[], gap = SPREAD_GAP): void {
-  // Ein einzelner Block kann sich mit nichts überdecken
-  if (items.length < 2) return;
-  spreadBlocks(items, gap);
+function spreadLoose(blocks: Rect[], loose: Placement[], gap: number) {
+  const list = byOrder(loose);
+  const fp = list.map((it) => footprint(it.parts));
+  const moved = new Set<number>();
+  list.forEach((piece, i) => {
+    if (!blocks.some((b) => hit(fp[i], b))) return;
+    // Nach rechts hinter das Hindernis schieben, bis nichts mehr überdeckt wird (jeder Schritt überspringt ein Hindernis)
+    for (let guard = 0; guard <= blocks.length + moved.size + 1; guard++) {
+      const obstacle = blocks.find((b) => hit(fp[i], b)) ?? [...moved].map((j) => fp[j]).find((r) => hit(fp[i], r));
+      if (!obstacle) break;
+      fp[i] = shift(piece, fp[i], obstacle.x1 + gap - fp[i].x0, 0);
+    }
+    moved.add(i);
+  });
+}
+
+/**
+ * Überdeckungen in der Ansicht auflösen: erst die Blöcke untereinander (spreadBlocks), dann lose Platten gegen die Blöcke
+ * (spreadLoose). Verändert die Lage (pose) der Teile.
+ */
+export function spreadApart(items: Placement[], loose: Placement[] = [], gap = SPREAD_GAP): void {
+  // Ein einzelner Block ohne lose Platten kann sich mit nichts überdecken
+  if (!items.length || (items.length < 2 && !loose.length)) return;
+  const { fp } = spreadBlocks(items, gap);
+  if (loose.length) spreadLoose(fp, loose, gap);
 }

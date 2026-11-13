@@ -145,7 +145,7 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
   ids.push(...multi.ids);
   let asms = multi.count;
   // Flache Konturen je Dicke sammeln: Ineinanderliegende Konturen sind wie beim Lasern Löcher
-  const flats = new Map<number, { paths: Paths; names: { label: string; box: number[]; layer: number }[] }>();
+  const flats = new Map<number, { paths: Paths; names: { label: string; box: number[]; layer: number; id: number }[] }>();
   const flat = (o: Obj, m: Obj['m'], thick: number) => {
     const L = ed.layer(o.layer);
     if (!isCutLayer(L) || o.shape.kind === 'text' || o.shape.kind === 'image') return;
@@ -156,7 +156,7 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     const f = flats.get(thick) ?? { paths: [], names: [] };
     flats.set(thick, f);
     f.paths.push(...paths);
-    f.names.push({ label: o.shape.kind === 'gen' ? genLabel(o.shape) : objLabel(o), box: pathBox(paths), layer: o.layer });
+    f.names.push({ label: o.shape.kind === 'gen' ? genLabel(o.shape) : objLabel(o), box: pathBox(paths), layer: o.layer, id: o.id });
     ids.push(o.id);
   };
   /** Lose Formen: erst nach den Baugruppen entscheiden, ob sie Platten schneiden (Loch, Kerbe) oder eigene Platten sind */
@@ -212,6 +212,7 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     if (consumed.has(x.o.id)) ids.push(x.o.id);
     else flat(x.o, x.m, x.thick);
   for (const id of consumed) if (!ids.includes(id)) ids.push(id);
+  const loose: Placement[] = [];
   let n = 0;
   for (const [thick, f] of flats)
     for (const { outer, holes } of islands(f.paths)) {
@@ -222,11 +223,13 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
       const layer = named?.layer ?? f.names.find((x) => x.box[0] >= box[0] && x.box[1] >= box[1] && x.box[2] <= box[2] && x.box[3] <= box[3])?.layer ?? f.names[0]?.layer ?? 0;
       const polys = [outer, ...holes].map((p) => p.map((q) => ({ x: q.X / SCALE, y: q.Y / SCALE })));
       n++;
-      solids.push({ key: `f${n}`, label: named?.label ?? t('Teil {n}', { n }), polys, pose: flatPose(), th: thick, group: `f${n}`, layer });
+      const plate: ViewSolid = { key: `f${n}`, label: named?.label ?? t('Teil {n}', { n }), polys, pose: flatPose(), th: thick, group: `f${n}`, layer };
+      solids.push(plate);
+      loose.push({ parts: [plate], order: named?.id ?? 1e9 + n });
       places.set(`f${n}`, { page: ed.doc.page, toLocal: IDENT });
     }
-  // Blöcke, die sich überdecken (z. B. Baugruppen nach dem Verschachteln), nebeneinanderlegen
-  spreadApart(items);
+  // Blöcke, die sich überdecken (z. B. Baugruppen nach dem Verschachteln), nebeneinanderlegen; lose Platten weichen aus
+  spreadApart(items, loose);
   // Aussehen je Platte aus ihrem Layer
   const looks = new Map<number, LookPreset>();
   for (const s of solids) {
