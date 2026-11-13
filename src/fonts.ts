@@ -69,6 +69,33 @@ async function browserLocalFont(family: string, bold: boolean, italic: boolean):
   }
 }
 
+/**
+ * Zugriff auf die lokal installierten Schriften des Browsers anfordern (Local Font Access API, Chromium).
+ * Muss aus einer Nutzer-Geste heraus aufgerufen werden (Klick/Change), sonst blockiert der Browser die
+ * Berechtigungs-Rückfrage. Ergebnis: true = Zugriff steht (bereits erteilt oder gerade erteilt), danach
+ * lädt `loadFont` echte Schrift-Binaries statt des Roboto-Fallbacks. false = keine API, abgelehnt oder
+ * abgebrochen — dann bleibt der Fallback, es wird nicht erneut gefragt (außer der Stand ist noch „prompt“).
+ * Desktop (Tauri) braucht das nicht: dort kommen Systemschriften über Rust (fontdb).
+ */
+export async function requestLocalFonts(): Promise<boolean> {
+  if (isTauri()) return true;
+  const w = window as unknown as { queryLocalFonts?: () => Promise<LocalFontData[]> };
+  if (!w.queryLocalFonts) return false;
+  try {
+    const perm = await navigator.permissions.query({ name: 'local-fonts' as PermissionName });
+    if (perm.state === 'granted') return true;
+    if (perm.state === 'denied') return false;
+  } catch {
+    // Permissions-API kennt „local-fonts“ nicht (oder fehlt) → direkt versuchen, löst ggf. die Rückfrage aus.
+  }
+  try {
+    await w.queryLocalFonts();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function loadFont(family: string, bold: boolean, italic: boolean): Promise<LoadedFont> {
   const key = fontKey(family, bold, italic);
   let p = cache.get(key);
