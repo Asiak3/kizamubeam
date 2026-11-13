@@ -785,8 +785,6 @@ const orderBoxes = new WeakMap<readonly Poly[], Box[]>();
 
 function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
   const n = polys.length;
-function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
-  const n = polys.length;
 
   if (!o.innerFirst && !o.travel && !o.group) return polys;
 
@@ -1243,7 +1241,7 @@ type CutEntry = Omit<CutSettings, 'air' | 'look' | 'sub'>;
 const entriesOf = (L: Layer): CutEntry[] => [L, ...(L.sub ?? []).filter((s: SubLayer) => s.output)];
 
 /** Manuelle Reihenfolge (Issue #153): zählt innere Formen, deren äußere Form früher geschnitten wird.
- * Manuell = Stapel-/Dokumentreihenfolge (`optimize` aus); `containsStrict` aus dem Topologie-Modul (#219). */
+ * Manuell = Stapel-/Dokumentreihenfolge (alle drei Optimierungen aus); `containsStrict` aus dem Topologie-Modul (#219). */
 function countManualViolations(polys: Poly[]): number {
   if (polys.length < 2) return 0;
   const boxes = boxesOf(polys);
@@ -1584,7 +1582,6 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   };
   const bounds = emptyBox();
   let skippedOpen = 0;
-let skippedOpen = 0;
 let kerfOpen = 0;
 let kerfDegenerate = 0;
 let kerfVanished = 0;
@@ -1692,7 +1689,6 @@ for (const [o, world] of effLeaves) {
         ),
       ];
     }
-        }
         for (const p of polys) {
           out.push(p);
           for (const q of p.pts) addPt(bounds, q.x, q.y);
@@ -1708,27 +1704,22 @@ for (const [o, world] of effLeaves) {
   if (kerfMerged) warnings.push(tn('Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.', 'Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.', kerfMerged));
   if (kerfFillOps) warnings.push(t('Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.'));
   if (!device.optInnerFirst) {
-    // „Innere Formen zuerst“ ist aus: warnen, wenn ein Loch nach seiner Außenkontur geschnitten würde (Issue #222)
+    // Ohne Innere-Formen-Priorisierung auf mögliche Schnittreihenfolge-Probleme hinweisen (#222).
     let nested = false;
-    outer: for (const b of buckets.values())
+    outer: for (const b of buckets.values()) {
       for (const set of b.sets) {
         const closed = set.filter((p) => p.closed);
-        for (let i = 0; i < closed.length && !nested; i++)
+        const boxes = boxesOf(closed);
+        for (let i = 0; i < closed.length; i++) {
           for (let j = 0; j < closed.length; j++) {
-            if (i === j) continue;
-            const a = closed[i],
-              c = closed[j];
-            let bx = emptyBox();
-            for (const q of a.pts) addPt(bx, q.x, q.y);
-            let by = emptyBox();
-            for (const q of c.pts) addPt(by, q.x, q.y);
-            if (bx.x0 < by.x0 || bx.y0 < by.y0 || bx.x1 > by.x1 || bx.y1 > by.y1) continue;
-            if (pointInPoly(a.pts[0], c.pts) || pointInPoly(midOf(bx), c.pts)) {
+            if (i !== j && containsStrict(closed, boxes, i, j)) {
               nested = true;
               break outer;
             }
           }
+        }
       }
+    }
     if (nested) warnings.push(t('„Innere Formen zuerst“ ist aus: Löcher werden ggf. nach ihrer Außenkontur geschnitten und fallen mit dem Reststück.'));
   }
 
@@ -1810,7 +1801,7 @@ for (const [o, world] of effLeaves) {
         group: device.optGroup,
       };
 
-      if (!orderOpts.innerFirst && e.mode === 'line') {
+      if (!orderOpts.innerFirst && !orderOpts.travel && !orderOpts.group && e.mode === 'line') {
         manualViolations += countManualViolations(polys);
       }
 
@@ -1821,8 +1812,8 @@ for (const [o, world] of effLeaves) {
   if (manualViolations)
     warnings.push(
       tn(
-        'Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.',
-        'Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.',
+        'Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.',
+        'Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.',
         manualViolations,
       ),
     );
