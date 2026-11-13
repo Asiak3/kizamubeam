@@ -558,7 +558,7 @@ function laserTab(ed: Editor): HTMLElement {
     ),
     h('div', { class: 'checks' },
       check(t('Nur Auswahl'), t('Nur die ausgewählten Objekte lasern'), () => device.cutSelected, (v) => (device.cutSelected = v)),
-      check(t('Pfad optimieren'), t('Innere Formen zuerst, kurze Leerwege'), () => device.optimize, (v) => (device.optimize = v)),
+      check(t('Pfad optimieren'), t('An: innere Formen zuerst, kurze Leerwege. Aus: Stapelreihenfolge aus dem Objekte-Fenster (manuell) — Warnung bei außen-vor-innen.'), () => device.optimize, (v) => (device.optimize = v)),
       check(t('Drehachse'), t('Rotary einschalten: Y wird zur Umfangsrichtung des Objekts'), () => device.rotary.enabled, (v) => (device.rotary = { ...device.rotary, enabled: v })),
       h('button', { class: 'btn small', title: t('Drehachse (Rotary) einrichten'), onclick: () => openRotaryDialog() }, t('Drehachse …')),
     ),

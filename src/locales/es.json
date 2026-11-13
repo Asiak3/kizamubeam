@@ -2170,7 +2170,6 @@
   "Nur Auswahl": "Solo selección",
   "Nur die ausgewählten Objekte lasern": "Enviar al láser solo los objetos seleccionados",
   "Pfad optimieren": "Optimizar trazado",
-  "Innere Formen zuerst, kurze Leerwege": "Primero las formas interiores, desplazamientos cortos",
   "Rotary einschalten: Y wird zur Umfangsrichtung des Objekts": "Activar rotary: Y pasa a ser la dirección circunferencial del objeto",
   "Drehachse (Rotary) einrichten": "Configurar rotary",
   "Drehachse …": "Rotary …",
@@ -4496,5 +4495,8 @@
   "Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.": "Contrato del kerf: {n} contorno en contacto unido mediante unión.",
   "Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.": "Contrato del kerf: {n} contornos en contacto unidos mediante unión.",
   "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Contrato del kerf: en el relleno, el kerf actúa sobre la geometría del contorno antes del sombreado.",
-  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: los contornos exteriores se desplazan hacia fuera, los agujeros hacia dentro. Indica aprox. la mitad del ancho de corte para que las piezas mantengan su medida. Solo contornos cerrados (kerf → puentes → perforación; el relleno compensa el contorno, imágenes sin kerf)."
+  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: los contornos exteriores se desplazan hacia fuera, los agujeros hacia dentro. Indica aprox. la mitad del ancho de corte para que las piezas mantengan su medida. Solo contornos cerrados (kerf → puentes → perforación; el relleno compensa el contorno, imágenes sin kerf).",
+  "An: innere Formen zuerst, kurze Leerwege. Aus: Stapelreihenfolge aus dem Objekte-Fenster (manuell) — Warnung bei außen-vor-innen.": "Activado: formas interiores primero, recorridos cortos. Desactivado: orden de apilado del panel de objetos (manual) — avisa si exterior va antes que interior.",
+  "Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.": "Orden manual: {n} forma interior se corta después de su forma exterior (se vulnera interior-primero) — active «Optimizar trazado» o cambie el orden en el panel de objetos.",
+  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.": "Orden manual: {n} formas interiores se cortan después de su forma exterior (se vulnera interior-primero) — active «Optimizar trazado» o cambie el orden en el panel de objetos."
 }

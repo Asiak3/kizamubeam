@@ -728,7 +728,6 @@
   "Nur Auswahl": "Taglia solo la grafica selezionata",
   "Nur die ausgewählten Objekte lasern": "Incidi solo gli oggetti selezionati",
   "Pfad optimieren": "Ottimizza percorso",
-  "Innere Formen zuerst, kurze Leerwege": "Prima le forme interne, spostamenti a vuoto brevi",
   "Drehachse": "Asse rotante",
   "Rotary einschalten: Y wird zur Umfangsrichtung des Objekts": "Abilita asse rotante: Y diventa la direzione circonferenziale dell'oggetto",
   "Drehachse (Rotary) einrichten": "Configura asse rotante",
@@ -4619,5 +4618,8 @@
   "Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.": "Contratto del kerf: {n} contorno a contatto unito tramite unione.",
   "Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.": "Contratto del kerf: {n} contorni a contatto uniti tramite unione.",
   "Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.": "Contratto del kerf: nel riempimento il kerf agisce sull’involucro prima del tratteggio.",
-  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: i contorni esterni si spostano verso l’esterno, i fori verso l’interno. Inserisci circa metà della larghezza di taglio così i pezzi mantengono la misura. Solo contorni chiusi (kerf → ponticelli → perforazione; il riempimento compensa l’involucro, immagini senza kerf)."
+  "Positiv: Außenkonturen wandern nach außen, Löcher nach innen. Etwa die halbe Schnittbreite eintragen, damit Teile maßhaltig werden. Nur geschlossene Konturen (Kerf → Tabs → Perforation; Fill kerft die Hülle, Bilder ohne Kerf).": "Positivo: i contorni esterni si spostano verso l’esterno, i fori verso l’interno. Inserisci circa metà della larghezza di taglio così i pezzi mantengono la misura. Solo contorni chiusi (kerf → ponticelli → perforazione; il riempimento compensa l’involucro, immagini senza kerf).",
+  "An: innere Formen zuerst, kurze Leerwege. Aus: Stapelreihenfolge aus dem Objekte-Fenster (manuell) — Warnung bei außen-vor-innen.": "On: prima le forme interne, spostamenti brevi. Off: ordine di sovrapposizione dal pannello oggetti (manuale) — avviso se esterno prima di interno.",
+  "Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.": "Ordine manuale: {n} forma interna tagliata dopo la sua forma esterna (violato interno-prima) — attivare «Ottimizza percorso» o cambiare l’ordine nel pannello oggetti.",
+  "Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Pfad optimieren“ einschalten oder Stapelreihenfolge im Objekte-Fenster ändern.": "Ordine manuale: {n} forme interne tagliate dopo la loro forma esterna (violato interno-prima) — attivare «Ottimizza percorso» o cambiare l’ordine nel pannello oggetti."
 }
