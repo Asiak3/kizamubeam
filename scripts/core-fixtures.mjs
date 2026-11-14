@@ -3,12 +3,12 @@ import { build } from 'esbuild';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const dir = mkdtempSync(join(tmpdir(), 'kizamubeam-'));
 const out = join(dir, 'fixtures.mjs');
 await build({
-  entryPoints: [new URL('./core-fixtures.ts', import.meta.url).pathname],
+  entryPoints: [fileURLToPath(new URL('./core-fixtures.ts', import.meta.url))],
   bundle: true,
   platform: 'node',
   format: 'esm',

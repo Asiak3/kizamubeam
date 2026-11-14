@@ -37,7 +37,7 @@ await test('Einrückung bleibt, zu lange Wörter werden getrennt', () => {
   assert.deepEqual(wrapParagraph('abc', 0.5, mono), ['a', 'b', 'c']);
 });
 
-const font = opentype.parse(readFileSync('node_modules/@fontsource/roboto/files/roboto-latin-400-normal.woff').buffer as ArrayBuffer);
+const font = opentype.parse(new Uint8Array(readFileSync('node_modules/@fontsource/roboto/files/roboto-latin-400-normal.woff')).buffer);
 const text = (extra: Partial<TextShape>): TextShape => ({
   kind: 'text', text: 'Der schnelle braune Fuchs springt über den faulen Hund', font: 'Roboto', size: 5,
   bold: false, italic: false, upper: false, align: 'left', hSpace: 0, vSpace: 0, ...extra,
