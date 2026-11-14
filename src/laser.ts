@@ -7,7 +7,7 @@ import { saveText } from './files';
 import { native } from './native';
 import {
   anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, formatDuration, frameGCode, Job, jogLines, jogToLines, loadDevices, Moves, newDevice,
-  posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, sameMoves, saveDevices, StartFrom, startHere,
+  posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, sameMoves, saveDevices, StartFrom, startHere, zJogLines,
 } from './gcode';
 import { isTauri, machine, PortInfo } from './machine';
 import type { PreparedGCode } from './gcode';
@@ -750,6 +750,40 @@ function moveTab(ed: Editor): HTMLElement {
   const setO = h('button', { class: 'btn', title: t('Werkstück-Nullpunkt an die aktuelle Position legen'), onclick: () => machine.send(fw().setOrigin) }, t('Ursprung hier setzen')) as HTMLButtonElement;
   const clearO = h('button', { class: 'btn', title: t('Werkstück-Nullpunkt auf den Maschinen-Nullpunkt zurücksetzen'), onclick: () => fw().clearOrigin && machine.send(fw().clearOrigin!) }, t('Ursprung löschen')) as HTMLButtonElement;
   const unlock = h('button', { class: 'btn', title: t('Alarm aufheben'), onclick: () => fw().unlock && machine.send(fw().unlock!) }, t('Entsperren')) as HTMLButtonElement;
+  // Z (nur mit motorischer Z-Achse): eigene Schrittweite/Geschwindigkeit, strenge Gates, kein Fokusbezug
+  const zst = { step: 0.1, speed: 60 };
+  const zKnown = () => {
+    const p = machine.status.wpos;
+    return !!p && Number.isFinite(p[2]);
+  };
+  const zBlocker = (): string | null => {
+    if (!machine.connected || machine.running) return t('Nicht verbunden oder Maschine beschäftigt.');
+    if (device.fw !== 'marlin' && machine.status.state !== 'Idle') return t('Z-Jog nur bei Stillstand (Idle).');
+    if (!zKnown()) return t('Position unbekannt. Auf eine gültige Positionsmeldung warten.');
+    if ((device.zJogStrict ?? true) && !machine.homed) return t('Z-Achse noch nicht referenziert. Erst eine Referenzfahrt ausführen — oder in den Geräteeinstellungen „Z-Jog nur nach Referenzfahrt“ ausschalten.');
+    if (rotaryOn(device) && device.rotary.axis === 'Z') return t('Drehachse auf Z: Z-Jog ist im Drehachsenmodus blockiert.');
+    if (!(zst.step > 0) || !(zst.speed >= 1)) return t('Positive Schrittweite und Geschwindigkeit (mindestens 1 mm/min) eingeben.');
+    return null;
+  };
+  const zJog = (dir: 1 | -1) => {
+    const why = zBlocker();
+    if (why) return notify(why, true);
+    for (const l of zJogLines(device, dir * zst.step, zst.speed)) machine.send(l);
+  };
+  const zStepSel = h('select', { onchange: (e: Event) => (zst.step = Number((e.target as HTMLSelectElement).value)) },
+    ...[0.1, 0.5, 1, 5].map((v) => h('option', { value: String(v), selected: v === zst.step }, `${dec(String(v))} mm`)),
+  );
+  const zSpeed = numInput('', (v) => v > 0 && (zst.speed = v), t('Geschwindigkeit in mm/min'));
+  zSpeed.value = String(zst.speed);
+  const zMinus = h('button', { class: 'btn', title: t('Negative Steuerungsrichtung Z verfahren'), onclick: () => zJog(-1) }, 'Z−') as HTMLButtonElement;
+  const zPlus = h('button', { class: 'btn', title: t('Positive Steuerungsrichtung Z verfahren'), onclick: () => zJog(1) }, 'Z+') as HTMLButtonElement;
+  const zSection = h('div', { class: 'move-row' }, zMinus, zPlus,
+    h('div', { class: 'form move-form' },
+      h('label', {}, t('Schritt')), zStepSel,
+      h('label', {}, 'mm/min'), zSpeed,
+    ),
+  );
+  const zNote = h('div', { class: 'note' }, t('Z+/Z− verfahren die Achse in Steuerungsrichtung (unabhängig von „Z+ fährt Richtung Material“). Freiraum prüfen. Hinweis Kopfkamera: Nach einer Z-Fahrt stimmt der Maßstab des Kamera-Overlays nicht mehr.'));
   root.append(
     pos,
     h('div', { class: 'move-row' }, pad,
@@ -758,6 +792,8 @@ function moveTab(ed: Editor): HTMLElement {
         h('label', {}, 'mm/min'), speed,
       ),
     ),
+    zSection,
+    zNote,
     h('div', { class: 'move-buttons' },
       setO,
       clearO,
@@ -770,9 +806,13 @@ function moveTab(ed: Editor): HTMLElement {
   const refresh = () => {
     const s = machine.status;
     pos.textContent = machine.connected && s.wpos
-      ? t('Position X {x}  Y {y} mm', { x: s.wpos[0].toFixed(2), y: s.wpos[1].toFixed(2) }) + (s.mpos && (Math.abs(s.mpos[0] - s.wpos[0]) > 1e-3 || Math.abs(s.mpos[1] - s.wpos[1]) > 1e-3) ? t(' (Maschine {x} / {y})', { x: s.mpos[0].toFixed(2), y: s.mpos[1].toFixed(2) }) : '')
+      ? t('Position X {x}  Y {y} mm', { x: s.wpos[0].toFixed(2), y: s.wpos[1].toFixed(2) }) + (device.zAxis && Number.isFinite(s.wpos[2]) ? `  Z ${s.wpos[2].toFixed(2)}` : '') + (s.mpos && (Math.abs(s.mpos[0] - s.wpos[0]) > 1e-3 || Math.abs(s.mpos[1] - s.wpos[1]) > 1e-3) ? t(' (Maschine {x} / {y})', { x: s.mpos[0].toFixed(2), y: s.mpos[1].toFixed(2) }) : '')
       : t('Nicht verbunden');
     root.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = !machine.connected || machine.running));
+    zSection.hidden = !device.zAxis;
+    zNote.hidden = !device.zAxis;
+    const zWhy = device.zAxis ? zBlocker() : null;
+    zMinus.disabled = zPlus.disabled = !machine.connected || machine.running || !!zWhy;
     // Der Zeiger-Modus ist kein Fahrbefehl und bleibt immer verstellbar.
     modeRow.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = false));
     syncClickB();
@@ -894,6 +934,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   head(t('Achsen'));
   bool(t('Motorische Z-Achse vorhanden'), () => d.zAxis, (v) => (d.zAxis = v), t('Layer dürfen den Fokus verschieben (Z-Versatz, tiefer je Durchgang). Z fährt relativ zur Höhe beim Start und am Ende zurück.'));
   bool(t('Z+ fährt Richtung Material'), () => d.zFlip, (v) => (d.zFlip = v), t('Einschalten, wenn bei dieser Maschine positive Z-Werte den Tisch anheben oder den Kopf absenken'));
+  bool(t('Z-Jog nur nach Referenzfahrt'), () => d.zJogStrict ?? true, (v) => (d.zJogStrict = v), t('Bewegen-Fenster: Z-Tasten bleiben gesperrt, bis einmal referenziert wurde (pro Verbindung). Aus = lax: dann genügt eine bekannte Position.'));
   rows.push(h('label', {}, t('Drehachse')), h('span', {}, h('button', { class: 'btn small', onclick: () => openRotaryDialog() }, t('Drehachse (Rotary) …'))));
   head(t('Air Assist & Ausgänge'));
   rows.push(h('label', { title: t('Wird auf Layern mit „Air Assist“ vor dem Lasern gesendet, ausgeschaltet wird mit M9') }, t('Einschalten mit')), h('select', { onchange: (e: Event) => (d.airCmd = (e.target as HTMLSelectElement).value as Device['airCmd']) },

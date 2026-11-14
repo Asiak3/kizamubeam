@@ -86,6 +86,7 @@
     "test:dialog-drag": "node scripts/run-ts.mjs scripts/dialog-drag-test.ts",
     "test:placement": "node scripts/run-ts.mjs scripts/placement-test.ts",
     "test:calibration": "node scripts/calibration-machine-controls-test.mjs && node scripts/calibration-dialog-offline-test.mjs",
+    "test:machine": "node scripts/run-ts.mjs scripts/machine-homing-test.ts",
     "test:vm": "node scripts/run-ts.mjs scripts/vm-burn-test.ts && node scripts/run-ts.mjs scripts/vm-parts-test.ts && cd vm/src-tauri && cargo test -p kizamubeam-vm-core",
     "test:nodes": "node scripts/vector-offline-test.mjs scripts/multi-object-nodes-test.ts",
     "test:refit": "node scripts/run-ts.mjs scripts/vector-fit-test.ts && node scripts/vector-offline-test.mjs scripts/path-refit-editor-test.ts",

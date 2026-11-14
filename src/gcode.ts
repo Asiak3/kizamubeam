@@ -167,6 +167,8 @@ export interface Device {
   zAxis: boolean;
   /** Z+ fährt Richtung Material (z. B. Tisch hebt sich); Standard: Z+ fährt den Kopf nach oben */
   zFlip: boolean;
+  /** Z-Jog im Bewegen-Fenster nur nach Referenzfahrt (pro Verbindung einmal); false = lax, nur bekannte Position nötig */
+  zJogStrict: boolean;
   /**
    * Rotpunkt-Zeiger (Issue #213): Lage des Strahls gegenüber dem Zeigerpunkt in mm, aus der Kalibrierung
    * (Position Strahl auf Kreuz minus Position Zeiger auf Kreuz, also A−B wie in LightBurn). Nur wenn
@@ -223,6 +225,7 @@ export const DEFAULT_DEVICE: Device = {
   agentMinSpeed: 0,
   rotary: DEFAULT_ROTARY,
   zAxis: false,
+  zJogStrict: true,
   zFlip: false,
   pointerOffset: { x: 0, y: 0, enabled: false },
   frameView: 'pointer',
@@ -492,6 +495,11 @@ export function jogLines(d: Device, dx: number, dy: number, f: number): string[]
   const k = rotaryScale(d.rotary);
   const l = Math.hypot(dx, dy);
   return fw.jog(dx, dy * k, l > 0 ? (f * Math.hypot(dx, dy * k)) / l : f, d.rotary.axis);
+}
+
+/** Z relativ verfahren (Bewegen-Fenster); nutzt denselben Jog-Befehl wie XY, nur mit Z-Buchstabe */
+export function zJogLines(d: Device, dz: number, f: number): string[] {
+  return FIRMWARES[d.fw].jog(0, dz, f, 'Z');
 }
 
 /** Absolut an eine Werkstückposition fahren (Laser zur Klickposition). y = null lässt Y stehen (z. B. mit Drehachse).
