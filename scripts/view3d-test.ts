@@ -556,6 +556,20 @@ test('spreadApart: berührende Blöcke bleiben, überdeckende werden mit Abstand
   for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) assert.ok(!closer(fp[i], fp[j], SPREAD_GAP - 1e-6), `${i}/${j}`);
   const all = footOf(four.flat());
   assert.ok((all.x1 - all.x0) / (all.y1 - all.y0) < 2.5, 'Anordnung zu langgestreckt');
+  // Lose Platten: nur ausweichen, wenn sie einen Block überdecken; der Block bleibt stehen, die Platte hält Abstand
+  const blk = one(), plate = one(), far = one();
+  const fb = footOf(blk);
+  shift(far, 5000);
+  const farBefore = posOf(far);
+  const blkBefore = posOf(blk);
+  spreadApart([{ parts: blk, order: 1 }], [{ parts: plate, order: 2 }, { parts: far, order: 3 }]);
+  assert.equal(posOf(blk), blkBefore, 'Block bleibt');
+  assert.equal(posOf(far), farBefore, 'Platte ohne Überdeckung bleibt');
+  assert.ok(!closer(footOf(plate), fb, SPREAD_GAP - 1e-6), 'Platte hält Abstand zum Block');
+  // Zwei lose Platten auf demselben Platz: beide weichen dem Block aus, aber nicht ineinander
+  const p1 = one(), p2 = one();
+  spreadApart([{ parts: one(), order: 1 }], [{ parts: p1, order: 2 }, { parts: p2, order: 3 }]);
+  assert.ok(!closer(footOf(p1), footOf(p2), SPREAD_GAP - 1e-6), 'lose Platten nicht ineinander');
 });
 
 /** Fläche der Konturen einer Platte nach Gerade-Ungerade-Regel (Löcher abgezogen), ohne Verschachtelung auszuwerten */
@@ -630,6 +644,24 @@ test('Lose Platte fern von allen Teilen bleibt an ihrer Stelle der Arbeitsfläch
   const bb = solidBounds(f);
   near(bb.min[0], 2000, 1e-6, 'x');
   near(bb.max[1], -2000, 1e-6, 'y');
+});
+
+test('Lose Platte, die die Box in 3D überdeckt, weicht allein aus; die Box bleibt', () => {
+  const { ed, roots } = boxesEditor(1);
+  // Teile der Box weit auseinander: die Box steht in 3D in der Mitte, auf der Arbeitsfläche liegt dort nichts
+  const spots: [number, number][] = [[100, 100], [1300, 100], [100, 1300], [1300, 1300], [100, 700]];
+  roots[0].forEach((o, k) => { o.m = [o.m[0], o.m[1], o.m[2], o.m[3], spots[k][0], spots[k][1]]; });
+  const alone = collectScene(ed, 3, false).scene;
+  const g = footOf(alone.solids as unknown as Solid[]);
+  cutLayer(ed);
+  const cx = (g.x0 + g.x1) / 2, cy = -(g.y0 + g.y1) / 2;
+  ed.doc.objs.push(cutRect(9007, cx - 15, cy - 10, 30, 20));
+  const sc = collectScene(ed, 3, false).scene;
+  const box = sc.solids.filter((s) => !s.key.startsWith('f'));
+  assert.deepEqual(box.map((s) => [s.key, s.pose.o]), alone.solids.map((s) => [s.key, s.pose.o]), 'Box bleibt stehen');
+  const f = sc.solids.find((s) => s.key.startsWith('f'))!;
+  assert.ok(f, 'lose Platte vorhanden');
+  assert.ok(!closer(footOf([f as unknown as Solid]), footOf(box as unknown as Solid[]), SPREAD_GAP - 1e-6), 'Platte hält Abstand zur Box');
 });
 
 test('Mehrlagenarbeit: Schneidform in einer Platte wird zum Loch', () => {

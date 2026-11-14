@@ -141,7 +141,7 @@ await test('ungültiger Inhalt: Platzhalter-Rechteck in voller Größe', () => {
 });
 
 await test('Klartext: Ziffern unter den Strichen, Begrenzungszeichen verlängert, erste Ziffer links daneben', () => {
-  const font = opentype.parse(readFileSync('node_modules/@fontsource/roboto/files/roboto-latin-400-normal.woff').buffer as ArrayBuffer);
+  const font = opentype.parse(new Uint8Array(readFileSync('node_modules/@fontsource/roboto/files/roboto-latin-400-normal.woff')).buffer);
   const s = shape({ text: true });
   const r = encodeLinear('ean13', s.data);
   assert.ok(r.ok);
