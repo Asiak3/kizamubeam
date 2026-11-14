@@ -158,6 +158,28 @@ export function parseStatus(line: string, prev: MachineStatus, wco: WorkOffset):
   return st;
 }
 
+/**
+ * Deckt diese Zeile eine Referenzfahrt mit Z-Abdeckung ab? GRBL-Familie nur `$H`/`$HZ`
+ * (`G28` fährt dort bloß eine gespeicherte Position an, referenziert nicht);
+ * Marlin/Smoothie: `G28` ohne Achsbuchstaben oder mit `Z` (Kommentare zählen nicht).
+ */
+export function homesZ(fw: Firmware, line: string): boolean {
+  const t = line.trim();
+  if (fw === 'fluidnc' || fw === 'grbl' || fw === 'grblhal') return /^\$H(Z)?$/i.test(t);
+  if (!/^G28(?=\s|$)/i.test(t)) return false;
+  const code = t.slice(3).split(';')[0].replace(/\(.*?\)/g, '');
+  return !/[XYZ]/i.test(code) || /Z/i.test(code);
+}
+
+/**
+ * Position nach dieser Controller-Meldung als verloren werten: `ALARM` oder Boot-Banner
+ * (Anker `^`, damit `$I`-/`M115`-Antworten nicht zurücksetzen). Marlin meldet Neustart nur mit `start`.
+ */
+export function losesPosition(line: string): boolean {
+  const t = line.trim();
+  return /^ALARM/i.test(t) || /^Grbl\s+[\w.]+/i.test(t) || /^FluidNC\s+v?[\w.\-]+/i.test(t) || /^start$/i.test(t);
+}
+
 type Unlisten = () => void;
 
 /** State of a remote host as its clients see it (sent by remoteHost.ts) */
@@ -189,6 +211,8 @@ const REMOTE_METHOD: Record<string, string> = {
 class Machine {
   connected = false;
   connecting = false;
+  /** Referenzfahrt mit Z-Abdeckung in dieser Verbindung ausgeführt (für strengen Z-Jog) */
+  homed = false;
   /** Beschreibung der Verbindung, z. B. „COM3“ oder „fluidnc.local:23“ */
   where = '';
   status: MachineStatus = emptyStatus();
@@ -201,6 +225,8 @@ class Machine {
   private wco: WorkOffset = { v: [0, 0, 0], known: false };
   /** Firmware der aktuellen Verbindung */
   fw = FIRMWARES.fluidnc;
+  /** Firmware-Schlüssel zu `fw` (für protokollabhängige Erkennung, z. B. Referenzfahrt) */
+  fwId: Firmware = 'fluidnc';
   /** Konfiguration der verbundenen FluidNC-Steuerung (nach dem Verbinden still gelesen); null = unbekannt */
   fluid: FluidConfig | null = null;
   /** Job, der auf der Steuerung von SD-Karte oder Flash läuft (FluidNC meldet SD: im Status) */
@@ -258,6 +284,7 @@ class Machine {
     const st = this.remote?.state;
     if (!st) return;
     this.fw = FIRMWARES[st.machine.fw] ?? FIRMWARES.fluidnc;
+    this.fwId = st.machine.fw;
     if (st.progress && !this.progress) this.progress = st.progress;
     if (!st.machine.running && this.progress && !st.progress) {
       this.progress = null;
@@ -337,6 +364,8 @@ class Machine {
     }
     if (line.startsWith('<')) {
       this.status = parseStatus(line, this.status, this.wco);
+      // Alarm heißt Positionsverlust (auch nach $X-Entsperrung neu referenzieren)
+      if (this.status.state.startsWith('Alarm')) this.homed = false;
       this.trackStoredJob();
       this.emit({ type: 'status' });
       return;
@@ -346,6 +375,8 @@ class Machine {
       if (this.capture.quiet) return;
     }
     const isErr = /^(error|alarm)/i.test(line);
+    // Alarm oder Controller-Neustart: Referenz ist verloren (wird beim nächsten Homing neu gesetzt)
+    if (losesPosition(line)) this.homed = false;
     const why = explain(line);
     this.log(why ? `${line}  (${why})` : line, isErr ? 'error' : 'in');
   }
@@ -359,6 +390,7 @@ class Machine {
     if (this.connected || this.connecting) return;
     this.connecting = true;
     this.wco = { v: [0, 0, 0], known: false };
+    this.homed = false;
     this.emit({ type: 'connection' });
     try {
       await this.listen();
@@ -369,6 +401,7 @@ class Machine {
       this.log(t('Verbinde mit {where} …', { where }));
       const fw = FIRMWARES[d.fw];
       this.fw = fw;
+      this.fwId = d.fw;
       await invoke('machine_connect', {
         kind: d.conn, port: d.port, baud: d.baud, host: d.host, tcpPort: netPort,
         sync: fw.sync, realtime: fw.realtime, poll: fw.poll, rxBuffer: d.rxBuffer || 127,
@@ -430,6 +463,8 @@ class Machine {
     if (/G\s*(10|92|5[4-9])\b/i.test(line)) this.wco.known = false;
     try {
       await this.call('machine_send', { line });
+      // Referenzfahrt merken — schon beim Senden: Scheitern landet nie in Idle, das Z-Gate bleibt dann zu.
+      if (homesZ(this.fwId, line)) this.homed = true;
     } catch (e) {
       this.log(tBackend(String(e)), 'error');
     }

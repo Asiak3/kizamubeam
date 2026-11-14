@@ -1,7 +1,7 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode } from '../src/gcode';
+import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode, zJogLines } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
 import { dedupPolys } from '../src/dedup';
@@ -291,6 +291,13 @@ await test('Verfahren und Testdrehung auf der Drehachse', () => {
   // Objekt Ø 80 auf Walze Ø 20: eine Objektumdrehung = vier Walzenumdrehungen
   assert.match(rotaryTestLines(d)[0], /^\$J=G91 G21 A1440 F/);
   assert.deepEqual(jogLines(newDevice({ fw: 'marlin' }), 0, 5, 1000), ['G91', 'G0 Y5 F1000', 'G90']);
+});
+
+await test('Z-Jog: alle Firmware-Profile fahren Z relativ in Steuerungsrichtung', () => {
+  assert.deepEqual(zJogLines(newDevice({ fw: 'fluidnc' }), 0.5, 60), ['$J=G91 G21 Z0.5 F60']);
+  assert.deepEqual(zJogLines(newDevice({ fw: 'grbl' }), -1, 60), ['$J=G91 G21 Z-1 F60']);
+  assert.deepEqual(zJogLines(newDevice({ fw: 'grblhal' }), 5, 120), ['$J=G91 G21 Z5 F120']);
+  assert.deepEqual(zJogLines(newDevice({ fw: 'marlin' }), 0.1, 60), ['G91', 'G0 Z0.1 F60', 'G90']);
 });
 
 await test('Warnung, wenn der Job höher ist als der Objektumfang', async () => {
