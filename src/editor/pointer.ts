@@ -707,6 +707,8 @@ export class EditorPointer {
           this.rotateMode = !this.rotateMode;
           this.emit('sel');
         }
+        // Wie Skalieren und Drehen: das Loslassen melden, damit z. B. die 3D-Ansicht, die beim Ziehen pausiert, folgt
+        if (d.moved) this.emit('sel');
         return;
       case 'scale':
       case 'rotate':

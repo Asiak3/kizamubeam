@@ -182,4 +182,13 @@ await test('right-click draft completion is reserved, not a context-menu gesture
   const ed = editor([]); ed.draft = { nodes: [{ x: 40, y: 40 }, { x: 60, y: 40 }], closed: false };
   ed.onDown(event(60, 40, { button: 2 })); assert.equal(ed.suppressContextMenu, true);
 });
+await test('releasing a move drag is reported, so views that pause while dragging (3D, #243) follow the drop', () => {
+  const a = rect(), ed = editor([a]), seen: string[] = [];
+  ed.hitTest = () => a; // hit testing needs the DOM-only Path2D
+  ed.on((what) => seen.push(what));
+  ed.onDown(event(40, 40)); ed.onMove(event(60, 40));
+  assert.equal(ed.drag?.type, 'move'); assert.equal(a.m[4], 50);
+  seen.length = 0; ed.onUp(event(60, 40));
+  assert.equal(ed.drag, null); assert.ok(seen.includes('sel'), `events on release: ${seen.join(', ')}`);
+});
 console.log(`Interaction prototypes: ${count} checks passed without hardware/app startup.`);
