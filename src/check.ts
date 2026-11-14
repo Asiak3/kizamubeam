@@ -210,6 +210,8 @@ export interface CheckInput {
   skipBed?: boolean;
   /** Objekte aller Seiten (Baugruppen, deren Teile nach dem Verschachteln verteilt liegen); sonst nur objs */
   allObjs?: Obj[];
+  /** Objekte je Seite: gezeichnete Formen schneiden Löcher und Kerben in Baugruppen wie beim Lasern (nur dieselbe Seite) */
+  pages?: Obj[][];
 }
 
 function collect(inp: CheckInput): Contour[] {
@@ -744,7 +746,7 @@ export function checkDesign(inp: CheckInput): CheckIssue[] {
       fix: f.gen ? { kind: 'gen', obj: f.gen.obj, patch: f.gen.patch, calibrated: f.calibrated } : undefined,
     });
   const asm: AsmFinding[] = [];
-  checkAssemblies(inp.objs, inp.allObjs ?? inp.objs, inp.layer, asm);
+  checkAssemblies(inp.objs, inp.allObjs ?? inp.objs, inp.layer, asm, inp.pages);
   for (const f of asm) out.push({ key: f.key, kind: f.kind, level: f.level, msg: f.msg, objs: f.objs, lines: f.lines, pts: [] });
   return out.map((x, i) => [x, i] as const).sort((a, b) => ORDER[a[0].level] - ORDER[b[0].level] || a[1] - b[1]).map(([x]) => x);
 }

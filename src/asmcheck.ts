@@ -1,12 +1,14 @@
 // „Konstruktion prüfen“ für Baugruppen aus Generatoren (Box, Einsatz, Regal, Scheibenkugel, Schicht- und
 // Rippenmodell): Hängt jedes Stück am Rest, und lässt sich alles gerade stecken? Die Rechnung steht in
 // src/view3d/assembly.ts; hier werden die Baugruppen im Dokument gefunden und die Befunde formuliert.
-import { IDENT, isOff, Layer, Mat, mul, Obj, Pt } from './model';
+import { IDENT, inv, isOff, Layer, leaves, Mat, mul, Obj, Pt } from './model';
 import { boundsOf } from './geom';
 import { t } from './i18n';
 import type { Params } from './generators/types';
 import { getGenerator } from './generators/index';
-import { asmSolids } from './view3d/solids';
+import { asmSolids, Solid } from './view3d/solids';
+import { collectCutters, Cutter, cutPlate } from './view3d/cuts';
+import { SCALE } from './clip';
 import { analyzeAssembly, AssemblyReport } from './view3d/assembly';
 import { genThickness } from './view3d/poses';
 
@@ -24,11 +26,21 @@ export interface AsmFinding {
 
 const cache = new Map<string, AssemblyReport | null>();
 
-/** Prüfung einer Baugruppe (zwischengespeichert, weil die Prüfung nach jeder Änderung neu läuft) */
-export function assemblyReport(gen: string, params: Params, keys: Set<string>): AssemblyReport | null {
-  const ck = `${gen}|${JSON.stringify(params)}|${[...keys].sort().join(',')}`;
+/** Gezeichnete Formen, die Teile einer Baugruppe ausschneiden: sig für den Zwischenspeicher, apply schneidet die Teile */
+export interface AsmCuts {
+  sig: string;
+  apply: (solids: Solid[]) => void;
+}
+
+/**
+ * Prüfung einer Baugruppe (zwischengespeichert, weil die Prüfung nach jeder Änderung neu läuft). cuts: Löcher und Kerben
+ * aus gezeichneten Formen (wie in der 3D-Ansicht, Issue #285); ohne sie wird die Baugruppe geprüft, wie sie erzeugt wird.
+ */
+export function assemblyReport(gen: string, params: Params, keys: Set<string>, cuts?: AsmCuts): AssemblyReport | null {
+  const ck = `${gen}|${JSON.stringify(params)}|${[...keys].sort().join(',')}${cuts ? '|' + cuts.sig : ''}`;
   if (cache.has(ck)) return cache.get(ck)!;
   const solids = asmSolids(gen, params, genThickness(params, 3), keys);
+  if (solids && cuts) cuts.apply(solids);
   const r = solids && solids.length > 1 ? analyzeAssembly(solids) : null;
   if (cache.size > 20) cache.clear();
   cache.set(ck, r);
@@ -52,23 +64,60 @@ function pieceName(r: AssemblyReport, i: number): string {
 
 const list = (names: string[], max = 8) => [...new Set(names)].slice(0, max).join(', ') + (new Set(names).size > max ? ' …' : '');
 
+/** Formen, die Teile dieser Baugruppe ausschneiden (nur Formen auf der Seite des Teils, deren Rahmen das Teil berührt) */
+function asmCuts(parts: Obj[], mats: Map<Obj, Mat>, pageOf: Map<Obj, number>, cutters: Cutter[]): AsmCuts | undefined {
+  const rel: { key: string; page: number; toLocal: Mat; cs: Cutter[] }[] = [];
+  for (const o of parts) {
+    const page = pageOf.get(o),
+      m = mats.get(o);
+    if (page === undefined || !m) continue;
+    const b = boundsOf([{ ...o, m }]);
+    if (!b) continue;
+    const box = [b.x * SCALE, b.y * SCALE, (b.x + b.w) * SCALE, (b.y + b.h) * SCALE];
+    const cs = cutters.filter((c) => c.page === page && c.box[0] < box[2] && c.box[2] > box[0] && c.box[1] < box[3] && c.box[3] > box[1]);
+    if (cs.length) rel.push({ key: (o.shape as Extract<Obj['shape'], { kind: 'gen' }>).part ?? 'main', page, toLocal: inv(m), cs });
+  }
+  if (!rel.length) return undefined;
+  return {
+    sig: JSON.stringify(rel.map((r) => [r.key, r.page, r.toLocal, r.cs.map((c) => [c.id, c.paths])])),
+    apply: (solids) => {
+      for (const s of solids) {
+        const r = rel.find((x) => x.key === s.key);
+        const cut = r && cutPlate(s.polys, r.page, r.toLocal, r.cs);
+        if (cut) s.polys = cut.polys;
+      }
+    },
+  };
+}
+
 /**
  * Befunde für alle Baugruppen der Seite. all: Objekte aller Seiten (nach dem Verschachteln liegen Teile verteilt),
- * damit fehlende Teile nur dann als fehlend gelten, wenn sie wirklich gelöscht sind.
+ * damit fehlende Teile nur dann als fehlend gelten, wenn sie wirklich gelöscht sind. pages: Objekte je Seite; damit
+ * schneiden gezeichnete Formen Löcher und Kerben in die Teile wie beim Lasern (ohne pages wird nichts geschnitten).
  */
-export function checkAssemblies(objs: Obj[], all: Obj[], layerOf: (i: number) => Layer, out: AsmFinding[]) {
+export function checkAssemblies(objs: Obj[], all: Obj[], layerOf: (i: number) => Layer, out: AsmFinding[], pages?: Obj[][]) {
   const tops = new Map<Obj, Obj>();
+  /** Lage jedes Teils auf der Arbeitsfläche */
+  const mats = new Map<Obj, Mat>();
   const here: Obj[] = [];
   const walk = (top: Obj, o: Obj, parent: Mat, mine: boolean) => {
     if (isOff(o)) return;
     const m = mul(parent, o.m);
     if (mine) tops.set(o, top);
     if (o.shape.kind === 'group') o.shape.children.forEach((c) => walk(top, c, m, mine));
-    else if (o.shape.kind === 'gen' && o.shape.asm && ASSEMBLIES.has(o.shape.gen) && layerOf(o.layer).output) here.push(o);
+    else if (o.shape.kind === 'gen' && o.shape.asm && ASSEMBLIES.has(o.shape.gen) && layerOf(o.layer).output) {
+      here.push(o);
+      mats.set(o, m);
+    }
   };
   const pageSet = new Set(objs);
   for (const o of all) walk(o, o, IDENT, pageSet.has(o));
   if (all !== objs) for (const o of objs) if (!all.includes(o)) walk(o, o, IDENT, true);
+  const pageOf = new Map<Obj, number>();
+  pages?.forEach((p, i) => {
+    for (const [l] of leaves(p)) pageOf.set(l, i);
+  });
+  const cutters = pages && here.length ? collectCutters(pages, layerOf) : [];
   // Baugruppen, von denen mindestens ein Teil auf dieser Seite liegt
   const asms = new Map<string, Obj[]>();
   for (const o of here) {
@@ -84,7 +133,7 @@ export function checkAssemblies(objs: Obj[], all: Obj[], layerOf: (i: number) =>
     const keys = new Set(parts.map((o) => (o.shape as Extract<Obj['shape'], { kind: 'gen' }>).part ?? 'main'));
     let r: AssemblyReport | null = null;
     try {
-      r = assemblyReport(s.gen, s.params as Params, keys);
+      r = assemblyReport(s.gen, s.params as Params, keys, cutters.length ? asmCuts(parts, mats, pageOf, cutters) : undefined);
     } catch {
       r = null;
     }
