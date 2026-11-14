@@ -454,8 +454,15 @@ export function buildView3dPanel(ed: Editor) {
   let queued = 0;
 
   const update = () => {
+    window.clearTimeout(queued);
     queued = 0;
     if (!viewer || !isShown('view3d')) return;
+    // Während eines Ziehens auf der Arbeitsfläche nicht neu aufbauen (Issue #243): später erneut versuchen, damit die
+    // Ansicht nach dem Loslassen einmal folgt, egal wie das Ziehen endet (Loslassen, Esc, Ziehen ohne Ereignis)
+    if (ed.drag) {
+      queued = window.setTimeout(update, 150);
+      return;
+    }
     const { scene, key, asms } = collectScene(ed, set.th, set.marks, set.look);
     hint.hidden = scene.solids.length > 0;
     viewer.setScene(scene, key !== lastKey);
