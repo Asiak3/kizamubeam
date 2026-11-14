@@ -145,13 +145,28 @@ export function buildAppsPanel(ed: Editor) {
     st.recent = pushRecent(st.recent, tile.key);
     if (!st.used.includes(tile.key)) st.used.push(tile.key);
     save(st);
-    render();
+    refreshTop(tile, false);
   };
 
   const toggleFav = (tile: Tile) => {
     st.favs = st.favs.includes(tile.key) ? st.favs.filter((x) => x !== tile.key) : [...st.favs, tile.key];
     save(st);
-    render();
+    refreshTop(tile, true);
+  };
+
+  /**
+   * Nach Benutzen oder Favorit nicht die ganze Liste neu aufbauen (Issue #264): Der Browser verschiebt sonst den
+   * Bildlauf. Nur die Abschnitte oben (Favoriten, zuletzt benutzt) erneuern und die Kacheln dieses Werkzeugs anpassen:
+   * nach dem Benutzen nur „NEU“ entfernen, beim Favorit die Kachel neu zeichnen (Stern).
+   */
+  const refreshTop = (tile: Tile, retile: boolean) => {
+    list.querySelectorAll('[data-top]').forEach((el) => el.remove());
+    if (!search.value.trim()) list.prepend(...topSections());
+    list.querySelectorAll<HTMLElement>('.app-tile').forEach((el) => {
+      if (el.dataset.key !== tile.key || el.closest('[data-top]')) return;
+      if (retile) el.replaceWith(tileEl(tile));
+      else el.querySelector('.app-new')?.remove();
+    });
   };
 
   const tileEl = (tile: Tile) => {
@@ -220,6 +235,19 @@ export function buildAppsPanel(ed: Editor) {
     return [...toolHits, ...packHits];
   };
 
+  /** Favoriten und zuletzt benutzt (nur ohne Filter), mit data-top markiert für refreshTop */
+  const topSections = () => {
+    const top: HTMLElement[] = [];
+    if (!st.filter) {
+      const favs = byKey(st.favs);
+      const recent = byKey(st.recent).filter((x) => !st.favs.includes(x.key)).slice(0, 3);
+      if (favs.length) top.push(section('fav', t('Favoriten'), 'star', favs));
+      if (recent.length) top.push(section('recent', t('Zuletzt benutzt'), 'undo', recent));
+    }
+    top.forEach((el) => (el.dataset.top = ''));
+    return top;
+  };
+
   const render = () => {
     renderChips();
     const q = search.value.trim();
@@ -231,15 +259,8 @@ export function buildAppsPanel(ed: Editor) {
       );
       return;
     }
-    const top: HTMLElement[] = [];
-    if (!st.filter) {
-      const favs = byKey(st.favs);
-      const recent = byKey(st.recent).filter((x) => !st.favs.includes(x.key)).slice(0, 3);
-      if (favs.length) top.push(section('fav', t('Favoriten'), 'star', favs));
-      if (recent.length) top.push(section('recent', t('Zuletzt benutzt'), 'undo', recent));
-    }
     list.replaceChildren(
-      ...top,
+      ...topSections(),
       ...groups
         .filter((g) => !st.filter || g.id === st.filter)
         .map((g) => ({ g, items: filtered().filter((x) => x.group === g.id) }))
