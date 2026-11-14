@@ -2620,7 +2620,7 @@
   "Jetzt suchen": "Check now",
   "Jetzt aktualisieren": "Update now",
   "Stabil": "Stable",
-  "Beta (mit Vorabversionen)": "Beta (including pre-releases)",
+  "Nightly (mit Vorabversionen)": "Nightly (including pre-releases)",
   "Version {version} ist verfügbar.": "Version {version} is available.",
   "KizamuBeam ist auf dem neuesten Stand.": "KizamuBeam is up to date.",
   "Suche nach Updates …": "Checking for updates …",
@@ -4523,7 +4523,7 @@
   "Gilt für diese Installation und wird mit „Einstellungen übertragen“ auf andere Rechner übernommen.": "Applies to this installation and is carried over to other computers with “Transfer settings”.",
   "Allgemein": "General",
   "Update-Kanal": "Update channel",
-  "Beta Stabil Version": "beta stable version",
+  "Nightly Beta Stabil Version": "nightly beta stable version",
   "Jetzt nach Updates suchen": "Check for updates now",
   "Jetzt suchen …": "Check now …",
   "Export Import Sync Ordner": "export import sync folder",
@@ -4738,5 +4738,7 @@
   "{which} {len} mm, {kind} {angle}°": "{which} {len} mm, {kind} {angle}°",
   "Überschnitt {v} mm": "Overcut {v} mm",
   "Kerf {v} mm": "Kerf {v} mm",
-  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Click: start here, Shift: reverse, Ctrl: reset"
+  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Click: start here, Shift: reverse, Ctrl: reset",
+  "Nightly-Builds entstehen jede Nacht automatisch aus dem aktuellen Entwicklungsstand und sind nicht an echter Hardware getestet. Mit einem Nightly gespeicherte Dateien lassen sich in der stabilen Version eventuell nicht öffnen.": "Nightly builds are made automatically every night from the current development state and are not tested on real hardware. Files saved with a nightly build may not open in the stable version.",
+  "Nightly-Build {version}: nicht an echter Hardware getestet. Ersten Job bitte beobachten.": "Nightly build {version}: not tested on real hardware. Please watch the first job."
 }

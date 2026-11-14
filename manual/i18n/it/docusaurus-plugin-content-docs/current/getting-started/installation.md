@@ -68,7 +68,9 @@ sudo usermod -aG dialout $USER
 KizamuBeam cerca le nuove versioni e si aggiorna da solo: **Aiuto → Controlla aggiornamenti …**. In **Modifica → Impostazioni → Generale → Aggiornamenti** scegli il canale di aggiornamento:
 
 - **Stabile**: solo versioni definitive (consigliato).
-- **Beta (incluse versioni preliminari)**: prova prima le nuove funzioni e aiuta a trovare i bug.
+- **Nightly (incluse versioni preliminari)**: ogni notte una nuova build dallo stato di sviluppo attuale, più le release candidate prima di ogni versione stabile. Prova prima le nuove funzioni e aiuta a trovare i bug. Le build nightly **non sono testate su hardware reale**: osserva il primo lavoro; i file salvati con una build nightly potrebbero non aprirsi nella versione stabile.
+
+Chi usava il canale Beta passa a Stabile; scegli Nightly tu stesso se lo desideri.
 
 ## Prossimi passi
 

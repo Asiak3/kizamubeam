@@ -48,4 +48,4 @@ Die Desktop-App kann diese Einstellungen auch **über einen Ordner** deiner Wahl
 
 ## Updates
 
-Die Desktop-App sucht nach neuen Versionen und bietet an, sie zu installieren. Unter **Bearbeiten → Einstellungen → Allgemein → Update-Kanal** wählst du **Stabil** oder **Beta** (mit Vorabversionen).
+Die Desktop-App sucht nach neuen Versionen und bietet an, sie zu installieren. Unter **Bearbeiten → Einstellungen → Allgemein → Update-Kanal** wählst du **Stabil** oder **Nightly** (nächtliche Builds und Release-Kandidaten).

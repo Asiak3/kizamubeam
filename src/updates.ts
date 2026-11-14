@@ -1,8 +1,9 @@
-// Updates: passenden Release auf GitHub finden (Kanal stabil oder Beta) und über den Updater in Rust
+// Updates: passenden Release auf GitHub finden (Kanal stabil oder Nightly) und über den Updater in Rust
 // (src-tauri/src/updater.rs) prüfen und installieren. Die Auswahl ist reine Logik und wird mit
 // `npm run test:updates` geprüft.
 
-export type Channel = 'stable' | 'beta';
+/** stable: only stable releases; nightly: nightly builds from main, release candidates and stable releases */
+export type Channel = 'stable' | 'nightly';
 
 export const RELEASES_API = 'https://api.github.com/repos/negurvulkan/kizamubeam/releases?per_page=100';
 export const RELEASES_PAGE = 'https://github.com/negurvulkan/kizamubeam/releases';
@@ -45,8 +46,20 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/** Vorgabe: Wer eine Vorabversion nutzt, bekommt Beta-Updates, sonst nur stabile */
-export const defaultChannel = (current: string): Channel => (current.includes('-') ? 'beta' : 'stable');
+/** Nightly builds are versioned like 2.9.0-nightly.20261114.12 */
+export const isNightly = (version: string) => /-nightly(\.|$)/.test(version);
+
+/** Default: a nightly build stays on nightly, everything else (stable, release candidates) gets stable updates */
+export const defaultChannel = (current: string): Channel => (isNightly(current) ? 'nightly' : 'stable');
+
+/**
+ * Channel from the stored setting. The former 'beta' channel (and anything unknown) becomes 'stable', so
+ * existing beta testers are never moved to untested nightly builds without choosing them.
+ */
+export function resolveChannel(stored: string | null, current: string): Channel {
+  if (stored === null) return defaultChannel(current);
+  return stored === 'nightly' ? 'nightly' : 'stable';
+}
 
 /** Releases der App heißen v1.2.3…; andere Programme im selben Repo (Virtual Machine: vm-v0.1.0) nicht */
 export const isAppTag = (tag: string) => /^v?\d/.test(tag);
@@ -58,7 +71,7 @@ export const isAppTag = (tag: string) => /^v?\d/.test(tag);
 export function pickRelease(releases: GhRelease[], channel: Channel, current: string): Candidate | null {
   let best: Candidate | null = null;
   for (const r of releases) {
-    if (r.draft || (r.prerelease && channel !== 'beta') || !isAppTag(r.tag_name)) continue;
+    if (r.draft || (r.prerelease && channel !== 'nightly') || !isAppTag(r.tag_name)) continue;
     const manifest = r.assets.find((a) => a.name === 'latest.json');
     if (!manifest) continue;
     const version = r.tag_name.replace(/^v/, '');

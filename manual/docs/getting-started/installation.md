@@ -68,7 +68,9 @@ sudo usermod -aG dialout $USER
 KizamuBeam checks for new versions and updates itself: **Help → Check for Updates …**. Under **Edit → Settings → General → Updates** you choose the update channel:
 
 - **Stable**: only finished releases (recommended).
-- **Beta (including pre-releases)**: try new features earlier and help find bugs.
+- **Nightly (including pre-releases)**: a new build every night from the current development state, plus release candidates before each stable version. Try new features earlier and help find bugs. Nightly builds are **not tested on real hardware**: watch your first job, and files saved with a nightly build may not open in the stable version.
+
+If you used the former Beta channel, KizamuBeam switches you to Stable; choose Nightly yourself if you want it.
 
 ## Next steps
 

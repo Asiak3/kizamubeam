@@ -209,7 +209,7 @@
   },
   "beta": {
     "title": "Stable – and still growing",
-    "text": "Version 2.2.0 is the first stable release: every feature has been tested on real hardware and is used every day. Want new features earlier? Switch to the Beta channel under Help → Check for Updates. Please report bugs and ideas on GitHub.",
+    "text": "Version 2.2.0 is the first stable release: every feature has been tested on real hardware and is used every day. Want new features earlier? Switch to the Nightly channel under Help → Check for Updates (a new build every night, not tested on hardware). Please report bugs and ideas on GitHub.",
     "unsigned_title": "Warning on first launch",
     "unsigned_text": "The installers aren’t code-signed yet, so macOS (Gatekeeper) and Windows (SmartScreen) show a warning the first time.",
     "unsigned_mac": "macOS: drag the app to the Applications folder and open it. In the dialog click “Done” (not “Move to Trash”), then System Settings → Privacy & Security → scroll down → “Open Anyway” → confirm with your password. Or in Terminal: xattr -cr /Applications/KizamuBeam.app",

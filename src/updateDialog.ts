@@ -2,7 +2,7 @@
 import { h } from './dom';
 import { t } from './i18n';
 import { hasNative, native } from './native';
-import { Channel, defaultChannel, pickRelease, RELEASES_API, RELEASES_PAGE } from './updates';
+import { Channel, defaultChannel, isNightly, pickRelease, RELEASES_API, RELEASES_PAGE, resolveChannel } from './updates';
 import { version as APP_VERSION } from '../package.json';
 
 const CHANNEL_KEY = 'kizamubeam.updateChannel';
@@ -24,7 +24,7 @@ const write = (k: string, v: string) => {
     /* ohne Speicher gilt die Vorgabe */
   }
 };
-const channel = (): Channel => (read(CHANNEL_KEY) as Channel | null) ?? defaultChannel(APP_VERSION);
+const channel = (): Channel => resolveChannel(read(CHANNEL_KEY), APP_VERSION);
 const autoCheck = () => read(AUTO_KEY) !== '0';
 
 /** For the settings window */
@@ -33,6 +33,11 @@ export const setUpdateChannel = (ch: Channel) => write(CHANNEL_KEY, ch);
 export const updateAutoCheck = autoCheck;
 export const setUpdateAutoCheck = (on: boolean) => write(AUTO_KEY, on ? '1' : '0');
 export const defaultUpdateChannel = () => defaultChannel(APP_VERSION);
+/** This build is a nightly build from main (untested on hardware) */
+export const nightlyBuild = isNightly(APP_VERSION);
+/** Warning shown with the nightly channel and in nightly builds */
+export const nightlyWarning = () =>
+  t('Nightly-Builds entstehen jede Nacht automatisch aus dem aktuellen Entwicklungsstand und sind nicht an echter Hardware getestet. Mit einem Nightly gespeicherte Dateien lassen sich in der stabilen Version eventuell nicht öffnen.');
 
 interface Found {
   version: string;
@@ -77,9 +82,13 @@ export function openUpdateDialog(found?: Found) {
     'select',
     { onchange: () => write(CHANNEL_KEY, chSel.value) },
     h('option', { value: 'stable' }, t('Stabil')),
-    h('option', { value: 'beta' }, t('Beta (mit Vorabversionen)')),
+    h('option', { value: 'nightly' }, t('Nightly (mit Vorabversionen)')),
   ) as HTMLSelectElement;
   chSel.value = channel();
+  const chNote = h('p', { class: 'note' }, nightlyWarning());
+  const showChNote = () => (chNote.hidden = chSel.value !== 'nightly');
+  chSel.addEventListener('change', showChNote);
+  showChNote();
   const auto = h('input', { type: 'checkbox', checked: autoCheck(), onchange: () => write(AUTO_KEY, auto.checked ? '1' : '0') }) as HTMLInputElement;
 
   const show = (f: Found | null) => {
@@ -147,6 +156,7 @@ export function openUpdateDialog(found?: Found) {
     h('h3', {}, t('Updates')),
     h('p', {}, t('Installierte Version: {version}', { version: APP_VERSION })),
     h('label', { class: 'row' }, t('Kanal'), chSel),
+    chNote,
     h('label', { class: 'row' }, auto, t('Beim Start einmal am Tag nach Updates suchen')),
     unsupported,
     status,

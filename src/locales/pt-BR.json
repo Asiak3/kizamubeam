@@ -2620,7 +2620,7 @@
   "Jetzt suchen": "Verificar agora",
   "Jetzt aktualisieren": "Atualizar agora",
   "Stabil": "Estável",
-  "Beta (mit Vorabversionen)": "Beta (incluindo pré-lançamentos)",
+  "Nightly (mit Vorabversionen)": "Nightly (incluindo pré-lançamentos)",
   "Version {version} ist verfügbar.": "A versão {version} está disponível.",
   "KizamuBeam ist auf dem neuesten Stand.": "O KizamuBeam está atualizado.",
   "Suche nach Updates …": "Procurando atualizações …",
@@ -4521,7 +4521,7 @@
   "Gilt für diese Installation und wird mit „Einstellungen übertragen“ auf andere Rechner übernommen.": "Vale para esta instalação e é levado a outros computadores com “Transferir configurações”.",
   "Allgemein": "Geral",
   "Update-Kanal": "Canal de atualização",
-  "Beta Stabil Version": "beta estável versão",
+  "Nightly Beta Stabil Version": "nightly beta estável versão",
   "Jetzt nach Updates suchen": "Procurar atualizações agora",
   "Jetzt suchen …": "Procurar agora …",
   "Export Import Sync Ordner": "exportar importar sincronizar pasta",
@@ -4736,5 +4736,7 @@
   "{which} {len} mm, {kind} {angle}°": "{which} {len} mm, {kind} {angle}°",
   "Überschnitt {v} mm": "Sobrecorte {v} mm",
   "Kerf {v} mm": "Kerf {v} mm",
-  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Clique: começar aqui, Shift: inverter, Ctrl: redefinir"
+  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Clique: começar aqui, Shift: inverter, Ctrl: redefinir",
+  "Nightly-Builds entstehen jede Nacht automatisch aus dem aktuellen Entwicklungsstand und sind nicht an echter Hardware getestet. Mit einem Nightly gespeicherte Dateien lassen sich in der stabilen Version eventuell nicht öffnen.": "As versões nightly são geradas automaticamente toda noite a partir do estado atual de desenvolvimento e não são testadas em hardware real. Arquivos salvos com uma versão nightly podem não abrir na versão estável.",
+  "Nightly-Build {version}: nicht an echter Hardware getestet. Ersten Job bitte beobachten.": "Versão nightly {version}: não testada em hardware real. Acompanhe o primeiro trabalho."
 }

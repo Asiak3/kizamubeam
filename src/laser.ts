@@ -22,6 +22,8 @@ import { openCheck } from './checkPanel';
 import { presetList } from './packs';
 import { presetOption } from './packsDialog';
 import { dec, locale, t, tBackend, tn } from './i18n';
+import { isNightly } from './updates';
+import { version as APP_VERSION } from '../package.json';
 
 const store = loadDevices();
 /** Das gewählte Gerät (live gebunden: wechselt mit der Auswahl) */
@@ -296,9 +298,16 @@ export async function uploadJob(ed: Editor, fs: FluidFs, file: string): Promise<
   return uploadGCode(g, fs, file);
 }
 
+/** Nightly builds remind once per session that they are untested on hardware */
+let nightlyWarned = false;
+
 function canRun(): boolean {
   const why = runBlocker();
   if (why) notify(why, true);
+  else if (isNightly(APP_VERSION) && !nightlyWarned) {
+    nightlyWarned = true;
+    notify(t('Nightly-Build {version}: nicht an echter Hardware getestet. Ersten Job bitte beobachten.', { version: APP_VERSION }));
+  }
   return !why;
 }
 

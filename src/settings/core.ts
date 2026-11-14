@@ -53,8 +53,9 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         set: (v) => hooks.setLanguage(v as LangPref),
       },
       {
-        kind: 'select', id: 'general.updateChannel', group: t('Updates'), label: t('Update-Kanal'), keywords: t('Beta Stabil Version'), def: defaultUpdateChannel(),
-        options: () => [['stable', t('Stabil')], ['beta', t('Beta (mit Vorabversionen)')]],
+        kind: 'select', id: 'general.updateChannel', group: t('Updates'), label: t('Update-Kanal'), keywords: t('Nightly Beta Stabil Version'), def: defaultUpdateChannel(),
+        options: () => [['stable', t('Stabil')], ['nightly', t('Nightly (mit Vorabversionen)')]],
+        hint: t('Nightly-Builds entstehen jede Nacht automatisch aus dem aktuellen Entwicklungsstand und sind nicht an echter Hardware getestet. Mit einem Nightly gespeicherte Dateien lassen sich in der stabilen Version eventuell nicht öffnen.'),
         get: () => updateChannel(),
         set: (v) => setUpdateChannel(v as Channel),
       },

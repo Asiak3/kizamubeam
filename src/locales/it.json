@@ -2352,7 +2352,7 @@
   "Jetzt suchen": "Controlla ora",
   "Jetzt aktualisieren": "Aggiorna ora",
   "Stabil": "Stabile",
-  "Beta (mit Vorabversionen)": "Beta (incluse versioni preliminari)",
+  "Nightly (mit Vorabversionen)": "Nightly (incluse versioni preliminari)",
   "Version {version} ist verfügbar.": "È disponibile la versione {version}.",
   "KizamuBeam ist auf dem neuesten Stand.": "KizamuBeam è aggiornato.",
   "Suche nach Updates …": "Ricerca aggiornamenti …",
@@ -4646,5 +4646,7 @@
   "{which} {len} mm, {kind} {angle}°": "{which} {len} mm, {kind} {angle}°",
   "Überschnitt {v} mm": "Sovrataglio {v} mm",
   "Kerf {v} mm": "Kerf {v} mm",
-  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Clic: inizia qui, Maiusc: inverti, Ctrl: ripristina"
+  "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Clic: inizia qui, Maiusc: inverti, Ctrl: ripristina",
+  "Nightly-Builds entstehen jede Nacht automatisch aus dem aktuellen Entwicklungsstand und sind nicht an echter Hardware getestet. Mit einem Nightly gespeicherte Dateien lassen sich in der stabilen Version eventuell nicht öffnen.": "Le build nightly vengono create automaticamente ogni notte dallo stato di sviluppo attuale e non sono testate su hardware reale. I file salvati con una build nightly potrebbero non aprirsi nella versione stabile.",
+  "Nightly-Build {version}: nicht an echter Hardware getestet. Ersten Job bitte beobachten.": "Build nightly {version}: non testata su hardware reale. Osserva il primo lavoro."
 }

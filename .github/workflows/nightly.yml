@@ -1,0 +1,119 @@
+# Nightly builds: once a night, if main has new commits and the CI workflow is green on them, a pre-release
+# v<next>-nightly.<YYYYMMDD>.<run> is created and built by release.yml (same installers and signed updater
+# packages as a normal release). The update channel "Nightly" in the app picks them up. Only the newest
+# KEEP nightlies are kept; a nightly whose build fails is removed again.
+# <next> is the next minor version after a stable version in tauri.conf.json (2.8.0 → 2.9.0), or the version
+# itself without its pre-release part (2.9.0-rc.1 → 2.9.0), so nightlies sort after the last stable release
+# and before the next one.
+# Manually: Actions → Nightly → Run workflow ("force" builds even without new commits).
+name: Nightly
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Build even if main has no new commits since the last nightly'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+env:
+  KEEP: 7
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Decide whether to build
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          last=$(gh release list --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | test("-nightly\\."))] | sort_by(.createdAt) | last | .tagName // ""')
+          if [[ -n "$last" && "$FORCE" != "true" ]] && [[ "$(git rev-list -n 1 "$last" 2>/dev/null)" == "$sha" ]]; then
+            echo "::notice::No new commits on main since $last."
+            exit 0
+          fi
+          ci=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&per_page=1" \
+            --jq '.workflow_runs[0].conclusion // ""')
+          if [[ "$ci" != "success" ]]; then
+            echo "::notice::CI on $sha is '${ci:-not finished or missing}', no nightly tonight."
+            exit 0
+          fi
+          cur=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          next=$(node -e "const v=process.argv[1],[a,b]=v.split('-')[0].split('.');console.log(v.includes('-')?v.split('-')[0]:a+'.'+(+b+1)+'.0')" "$cur")
+          version="$next-nightly.$(date -u +%Y%m%d).$GITHUB_RUN_NUMBER"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          echo "Nightly $version from $sha (repository version $cur)"
+
+      - name: Create pre-release
+        if: steps.plan.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          SHA: ${{ steps.plan.outputs.sha }}
+          LAST: ${{ steps.plan.outputs.last }}
+        run: |
+          changes=""
+          if [[ -n "$LAST" ]]; then changes="Changes since the previous nightly: https://github.com/$GITHUB_REPOSITORY/compare/$LAST...$SHA"; fi
+          notes=$(printf '%s\n\n%s\n\n%s\n' \
+            "Automatic nightly build from main ($SHA). **Not tested on real hardware.** Watch your first job, and keep in mind that files saved with a nightly build may not open in the current stable version." \
+            "$changes" \
+            "Installers for macOS (Apple Silicon and Intel), Windows and Linux are listed below under “Assets”.")
+          # A release created with GITHUB_TOKEN does not trigger release.yml a second time
+          gh release create "$TAG" --target "$SHA" --prerelease --title "KizamuBeam $TAG" --notes "$notes"
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.tag != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      version: ${{ needs.prepare.outputs.version }}
+    secrets: inherit
+
+  cleanup:
+    needs: [prepare, build]
+    if: ${{ always() && needs.prepare.outputs.tag != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove this nightly if its build failed
+        if: needs.build.result != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+
+      - name: Keep only the newest nightlies
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
+            --jq "[.[] | select(.tagName | test(\"-nightly\\\\.\"))] | sort_by(.createdAt) | reverse | .[$KEEP:] | .[].tagName" |
+          while read -r tag; do
+            echo "Removing $tag"
+            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+          done

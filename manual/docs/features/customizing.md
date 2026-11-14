@@ -48,4 +48,4 @@ The desktop app can also sync these settings **through a folder** you choose, su
 
 ## Updates
 
-The desktop app checks for new versions and offers to install them. Under **Edit → Settings → General → Update channel** you choose **Stable** or **Beta** (with pre-releases).
+The desktop app checks for new versions and offers to install them. Under **Edit → Settings → General → Update channel** you choose **Stable** or **Nightly** (nightly builds and release candidates).

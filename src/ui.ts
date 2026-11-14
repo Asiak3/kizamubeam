@@ -41,7 +41,7 @@ import { askGenConvert, openGenDialog } from './generators/dialog';
 import { assignLayerAsk, needsChildLayersQuestion } from './layerAssign';
 import { genLabel, getGenerator } from './generators';
 import { maybeOfferSetup, openSetupWizard } from './setupWizard';
-import { maybeCheckForUpdates, openUpdateDialog } from './updateDialog';
+import { maybeCheckForUpdates, nightlyBuild, nightlyWarning, openUpdateDialog } from './updateDialog';
 import { openPacksDialog } from './packsDialog';
 import { openGridDialog } from './gridDialog';
 import { buildLaser, frameJob, isPositionPick, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob, togglePositionPick } from './laser';
@@ -241,7 +241,7 @@ function changeLanguage(ed: Editor, p: LangPref) {
 
 /** Feste Texte aus index.html */
 function translateStatic() {
-  document.title = 'KizamuBeam';
+  document.title = nightlyBuild ? `KizamuBeam ${APP_VERSION}` : 'KizamuBeam';
   ($('#texteditor textarea') as HTMLTextAreaElement).placeholder = t('Text eingeben …');
   $('#texteditor .hint').textContent = t('Enter: neue Zeile · Ctrl+Enter oder Esc: fertig');
 }
@@ -580,6 +580,7 @@ function showAbout() {
     { class: 'about' },
     h('img', { src: isDark() ? logoDark : logoLight, alt: 'KizamuBeam' }),
     h('p', {}, t('Version {version}', { version: APP_VERSION })),
+    nightlyBuild ? h('p', { class: 'note' }, nightlyWarning()) : null,
     h('p', {}, t('„Kizamu“ (刻む) ist japanisch und heißt einritzen, gravieren, fein schneiden.')),
     h('p', {}, t('© 2026 Hanjo Winter · github.com/negurvulkan')),
     h('p', { class: 'note' }, t('Entwickelt mit Unterstützung von Claude Code.')),
