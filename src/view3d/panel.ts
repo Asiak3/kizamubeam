@@ -19,6 +19,7 @@ import { asmSolids, findOverlaps, Overlap, Solid, solidBounds } from './solids';
 import { flatPose, genThickness } from './poses';
 import { assembleMates, MatePart } from './mates';
 import { Placement, spreadApart } from './spread';
+import { collectCutters, cutPlate, pathBox } from './cuts';
 import { BURN, CanvasPlace, engravings, memberPlace } from './engrave';
 import { cleanLook, DEFAULT_LOOK, layerLook, LookPreset, MaterialLook, resolveLook } from './looks';
 import { lookEditor } from './lookui';
@@ -111,6 +112,26 @@ function collectMultiLayers(ed: Editor, selected: Obj[] | null, fallback: Materi
   return { solids, ids, used, count, items };
 }
 
+/**
+ * Gezeichnete Formen auf Schnitt-Layern, die eine Platte überdecken, schneiden sie aus: ganz darin ein Loch, am Rand eine Kerbe
+ * (wie beim Lasern, siehe cuts.ts und collectMates). Gilt für Teile von Generator-Baugruppen und für Platten von
+ * Mehrlagenarbeiten. Liefert die IDs der Formen, die wirklich etwas geschnitten haben; sie sind dann keine eigenen Platten mehr.
+ */
+function cutPlates(ed: Editor, targets: ViewSolid[], places: Map<string, CanvasPlace>, skip: Set<number>): Set<number> {
+  const consumed = new Set<number>();
+  if (!targets.length) return consumed;
+  const cutters = collectCutters(ed.doc.pages.map((pg) => pg.objs), (i) => ed.layer(i), skip);
+  for (const s of targets) {
+    const pl = places.get(s.key);
+    if (!pl) continue;
+    const r = cutPlate(s.polys, pl.page, pl.toLocal, cutters);
+    if (!r) continue;
+    s.polys = r.polys;
+    for (const id of r.used) consumed.add(id);
+  }
+  return consumed;
+}
+
 /** Teile für die Ansicht sammeln; liefert auch einen Schlüssel, der sich nur ändert, wenn andere Objekte gezeigt werden */
 export function collectScene(ed: Editor, th: number, marks = true, fallback: MaterialLook = DEFAULT_LOOK): { scene: Scene3D; key: string; asms: number } {
   const roots = ed.sel.length ? ed.sel : ed.doc.objs.filter((o) => !o.hidden);
@@ -138,6 +159,8 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     f.names.push({ label: o.shape.kind === 'gen' ? genLabel(o.shape) : objLabel(o), box: pathBox(paths), layer: o.layer });
     ids.push(o.id);
   };
+  /** Lose Formen: erst nach den Baugruppen entscheiden, ob sie Platten schneiden (Loch, Kerbe) oder eigene Platten sind */
+  const looseShapes: { o: Obj; m: Obj['m']; thick: number }[] = [];
   // Eine Auswahl zeigt auch ausgeblendete Objekte, die ganze Seite nur sichtbare
   const all = [...(ed.sel.length ? leaves(roots) : visibleLeaves(roots))].filter(([o]) => !multi.used.has(o.id));
   const mated = collectMates(ed, all, th, places);
@@ -148,6 +171,8 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
   asms += mated.groups.length;
   /** Blöcke der Ansicht, die sich nicht überdecken dürfen (siehe spreadApart) */
   const items: Placement[] = [...multi.items];
+  /** Platten, in die Formen Löcher und Kerben schneiden dürfen */
+  const targets: ViewSolid[] = [...multi.solids];
   mated.groups.forEach((g, i) => items.push({ parts: g, order: mated.orders[i] }));
   for (const [o, m] of all) {
     if (mated.used.has(o.id)) continue;
@@ -159,7 +184,7 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
       const parts = asmSolids(s.gen, s.params, th, keys);
       if (!parts) {
         // Ohne räumlichen Aufbau (oder mit fehlerhaften Parametern): flach zeigen wie andere Konturen
-        flat(o, m, genThickness(s.params, th));
+        looseShapes.push({ o, m, thick: genThickness(s.params, th) });
         continue;
       }
       asmDone.add(s.asm);
@@ -172,14 +197,21 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
         const vs = { ...p, key, group: s.asm, layer: (mem ?? members[0])?.o.layer ?? o.layer };
         solids.push(vs);
         placed.push(vs);
+        targets.push(vs);
         const pl = mem && memberPlace(ed, mem.o);
         if (pl) places.set(key, pl);
       }
       ids.push(s.asm);
       items.push({ parts: placed, order: Math.min(...members.map((x) => x.o.id)) });
-    } else if (s.kind === 'gen') flat(o, m, genThickness(s.params, th));
-    else flat(o, m, th);
+    } else if (s.kind === 'gen') looseShapes.push({ o, m, thick: genThickness(s.params, th) });
+    else looseShapes.push({ o, m, thick: th });
   }
+  // Formen, die Platten berühren, schneiden Löcher und Kerben hinein; nur die übrigen sind eigene Platten
+  const consumed = cutPlates(ed, targets, places, new Set([...multi.used, ...mated.used]));
+  for (const x of looseShapes)
+    if (consumed.has(x.o.id)) ids.push(x.o.id);
+    else flat(x.o, x.m, x.thick);
+  for (const id of consumed) if (!ids.includes(id)) ids.push(id);
   let n = 0;
   for (const [thick, f] of flats)
     for (const { outer, holes } of islands(f.paths)) {
@@ -302,19 +334,6 @@ function collectMates(ed: Editor, shown: [Obj, Mat][], th: number, places: Map<s
   const groups = [...byGroup.values()];
   // Reihenfolge nach der kleinsten Objekt-ID der Gruppe (Schlüssel der Teile: „m“ + ID)
   return { groups, orders: groups.map((g) => Math.min(...g.map((x) => Number(x.key.slice(1))))), used };
-}
-
-/** Ausdehnung von Clipper-Pfaden (µm): [x0, y0, x1, y1] */
-function pathBox(paths: Paths): number[] {
-  const b = [Infinity, Infinity, -Infinity, -Infinity];
-  for (const p of paths)
-    for (const q of p) {
-      b[0] = Math.min(b[0], q.X);
-      b[1] = Math.min(b[1], q.Y);
-      b[2] = Math.max(b[2], q.X);
-      b[3] = Math.max(b[3], q.Y);
-    }
-  return b;
 }
 
 /** Konturen nach Gerade-Ungerade-Regel in zusammenhängende Flächen mit ihren Löchern zerlegen */

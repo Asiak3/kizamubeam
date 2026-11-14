@@ -469,6 +469,8 @@ const { EditorGenerators } = await import('../src/editor/generators');
 const { buildGen } = await import('../src/generators/index');
 const { defaultLayer } = await import('../src/model');
 const { boundsOf } = await import('../src/geom');
+const jigMod = await import('../src/generators/jig');
+const { normalizeParams } = await import('../src/generators/index');
 
 type Rect = { x0: number; y0: number; x1: number; y1: number };
 const footOf = (parts: Solid[]): Rect => {
@@ -556,25 +558,254 @@ test('spreadApart: berührende Blöcke bleiben, überdeckende werden mit Abstand
   assert.ok((all.x1 - all.x0) / (all.y1 - all.y0) < 2.5, 'Anordnung zu langgestreckt');
 });
 
+/** Fläche der Konturen einer Platte nach Gerade-Ungerade-Regel (Löcher abgezogen), ohne Verschachtelung auszuwerten */
+const plateArea = (polys: Solid['polys']) => {
+  const areaOf = (p: { x: number; y: number }[]) => Math.abs(p.reduce((s, q, i) => s + (p[(i + 1) % p.length].x - q.x) * (p[(i + 1) % p.length].y + q.y), 0) / 2);
+  const contains = (outer: { x: number; y: number }[], q: { x: number; y: number }) => {
+    let inside = false;
+    for (let i = 0, j = outer.length - 1; i < outer.length; j = i++) if (outer[i].y > q.y !== outer[j].y > q.y && q.x < ((outer[j].x - outer[i].x) * (q.y - outer[i].y)) / (outer[j].y - outer[i].y) + outer[i].x) inside = !inside;
+    return inside;
+  };
+  return polys.reduce((sum, p, i) => sum + (polys.filter((o, j) => j !== i && contains(o, p[0])).length % 2 ? -1 : 1) * areaOf(p), 0);
+};
+
 function cutLayer(ed: any) {
   ed.doc.layers[1] = { ...defaultLayer(1), mode: 'line' };
 }
 const cutRect = (id: number, x: number, y: number, w: number, h: number): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer: 1, shape: { kind: 'rect', w, h, r: 0 } } as Obj);
+const wall = (members: Obj[], part: string) => members.find((o) => o.shape.kind === 'gen' && o.shape.part === part)!;
 
-test('Gezeichnete Form auf einer Wand: Box und Form bleiben wie bisher (Form an ihrer Stelle der Arbeitsfläche)', () => {
+test('Schneidform ganz in einer Wand: Loch in der Wand, keine lose Platte, Box bleibt', () => {
   const { ed, roots } = boxesEditor(1);
-  const alone = collectScene(ed, 3, false).scene;
-  const front = roots[0].find((o) => o.shape.kind === 'gen' && o.shape.part === 'front')!;
+  const before = collectScene(ed, 3, false).scene;
+  const front = wall(roots[0], 'front');
   const b = boundsOf([front])!;
   cutLayer(ed);
   ed.doc.objs.push(cutRect(9001, b.x + b.w / 2 - 10, b.y + b.h / 2 - 5, 20, 10));
+  const after = collectScene(ed, 3, false).scene;
+  assert.equal(after.solids.length, before.solids.length, 'keine zusätzliche Platte');
+  assert.ok(!after.solids.some((s) => s.key.startsWith('f')), 'nicht als lose Platte');
+  const key = (sc: typeof before) => sc.solids.find((s) => s.key.endsWith(':front'))!;
+  near(plateArea(key(before).polys) - plateArea(key(after).polys), 200, 1e-3, 'Loch 20 × 10');
+  assert.deepEqual(after.solids.map((s) => [s.key, s.pose.o]), before.solids.map((s) => [s.key, s.pose.o]), 'Lage der Box unverändert');
+});
+
+test('Schneidform am Rand einer Wand: Kerbe, keine lose Platte', () => {
+  const { ed, roots } = boxesEditor(1);
+  const before = collectScene(ed, 3, false).scene;
+  const b = boundsOf([wall(roots[0], 'front')])!;
+  cutLayer(ed);
+  // Mitte der linken Kante der Wand: die Hälfte des Rechtecks liegt außerhalb der Wand
+  ed.doc.objs.push(cutRect(9002, b.x - 5, b.y + b.h / 2 - 5, 10, 10));
+  const after = collectScene(ed, 3, false).scene;
+  assert.ok(!after.solids.some((s) => s.key.startsWith('f')), 'nicht als lose Platte');
+  const lost = plateArea(before.solids.find((s) => s.key.endsWith(':front'))!.polys) - plateArea(after.solids.find((s) => s.key.endsWith(':front'))!.polys);
+  assert.ok(lost > 1 && lost <= 50 + 1e-6, `Kerbe ${lost} mm²`);
+});
+
+test('Schneidform auf einem Fülllayer, auf anderer Seite oder neben der Wand schneidet nichts', () => {
+  const { ed, roots } = boxesEditor(1);
+  const before = collectScene(ed, 3, false).scene;
+  const b = boundsOf([wall(roots[0], 'front')])!;
+  const polys = () => collectScene(ed, 3, false).scene.solids.find((s) => s.key.endsWith(':front'))!.polys.length;
+  // Fülllayer (Gravur): keine Platte, kein Loch
+  ed.doc.objs.push({ ...cutRect(9003, b.x + 5, b.y + 5, 10, 10), layer: 0 } as Obj);
+  assert.equal(polys(), before.solids.find((s) => s.key.endsWith(':front'))!.polys.length);
+  // Auf einer anderen Seite: gleiche Stelle, aber kein Loch
+  cutLayer(ed);
+  ed.doc.pages.push({ name: 'B', objs: [cutRect(9004, b.x + 5, b.y + 5, 10, 10)] } as never);
+  assert.equal(polys(), before.solids.find((s) => s.key.endsWith(':front'))!.polys.length);
+  // Berührt nur die Kante: nichts wird geschnitten
+  ed.doc.objs.push(cutRect(9005, b.x - 10, b.y + b.h / 2 - 5, 10, 10));
+  assert.equal(polys(), before.solids.find((s) => s.key.endsWith(':front'))!.polys.length);
+});
+
+test('Lose Platte fern von allen Teilen bleibt an ihrer Stelle der Arbeitsfläche', () => {
+  const { ed } = boxesEditor(1);
+  cutLayer(ed);
+  ed.doc.objs.push(cutRect(9006, 2000, 2000, 30, 20));
   const sc = collectScene(ed, 3, false).scene;
-  assert.deepEqual(sc.solids.filter((s) => !s.key.startsWith('f')).map((s) => [s.key, s.pose.o]), alone.solids.map((s) => [s.key, s.pose.o]), 'Box bleibt stehen');
   const f = sc.solids.find((s) => s.key.startsWith('f'))!;
-  assert.ok(f, 'Form als eigene Platte');
+  assert.ok(f, 'lose Platte vorhanden');
   const bb = solidBounds(f);
-  near(bb.min[0], b.x + b.w / 2 - 10, 1e-6, 'x');
-  near(bb.max[1], -(b.y + b.h / 2 - 5), 1e-6, 'y');
+  near(bb.min[0], 2000, 1e-6, 'x');
+  near(bb.max[1], -2000, 1e-6, 'y');
+});
+
+test('Mehrlagenarbeit: Schneidform in einer Platte wird zum Loch', () => {
+  const rect = (id: number, x: number, y: number): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer: 0, shape: { kind: 'rect', w: 40, h: 30, r: 0 } });
+  const lower = rect(901, 20, 20), upper = rect(902, 180, 90);
+  const hole = cutRect(903, 30, 30, 10, 10);
+  const doc = loadDoc({ version: 2, bed: { w: 300, h: 200 }, page: 0, layers: {}, pages: [{ name: 'A', objs: [lower, hole] }, { name: 'B', objs: [upper] }], multiLayerAssemblies: [{ id: 'layers', plates: [
+    { object: 901, name: 'Basis', thickness: 2, look: { id: 'birch' }, anchor: IDENT },
+    { object: 902, name: 'Decklage', thickness: 4, look: { id: 'acrylic' }, anchor: IDENT },
+  ] }] });
+  const ed = { doc, sel: [lower], layer: () => ({ mode: 'line', output: true, show: true, material: undefined }) } as never;
+  const sc = collectScene(ed, 3, false).scene;
+  assert.equal(sc.solids.length, 2, 'Platten, kein loses Teil');
+  const basis = sc.solids.find((s) => s.label === 'Basis')!;
+  near(plateArea(basis.polys), 40 * 30 - 100, 1e-3, 'Basis mit Loch');
+});
+
+
+test('Jig (Generator-Platte) über einer Wand schneidet nichts hinein und bleibt eine eigene Platte', () => {
+  const { ed, roots } = boxesEditor(1);
+  const before = collectScene(ed, 3, false).scene;
+  const front = wall(roots[0], 'front');
+  const b = boundsOf([front])!;
+  const { JIG, encodeShapes, outlineFromPolys } = jigMod;
+  const circle = Array.from({ length: 48 }, (_, k) => ({ x: Math.cos((k / 48) * 2 * Math.PI) * 10, y: Math.sin((k / 48) * 2 * Math.PI) * 10 }));
+  const jig = buildGen(JIG, normalizeParams(JIG, { ...defaultParams(JIG), shapes: encodeShapes([{ n: 'A', c: 2, r: 0, s: outlineFromPolys([circle]) }]) }));
+  cutLayer(ed);
+  const members: Obj[] = ed.addGen(jig, 1, { x: 0, y: 0 });
+  ed.sel = [];
+  // Jig mitten über die Wand legen
+  const jb = boundsOf(members)!;
+  for (const o of members) o.m = [o.m[0], o.m[1], o.m[2], o.m[3], o.m[4] + b.x + b.w / 2 - (jb.x + jb.w / 2), o.m[5] + b.y + b.h / 2 - (jb.y + jb.h / 2)];
+  const after = collectScene(ed, 3, false).scene;
+  const frontOf = (sc: typeof before) => sc.solids.find((s) => s.key.endsWith(':front'))!;
+  near(plateArea(frontOf(after).polys), plateArea(frontOf(before).polys), 1e-6, 'Wand unverändert');
+  assert.equal(frontOf(after).polys.length, frontOf(before).polys.length);
+  assert.ok(after.solids.some((s) => s.key.startsWith('f')), 'Jig bleibt als eigene Platte');
+});
+
+
+const { apply } = await import('../src/model');
+/** Das Loch einer Platte (Kontur mit der gesuchten Fläche), über die Matrix des Teils zurück auf die Arbeitsfläche: Rahmen [x0, y0, x1, y1] */
+function holeOnCanvas(after: Solid['polys'], area: number, m: Obj['m']) {
+  const areaOf = (p: { x: number; y: number }[]) => Math.abs(p.reduce((s, q, i) => s + (p[(i + 1) % p.length].x - q.x) * (p[(i + 1) % p.length].y + q.y), 0) / 2);
+  const hit = after.filter((p) => Math.abs(areaOf(p) - area) < 0.05);
+  assert.equal(hit.length, 1, 'genau eine Kontur mit der Fläche des Lochs');
+  const pts = hit[0].map((q) => apply(m, q.x, q.y));
+  return [Math.min(...pts.map((p) => p.x)), Math.min(...pts.map((p) => p.y)), Math.max(...pts.map((p) => p.x)), Math.max(...pts.map((p) => p.y))];
+}
+const frontOf = (sc: { solids: { key: string; polys: Solid['polys'] }[] }) => sc.solids.find((s) => s.key.endsWith(':front'))!;
+
+test('Loch an der richtigen Stelle, wenn das Teil auf der Arbeitsfläche verschoben, gedreht oder gespiegelt ist', () => {
+  const rot = (deg: number) => (m: Obj['m']): Obj['m'] => {
+    const c = Math.cos((deg * Math.PI) / 180), s = Math.sin((deg * Math.PI) / 180);
+    return [c, s, -s, c, m[4], m[5]];
+  };
+  const cases: [string, (m: Obj['m']) => Obj['m']][] = [
+    ['verschoben', (m) => [m[0], m[1], m[2], m[3], m[4] + 137, m[5] + 61]],
+    ['90° gedreht', rot(90)],
+    ['30° gedreht', rot(30)],
+    ['gespiegelt', (m) => [-m[0], m[1], -m[2], m[3], m[4] + 200, m[5]]],
+  ];
+  for (const [name, mk] of cases) {
+    const { ed, roots } = boxesEditor(1);
+    const front = wall(roots[0], 'front');
+    front.m = mk(front.m);
+    const before = collectScene(ed, 3, false).scene;
+    const b = boundsOf([front])!;
+    cutLayer(ed);
+    const cx = b.x + b.w / 2 + 7, cy = b.y + b.h / 2 - 3;
+    ed.doc.objs.push(cutRect(9100, cx - 6, cy - 4, 12, 8));
+    const after = collectScene(ed, 3, false).scene;
+    assert.ok(!after.solids.some((s) => s.key.startsWith('f')), name + ': nicht als lose Platte');
+    near(plateArea(frontOf(before).polys) - plateArea(frontOf(after).polys), 96, 0.05, name + ': Loch 12 × 8');
+    const box = holeOnCanvas(frontOf(after).polys, 96, front.m);
+    [cx - 6, cy - 4, cx + 6, cy + 4].forEach((v, i) => near(box[i], v, 0.02, name + ': Lage des Lochs ' + i));
+  }
+});
+
+test('Loch bleibt richtig, wenn die Parameter der Baugruppe danach geändert werden', () => {
+  const { ed, roots } = boxesEditor(1);
+  const front = wall(roots[0], 'front');
+  const b = boundsOf([front])!;
+  cutLayer(ed);
+  const cutter = cutRect(9101, b.x + b.w / 2 - 10, b.y + b.h / 2 - 5, 20, 10);
+  ed.doc.objs.push(cutter);
+  const before = collectScene(ed, 3, false).scene;
+  const clean = boxesEditor(1);
+  const plain = collectScene(clean.ed, 3, false).scene;
+  near(plateArea(frontOf(plain).polys) - plateArea(frontOf(before).polys), 200, 1e-3, 'Loch vor der Änderung');
+  // Breite und Höhe ändern: das Teil wird neu berechnet und, wie vom Generator vorgesehen, neu angeordnet
+  const gen = getGenerator('box')!;
+  const params = { ...(front.shape as { params: Params }).params, width: 140, height: 70 };
+  ed.updateGen(front, buildGen(gen, params), true);
+  const after = collectScene(ed, 3, false).scene;
+  const nb = boundsOf([wall(roots[0], 'front')])!;
+  const cb = { x0: cutter.m[4], y0: cutter.m[5], x1: cutter.m[4] + 20, y1: cutter.m[5] + 10 };
+  const inside = cb.x0 > nb.x + 5 && cb.x1 < nb.x + nb.w - 5 && cb.y0 > nb.y + 5 && cb.y1 < nb.y + nb.h - 5;
+  // Referenz: dieselbe Baugruppe (neue Maße) ohne die Form
+  const without = ed.doc.objs.filter((o: Obj) => o !== cutter);
+  const keep = ed.doc.objs;
+  ed.doc.objs = without;
+  const plain2 = collectScene(ed, 3, false).scene;
+  ed.doc.objs = keep;
+  const lost = plateArea(frontOf(plain2).polys) - plateArea(frontOf(after).polys);
+  assert.ok(inside, 'die Form liegt nach der Änderung noch ganz auf der neuen Wand');
+  near(lost, 200, 1e-3, 'Loch nach der Änderung');
+});
+
+
+test('findOverlaps sieht die Platte mit Loch: ohne Zinkenrand überdeckt die Frontwand nichts mehr', () => {
+  const { ed, roots } = boxesEditor(1);
+  // Presspassung (negatives Steckspiel): die Zinken der Wände dringen ineinander ein
+  const front0 = wall(roots[0], 'front');
+  ed.updateGen(front0, buildGen(getGenerator('box')!, { ...(front0.shape as { params: Params }).params, clearance: -0.5 }), true);
+  const before = collectScene(ed, 3, false).scene;
+  const involvesFront = (o: { a: unknown; b: unknown }) => [o.a, o.b].some((k) => String(k).endsWith(':front'));
+  assert.ok(before.overlaps.some(involvesFront), 'Ausgangslage: die Frontwand überdeckt sich mit Nachbarn');
+  // Vier Streifen schneiden den ganzen Zinkenrand der Frontwand weg
+  const front = wall(roots[0], 'front');
+  const b = boundsOf([front])!;
+  cutLayer(ed);
+  const w = 8, o = 30;
+  ed.doc.objs.push(
+    cutRect(9200, b.x - o, b.y - o, b.w + 2 * o, o + w),
+    cutRect(9201, b.x - o, b.y + b.h - w, b.w + 2 * o, o + w),
+    cutRect(9202, b.x - o, b.y - o, o + w, b.h + 2 * o),
+    cutRect(9203, b.x + b.w - w, b.y - o, o + w, b.h + 2 * o),
+  );
+  const after = collectScene(ed, 3, false).scene;
+  assert.ok(!after.solids.some((s) => s.key.startsWith('f')), 'keine losen Platten');
+  assert.ok(plateArea(frontOf(after).polys) < plateArea(frontOf(before).polys), 'Frontwand wurde beschnitten');
+  assert.ok(!after.overlaps.some(involvesFront), 'die beschnittene Frontwand überdeckt nichts mehr');
+  assert.deepEqual(after.overlaps, findOverlaps(after.solids as unknown as Solid[]), 'Überdeckungen stammen von den beschnittenen Platten');
+});
+
+test('Schneidformen wie beim Lasern: ausgeblendet schneidet, Layer ohne Ausgabe und noLaser schneiden nicht', () => {
+  const lost = (setup: (ed: any, cutter: Obj) => void) => {
+    const { ed, roots } = boxesEditor(1);
+    const plain = collectScene(ed, 3, false).scene;
+    const b = boundsOf([wall(roots[0], 'front')])!;
+    cutLayer(ed);
+    const cutter = cutRect(9300, b.x + b.w / 2 - 10, b.y + b.h / 2 - 5, 20, 10);
+    ed.doc.objs.push(cutter);
+    setup(ed, cutter);
+    return plateArea(frontOf(plain).polys) - plateArea(frontOf(collectScene(ed, 3, false).scene).polys);
+  };
+  // Ausgeblendete Objekte lasert die Ausgabe trotzdem (Issue #217): das Loch gehört in die Ansicht
+  near(lost((_, c) => (c.hidden = true)), 200, 1e-3, 'ausgeblendet');
+  near(lost((ed) => (ed.doc.layers[1] = { ...ed.doc.layers[1], output: false })), 0, 1e-6, 'Layer ohne Ausgabe');
+  near(lost((_, c) => (c.noLaser = true)), 0, 1e-6, 'noLaser');
+});
+
+const { checkAssemblies } = await import('../src/asmcheck');
+test('Steckprüfung sieht die ausgeschnittene Platte: ein ringsum freigeschnittenes Stück der Frontwand hängt an nichts', () => {
+  const findings = (withCut: boolean, withPages = true) => {
+    const { ed, roots } = boxesEditor(1);
+    const b = boundsOf([wall(roots[0], 'front')])!;
+    if (withCut) {
+      cutLayer(ed);
+      // Rahmen aus vier Streifen (2 mm breit) um ein Fenster von 40 × 20 mm: das Innere fällt beim Lasern heraus
+      const x = b.x + b.w / 2 - 20, y = b.y + b.h / 2 - 10;
+      ed.doc.objs.push(cutRect(9400, x - 2, y - 2, 44, 2), cutRect(9401, x - 2, y + 20, 44, 2), cutRect(9402, x - 2, y, 2, 20), cutRect(9403, x + 40, y, 2, 20));
+    }
+    const out: { kind: string; level: string; msg: string }[] = [];
+    const pages = ed.doc.pages.map((pg: { objs: Obj[] }) => pg.objs);
+    checkAssemblies(ed.doc.objs, pages.flat(), (i: number) => ed.layer(i), out as never, withPages ? pages : undefined);
+    return out;
+  };
+  assert.deepEqual(findings(false), [], 'ohne Formen: alles hängt zusammen');
+  const cut = findings(true);
+  assert.equal(cut.length, 1, 'ein Befund');
+  assert.equal(cut[0].kind, 'loose');
+  assert.equal(cut[0].level, 'error');
+  // Ohne Seiten (andere Aufrufer von checkDesign) wird wie bisher nicht geschnitten
+  assert.deepEqual(findings(true, false), [], 'ohne pages wie bisher');
 });
 
 if (failed) {
