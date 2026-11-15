@@ -1,4 +1,5 @@
 // Shared, disposable dialog behavior. All dimensions are CSS pixels.
+import { t } from './i18n';
 export function movableToolWindow(dialog: HTMLDialogElement, handle: HTMLElement, redraw: () => void): () => void {
   let drag: { x: number; y: number; left: number; top: number } | null = null;
   const clamp = () => {
@@ -22,6 +23,23 @@ export function movableToolWindow(dialog: HTMLDialogElement, handle: HTMLElement
     e.preventDefault();
   };
   handle.addEventListener('pointerdown', down);
+  handle.tabIndex = 0;
+  if (!handle.title) handle.title = t('Fenster mit Pfeiltasten verschieben');
+  const onKey = (e: KeyboardEvent) => {
+    const step = e.shiftKey ? 40 : 8;
+    let dx = 0, dy = 0;
+    if (e.key === 'ArrowLeft') dx = -step;
+    else if (e.key === 'ArrowRight') dx = step;
+    else if (e.key === 'ArrowUp') dy = -step;
+    else if (e.key === 'ArrowDown') dy = step;
+    else return;
+    e.preventDefault();
+    const r = dialog.getBoundingClientRect();
+    dialog.style.left = `${r.left + dx}px`;
+    dialog.style.top = `${r.top + dy}px`;
+    clamp();
+  };
+  handle.addEventListener('keydown', onKey);
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', up); window.addEventListener('resize', clamp);
   const observer = new ResizeObserver(() => clamp()); observer.observe(dialog);
@@ -29,6 +47,7 @@ export function movableToolWindow(dialog: HTMLDialogElement, handle: HTMLElement
   dialog.style.left = `${r.left}px`; dialog.style.top = `${r.top}px`; clamp();
   return () => {
     observer.disconnect(); handle.removeEventListener('pointerdown', down);
+    handle.removeEventListener('keydown', onKey);
     window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
     window.removeEventListener('pointercancel', up); window.removeEventListener('resize', clamp);
   };

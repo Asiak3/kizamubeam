@@ -13,9 +13,20 @@ export async function openOutlineDialog(ed: Editor): Promise<void> {
   if (open.has(ed) || ed.outlinePreview || document.querySelector('dialog[open]')) return;
   open.add(ed);
   let attached = false;
+  const prevHint = ed.hint;
+  let busyShown = false;
+  const busyTimer = setTimeout(() => {
+    busyShown = true;
+    ed.hint = t('Außenkontur wird berechnet …');
+    ed.emit('tool');
+  }, 300);
   try {
     const session = await ed.prepareOutline(OUTLINE_JOIN_TOL, true);
-    if (document.querySelector('dialog[open]')) return;
+    if (document.querySelector('dialog[open]')) {
+      clearTimeout(busyTimer);
+      if (busyShown) { ed.hint = prevHint; ed.emit('tool'); }
+      return;
+    }
     const selected = new Set<number>();
     const keep = h('input', { type: 'checkbox', checked: true, id: 'outline-keep',title:t('Erhaltene Originale können doppelt geschnitten werden.') });
     const keepHint=h('p',{class:'note'},t('Erhaltene Originale können doppelt geschnitten werden.'));
@@ -23,7 +34,8 @@ export async function openOutlineDialog(ed: Editor): Promise<void> {
     const layer = h('select', { id: 'outline-layer' }, ...PALETTE.map((_color, i) =>
       h('option', { value: String(i), selected: i === homeLayer(session.sources[0]) },
         `${layerLabel(i)} — ${ed.doc.layers[i]?.name ?? layerLabel(i)}`)));
-    const tolerance = h('input', { id: 'outline-tolerance', type: 'number', min: 0, max: 0.5, step: 0.01, value: String(OUTLINE_JOIN_TOL),title:t('Verbindet nahe Enden. Eine Änderung setzt die Inselauswahl zurück.') });
+    const toleranceNote = h('p', { class: 'note', id: 'outline-tolerance-note' }, t('Verbindet nahe Enden. Eine Änderung setzt die Inselauswahl zurück.'));
+    const tolerance = h('input', { id: 'outline-tolerance', type: 'number', min: 0, max: 0.5, step: 0.01, value: String(OUTLINE_JOIN_TOL), 'aria-describedby': 'outline-tolerance-note' });
     const mode = h('select', { id: 'outline-mode' },
       h('option', { value: 'outer' }, t('Nur Außenkontur')),
       h('option', { value: 'combined' }, t('Außenkontur + Inseln')),
@@ -129,10 +141,11 @@ export async function openOutlineDialog(ed: Editor): Promise<void> {
         h('label', { for: tolerance.id }, t('Verbindungstoleranz (mm)')), tolerance,
         h('label', { for: layer.id }, t('Zielebene')), layer,
         h('label', { for: keep.id }, t('Originale behalten')), keep),
+      toleranceNote,
       info,
       h('div', { class: 'dialog-buttons' },
         h('button', { class: 'btn',title:t('Alle exakt ableitbaren Inseln wählen.'), onclick: () => { if (planValid && mode.value !== 'outer') { session.plan.holes.forEach((_h, i) => { if (!session.plan.islandErrors?.[i]) selected.add(i); }); refresh(); } } }, t('Alle exakten')),
-        h('button', { class: 'btn', onclick: () => { selected.clear(); refresh(); } }, t('Keine'))),
+        h('button', { class: 'btn', onclick: () => { selected.clear(); refresh(); } }, t('Keine wählen'))),
       choices,
       keepHint,
       ...(session.noLaser ? [h('p', { class: 'note' }, t('Ergebnis: Nicht lasern (Quelle deaktiviert).'))] : []),
@@ -141,7 +154,6 @@ export async function openOutlineDialog(ed: Editor): Promise<void> {
       try {
         if (apply.disabled) return;
         const approximateIslands=approximations();
-        if (!keep.checked && !confirm(t('Ausgewählte Originale durch den neuen Pfad ersetzen? Parametrische Bearbeitbarkeit der ersetzten Objekte geht verloren. Rückgängig stellt die Originale wieder her.'))) return;
         applying = true;
         ed.applyOutline(session, selected, Number(layer.value), keep.checked, !keep.checked, mode.value as OutlineMode,{islands:approximateIslands});
         dlg.close();
@@ -170,11 +182,14 @@ export async function openOutlineDialog(ed: Editor): Promise<void> {
       if (e.key === 'Escape') { e.preventDefault(); dlg.close(); }
     });
     document.body.append(dlg); dlg.show(); attached = true;
+    clearTimeout(busyTimer);
+    if (busyShown) { ed.hint = prevHint; ed.emit('tool'); }
+    mode.focus();
     ed.outlinePreview = preview; ed.on(changed);
     ed.canvas.addEventListener('pointerleave', leave);
     disposeWindow = movableToolWindow(dlg, title, () => {});
     rebuildChoices(); refresh();
   } catch (error) {
     ed.hint = error instanceof Error ? error.message : String(error); ed.emit('tool');
-  } finally { if (!attached) open.delete(ed); }
+  } finally { clearTimeout(busyTimer); if (!attached) open.delete(ed); }
 }

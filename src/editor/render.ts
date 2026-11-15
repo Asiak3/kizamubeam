@@ -334,11 +334,11 @@ export class EditorRender {
         ctx.fillStyle = 'rgba(255,150,35,0.3)';
         ctx.fill(subsToPath2D(preview.holes[preview.hover]), 'evenodd');
       }
-      ctx.strokeStyle = '#56d7bd'; ctx.lineWidth = 2 * px;
+      ctx.strokeStyle = '#0d9488'; ctx.lineWidth = 2 * px;
       ctx.setLineDash([6 * px, 4 * px]);
       ctx.stroke(subsToPath2D(preview.subs));
       if (preview.removed?.length) {
-        ctx.strokeStyle = '#e99c32'; ctx.lineWidth = 3 * px;
+        ctx.strokeStyle = '#c77414'; ctx.lineWidth = 3 * px;
         ctx.setLineDash([4 * px, 3 * px]); ctx.stroke(subsToPath2D(preview.removed));
       }
       if (preview.excluded?.length) {
