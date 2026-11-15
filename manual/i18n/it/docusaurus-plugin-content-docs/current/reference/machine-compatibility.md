@@ -30,4 +30,4 @@ Quando crei un dispositivo, i modelli per i laser più diffusi compilano area di
 
 ## Provati dagli utenti
 
-Le esperienze con macchine reali aiutano gli altri. Raccontaci su [Discord](https://discord.gg/SSr8VHh7EJ) o in una [issue su GitHub](https://github.com/negurvulkan/kizamubeam/issues) quale laser usi con KizamuBeam e come funziona.
+Le esperienze con macchine reali aiutano gli altri. Raccontaci su [Discord](https://discord.gg/SSr8VHh7EJ) o in una [issue su GitHub](https://github.com/KizamuBeam/kizamubeam/issues) quale laser usi con KizamuBeam e come funziona.

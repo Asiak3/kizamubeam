@@ -105,6 +105,25 @@ await test('fetchCatalog + fetchCatalogPack: Signatur und Prüfsumme werden gepr
   await assert.rejects(() => C.fetchCatalog('https://x.test/c/catalog.json', pub), /nicht erreichbar/);
 });
 
+await test('fetchCatalog: falls back to the next mirror, packages come from the mirror that answered', async () => {
+  const text = pack('1.0.0');
+  const catText = await C.buildCatalog([['de.test.katalog.kzp', text]], '');
+  const files = new Map<string, string>([
+    ['https://bad.test/catalog.json', catText.replace('"1.0.0"', '"9.0.0"')],
+    ['https://bad.test/catalog.json.sig', await sign(catText)],
+    ['https://b.test/c/catalog.json', catText],
+    ['https://b.test/c/catalog.json.sig', await sign(catText)],
+    ['https://b.test/c/de.test.katalog.kzp', text],
+  ]);
+  g.fetch = async (u: string) => ({ ok: files.has(u), status: files.has(u) ? 200 : 404, text: async () => files.get(u) ?? '' });
+  const cat = await C.fetchCatalog(['https://gone.test/catalog.json', 'https://bad.test/catalog.json', 'https://b.test/c/catalog.json'], pub);
+  assert.equal(cat.packs[0].id, 'de.test.katalog');
+  assert.equal(await C.fetchCatalogPack(cat.packs[0]), text);
+  // nothing usable: a wrong signature is reported rather than "not reachable"
+  await assert.rejects(() => C.fetchCatalog(['https://gone.test/catalog.json', 'https://bad.test/catalog.json'], pub), /Signatur/);
+  await assert.rejects(() => C.fetchCatalog(['https://gone.test/catalog.json'], pub), /nicht erreichbar/);
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

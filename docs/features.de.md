@@ -2,7 +2,7 @@
 
 [English](features.md) · Deutsch · [Italiano](features.it.md) · [Zurück zum README](../README.de.md)
 
-Alles, was KizamuBeam kann, mit Menüwegen und Tastenkürzeln. Den schnellen Überblick gibt es im [README](../README.de.md) und auf der [Website](https://negurvulkan.github.io/kizamubeam/).
+Alles, was KizamuBeam kann, mit Menüwegen und Tastenkürzeln. Den schnellen Überblick gibt es im [README](../README.de.md) und auf der [Website](https://kizamubeam.github.io/kizamubeam/).
 
 ## Kameraüberlagerung und portable Kalibrierung
 

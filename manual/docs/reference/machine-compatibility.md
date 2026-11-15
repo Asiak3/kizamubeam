@@ -30,4 +30,4 @@ When you create a device, templates for common lasers fill in the work area and 
 
 ## Tested by users
 
-Reports from real machines help others. Tell us on [Discord](https://discord.gg/SSr8VHh7EJ) or in a [GitHub issue](https://github.com/negurvulkan/kizamubeam/issues) which laser you use with KizamuBeam and how well it works.
+Reports from real machines help others. Tell us on [Discord](https://discord.gg/SSr8VHh7EJ) or in a [GitHub issue](https://github.com/KizamuBeam/kizamubeam/issues) which laser you use with KizamuBeam and how well it works.

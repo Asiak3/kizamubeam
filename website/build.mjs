@@ -8,8 +8,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
-const SITE = 'https://negurvulkan.github.io/kizamubeam/';
-const REPO = 'https://github.com/negurvulkan/kizamubeam';
+const SITE = 'https://kizamubeam.github.io/kizamubeam/';
+const REPO = 'https://github.com/KizamuBeam/kizamubeam';
 const RELEASES = `${REPO}/releases`;
 // The Virtual Machine has its own vm-v* tags; this lists only those releases.
 const VM_RELEASES = `${RELEASES}?q=vm-v&expanded=true`;

@@ -77,7 +77,7 @@ git -C "D:/Entwicklung/laser_beam/forks/kizamubeam-upstream" pull --ff-only
 Das aktualisiert **nur Upstream**, nicht die lokalen Änderungen/PR-Arbeitsbäume.
 Die Remotes sind normal eingerichtet:
 
-- `upstream`: `https://github.com/negurvulkan/kizamubeam.git`
+- `upstream`: `https://github.com/KizamuBeam/kizamubeam.git`
 - `origin`: `https://github.com/liquid-light/kizamubeam.git`
 
 GitHub-Anmeldung/SSH-Schlüssel bei Bedarf auf dem Zielrechner selbst einrichten.

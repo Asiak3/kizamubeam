@@ -8,7 +8,20 @@ import { compareVersions } from './updates';
 import { localText, Pack, parsePack, PACK_EXT } from './packs';
 import { t } from './i18n';
 
-export const CATALOG_URL = 'https://negurvulkan.github.io/kizamubeam/catalog/catalog.json';
+/**
+ * Where the signed catalogue is published, tried in this order. GitHub Pages of the KizamuBeam organization first,
+ * then the webspace mirror of kizamubeam.com (pages.yml, branch `webspace`). The signature is checked either way,
+ * so any mirror is fine. The repository used to live at negurvulkan/kizamubeam; its old Pages address is kept
+ * last in case it is still served.
+ */
+export const CATALOG_URLS = [
+  'https://kizamubeam.github.io/kizamubeam/catalog/catalog.json',
+  'https://kizamubeam.com/catalog/catalog.json',
+  'https://negurvulkan.github.io/kizamubeam/catalog/catalog.json',
+];
+export const CATALOG_URL = CATALOG_URLS[0];
+/** Address the last catalogue was loaded from; package files are resolved relative to it */
+let catalogSource = CATALOG_URL;
 export const CATALOG_FORMAT = 'kizamubeam-catalog';
 /**
  * Öffentlicher Schlüssel (Ed25519, hex) zum Prüfen von catalog.json.sig; erzeugen mit scripts/catalog-keygen.mjs.
@@ -105,21 +118,38 @@ export function catalogState(e: CatalogEntry, installed: Pack | undefined, appVe
   return c > 0 ? 'update' : c === 0 ? 'installed' : 'newer-installed';
 }
 
-/** Katalog laden und Signatur prüfen */
-export async function fetchCatalog(url = CATALOG_URL, pubHex = CATALOG_PUBKEY): Promise<Catalog> {
+/**
+ * Load the catalogue and check its signature. With several addresses, they are tried in order until one delivers
+ * a correctly signed catalogue; if none does, a signature error wins over "not reachable".
+ */
+export async function fetchCatalog(url: string | string[] = CATALOG_URLS, pubHex = CATALOG_PUBKEY): Promise<Catalog> {
   if (!HEX64.test(pubHex)) throw new CatalogError(t('Diese Version kennt noch keinen Schlüssel für den Katalog.'));
   const get = async (u: string) => {
     const r = await fetch(u, { cache: 'no-cache' });
     if (!r.ok) throw new CatalogError(t('Katalog nicht erreichbar ({status})', { status: r.status }));
     return r.text();
   };
-  const [text, sig] = await Promise.all([get(url), get(url + '.sig')]);
-  if (!(await verifyCatalog(text, sig, pubHex))) throw new CatalogError(t('Die Signatur des Katalogs stimmt nicht. Er wird nicht benutzt.'));
-  return parseCatalog(text);
+  let error: unknown;
+  let badSignature: CatalogError | undefined;
+  for (const u of Array.isArray(url) ? url : [url]) {
+    try {
+      const [text, sig] = await Promise.all([get(u), get(u + '.sig')]);
+      if (!(await verifyCatalog(text, sig, pubHex))) {
+        badSignature = new CatalogError(t('Die Signatur des Katalogs stimmt nicht. Er wird nicht benutzt.'));
+        continue;
+      }
+      const catalog = parseCatalog(text);
+      catalogSource = u;
+      return catalog;
+    } catch (e) {
+      error = e;
+    }
+  }
+  throw badSignature ?? error;
 }
 
 /** Paketdatei eines Eintrags laden und gegen Prüfsumme und Kennung prüfen; liefert den Text zum Installieren */
-export async function fetchCatalogPack(e: CatalogEntry, url = CATALOG_URL): Promise<string> {
+export async function fetchCatalogPack(e: CatalogEntry, url = catalogSource): Promise<string> {
   const r = await fetch(new URL(e.file, url).href, { cache: 'no-cache' });
   if (!r.ok) throw new CatalogError(t('Paket nicht erreichbar ({status})', { status: r.status }));
   const text = await r.text();

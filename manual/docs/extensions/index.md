@@ -39,4 +39,4 @@ The example pack is meant as a starting point for your own packs. Packs from oth
 
 ## Making your own pack
 
-A pack is a single JSON file. The format is described in the developer documentation: [Extension packs](https://github.com/negurvulkan/kizamubeam/blob/main/docs/packs.md). Packs for the official catalogue are submitted as a pull request to the [`packs/`](https://github.com/negurvulkan/kizamubeam/tree/main/packs) folder.
+A pack is a single JSON file. The format is described in the developer documentation: [Extension packs](https://github.com/KizamuBeam/kizamubeam/blob/main/docs/packs.md). Packs for the official catalogue are submitted as a pull request to the [`packs/`](https://github.com/KizamuBeam/kizamubeam/tree/main/packs) folder.

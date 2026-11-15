@@ -2,7 +2,7 @@
 
 English · [Deutsch](features.de.md) · [Italiano](features.it.md) · [Back to the README](../README.md)
 
-Everything KizamuBeam can do, with menu paths and keyboard shortcuts. For a quick overview, see the [README](../README.md) or the [website](https://negurvulkan.github.io/kizamubeam/en/).
+Everything KizamuBeam can do, with menu paths and keyboard shortcuts. For a quick overview, see the [README](../README.md) or the [website](https://kizamubeam.github.io/kizamubeam/en/).
 
 ## Camera overlay adjustments and portable calibration
 

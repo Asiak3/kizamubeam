@@ -6,7 +6,7 @@ description: Wie du das KizamuBeam-Handbuch verbessern, erweitern und übersetze
 
 # Am Handbuch mitarbeiten
 
-Das Handbuch ist in Markdown geschrieben und liegt im KizamuBeam-Repository im Ordner [`manual/`](https://github.com/negurvulkan/kizamubeam/tree/main/manual). Jede Änderung läuft über einen Pull Request und wird nach dem Mergen automatisch veröffentlicht.
+Das Handbuch ist in Markdown geschrieben und liegt im KizamuBeam-Repository im Ordner [`manual/`](https://github.com/KizamuBeam/kizamubeam/tree/main/manual). Jede Änderung läuft über einen Pull Request und wird nach dem Mergen automatisch veröffentlicht.
 
 ## Kleine Korrekturen
 

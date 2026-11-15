@@ -121,7 +121,7 @@ Archiv behalten, nicht automatisch beendet. [Nachweis](local-builds.md).
 ## PR176-Korrektur — 08.11.2026
 
 Vom Benutzer beauftragtes Update veröffentlicht: `9ff440b` in bestehendem Draft
-[#176](https://github.com/negurvulkan/kizamubeam/pull/176), alle drei zuvor
+[#176](https://github.com/KizamuBeam/kizamubeam/pull/176), alle drei zuvor
 dokumentierten Pickerbefunde korrigiert.38 neue +14 bestehende Browserprüfungen,
 vertrauenswürdiger Hold und relevante PR-Tests bestanden;38 Regressionen auch
 auf kombinierter lokaler Hauptquelle (mit Outline-Preview-Guards) bestanden.
@@ -177,20 +177,20 @@ Windows-Testbuild `artifacts/windows-editor-round-20261107-200133/` enthalten.
 EXE/NSIS, 18 Checks und Quellenhashprüfung bestanden. Nur dieser Windows-Build
 behalten; ältere Archive gelöscht. Abschlussnachweis in [local-builds.md](local-builds.md).
 
-- [#175 Pfadinseln](https://github.com/negurvulkan/kizamubeam/pull/175):
+- [#175 Pfadinseln](https://github.com/KizamuBeam/kizamubeam/pull/175):
   Abstand in Welt-mm, Löcher erhalten, wahlweise unveränderte Geometrie oder
   eigenes bestätigtes Endpunkt-Lückenschließen mit Vorschau.
-- [#176 Überlappungsauswahl](https://github.com/negurvulkan/kizamubeam/pull/176):
+- [#176 Überlappungsauswahl](https://github.com/KizamuBeam/kizamubeam/pull/176):
   langer Rechtsklick standardmäßig, Hover-Hervorhebung, explizite Auswahl;
   Rechts-/Links-Hold/aus und Dauer in Einstellungen wählbar.
-- [#177 Freihand-Fortsetzung/Neuzeichnen](https://github.com/negurvulkan/kizamubeam/pull/177):
+- [#177 Freihand-Fortsetzung/Neuzeichnen](https://github.com/KizamuBeam/kizamubeam/pull/177):
   Endpunktfortsetzung bzw. Ersatz zwischen vorhandenen Knoten eines Teilpfads.
-- [#178 Lasso/Mehrfach-Handle-Auswahl](https://github.com/negurvulkan/kizamubeam/pull/178):
+- [#178 Lasso/Mehrfach-Handle-Auswahl](https://github.com/KizamuBeam/kizamubeam/pull/178):
   Objekt-/Komponentenlasso, Mehrfachgriff-Auswahl und Bearbeitung.
 
 PR176 wurde am08.11.2026 auf Benutzerwunsch per Subagent auf **Ready for review**
 gestellt; Benutzerabnahme Windows/Linux, macOS ungetestet. Head9ff440b unverändert,
-kein Merge/Release/Tag. [Nachweis](https://github.com/negurvulkan/kizamubeam/pull/176#issuecomment-6726945250).
+kein Merge/Release/Tag. [Nachweis](https://github.com/KizamuBeam/kizamubeam/pull/176#issuecomment-6726945250).
 Die übrigen PRs sind Draft, unabhängig implementiert/geprüft, noch nicht gemergt. Die entsprechenden „noch nicht implementiert“-
 Einträge weiter unten beschreiben damit den vorherigen Stand; aktuell sind
 Review, Integration, genannte Ausbaugrenzen und native Abnahme offen.
@@ -240,13 +240,13 @@ GitHub-Abgleich am 07.11.: alle folgenden PRs OPEN.
 
 | PR | Inhalt | Status |
 | --- | --- | --- |
-| [#168](https://github.com/negurvulkan/kizamubeam/pull/168) | Native Bild-/SVG-Dateidrop-Bridge | Offen |
-| [#169](https://github.com/negurvulkan/kizamubeam/pull/169) | Bleistift, Pointerfix, Rückmeldung, Icon | Offen; gemeldeter Ablauf vom Benutzer bestätigt |
-| [#170](https://github.com/negurvulkan/kizamubeam/pull/170) | Außenkontur mit wählbaren Löchern | **Draft: Herkunft/Lizenz klären** |
-| [#171](https://github.com/negurvulkan/kizamubeam/pull/171) | Sichtbare Icons/Defaults für Vereinfachen und Isolation | Offen |
-| [#172](https://github.com/negurvulkan/kizamubeam/pull/172) | Objekte-Baum zunächst eingeklappt | Offen |
-| [#173](https://github.com/negurvulkan/kizamubeam/pull/173) | Pinch-Zoom der Upstream-Arbeitsfläche/Windows-Flag | Offen; Benutzer bestätigt „getestet, works“ |
-| [#174](https://github.com/negurvulkan/kizamubeam/pull/174) | Kamera-Overlay als Haupttoolbar-Symbol | Offen; Issue #145 war bereits geschlossen |
+| [#168](https://github.com/KizamuBeam/kizamubeam/pull/168) | Native Bild-/SVG-Dateidrop-Bridge | Offen |
+| [#169](https://github.com/KizamuBeam/kizamubeam/pull/169) | Bleistift, Pointerfix, Rückmeldung, Icon | Offen; gemeldeter Ablauf vom Benutzer bestätigt |
+| [#170](https://github.com/KizamuBeam/kizamubeam/pull/170) | Außenkontur mit wählbaren Löchern | **Draft: Herkunft/Lizenz klären** |
+| [#171](https://github.com/KizamuBeam/kizamubeam/pull/171) | Sichtbare Icons/Defaults für Vereinfachen und Isolation | Offen |
+| [#172](https://github.com/KizamuBeam/kizamubeam/pull/172) | Objekte-Baum zunächst eingeklappt | Offen |
+| [#173](https://github.com/KizamuBeam/kizamubeam/pull/173) | Pinch-Zoom der Upstream-Arbeitsfläche/Windows-Flag | Offen; Benutzer bestätigt „getestet, works“ |
+| [#174](https://github.com/KizamuBeam/kizamubeam/pull/174) | Kamera-Overlay als Haupttoolbar-Symbol | Offen; Issue #145 war bereits geschlossen |
 
 Bereits gemergt: #162 Knoten, #163 Isolation, #164 Kontextmenüs, #165 Refitting.
 Layerlistenfehler #143 wurde upstream mit #156 behandelt; #144 ist geschlossen.

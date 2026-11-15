@@ -6,7 +6,7 @@ description: Jobs, Kamerafunktionen und Print and Cut ohne Hardware mit der Kiza
 
 # Virtuelle Maschine
 
-Die **KizamuBeam Virtual Machine** ist ein eigenes Programm (ein eigener Download auf der [Release-Seite](https://github.com/negurvulkan/kizamubeam/releases)), das sich wie ein Laser mit FluidNC-3.7- oder GRBL-1.1-Steuerung verhält. Nutze sie, um KizamuBeam kennenzulernen, einen Job auszuprobieren, bevor du Material verschwendest, oder Kamerafunktionen ohne Kamera zu testen.
+Die **KizamuBeam Virtual Machine** ist ein eigenes Programm (ein eigener Download auf der [Release-Seite](https://github.com/KizamuBeam/kizamubeam/releases)), das sich wie ein Laser mit FluidNC-3.7- oder GRBL-1.1-Steuerung verhält. Nutze sie, um KizamuBeam kennenzulernen, einen Job auszuprobieren, bevor du Material verschwendest, oder Kamerafunktionen ohne Kamera zu testen.
 
 ## Verbinden
 

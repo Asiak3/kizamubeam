@@ -32,4 +32,4 @@ Permette agli agenti IA di leggere e modificare i tuoi progetti. È disattivato 
 
 ## Come posso aiutare?
 
-Prova KizamuBeam sul tuo laser, segnala bug e idee su [GitHub](https://github.com/negurvulkan/kizamubeam/issues), fai domande e condividi i tuoi progetti su [Discord](https://discord.gg/SSr8VHh7EJ), traduci l’interfaccia o [questo manuale](../contributing.md), oppure invia una pull request.
+Prova KizamuBeam sul tuo laser, segnala bug e idee su [GitHub](https://github.com/KizamuBeam/kizamubeam/issues), fai domande e condividi i tuoi progetti su [Discord](https://discord.gg/SSr8VHh7EJ), traduci l’interfaccia o [questo manuale](../contributing.md), oppure invia una pull request.

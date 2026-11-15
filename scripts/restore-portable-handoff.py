@@ -56,7 +56,7 @@ def restore(package, destination):
             raise RuntimeError(result.stderr.decode("utf-8", "replace"))
         git(storage, "config", "--remove-section", "remote.origin")
         git(storage, "remote", "add", "origin", "https://github.com/liquid-light/kizamubeam.git")
-        git(storage, "remote", "add", "upstream", "https://github.com/negurvulkan/kizamubeam.git")
+        git(storage, "remote", "add", "upstream", "https://github.com/KizamuBeam/kizamubeam.git")
         git(storage, "config", "pull.ff", "only")
         for name, value in repo["gitSettings"].items():
             git(storage, "config", name, value)

@@ -6,7 +6,7 @@ description: Come migliorare, ampliare e tradurre il manuale di KizamuBeam.
 
 # Contribuire al manuale
 
-Il manuale è scritto in Markdown e si trova nel repository di KizamuBeam, nella cartella [`manual/`](https://github.com/negurvulkan/kizamubeam/tree/main/manual). Ogni modifica passa da una pull request e viene pubblicata automaticamente dopo il merge.
+Il manuale è scritto in Markdown e si trova nel repository di KizamuBeam, nella cartella [`manual/`](https://github.com/KizamuBeam/kizamubeam/tree/main/manual). Ogni modifica passa da una pull request e viene pubblicata automaticamente dopo il merge.
 
 ## Piccole correzioni
 

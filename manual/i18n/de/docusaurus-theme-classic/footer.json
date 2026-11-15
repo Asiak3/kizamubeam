@@ -25,11 +25,11 @@
   },
   "link.item.label.Website": {
     "message": "Website",
-    "description": "The label of footer link with label=Website linking to https://negurvulkan.github.io/kizamubeam/"
+    "description": "The label of footer link with label=Website linking to https://kizamubeam.github.io/kizamubeam/"
   },
   "link.item.label.Download": {
     "message": "Download",
-    "description": "The label of footer link with label=Download linking to https://github.com/negurvulkan/kizamubeam/releases"
+    "description": "The label of footer link with label=Download linking to https://github.com/KizamuBeam/kizamubeam/releases"
   },
   "link.item.label.Discord": {
     "message": "Discord",
@@ -45,11 +45,11 @@
   },
   "link.item.label.GitHub": {
     "message": "GitHub",
-    "description": "The label of footer link with label=GitHub linking to https://github.com/negurvulkan/kizamubeam"
+    "description": "The label of footer link with label=GitHub linking to https://github.com/KizamuBeam/kizamubeam"
   },
   "link.item.label.Report an issue": {
     "message": "Fehler melden",
-    "description": "The label of footer link with label=Report an issue linking to https://github.com/negurvulkan/kizamubeam/issues"
+    "description": "The label of footer link with label=Report an issue linking to https://github.com/KizamuBeam/kizamubeam/issues"
   },
   "copyright": {
     "message": "© 2026 Hanjo Winter · Freie Software unter GPL-3.0-or-later · Entwickelt mit Unterstützung von Claude Code.",

@@ -46,4 +46,4 @@ With FluidNC, upload the job to the controller and run it from there (**Laser â†
 
 ## Still stuck?
 
-Ask on [Discord](https://discord.gg/SSr8VHh7EJ) or open a [GitHub issue](https://github.com/negurvulkan/kizamubeam/issues). Mention your operating system, KizamuBeam version, laser and firmware.
+Ask on [Discord](https://discord.gg/SSr8VHh7EJ) or open a [GitHub issue](https://github.com/KizamuBeam/kizamubeam/issues). Mention your operating system, KizamuBeam version, laser and firmware.

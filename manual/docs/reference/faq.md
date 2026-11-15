@@ -32,4 +32,4 @@ It lets AI agents read and edit your designs. It is off by default, local only a
 
 ## How can I help?
 
-Try KizamuBeam on your laser, report bugs and ideas on [GitHub](https://github.com/negurvulkan/kizamubeam/issues), ask questions and share your projects on [Discord](https://discord.gg/SSr8VHh7EJ), translate the interface or [this manual](../contributing.md), or send a pull request.
+Try KizamuBeam on your laser, report bugs and ideas on [GitHub](https://github.com/KizamuBeam/kizamubeam/issues), ask questions and share your projects on [Discord](https://discord.gg/SSr8VHh7EJ), translate the interface or [this manual](../contributing.md), or send a pull request.

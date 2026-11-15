@@ -2,7 +2,7 @@
 
 [English](features.md) · [Deutsch](features.de.md) · Italiano · [Torna al README](../README.it.md)
 
-Tutto ciò che KizamuBeam sa fare, con percorsi dei menu e scorciatoie da tastiera. Per una panoramica veloce vedi il [README](../README.it.md) o il [sito web](https://negurvulkan.github.io/kizamubeam/it/). I nomi dei menu seguono l’interfaccia in italiano; dove la traduzione dell’interfaccia è ancora incompleta, possono apparire in inglese.
+Tutto ciò che KizamuBeam sa fare, con percorsi dei menu e scorciatoie da tastiera. Per una panoramica veloce vedi il [README](../README.it.md) o il [sito web](https://kizamubeam.github.io/kizamubeam/it/). I nomi dei menu seguono l’interfaccia in italiano; dove la traduzione dell’interfaccia è ancora incompleta, possono apparire in inglese.
 
 ## Regolazioni della sovrapposizione della fotocamera e calibrazione portabile
 

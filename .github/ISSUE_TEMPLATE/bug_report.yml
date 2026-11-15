@@ -8,7 +8,7 @@ body:
         Thanks for taking the time to report a bug!
 
         **Safety first:** if the laser head moved unexpectedly, homing failed or the laser did not switch off, stop testing on the machine. Do not repeat a dangerous movement just to collect a log.
-        Never post Wi-Fi passwords, access tokens or other secrets, and remove personal data from files and logs. Security vulnerabilities belong in a [private report](https://github.com/negurvulkan/kizamubeam/security/advisories/new), not here.
+        Never post Wi-Fi passwords, access tokens or other secrets, and remove personal data from files and logs. Security vulnerabilities belong in a [private report](https://github.com/KizamuBeam/kizamubeam/security/advisories/new), not here.
   - type: textarea
     id: description
     attributes:

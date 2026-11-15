@@ -3,16 +3,16 @@ import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 // The manual is hosted next to the product website on GitHub Pages:
-//   https://negurvulkan.github.io/kizamubeam/docs/
+//   https://kizamubeam.github.io/kizamubeam/docs/
 // Both values can be overridden at build time (empty values are ignored), so moving the manual to its own
 // domain later (e.g. https://docs.kizamubeam.com/) needs no code change:
 //   DOCS_URL=https://docs.kizamubeam.com DOCS_BASE_URL=/ npm run build
-const url = process.env.DOCS_URL || 'https://negurvulkan.github.io';
+const url = process.env.DOCS_URL || 'https://kizamubeam.github.io';
 const baseUrl = process.env.DOCS_BASE_URL || '/kizamubeam/docs/';
 // Product website, used for links back to it (download page etc.).
-const website = process.env.WEBSITE_URL || 'https://negurvulkan.github.io/kizamubeam/';
+const website = process.env.WEBSITE_URL || 'https://kizamubeam.github.io/kizamubeam/';
 
-const repo = 'https://github.com/negurvulkan/kizamubeam';
+const repo = 'https://github.com/KizamuBeam/kizamubeam';
 const discord = 'https://discord.gg/SSr8VHh7EJ';
 const youtube = 'https://www.youtube.com/@KizamuBeam';
 const reddit = 'https://www.reddit.com/r/KizamuBeam/';
@@ -25,7 +25,7 @@ const config: Config = {
   url,
   baseUrl,
 
-  organizationName: 'negurvulkan',
+  organizationName: 'KizamuBeam',
   projectName: 'kizamubeam',
 
   onBrokenLinks: 'throw',

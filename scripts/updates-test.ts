@@ -17,7 +17,7 @@ const rel = (tag: string, prerelease: boolean, manifest = true, draft = false) =
   tag_name: tag,
   prerelease,
   draft,
-  assets: manifest ? [{ name: 'KizamuBeam.dmg', browser_download_url: 'x' }, { name: 'latest.json', browser_download_url: `https://github.com/negurvulkan/kizamubeam/releases/download/${tag}/latest.json` }] : [],
+  assets: manifest ? [{ name: 'KizamuBeam.dmg', browser_download_url: 'x' }, { name: 'latest.json', browser_download_url: `https://github.com/KizamuBeam/kizamubeam/releases/download/${tag}/latest.json` }] : [],
 });
 
 test('Versionen mit Vorabversion richtig sortiert', () => {
@@ -79,7 +79,7 @@ test('Nichts Neueres: kein Update', () => {
 });
 
 test('Adresse zeigt auf die latest.json des Releases', () => {
-  assert.equal(pickRelease(list, 'nightly', '1.2.0-beta')?.manifest, 'https://github.com/negurvulkan/kizamubeam/releases/download/v1.3.0-beta/latest.json');
+  assert.equal(pickRelease(list, 'nightly', '1.2.0-beta')?.manifest, 'https://github.com/KizamuBeam/kizamubeam/releases/download/v1.3.0-beta/latest.json');
 });
 
 test('Releases der Virtual Machine (vm-v…) sind keine App-Updates', () => {

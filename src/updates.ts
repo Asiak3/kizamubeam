@@ -5,8 +5,8 @@
 /** stable: only stable releases; nightly: nightly builds from main, release candidates and stable releases */
 export type Channel = 'stable' | 'nightly';
 
-export const RELEASES_API = 'https://api.github.com/repos/negurvulkan/kizamubeam/releases?per_page=100';
-export const RELEASES_PAGE = 'https://github.com/negurvulkan/kizamubeam/releases';
+export const RELEASES_API = 'https://api.github.com/repos/KizamuBeam/kizamubeam/releases?per_page=100';
+export const RELEASES_PAGE = 'https://github.com/KizamuBeam/kizamubeam/releases';
 
 export interface GhRelease {
   tag_name: string;

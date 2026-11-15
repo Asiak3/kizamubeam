@@ -6,18 +6,18 @@ KizamuBeam is free software under **GPL-3.0-or-later**. It is maintained as a co
 
 Want to translate the app, the website or the documentation? See **[TRANSLATION.md](TRANSLATION.md)**, no programming needed.
 
-Want to write or improve the [user manual](https://negurvulkan.github.io/kizamubeam/docs/)? It is plain Markdown in [`manual/`](manual/); see **[manual/README.md](manual/README.md)**.
+Want to write or improve the [user manual](https://kizamubeam.github.io/kizamubeam/docs/)? It is plain Markdown in [`manual/`](manual/); see **[manual/README.md](manual/README.md)**.
 
 ## Before you start
 
-- Check existing [issues](https://github.com/negurvulkan/kizamubeam/issues) and [pull requests](https://github.com/negurvulkan/kizamubeam/pulls) to avoid duplicating work.
+- Check existing [issues](https://github.com/KizamuBeam/kizamubeam/issues) and [pull requests](https://github.com/KizamuBeam/kizamubeam/pulls) to avoid duplicating work.
 - For a substantial feature, new dependency, major refactor, or change to supported hardware or file formats, please open an issue first to discuss the approach.
 - Small, self-contained fixes can be submitted directly as pull requests.
 - Be respectful and constructive. Different experience levels and development workflows are welcome.
 
 ## Reporting a bug
 
-Please use the [issue forms](https://github.com/negurvulkan/kizamubeam/issues/new/choose): **Bug report**, **Feature request** or **Machine compatibility report** (also for machines that work well). Questions are best asked on [Discord](https://discord.gg/SSr8VHh7EJ). A bug report should include as much of the following as you can:
+Please use the [issue forms](https://github.com/KizamuBeam/kizamubeam/issues/new/choose): **Bug report**, **Feature request** or **Machine compatibility report** (also for machines that work well). Questions are best asked on [Discord](https://discord.gg/SSr8VHh7EJ). A bug report should include as much of the following as you can:
 
 - KizamuBeam version, operating system, and steps to reproduce the problem.
 - Expected behavior versus actual behavior.
@@ -32,7 +32,7 @@ Please use the [issue forms](https://github.com/negurvulkan/kizamubeam/issues/ne
 Requirements: **Node.js 20+**, npm, and **stable Rust**. Building the desktop app requires the platform-specific [Tauri 2 prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```bash
-git clone https://github.com/negurvulkan/kizamubeam.git
+git clone https://github.com/KizamuBeam/kizamubeam.git
 cd kizamubeam
 npm ci
 npm run tauri dev    # Desktop app with live reload

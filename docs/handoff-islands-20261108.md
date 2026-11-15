@@ -127,7 +127,7 @@ Build-ZIP ersetzt weder deren Git-Historie noch deren unpublizierte Änderungen.
   bestanden; italienische Übersetzungen/i18n und Browserlauf noch offen.
 - #176: **Ready for review**, Head9ff440b. Benutzerabnahme Windows/Linux,
   macOS ungetestet. Keine neue Releaseversion/Tags/Merge.
-  https://github.com/negurvulkan/kizamubeam/pull/176#issuecomment-6726945250
+  https://github.com/KizamuBeam/kizamubeam/pull/176#issuecomment-6726945250
 - Weitere lokale Offset-/Slot-Prototypen und #177/#178 bleiben getrennt.
   Details: `docs/local-status-20261107.md`, `docs/slot-placement.md` (working drafts in `docs/pr-drafts/` removed).
 
