@@ -27,7 +27,7 @@ function mirrorParent(recipe: SlotRecipe, slot: PlacedSlot): PlacedSlot {
   if (!mirror || !validId(mirror.slotId) || !mirror.axis ||
     !(mirror.axis.kind === 'helper' ? validId(mirror.axis.helperId) : mirror.axis.kind === 'edge' && validId(mirror.axis.edge)) ||
     slot.groupId !== undefined || slot.anchor !== undefined || slot.projection !== undefined)
-    throw new Error(t('Ungültige Spiegelreferenz. Gespiegelte Schnitte erben die Schlitzgruppe.'));
+    throw new Error(t('Ungültige Spiegelreferenz. Gespiegelte Schnitte erben die Gruppe.'));
   const parents = recipe.slots.filter(s => s.id === mirror.slotId);
   if (parents.length !== 1) throw new Error(t('Referenzierter Schnitt fehlt oder ist nicht eindeutig.'));
   return parents[0];
@@ -44,7 +44,7 @@ export function effectiveSlotGroup(recipe: SlotRecipe, slot: PlacedSlot): SlotGr
   slot = dimensionSource(recipe, slot);
   if (slot.groupId === undefined) return undefined;
   const group = recipe.groups?.find(g => g.id === slot.groupId);
-  if (!group) throw new Error(t('Referenzierte Schlitzgruppe fehlt.'));
+  if (!group) throw new Error(t('Referenzierte Gruppe fehlt.'));
   return group;
 }
 export function effectiveSlot(recipe: SlotRecipe, slot: PlacedSlot): PlacedSlot {
@@ -75,7 +75,7 @@ export function adoptSlotFeatureRecipe(recipe: SlotRecipe, angle?: number): Slot
     let group = same;
     if (!group) {
       let n = 1; while (result.groups.some(g => g.id === `group-${n}`)) n++;
-      group = { id: `group-${n}`, name: t('Schlitzgruppe {n}', { n }), width: slot.width, depth: slot.depth, clearance: slot.clearance, factor: slot.factor, burn: 0, cornerStyle: 'corner' };
+      group = { id: `group-${n}`, name: t('Gruppe {n}', { n }), width: slot.width, depth: slot.depth, clearance: slot.clearance, factor: slot.factor, burn: 0, cornerStyle: 'corner' };
       result.groups.push(group);
     }
     slot.groupId = group.id;
@@ -139,6 +139,8 @@ export function readSlotRecipe(p: Params): SlotRecipe {
 }
 // Runtime-only orientation: serialized projections always address the actual base edge.
 // Reflection may reverse its tangent; preserve semantic parent start/end for dependencies.
+// Bookkeeping lives in this module-level WeakSet (not on PlacedSlot) so the serialized
+// recipe stays free of runtime orientation state; entries vanish with their objects.
 const reversedMirrorFrames = new WeakSet<PlacedSlot>();
 /** Resolve a DAG of stable slot references before geometry or output is generated. */
 export function resolvedFeatureGeometry(r: SlotRecipe): { slots: PlacedSlot[]; helpers: ResolvedConstructionLine[] } {

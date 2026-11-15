@@ -123,12 +123,9 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         const slot = allSlots().find(s => s.id === source.id), group = recipe.groups!.find(g => g.id === targetSelection.id);
         if (!slot || !group || slot.groupId === group.id) return;
         if (slot.mirror) { info.textContent = t('Spiegelungen erben die Gruppe ihrer ursprünglichen Ausklinkung.'); return; }
-        if (!confirm(t('In die andere Gruppe verschieben und deren Form- und Korrekturparameter übernehmen?'))) return;
         slot.groupId = group.id;
       } else {
-        const order = (recipe.order ?? []).filter(item => !(item.kind === source.kind && item.id === source.id));
-        const present = [...recipe.groups!.map(g => ({ kind: 'group' as const, id: g.id })), ...recipe.slots.map(s => ({ kind: 'slot' as const, id: s.id! })), ...recipe.helpers!.map(l => ({ kind: 'helper' as const, id: l.id }))];
-        for (const item of present) if (!(item.kind === source.kind && item.id === source.id) && !order.some(o => o.kind === item.kind && o.id === item.id)) order.push(item);
+        const order = completeOrder(source);
         const index = targetSelection ? order.findIndex(o => o.kind === targetSelection.kind && o.id === targetSelection.id) : -1;
         order.splice(index < 0 ? order.length : index, 0, source); recipe.order = order;
       }
@@ -139,7 +136,32 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
       input.addEventListener('input', () => { set(input.valueAsNumber); request(); }); parent.append(h('label', { for: id }, label), input);
     };
     const describe = (ref: SlotOrigin | null) => ref ? points().find(p => originKey(p.ref) === originKey(ref))?.label ?? originKey(ref) : t('Noch nicht gewählt');
-    const choose = (parent: HTMLElement, label: string, mode: Pick, value: string) => parent.append(iconButton(`slot-choose-${mode}`, label, mode === 'edge' || mode === 'helperEdge' ? 'line' : mode === 'mirrorAxis' ? 'mirrorh' : 'origin', () => { pick = mode; mirrorParentId = null; info.textContent = label; updateToolbar(); }), h('output', {}, value));
+    const choose = (parent: HTMLElement, label: string, mode: Pick, value: string) => {
+      parent.append(iconButton(`slot-choose-${mode}`, label, mode === 'edge' || mode === 'helperEdge' ? 'line' : mode === 'mirrorAxis' ? 'mirrorh' : 'origin', () => { pick = mode; mirrorParentId = null; info.textContent = label; showProperties(); updateToolbar(); properties.querySelector<HTMLSelectElement>('#slot-pick-list')?.focus(); }), h('output', {}, value));
+      choiceSelect(parent, mode);
+    };
+    // Keyboard alternative to canvas picking: lists the same candidates the
+    // pointer handler offers; both paths share applyEdgeKey/applyMirrorAxis/attachPoint.
+    const edgeChoices = () => (visible('source', 'source') ? result?.edges ?? [] : []);
+    const choiceSelect = (parent: HTMLElement, mode: Pick) => {
+      if (pick !== mode || (mode !== 'origin' && mode !== 'first' && mode !== 'second' && mode !== 'edge' && mode !== 'helperEdge' && mode !== 'mirrorAxis')) return;
+      const isPoint = mode === 'origin' || mode === 'first' || mode === 'second';
+      const select = h('select', { id: 'slot-pick-list', 'aria-label': t('Auswahl per Tastatur statt Canvas-Klick') });
+      select.append(h('option', { value: '' }, t('Bitte wählen …')));
+      if (isPoint) for (const c of points()) select.append(h('option', { value: originKey(c.ref) }, `${c.label} (${c.point.x.toFixed(1)}, ${c.point.y.toFixed(1)})`));
+      else if (mode === 'mirrorAxis') {
+        for (const helper of result?.helpers ?? []) if (visible('helper', helper.id)) select.append(h('option', { value: `helper:${helper.id}` }, `${helper.id}: ${t('Hilfslinie')}`));
+        for (const edge of edgeChoices()) select.append(h('option', { value: `edge:${edge.key}` }, `${edge.key} (${edge.length.toFixed(1)} mm)`));
+      } else for (const edge of edgeChoices()) select.append(h('option', { value: edge.key }, `${edge.key} (${edge.length.toFixed(1)} mm)`));
+      if (select.children.length < 2) select.disabled = true;
+      select.addEventListener('change', () => {
+        if (!select.value) return;
+        if (isPoint) { const found = points().find(c => originKey(c.ref) === select.value); if (found) attachPoint(found.ref); }
+        else if (mode === 'mirrorAxis') applyMirrorAxis(select.value.startsWith('helper:') ? { kind: 'helper', helperId: select.value.slice(7) } : { kind: 'edge', edge: select.value.slice(5) });
+        else applyEdgeKey(select.value, mode === 'helperEdge');
+      });
+      parent.append(h('label', { for: select.id, class: 'note' }, t('Oder per Liste wählen (Tastatur):')), select);
+    };
     function showProperties(): void {
       properties.replaceChildren();
       const heading = selected?.kind === 'group' ? t('Gruppenparameter') : selected?.kind === 'source' ? t('Originalform') : selected?.kind === 'helper' ? t('Parametrische Hilfslinie') : t('Position der Ausklinkung');
@@ -153,6 +175,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         choose(form, t('Zweiten Punkt wählen'), 'second', describe(line.second));
         choose(form, t('Senkrechte zu Kante wählen'), 'helperEdge', line.edge || t('Noch nicht gewählt'));
         properties.append(h('p', { class: 'note' }, t('Unendliche Hilfslinie durch den Mittelpunkt, senkrecht zur Referenzkante. Nur Konstruktion, keine Ausgabe.')));
+        appendMoveRow(form);
       } else if (selected?.kind === 'group') {
         const group = currentGroup();
         const name = h('input', { value: group.name, id: 'slot-group-name' }); name.addEventListener('input', () => { group.name = name.value; refreshTree(); });
@@ -163,13 +186,23 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         style.addEventListener('change', () => { group.cornerStyle = style.value as SlotGroup['cornerStyle']; request(); });
         form.append(h('label', { for: style.id }, t('Inneneckenstil')), style);
         properties.append(h('p', { class: 'note' }, t('Gruppenmaße gelten für alle Mitglieder. Lokale Burn-Korrektur erfordert Layer-Kerf 0.')));
+        appendMoveRow(form);
       } else {
         const slot = currentSlot(); if (!slot) return;
         properties.append(h('p', { class: 'note' }, `${t('Gruppe')}: ${currentGroup().name}`));
         if (drafts.has(slot.id!)) properties.append(h('p', { class: 'slot-draft-note' }, t('Entwurf – bleibt beim Wechsel im Featuretree erhalten.')));
+        // Keyboard alternative to dragging the slot into another group (mirror slots inherit).
+        const groupSelect = h('select', { id: 'slot-group-assign' }, ...recipe.groups!.map(g => h('option', { value: g.id, selected: currentGroup().id === g.id }, g.name)));
+        groupSelect.addEventListener('change', () => {
+          const group = recipe.groups!.find(g => g.id === groupSelect.value), target = currentSlot();
+          if (!group || !target || target.mirror || target.groupId === group.id) return;
+          target.groupId = group.id; showProperties(); refreshTree(); request();
+        });
+        form.append(h('label', { for: groupSelect.id }, t('Gruppe')), groupSelect);
         if (slot.mirror) {
           properties.append(h('p', { class: 'note' }, t('Parametrische Spiegelung von {id}. Maße und Gruppe werden geerbt.', { id: slot.mirror.slotId })));
           choose(form, t('Spiegelachse wählen: Hilfslinie oder Körperkante'), 'mirrorAxis', slot.mirror.axis.kind === 'helper' ? slot.mirror.axis.helperId : slot.mirror.axis.edge);
+          appendMoveRow(form);
           return;
         }
         if (!slot.projection) { properties.append(h('p', {}, t('Bisheriger Ausschnitt bleibt unverändert. Für das neue Positionsmodell Referenz und Gerade wählen.'))); return; }
@@ -184,6 +217,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         const directionButton = iconButton('slot-direction', p.direction === 1 ? t('In Kantenrichtung') : t('Gegen Kantenrichtung'), p.direction === 1 ? 'right' : 'left', () => { p.direction = p.direction === 1 ? -1 : 1; showProperties(); request(); });
         form.append(h('label', {}, t('Richtung entlang der Geraden')), directionButton);
         properties.append(iconButton('slot-edit-group', t('Gruppenparameter bearbeiten'), 'group', () => { selected = { kind: 'group', id: currentGroup().id }; pick = null; showProperties(); refreshTree(); updateToolbar(); scheduleDraw(); }));
+        appendMoveRow(form);
       }
     }
     const updateToolbar = () => {
@@ -219,6 +253,64 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         refreshTree(); updateToolbar(); scheduleDraw();
       }, proposed.slots.filter(s => visible('slot', s.id!)).map(s => s.id!));
     }
+    // Shared with the keyboard list and the canvas click path: set a projection
+    // edge (or helper reference edge), choosing a feasible initial direction once.
+    const applyEdgeKey = (edgeKey: string, forHelper: boolean) => {
+      const edge = edgeChoices().find(e => e.key === edgeKey);
+      if (!edge) return;
+      if (forHelper) { const line = currentHelper(); if (line) line.edge = edge.key; finishHelper(); }
+      else {
+        const slot = currentSlot(); if (slot?.projection && !slot.mirror) {
+          const projection = slot.projection;
+          if (!projection.edge && projection.origin && drafts.has(slot.id!)) {
+            const origin = points().find(c => originKey(c.ref) === originKey(projection.origin))?.point;
+            if (origin) { const zero = dot(sub(origin, edge.a), edge.tangent), w = currentGroup().width * currentGroup().factor + currentGroup().clearance;
+              const offset = projection.target === 'start' ? w / 2 : projection.target === 'end' ? -w / 2 : 0;
+              const fits = (direction: number) => { const center = zero + projection.distance * direction + offset; return center - w / 2 >= -0.001 && center + w / 2 <= edge.length + 0.001; };
+              if (!fits(projection.direction) && fits(-projection.direction)) projection.direction = projection.direction === 1 ? -1 : 1;
+            }
+          }
+          projection.edge = edge.key;
+        }
+      }
+      pick = null; showProperties(); updateToolbar(); request();
+    };
+    // Shared with the keyboard list and the canvas click path: resolve a mirror axis.
+    const applyMirrorAxis = (axis: NonNullable<PlacedSlot['mirror']>['axis']) => {
+      const slot = currentSlot(); if (!slot) return;
+      if (mirrorParentId) {
+        const id = nextId('slot'), mirrored: PlacedSlot = { ...structuredClone(slot), id, groupId: undefined, projection: undefined, anchor: undefined, mirror: { slotId: mirrorParentId, axis } };
+        drafts.set(id, mirrored); selected = { kind: 'slot', id }; resetToSource = false;
+      } else if (slot.mirror) slot.mirror.axis = axis;
+      mirrorParentId = null; pick = null; showProperties(); refreshTree(); request();
+    };
+    // Shared with drag-and-drop: complete the stored order with missing features.
+    // Stale ids are kept (as before); the trial build filters them for preview.
+    const completeOrder = (without?: { kind: string; id: string }) => {
+      const order = (recipe.order ?? []).filter(item => !(without && item.kind === without.kind && item.id === without.id));
+      const present = [...recipe.groups!.map(g => ({ kind: 'group' as const, id: g.id })), ...recipe.slots.map(s => ({ kind: 'slot' as const, id: s.id! })), ...recipe.helpers!.map(l => ({ kind: 'helper' as const, id: l.id }))];
+      for (const item of present) if (!(without && item.kind === without.kind && item.id === without.id) && !order.some(o => o.kind === item.kind && o.id === item.id)) order.push(item);
+      return order;
+    };
+    // Keyboard alternative to tree drag-and-drop: move the selection within the order.
+    const moveSelected = (delta: -1 | 1) => {
+      if (!selected || selected.kind === 'source') return;
+      const order = completeOrder();
+      const index = order.findIndex(o => o.kind === selected!.kind && o.id === selected!.id);
+      const other = index + delta;
+      if (index < 0 || other < 0 || other >= order.length) return;
+      [order[index], order[other]] = [order[other], order[index]];
+      recipe.order = order; refreshTree(); showProperties(); request();
+    };
+    const appendMoveRow = (parent: HTMLElement) => {
+      const row = h('div', { class: 'slot-inline-buttons' });
+      const earlier = h('button', { class: 'btn', type: 'button' }, t('Früher'));
+      earlier.addEventListener('click', () => moveSelected(-1));
+      const later = h('button', { class: 'btn', type: 'button' }, t('Später'));
+      later.addEventListener('click', () => moveSelected(1));
+      row.append(earlier, later);
+      parent.append(h('label', {}, t('Reihenfolge (Tastatur-Alternative zum Ziehen)')), row);
+    };
     const attachPoint = (ref: SlotOrigin) => {
       const line = currentHelper();
       if ((pick === 'first' || pick === 'second') && line) {
@@ -275,7 +367,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
       recipe.order = recipe.order!.filter(o => !(o.kind === kind && o.id === id)); selected = { kind: 'group', id: recipe.groups![0].id }; showProperties(); refreshTree(); request();
     });
     button('slot-restore-source', t('Originalform wiederherstellen'), 'rotccw', () => {
-      if (stale || !confirm(t('Alle Ausklinkungen, Spiegelungen, Gruppen und Konstruktionshilfen im Werkzeug löschen und zur Originalform zurückkehren? Das Fenster bleibt offen. Erst Übernehmen ändert das Projekt.'))) return;
+      if (stale) return;
       recipe = { source: structuredClone(original.source), base: structuredClone(original.base), slots: [], settings: { cornerAngle: recipe.settings!.cornerAngle }, groups: [defaultGroup('group-1')], helpers: [], order: [] };
       resetToSource = true;
       drafts.clear(); helperDrafts.clear(); hidden.clear(); pick = null; selected = { kind: 'group', id: recipe.groups![0].id }; showProperties(); refreshTree(); request();
@@ -296,12 +388,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         axes.sort((a, b) => a.distance - b.distance);
         if (!axes.length || axes[0].distance > tolerance) return;
         if (axes.length > 1 && Math.abs(axes[0].distance - axes[1].distance) < 0.1 / viewport.scale) { info.textContent = t('Spiegelachse nicht eindeutig. Abseits eines Schnittpunkts wählen.'); return; }
-        const slot = currentSlot(); if (!slot) return;
-        if (mirrorParentId) {
-          const id = nextId('slot'), mirrored: PlacedSlot = { ...structuredClone(slot), id, groupId: undefined, projection: undefined, anchor: undefined, mirror: { slotId: mirrorParentId, axis: axes[0].axis } };
-          drafts.set(id, mirrored); selected = { kind: 'slot', id }; resetToSource = false;
-        } else if (slot.mirror) slot.mirror.axis = axes[0].axis;
-        mirrorParentId = null; pick = null; showProperties(); refreshTree(); request(); return;
+        applyMirrorAxis(axes[0].axis); return;
       }
       if (['origin', 'first', 'second'].includes(pick)) {
         const choices = points().map(choice => ({ choice, distance: Math.hypot(choice.point.x - p.x, choice.point.y - p.y) })).sort((a, b) => a.distance - b.distance);
@@ -309,24 +396,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
       } else if (pick === 'edge' || pick === 'helperEdge') {
         const choices = (visible('source', 'source') ? result.edges : []).map(edge => { const at = Math.max(0, Math.min(edge.length, dot(sub(p, edge.a), edge.tangent))); return { edge, distance: Math.hypot(p.x - edge.a.x - edge.tangent.x * at, p.y - edge.a.y - edge.tangent.y * at) }; }).sort((a, b) => a.distance - b.distance);
         if (!choices.length || choices[0].distance > tolerance) return;
-        if (pick === 'helperEdge') { const line = currentHelper(); if (line) line.edge = choices[0].edge.key; finishHelper(); }
-        else {
-          const slot = currentSlot(); if (slot?.projection && !slot.mirror) {
-            const edge = choices[0].edge, projection = slot.projection;
-            // A fresh feature has no previous edge direction to preserve. Choose a
-            // feasible initial direction once, never repair existing invalid edits.
-            if (!projection.edge && projection.origin && drafts.has(slot.id!)) {
-              const origin = points().find(c => originKey(c.ref) === originKey(projection.origin))?.point;
-              if (origin) { const zero = dot(sub(origin, edge.a), edge.tangent), w = currentGroup().width * currentGroup().factor + currentGroup().clearance;
-                const offset = projection.target === 'start' ? w / 2 : projection.target === 'end' ? -w / 2 : 0;
-                const fits = (direction: number) => { const center = zero + projection.distance * direction + offset; return center - w / 2 >= -0.001 && center + w / 2 <= edge.length + 0.001; };
-                if (!fits(projection.direction) && fits(-projection.direction)) projection.direction = projection.direction === 1 ? -1 : 1;
-              }
-            }
-            projection.edge = edge.key;
-          }
-        }
-        pick = null; showProperties(); updateToolbar(); request();
+        applyEdgeKey(choices[0].edge.key, pick === 'helperEdge');
       }
     });
     canvas.addEventListener('pointermove', e => { if (drag?.id === e.pointerId) { viewport.pan(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; scheduleDraw(); } });
@@ -355,7 +425,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
       const showSelection = !selected || visible(selected.kind, selected.id);
       if (visible('source', 'source')) {
         const p = subsToPath2D(result?.subs ?? recipe.base); ctx.fill(p, 'evenodd'); ctx.stroke(p);
-        ctx.strokeStyle = '#626b79'; ctx.setLineDash([3 / scale, 3 / scale]); ctx.stroke(subsToPath2D(recipe.base)); ctx.setLineDash([]);
+        ctx.strokeStyle = '#7d8896'; ctx.setLineDash([3 / scale, 3 / scale]); ctx.stroke(subsToPath2D(recipe.base)); ctx.setLineDash([]);
       } else for (const slot of result?.slots ?? []) if (slot.projection && visible('slot', slot.id!)) ctx.stroke(subsToPath2D([previewFrame(slot).outline]));
       for (const helper of result?.helpers ?? []) { if (!visible('helper', helper.id)) continue; ctx.strokeStyle = selected?.kind === 'helper' && helper.id === selected.id ? '#ff9c38' : '#65d6df'; ctx.setLineDash([6 / scale, 4 / scale]); infiniteLine(ctx, helper); ctx.setLineDash([]); }
       const selectedEdge = result?.edges.find(edge => edge.key === activeEdge());
@@ -400,7 +470,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
     });
     let disposeWindow = () => {};
     dlg.addEventListener('close', () => { closed = true; client.dispose(); tree.dispose(); disposeWindow(); disposePinch(); ed.off(changed); if (drawing) cancelAnimationFrame(drawing); dlg.remove(); });
-    dlg.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape' && pick) { e.preventDefault(); pick = null; updateToolbar(); } });
+    dlg.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape' && pick) { e.preventDefault(); pick = null; showProperties(); updateToolbar(); } });
     document.body.append(dlg); dlg.showModal(); disposeWindow = movableToolWindow(dlg, title, scheduleDraw); showProperties(); refreshTree(); request();
   } catch (error) { ed.hint = error instanceof Error ? error.message : String(error); ed.emit('tool'); }
 }

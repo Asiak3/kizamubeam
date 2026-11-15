@@ -105,7 +105,7 @@ export function openSlotDialog(ed: Editor) {
   if (libTh && Math.abs(libTh - st.th) <= st.tol) st.th = libTh;
   st.thNew = libTh && Math.abs(libTh - st.th) > 0.05 ? libTh : st.th;
 
-  const info = h('div', { class: 'note' }, ' ');
+  const info = h('div', { class: 'note', role: 'status', 'aria-live': 'polite' }, ' ');
   const found = h('div', { class: 'note' },
     widths.length
       ? t('Erkannte Schlitzbreiten: {list}', { list: widths.slice(0, 5).map((w) => `${mm(w.width)} mm (${w.count}×)`).join(', ') })
