@@ -182,6 +182,8 @@ main:focus { outline: none; }
   border-radius: var(--r-md); color: var(--text); border: 1px solid var(--border); background: var(--surface);
 }
 .icon-btn:hover { border-color: var(--text-muted); }
+/* YouTube and Reddit only fit the header from tablet width; the footer always links them. */
+@media (max-width: 559px) { .icon-btn-wide { display: none; } }
 @media (min-width: 860px) {
   .main-nav { display: block; }
   .header-actions { margin-left: 0; }
@@ -451,7 +453,8 @@ main:focus { outline: none; }
 .footer-nav a { display: inline-block; padding-block: 6px; }
 .trademark { font-size: .8125rem; color: #a8b0b8; max-width: 90ch; }
 @media (min-width: 860px) {
-  .footer-inner { grid-template-columns: 1fr auto; align-items: end; }
+  .footer-inner { grid-template-columns: minmax(18rem, 1fr) minmax(0, 2fr); align-items: end; }
+  .footer-nav ul { justify-content: flex-end; }
 }
 
 /* ---------- Motion ---------- */

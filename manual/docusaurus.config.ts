@@ -14,6 +14,8 @@ const website = process.env.WEBSITE_URL || 'https://negurvulkan.github.io/kizamu
 
 const repo = 'https://github.com/negurvulkan/kizamubeam';
 const discord = 'https://discord.gg/SSr8VHh7EJ';
+const youtube = 'https://www.youtube.com/@KizamuBeam';
+const reddit = 'https://www.reddit.com/r/KizamuBeam/';
 
 const config: Config = {
   title: 'KizamuBeam Manual',
@@ -133,6 +135,8 @@ const config: Config = {
           title: 'Community',
           items: [
             {label: 'Discord', href: discord},
+            {label: 'YouTube', href: youtube},
+            {label: 'Reddit', href: reddit},
             {label: 'GitHub', href: repo},
             {label: 'Report an issue', href: `${repo}/issues`},
           ],

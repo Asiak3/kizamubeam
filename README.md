@@ -17,6 +17,8 @@
   <a href="https://negurvulkan.github.io/kizamubeam/docs/">Manual</a> ·
   <a href="docs/features.md">All features</a> ·
   <a href="https://discord.gg/SSr8VHh7EJ">Discord</a> ·
+  <a href="https://www.youtube.com/@KizamuBeam">YouTube</a> ·
+  <a href="https://www.reddit.com/r/KizamuBeam/">Reddit</a> ·
   <a href="README.de.md">Deutsch</a> ·
   <a href="README.it.md">Italiano</a>
 </p>
@@ -91,7 +93,7 @@ Releases, updates, translations and the code structure are described in the [dev
 
 ## Community
 
-Questions, ideas or something you made with KizamuBeam? Join us on [Discord](https://discord.gg/SSr8VHh7EJ). Bugs and feature requests are best filed as [GitHub issues](https://github.com/negurvulkan/kizamubeam/issues).
+Questions, ideas or something you made with KizamuBeam? Join us on [Discord](https://discord.gg/SSr8VHh7EJ) or [r/KizamuBeam](https://www.reddit.com/r/KizamuBeam/), and find videos on our [YouTube channel](https://www.youtube.com/@KizamuBeam). Bugs and feature requests are best filed as [GitHub issues](https://github.com/negurvulkan/kizamubeam/issues).
 
 ## Contributors
 

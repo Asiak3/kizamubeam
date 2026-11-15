@@ -16,6 +16,8 @@
     "lang_current": "English",
     "github_label": "KizamuBeam on GitHub",
     "discord_label": "KizamuBeam on Discord",
+    "youtube_label": "KizamuBeam on YouTube",
+    "reddit_label": "KizamuBeam on Reddit",
     "recommended": "For your system",
     "more_formats": "More formats",
     "back_top": "Back to top"
@@ -235,6 +237,8 @@
     "link_releases": "Releases",
     "link_issues": "Report an issue",
     "link_discord": "Discord",
+    "link_youtube": "YouTube",
+    "link_reddit": "Reddit",
     "link_license": "License",
     "trademark": "LightBurn is a trademark of LightBurn Software, LLC. KizamuBeam is an independent project and is not affiliated with or endorsed by LightBurn Software. All other trademarks belong to their respective owners."
   },

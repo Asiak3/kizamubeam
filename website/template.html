@@ -61,6 +61,8 @@
         <span class="lang-current" lang="{{lang}}" title="{{ui.lang_current}}"><span aria-hidden="true">{{lang_upper}}</span><span class="visually-hidden">{{ui.lang_current}}</span></span>{{#each langs_other}}<span class="lang-sep" aria-hidden="true">/</span><a class="lang-other" href="{{.href}}" hreflang="{{.code}}" lang="{{.code}}" data-set-lang="{{.code}}" title="{{.name}}"><span aria-hidden="true">{{.upper}}</span><span class="visually-hidden">{{.name}}</span></a>{{/each}}
       </nav>
       <a class="icon-btn" href="{{discord}}" aria-label="{{ui.discord_label}}">{{svg:discord}}</a>
+      <a class="icon-btn icon-btn-wide" href="{{youtube}}" aria-label="{{ui.youtube_label}}">{{svg:youtube}}</a>
+      <a class="icon-btn icon-btn-wide" href="{{reddit}}" aria-label="{{ui.reddit_label}}">{{svg:reddit}}</a>
       <a class="icon-btn" href="{{repo}}" aria-label="{{ui.github_label}}">{{svg:github}}</a>
     </div>
   </div>
@@ -348,6 +350,8 @@
         <li><a href="{{base}}{{nav.docs_href}}">{{nav.docs}}</a></li>
         <li><a href="{{repo}}/issues">{{footer.link_issues}}</a></li>
         <li><a href="{{discord}}">{{footer.link_discord}}</a></li>
+        <li><a href="{{youtube}}">{{footer.link_youtube}}</a></li>
+        <li><a href="{{reddit}}">{{footer.link_reddit}}</a></li>
         <li><a href="{{license_url}}">{{footer.link_license}}</a></li>{{#each langs_other}}
         <li><a href="{{.href}}" hreflang="{{.code}}" lang="{{.code}}" data-set-lang="{{.code}}">{{.name}}</a></li>{{/each}}
       </ul>
