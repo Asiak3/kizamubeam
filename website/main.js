@@ -33,7 +33,7 @@
   //    the list is split: app releases for #download, vm-v* for #vm. On any
   //    failure the generic Releases links stay in place.
   if (!window.fetch || !document.querySelector('[data-dl], [data-vm-dl]')) return;
-  var API = 'https://api.github.com/repos/negurvulkan/kizamubeam/releases?per_page=30';
+  var API = 'https://api.github.com/repos/KizamuBeam/kizamubeam/releases?per_page=30';
   var ctrl = window.AbortController ? new AbortController() : null;
   var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 6000);
   var isVm = function (x) { return /^vm-/i.test(String(x.tag_name || '')); };

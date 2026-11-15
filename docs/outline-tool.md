@@ -15,7 +15,7 @@ EXE/NSIS,18Prüfbefehle und Quellen-/Binärhashprüfung bestanden, nicht gestart
 
 ## Historischer Stand vor der Insel-Weiterentwicklung
 
-07.11.: isolierter [PR #170](https://github.com/negurvulkan/kizamubeam/pull/170)
+07.11.: isolierter [PR #170](https://github.com/KizamuBeam/kizamubeam/pull/170)
 gegen Upstream 2.8.0 veröffentlicht, zunächst **Draft**. 24 Geometrie-/Editor-
 und 31 Browserchecks plus Apps/History/G-code/i18n/Build bestanden. Die mögliche
 VectorCraft-Codeherkunft/Lizenzzuordnung aus Issue #147 muss vor Merge geprüft

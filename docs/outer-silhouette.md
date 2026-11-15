@@ -1,7 +1,7 @@
 # Outer silhouette with selected holes (local prototype)
 
 Status: **local manual tests ongoing**. Feature request published by explicit
-request: https://github.com/negurvulkan/kizamubeam/issues/147.
+request: https://github.com/KizamuBeam/kizamubeam/issues/147.
 Included in the successful Windows test build
 `artifacts/windows-slots-outline-20261106-014932/` (not launched/installed).
 Earlier “no EXE” verification notes below describe the initial implementation.

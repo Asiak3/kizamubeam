@@ -12,7 +12,7 @@ This is a community-maintained project. There is no guaranteed response time or 
 
 **Please do not create a public GitHub issue or pull request containing an exploitable security vulnerability, credentials, or a working exploit.**
 
-1. If [GitHub private vulnerability reporting](https://github.com/negurvulkan/kizamubeam/security/advisories/new) is enabled for this repository, use it to submit a confidential report.
+1. If [GitHub private vulnerability reporting](https://github.com/KizamuBeam/kizamubeam/security/advisories/new) is enabled for this repository, use it to submit a confidential report.
 2. If it is unavailable, contact [the maintainer](https://github.com/negurvulkan) using a private contact method the maintainer has explicitly published.
 3. If no private channel is available, you may open a **brief public issue requesting a confidential security-reporting channel**, without including the vulnerability details, reproduction steps, exploit code, or sensitive attachments.
 
@@ -36,7 +36,7 @@ Unexpected movement, failed homing, malfunctioning limit checks, incorrect laser
 - **Stop using the affected function immediately.** Follow your machine manufacturer's emergency-stop and shutdown procedures.
 - Do not repeat an unsafe movement or fire the laser merely to collect diagnostic data.
 - Never bypass interlocks, limit switches, emergency stops, or protective equipment for testing.
-- For a dangerous machine-control bug **without an exploitable security component**, use the [bug report form](https://github.com/negurvulkan/kizamubeam/issues/new/choose), describe the risk clearly, and avoid publishing dangerous step-by-step operating instructions.
+- For a dangerous machine-control bug **without an exploitable security component**, use the [bug report form](https://github.com/KizamuBeam/kizamubeam/issues/new/choose), describe the risk clearly, and avoid publishing dangerous step-by-step operating instructions.
 - If the issue also exposes a security vulnerability, use the confidential reporting process above.
 
 A passing simulator test is not evidence that a physical machine is safe. Real hardware behavior depends on controller firmware, wiring, configuration, and the machine itself.

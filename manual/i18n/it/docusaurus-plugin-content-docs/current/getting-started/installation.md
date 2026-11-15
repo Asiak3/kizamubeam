@@ -6,7 +6,7 @@ description: Scaricare, installare e aggiornare KizamuBeam su macOS, Windows e L
 
 # Installazione
 
-KizamuBeam è gratuito e non richiede account né chiavi di licenza. Scarica il programma di installazione per il tuo sistema dalla [pagina delle release](https://github.com/negurvulkan/kizamubeam/releases) o dal [sito web](https://negurvulkan.github.io/kizamubeam/it/#download).
+KizamuBeam è gratuito e non richiede account né chiavi di licenza. Scarica il programma di installazione per il tuo sistema dalla [pagina delle release](https://github.com/KizamuBeam/kizamubeam/releases) o dal [sito web](https://kizamubeam.github.io/kizamubeam/it/#download).
 
 | Sistema | File |
 |---|---|

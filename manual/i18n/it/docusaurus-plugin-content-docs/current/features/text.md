@@ -56,7 +56,7 @@ Per un’intera serie di pagine da una tabella vedi [Modelli e libreria](templat
 
 ## Codici QR
 
-Fai clic sul pulsante QR nella barra Strumenti (o cercalo nella Casella degli strumenti). Un codice QR può contenere:
+Apri **Codice QR** nella Casella degli strumenti (o cercalo lì). Un doppio clic su un codice QR esistente lo modifica. Un codice QR può contenere:
 
 - testo o un indirizzo web,
 - i dati di accesso a una rete Wi-Fi,

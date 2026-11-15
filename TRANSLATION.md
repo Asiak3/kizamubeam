@@ -18,7 +18,7 @@ Currently available: **German** (the original), **English**, **Italian**, **Span
 
 ## Before you start
 
-- Check the [open issues and pull requests](https://github.com/negurvulkan/kizamubeam/pulls) to see whether someone is already working on your language. If so, join them instead of starting over.
+- Check the [open issues and pull requests](https://github.com/KizamuBeam/kizamubeam/pulls) to see whether someone is already working on your language. If so, join them instead of starting over.
 - For a new language, it helps to open a short issue (“Adding French”) so others can find you.
 - You don't have to finish everything at once. A partial translation can be merged: untranslated texts simply show in English.
 
@@ -145,7 +145,7 @@ The KizamuBeam Virtual Machine (`vm/`) uses the same language list, but its own 
 
 ## 2. The website
 
-The website at <https://negurvulkan.github.io/kizamubeam/> is generated from [`website/i18n/`](website/i18n/). See [website/README.md](website/README.md) for details.
+The website at <https://kizamubeam.github.io/kizamubeam/> is generated from [`website/i18n/`](website/i18n/). See [website/README.md](website/README.md) for details.
 
 To update a language, change its `website/i18n/<code>.json`, keeping all keys in sync with `en.json`, then rebuild and commit both the JSON and the generated HTML:
 
@@ -179,12 +179,12 @@ The feature list is long and changes often. It's fine to skip it.
 
 ## 5. The user manual
 
-The [user manual](https://negurvulkan.github.io/kizamubeam/docs/) is built with Docusaurus from [`manual/`](manual/). English pages are in `manual/docs/`; a translation keeps the same file names under `manual/i18n/<code>/docusaurus-plugin-content-docs/current/`, plus the label files `manual/i18n/<code>/*.json`. Pages that are not translated yet show the English text, so you can translate one page at a time. A new manual language also needs an entry in `i18n.locales` in `manual/docusaurus.config.ts`. Details, and how to preview the manual locally, are in [Contributing to the manual](https://negurvulkan.github.io/kizamubeam/docs/contributing).
+The [user manual](https://kizamubeam.github.io/kizamubeam/docs/) is built with Docusaurus from [`manual/`](manual/). English pages are in `manual/docs/`; a translation keeps the same file names under `manual/i18n/<code>/docusaurus-plugin-content-docs/current/`, plus the label files `manual/i18n/<code>/*.json`. Pages that are not translated yet show the English text, so you can translate one page at a time. A new manual language also needs an entry in `i18n.locales` in `manual/docusaurus.config.ts`. Details, and how to preview the manual locally, are in [Contributing to the manual](https://kizamubeam.github.io/kizamubeam/docs/contributing).
 
 ## Submitting your translation
 
 1. Commit your changes on a branch in your fork, e.g. `translation-fr`.
-2. Open a pull request against `main` of [negurvulkan/kizamubeam](https://github.com/negurvulkan/kizamubeam). A title like “Add French translation” or “Update Italian translation” is perfect.
+2. Open a pull request against `main` of [KizamuBeam/kizamubeam](https://github.com/KizamuBeam/kizamubeam). A title like “Add French translation” or “Update Italian translation” is perfect.
 3. In the description, mention:
    - the language and what you translated (app, website, README, feature list, manual),
    - roughly how complete it is (the line from `npm run i18n:check`),

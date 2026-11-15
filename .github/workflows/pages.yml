@@ -109,7 +109,7 @@ jobs:
           find _webspace/website -maxdepth 2 -type f \
             \( -name '*.html' -o -name '*.xml' -o -name '*.txt' -o -name '*.webmanifest' \) \
             -not -path '_webspace/website/docs/*' \
-            -exec sed -i "s#https://negurvulkan.github.io/kizamubeam/#${site}#g" {} +
+            -exec sed -i "s#https://kizamubeam.github.io/kizamubeam/#${site}#g" {} +
           rm -f _webspace/website/README.md _webspace/website/build.mjs _webspace/website/template.html
           rm -rf _webspace/website/i18n
           cat > _webspace/README.md <<EOF

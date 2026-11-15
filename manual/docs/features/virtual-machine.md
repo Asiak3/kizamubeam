@@ -6,7 +6,7 @@ description: Try jobs, camera functions and Print and Cut without hardware with 
 
 # Virtual Machine
 
-The **KizamuBeam Virtual Machine** is a separate program (a separate download on the [releases page](https://github.com/negurvulkan/kizamubeam/releases)) that behaves like a laser with a FluidNC 3.7 or GRBL 1.1 controller. Use it to learn KizamuBeam, to try a job before you waste material, or to test camera functions without a camera.
+The **KizamuBeam Virtual Machine** is a separate program (a separate download on the [releases page](https://github.com/KizamuBeam/kizamubeam/releases)) that behaves like a laser with a FluidNC 3.7 or GRBL 1.1 controller. Use it to learn KizamuBeam, to try a job before you waste material, or to test camera functions without a camera.
 
 ## Connecting
 

@@ -46,4 +46,4 @@ Con FluidNC carica il lavoro sul controller ed eseguilo da lì (**Laser → Flui
 
 ## Ancora bloccato?
 
-Chiedi su [Discord](https://discord.gg/SSr8VHh7EJ) o apri una [issue su GitHub](https://github.com/negurvulkan/kizamubeam/issues). Indica sistema operativo, versione di KizamuBeam, laser e firmware.
+Chiedi su [Discord](https://discord.gg/SSr8VHh7EJ) o apri una [issue su GitHub](https://github.com/KizamuBeam/kizamubeam/issues). Indica sistema operativo, versione di KizamuBeam, laser e firmware.

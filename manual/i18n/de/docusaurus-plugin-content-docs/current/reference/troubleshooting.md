@@ -46,4 +46,4 @@ Lade den Job bei FluidNC auf den Controller und starte ihn dort (**Laser → Flu
 
 ## Immer noch nicht weiter?
 
-Frag auf [Discord](https://discord.gg/SSr8VHh7EJ) oder eröffne ein [GitHub-Issue](https://github.com/negurvulkan/kizamubeam/issues). Nenne dabei Betriebssystem, KizamuBeam-Version, Laser und Firmware.
+Frag auf [Discord](https://discord.gg/SSr8VHh7EJ) oder eröffne ein [GitHub-Issue](https://github.com/KizamuBeam/kizamubeam/issues). Nenne dabei Betriebssystem, KizamuBeam-Version, Laser und Firmware.

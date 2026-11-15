@@ -8,8 +8,15 @@ use std::sync::Mutex;
 use tauri::ipc::Channel;
 use tauri_plugin_updater::{Update, UpdaterExt};
 
-/// Nur Dateien aus den Releases dieses Repositorys
-const ALLOWED_PREFIX: &str = "https://github.com/negurvulkan/";
+/// Only files from this repository's releases. The repository moved from negurvulkan/kizamubeam to the
+/// KizamuBeam organization; GitHub redirects the old address, so both are accepted. GitHub treats the owner
+/// and repository name case-insensitively, so the comparison does too.
+const ALLOWED_PREFIXES: [&str; 2] = ["https://github.com/kizamubeam/kizamubeam/", "https://github.com/negurvulkan/kizamubeam/"];
+
+fn allowed_url(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    ALLOWED_PREFIXES.iter().any(|p| lower.starts_with(p))
+}
 
 pub const PUBKEY: Option<&str> = option_env!("KIZAMUBEAM_UPDATER_PUBKEY");
 
@@ -44,7 +51,7 @@ pub fn update_supported() -> bool {
 #[tauri::command]
 pub async fn update_check(app: tauri::AppHandle, pending: tauri::State<'_, Pending>, url: String) -> Result<Option<UpdateInfo>, String> {
     let key = pubkey().ok_or("Dieser Build kann sich nicht selbst aktualisieren (kein Update-Schlüssel).")?;
-    if !url.starts_with(ALLOWED_PREFIX) {
+    if !allowed_url(&url) {
         return Err(format!("Unerwartete Update-Adresse: {url}"));
     }
     let url = url.parse().map_err(|e| format!("{e}"))?;
@@ -84,4 +91,19 @@ pub async fn update_install(app: tauri::AppHandle, pending: tauri::State<'_, Pen
         .await
         .map_err(|e| e.to_string())?;
     app.restart();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::allowed_url;
+
+    #[test]
+    fn accepts_releases_of_this_repository_only() {
+        assert!(allowed_url("https://github.com/KizamuBeam/kizamubeam/releases/download/v2.9.0/latest.json"));
+        assert!(allowed_url("https://github.com/kizamubeam/kizamubeam/releases/download/v2.9.0/latest.json"));
+        assert!(allowed_url("https://github.com/negurvulkan/kizamubeam/releases/download/v2.8.0/latest.json"));
+        assert!(!allowed_url("https://github.com/KizamuBeam/other/releases/download/v1/latest.json"));
+        assert!(!allowed_url("https://github.com/someone/kizamubeam/releases/download/v1/latest.json"));
+        assert!(!allowed_url("https://example.com/https://github.com/KizamuBeam/kizamubeam/latest.json"));
+    }
 }

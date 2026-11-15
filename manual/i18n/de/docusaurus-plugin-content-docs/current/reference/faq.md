@@ -32,4 +32,4 @@ Damit können KI-Agenten Entwürfe lesen und bearbeiten. Er ist standardmäßig 
 
 ## Wie kann ich mithelfen?
 
-Teste KizamuBeam mit deinem Laser, melde Fehler und Wünsche auf [GitHub](https://github.com/negurvulkan/kizamubeam/issues), stell Fragen und zeig deine Projekte auf [Discord](https://discord.gg/SSr8VHh7EJ), übersetze die Oberfläche oder [dieses Handbuch](../contributing.md), oder schick einen Pull Request.
+Teste KizamuBeam mit deinem Laser, melde Fehler und Wünsche auf [GitHub](https://github.com/KizamuBeam/kizamubeam/issues), stell Fragen und zeig deine Projekte auf [Discord](https://discord.gg/SSr8VHh7EJ), übersetze die Oberfläche oder [dieses Handbuch](../contributing.md), oder schick einen Pull Request.

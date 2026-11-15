@@ -10,7 +10,7 @@
     "de": "Zeigt alle Inhalte, die ein Paket haben kann. Die Werte sind Beispiele, keine gemessenen Einstellungen."
   },
   "author": "KizamuBeam",
-  "homepage": "https://github.com/negurvulkan/kizamubeam/blob/main/docs/packs.md",
+  "homepage": "https://github.com/KizamuBeam/kizamubeam/blob/main/docs/packs.md",
   "devices": [
     {
       "name": { "en": "Example: GRBL laser 300 × 200", "de": "Beispiel: GRBL-Laser 300 × 200" },

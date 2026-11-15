@@ -24,6 +24,6 @@ KizamuBeam ti accompagna dalla prima idea al pezzo finito in un’unica app: dis
 
 ## Informazioni su questo manuale
 
-Il manuale è nuovo e cresce a ogni versione. Le pagine non ancora scritte rimandano all’[elenco completo delle funzioni](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.it.md), che descrive ogni funzione con il relativo percorso nei menu.
+Il manuale è nuovo e cresce a ogni versione. Le pagine non ancora scritte rimandano all’[elenco completo delle funzioni](https://github.com/KizamuBeam/kizamubeam/blob/main/docs/features.it.md), che descrive ogni funzione con il relativo percorso nei menu.
 
 Il manuale si trova nello stesso repository dell’app. Hai trovato un errore o vuoi aggiungere una pagina o una traduzione? Leggi [Contribuire al manuale](contributing.md). Le domande sono benvenute su [Discord](https://discord.gg/SSr8VHh7EJ).

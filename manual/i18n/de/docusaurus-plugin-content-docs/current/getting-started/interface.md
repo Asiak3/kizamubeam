@@ -13,9 +13,9 @@ description: Ein Rundgang durch das Hauptfenster von KizamuBeam, seine Leisten, 
 | Bereich | Was du dort findest |
 |---|---|
 | **Menüleiste** (oben) | Datei, Bearbeiten, Werkzeuge, Anordnen, Seiten, Laser, Ansicht, Fenster und Hilfe. |
-| **Hauptleiste** (unter dem Menü) | Neu, Öffnen, Speichern, Importieren und Exportieren, Rückgängig, Zwischenablage, Zoom, 3D-Ansicht, Kamera, Geräteeinstellungen, Konstruktion prüfen, Vorschau, Gruppieren, Spiegeln und Ausrichten. |
+| **Hauptleiste** (unter dem Menü) | Neu, Öffnen, Speichern, Importieren und Exportieren, Rückgängig, Zwischenablage, Zoom, 3D-Ansicht, Kamera, Geräteeinstellungen, Konstruktion prüfen, Vorschau, Gruppieren, Isolieren, Spiegeln und Ausrichten. |
 | **Eigenschaftenleiste** | Position, Größe und Drehung der Auswahl. Die Felder verstehen Formeln mit Einheiten, etwa `100/3` oder `2in`. Ist ein Text ausgewählt, erscheint die Textleiste mit Schrift, Höhe und Abständen. |
-| **Werkzeugleiste** (links) | Auswählen und Knoten bearbeiten, Linien, Kurven, Rechtecke, Ellipsen, Polygone und Text zeichnen, QR-Codes, der **Werkzeugkasten** mit allen Generatoren, boolesche Operationen, Versatz, Arrays, Verschachteln und Messen. |
+| **Werkzeugleiste** (links) | Auswählen und Knoten bearbeiten, Linien, Kurven, Rechtecke, Ellipsen, Polygone und Text zeichnen, Knopfgruppen für boolesche Operationen (mit Formerstellung), Kontur (Versatz), Pfad-Werkzeuge und Arrays, Beziehungen und Messen, am Ende der **Werkzeugkasten** mit allen Generatoren und Spezialwerkzeugen. Ein kleines ▾ neben einem Knopf öffnet den Rest seiner Gruppe. |
 | **Projekt-Tabs** (über der Arbeitsfläche) | Mehrere Projekte gleichzeitig, jedes mit eigenen Seiten, eigener Auswahl und eigenem Rückgängig-Verlauf. |
 | **Arbeitsfläche** (Mitte) | Das Laserbett des gewählten Geräts. Hilfslinien ziehst du aus den Linealen. |
 | **Fenster** (rechts) | Schnitte / Layer, Objekte und Verlauf; unten rechts Laser, Verschieben und Konsole. |

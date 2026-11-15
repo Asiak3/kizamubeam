@@ -6,7 +6,7 @@ description: Download and install KizamuBeam on macOS, Windows and Linux, and ke
 
 # Installation
 
-KizamuBeam is free and needs no account or license key. Download the installer for your system from the [releases page](https://github.com/negurvulkan/kizamubeam/releases) or the [website](https://negurvulkan.github.io/kizamubeam/en/#download).
+KizamuBeam is free and needs no account or license key. Download the installer for your system from the [releases page](https://github.com/KizamuBeam/kizamubeam/releases) or the [website](https://kizamubeam.github.io/kizamubeam/en/#download).
 
 | System | File |
 |---|---|

@@ -52,4 +52,4 @@ Jeder Laser wird als Gerät mit eigenem Arbeitsbereich, eigener Verbindung und e
 
 ## Ohne Laser
 
-Die **KizamuBeam Virtual Machine** ist ein eigenes Programm, das sich wie ein FluidNC- oder GRBL-Controller verhält und den Job in 3D zeigt, eingebrannt in virtuelles Material. Lade sie von der [Release-Seite](https://github.com/negurvulkan/kizamubeam/releases?q=vm-v) und verbinde dich über die Gerätevorlage „KizamuBeam Virtual Machine“.
+Die **KizamuBeam Virtual Machine** ist ein eigenes Programm, das sich wie ein FluidNC- oder GRBL-Controller verhält und den Job in 3D zeigt, eingebrannt in virtuelles Material. Lade sie von der [Release-Seite](https://github.com/KizamuBeam/kizamubeam/releases?q=vm-v) und verbinde dich über die Gerätevorlage „KizamuBeam Virtual Machine“.

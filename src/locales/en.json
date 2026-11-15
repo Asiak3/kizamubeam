@@ -4749,5 +4749,6 @@
   "Kerf {v} mm": "Kerf {v} mm",
   "Klick: Start hier, Shift: umkehren, Ctrl: zurücksetzen": "Click: start here, Shift: reverse, Ctrl: reset",
   "Nightly-Builds entstehen jede Nacht automatisch aus dem aktuellen Entwicklungsstand und sind nicht an echter Hardware getestet. Mit einem Nightly gespeicherte Dateien lassen sich in der stabilen Version eventuell nicht öffnen.": "Nightly builds are made automatically every night from the current development state and are not tested on real hardware. Files saved with a nightly build may not open in the stable version.",
-  "Nightly-Build {version}: nicht an echter Hardware getestet. Ersten Job bitte beobachten.": "Nightly build {version}: not tested on real hardware. Please watch the first job."
+  "Nightly-Build {version}: nicht an echter Hardware getestet. Ersten Job bitte beobachten.": "Nightly build {version}: not tested on real hardware. Please watch the first job.",
+  "Kontur (Gruppe)": "Contour (group)"
 }

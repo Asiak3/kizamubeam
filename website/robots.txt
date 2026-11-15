@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://negurvulkan.github.io/kizamubeam/sitemap.xml
-Sitemap: https://negurvulkan.github.io/kizamubeam/docs/sitemap.xml
+Sitemap: https://kizamubeam.github.io/kizamubeam/sitemap.xml
+Sitemap: https://kizamubeam.github.io/kizamubeam/docs/sitemap.xml

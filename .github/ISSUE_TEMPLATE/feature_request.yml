@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for the idea! Please check the [feature overview](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.md) first, the function you are looking for may already exist under a different name.
+        Thanks for the idea! Please check the [feature overview](https://github.com/KizamuBeam/kizamubeam/blob/main/docs/features.md) first, the function you are looking for may already exist under a different name.
   - type: textarea
     id: problem
     attributes:

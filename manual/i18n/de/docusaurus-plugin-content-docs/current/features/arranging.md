@@ -19,7 +19,7 @@ Bei mehreren ausgewählten Objekten richtet die Ausrichten-Gruppe in der Hauptle
 
 ## Verschachteln
 
-**Anordnen → Verschachteln …** (auch in der Werkzeugleiste und im Werkzeugkasten) ordnet die ausgewählten Teile nach ihren echten Umrissen an, nicht nur nach ihren Begrenzungsrahmen, um Material zu sparen.
+**Anordnen → Verschachteln …** (auch im Werkzeugkasten) ordnet die ausgewählten Teile nach ihren echten Umrissen an, nicht nur nach ihren Begrenzungsrahmen, um Material zu sparen.
 
 **Wohin:**
 

@@ -39,4 +39,4 @@ Das Beispielpaket ist als Ausgangspunkt für eigene Pakete gedacht. Pakete ander
 
 ## Ein eigenes Paket bauen
 
-Ein Paket ist eine einzelne JSON-Datei. Das Format steht in der Entwicklerdokumentation: [Extension packs](https://github.com/negurvulkan/kizamubeam/blob/main/docs/packs.md) (englisch). Pakete für den offiziellen Katalog reichst du als Pull Request für den Ordner [`packs/`](https://github.com/negurvulkan/kizamubeam/tree/main/packs) ein.
+Ein Paket ist eine einzelne JSON-Datei. Das Format steht in der Entwicklerdokumentation: [Extension packs](https://github.com/KizamuBeam/kizamubeam/blob/main/docs/packs.md) (englisch). Pakete für den offiziellen Katalog reichst du als Pull Request für den Ordner [`packs/`](https://github.com/KizamuBeam/kizamubeam/tree/main/packs) ein.

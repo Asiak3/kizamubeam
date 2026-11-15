@@ -24,6 +24,6 @@ KizamuBeam takes you from the first idea to the finished piece in one app: draw 
 
 ## About this manual
 
-This manual is new and grows with every release. Pages that are not written yet point to the [complete feature list](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.md), which describes every function with its menu path.
+This manual is new and grows with every release. Pages that are not written yet point to the [complete feature list](https://github.com/KizamuBeam/kizamubeam/blob/main/docs/features.md), which describes every function with its menu path.
 
 The manual lives in the same repository as the app. Found a mistake, or want to add a page or a translation? See [Contributing to the manual](contributing.md). Questions are welcome on [Discord](https://discord.gg/SSr8VHh7EJ).

@@ -13,9 +13,9 @@ description: Un giro nella finestra principale di KizamuBeam, con barre degli st
 | Area | Cosa trovi |
 |---|---|
 | **Barra dei menu** (in alto) | File, Modifica, Strumenti, Disponi, Pagine, Laser, Visualizza, Finestra e Aiuto. |
-| **Barra degli strumenti principale** (sotto il menu) | Nuovo, apri, salva, importa ed esporta, annulla, appunti, zoom, vista 3D, fotocamera, impostazioni del dispositivo, controllo del progetto, anteprima, raggruppa, specchia e allinea. |
+| **Barra degli strumenti principale** (sotto il menu) | Nuovo, apri, salva, importa ed esporta, annulla, appunti, zoom, vista 3D, fotocamera, impostazioni del dispositivo, controllo del progetto, anteprima, raggruppa, isola, specchia e allinea. |
 | **Barra delle modifiche numeriche** | Posizione, dimensioni e rotazione della selezione. I campi accettano formule con unità, come `100/3` o `2in`. Con un testo selezionato compare la barra del testo con font, altezza e spaziatura. |
-| **Barra Strumenti** (a sinistra) | Selezione e modifica dei nodi, linee, curve, rettangoli, ellissi, poligoni e testo, codici QR, la **Casella degli strumenti** con tutti i generatori, operazioni booleane, offset, array, nesting e misura. |
+| **Barra Strumenti** (a sinistra) | Selezione e modifica dei nodi, linee, curve, rettangoli, ellissi, poligoni e testo, gruppi di pulsanti per operazioni booleane (con la costruzione forme), contorno (offset), strumenti percorso e array, relazioni e misura, e alla fine la **Casella degli strumenti** con tutti i generatori e gli strumenti speciali. Una piccola ▾ accanto a un pulsante apre il resto del gruppo. |
 | **Schede dei progetti** (sopra l’area di lavoro) | Più progetti aperti insieme, ognuno con pagine, selezione e cronologia di annullamento propri. |
 | **Area di lavoro** (al centro) | Il piano del laser del dispositivo selezionato. Trascina le guide dai righelli. |
 | **Finestre** (a destra) | Tagli / Livello, Oggetti e Cronologia; in basso a destra Laser, Sposta e Console. |

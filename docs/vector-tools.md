@@ -14,10 +14,10 @@ without resetting order, icon sizes, hidden bars or group choices. Explicit v6
 removals remain removed. 11 Apps/migration and 21 actual toolbar DOM checks passed;
 this toolbar follow-up has not been published as a PR.
 
-- [#162](https://github.com/negurvulkan/kizamubeam/pull/162): multi-object node/segment editing.
-- [#165](https://github.com/negurvulkan/kizamubeam/pull/165): whole-path simplification/refitting, without Pencil.
-- [#163](https://github.com/negurvulkan/kizamubeam/pull/163): temporary isolation.
-- [#164](https://github.com/negurvulkan/kizamubeam/pull/164): context menus; closes issue #144 on merge.
+- [#162](https://github.com/KizamuBeam/kizamubeam/pull/162): multi-object node/segment editing.
+- [#165](https://github.com/KizamuBeam/kizamubeam/pull/165): whole-path simplification/refitting, without Pencil.
+- [#163](https://github.com/KizamuBeam/kizamubeam/pull/163): temporary isolation.
+- [#164](https://github.com/KizamuBeam/kizamubeam/pull/164): context menus; closes issue #144 on merge.
 
 Each was extracted into its own branch against upstream `main` (`9bee124`), built
 and tested independently. They are not stacked. Their documentation/tests describe

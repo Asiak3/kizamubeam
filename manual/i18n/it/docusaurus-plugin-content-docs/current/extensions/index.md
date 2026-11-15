@@ -39,4 +39,4 @@ Il pacchetto di esempio è pensato come punto di partenza per i tuoi pacchetti. 
 
 ## Creare un pacchetto
 
-Un pacchetto è un singolo file JSON. Il formato è descritto nella documentazione per sviluppatori: [Extension packs](https://github.com/negurvulkan/kizamubeam/blob/main/docs/packs.md) (in inglese). I pacchetti per il catalogo ufficiale si propongono con una pull request nella cartella [`packs/`](https://github.com/negurvulkan/kizamubeam/tree/main/packs).
+Un pacchetto è un singolo file JSON. Il formato è descritto nella documentazione per sviluppatori: [Extension packs](https://github.com/KizamuBeam/kizamubeam/blob/main/docs/packs.md) (in inglese). I pacchetti per il catalogo ufficiale si propongono con una pull request nella cartella [`packs/`](https://github.com/KizamuBeam/kizamubeam/tree/main/packs).

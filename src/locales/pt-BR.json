@@ -4749,5 +4749,6 @@
   "Nightly-Builds entstehen jede Nacht automatisch aus dem aktuellen Entwicklungsstand und sind nicht an echter Hardware getestet. Mit einem Nightly gespeicherte Dateien lassen sich in der stabilen Version eventuell nicht öffnen.": "As versões nightly são geradas automaticamente toda noite a partir do estado atual de desenvolvimento e não são testadas em hardware real. Arquivos salvos com uma versão nightly podem não abrir na versão estável.",
   "Nightly-Build {version}: nicht an echter Hardware getestet. Ersten Job bitte beobachten.": "Versão nightly {version}: não testada em hardware real. Acompanhe o primeiro trabalho.",
   "{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).": "{n} objeto oculto participa do trabalho (saída ativada).",
-  "{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).": "{n} objetos ocultos participam do trabalho (saída ativada)."
+  "{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).": "{n} objetos ocultos participam do trabalho (saída ativada).",
+  "Kontur (Gruppe)": "Contorno (grupo)"
 }

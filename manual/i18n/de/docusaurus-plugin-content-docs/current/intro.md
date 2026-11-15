@@ -24,6 +24,6 @@ Mit KizamuBeam kommst du in einer App von der ersten Idee zum fertigen Stück: d
 
 ## Über dieses Handbuch
 
-Das Handbuch ist neu und wächst mit jeder Version. Seiten, die noch fehlen, verweisen auf die [vollständige Funktionsliste](https://github.com/negurvulkan/kizamubeam/blob/main/docs/features.de.md), die jede Funktion mit ihrem Menüpfad beschreibt.
+Das Handbuch ist neu und wächst mit jeder Version. Seiten, die noch fehlen, verweisen auf die [vollständige Funktionsliste](https://github.com/KizamuBeam/kizamubeam/blob/main/docs/features.de.md), die jede Funktion mit ihrem Menüpfad beschreibt.
 
 Das Handbuch liegt im selben Repository wie die App. Einen Fehler gefunden, oder du möchtest eine Seite oder Übersetzung beitragen? Siehe [Am Handbuch mitarbeiten](contributing.md). Fragen gern auf [Discord](https://discord.gg/SSr8VHh7EJ).

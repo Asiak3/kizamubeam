@@ -1,6 +1,6 @@
 # Bleistift — Rückmeldung und Pointer-Lebenszyklus
 
-Veröffentlicht: [PR #169](https://github.com/negurvulkan/kizamubeam/pull/169),
+Veröffentlicht: [PR #169](https://github.com/KizamuBeam/kizamubeam/pull/169),
 unabhängig gegen upstream `73e75cb`/2.8.0. Enthält Bleistift samt Optionen,
 eigenem Symbol, Standardleisten-Eintrag, Pointerfix und Rückmeldung. Isoliert:
 5 Regressionen und 6 Trusted-Mouse-Browserchecks sowie Build/i18n/Apps/History/G-code.

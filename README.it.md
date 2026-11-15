@@ -10,9 +10,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/negurvulkan/kizamubeam/releases"><b>Download</b></a> ·
-  <a href="https://negurvulkan.github.io/kizamubeam/it/">Sito web</a> ·
-  <a href="https://negurvulkan.github.io/kizamubeam/docs/it/">Manuale</a> ·
+  <a href="https://github.com/KizamuBeam/kizamubeam/releases"><b>Download</b></a> ·
+  <a href="https://kizamubeam.github.io/kizamubeam/it/">Sito web</a> ·
+  <a href="https://kizamubeam.github.io/kizamubeam/docs/it/">Manuale</a> ·
   <a href="docs/features.it.md">Tutte le funzioni</a> ·
   <a href="https://discord.gg/SSr8VHh7EJ">Discord</a> ·
   <a href="https://www.youtube.com/@KizamuBeam">YouTube</a> ·
@@ -37,7 +37,7 @@ KizamuBeam ti accompagna dalla prima idea al pezzo finito in un’unica app: dis
 | **Windows** (64 bit) | `KizamuBeam_…_x64-setup.exe` |
 | **Linux** (64 bit) | `KizamuBeam_…_amd64.AppImage`, `.deb` o `.rpm` |
 
-Scarica l’ultima versione dalla [pagina delle release](https://github.com/negurvulkan/kizamubeam/releases) o dal [sito web](https://negurvulkan.github.io/kizamubeam/it/#download). Versione attuale: **2.8.0** (stabile). Una volta installato, KizamuBeam si aggiorna da solo (Aiuto → Controlla aggiornamenti).
+Scarica l’ultima versione dalla [pagina delle release](https://github.com/KizamuBeam/kizamubeam/releases) o dal [sito web](https://kizamubeam.github.io/kizamubeam/it/#download). Versione attuale: **2.8.0** (stabile). Una volta installato, KizamuBeam si aggiorna da solo (Aiuto → Controlla aggiornamenti).
 
 > **Primo avvio su macOS:** se macOS dice che l’app non può essere verificata, apri Impostazioni di Sistema → Privacy e sicurezza e fai clic su “Apri comunque”.
 
@@ -91,7 +91,7 @@ Release, aggiornamenti, traduzioni e struttura del codice sono descritti nella [
 
 ## Community
 
-Domande, idee o qualcosa che hai realizzato con KizamuBeam? Unisciti a noi su [Discord](https://discord.gg/SSr8VHh7EJ) o su [r/KizamuBeam](https://www.reddit.com/r/KizamuBeam/); i video sono sul nostro [canale YouTube](https://www.youtube.com/@KizamuBeam). Bug e richieste di funzioni vanno segnalati preferibilmente come [issue su GitHub](https://github.com/negurvulkan/kizamubeam/issues).
+Domande, idee o qualcosa che hai realizzato con KizamuBeam? Unisciti a noi su [Discord](https://discord.gg/SSr8VHh7EJ) o su [r/KizamuBeam](https://www.reddit.com/r/KizamuBeam/); i video sono sul nostro [canale YouTube](https://www.youtube.com/@KizamuBeam). Bug e richieste di funzioni vanno segnalati preferibilmente come [issue su GitHub](https://github.com/KizamuBeam/kizamubeam/issues).
 
 ## Contributori
 
@@ -103,11 +103,11 @@ Grazie a tutte le persone che hanno contribuito ([legenda emoji](https://allcont
 <table>
   <tbody>
     <tr>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/negurvulkan"><img src="https://avatars.githubusercontent.com/u/61453878?v=4?s=80" width="80px;" alt="Hanjo Winter"/><br /><sub><b>Hanjo Winter</b></sub></a><br /><a href="#projectManagement-negurvulkan" title="Project Management">📆</a> <a href="#maintenance-negurvulkan" title="Maintenance">🚧</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=negurvulkan" title="Code">💻</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=negurvulkan" title="Documentation">📖</a> <a href="#design-negurvulkan" title="Design">🎨</a> <a href="#ideas-negurvulkan" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=negurvulkan" title="Tests">⚠️</a> <a href="#translation-negurvulkan" title="Translation">🌍</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/liquid-light"><img src="https://avatars.githubusercontent.com/u/21311036?v=4?s=80" width="80px;" alt="liquid-light"/><br /><sub><b>liquid-light</b></sub></a><br /><a href="https://github.com/negurvulkan/kizamubeam/commits?author=liquid-light" title="Code">💻</a> <a href="#ideas-liquid-light" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/negurvulkan/kizamubeam/issues?q=author%3Aliquid-light" title="Bug reports">🐛</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=liquid-light" title="Tests">⚠️</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/SimoCassan"><img src="https://avatars.githubusercontent.com/u/96295007?v=4?s=80" width="80px;" alt="SimoCassan"/><br /><sub><b>SimoCassan</b></sub></a><br /><a href="#translation-SimoCassan" title="Translation">🌍</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=SimoCassan" title="Code">💻</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Asiak3"><img src="https://avatars.githubusercontent.com/u/71585581?v=4?s=80" width="80px;" alt="Asiak C."/><br /><sub><b>Asiak C.</b></sub></a><br /><a href="https://github.com/negurvulkan/kizamubeam/commits?author=Asiak3" title="Code">💻</a> <a href="#ideas-Asiak3" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/negurvulkan/kizamubeam/issues?q=author%3AAsiak3" title="Bug reports">🐛</a></td>
-      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Pietrogramma"><img src="https://avatars.githubusercontent.com/u/11855652?v=4?s=80" width="80px;" alt="Pietrogramma"/><br /><sub><b>Pietrogramma</b></sub></a><br /><a href="#translation-Pietrogramma" title="Translation">🌍</a> <a href="https://github.com/negurvulkan/kizamubeam/commits?author=Pietrogramma" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/negurvulkan"><img src="https://avatars.githubusercontent.com/u/61453878?v=4?s=80" width="80px;" alt="Hanjo Winter"/><br /><sub><b>Hanjo Winter</b></sub></a><br /><a href="#projectManagement-negurvulkan" title="Project Management">📆</a> <a href="#maintenance-negurvulkan" title="Maintenance">🚧</a> <a href="https://github.com/KizamuBeam/kizamubeam/commits?author=negurvulkan" title="Code">💻</a> <a href="https://github.com/KizamuBeam/kizamubeam/commits?author=negurvulkan" title="Documentation">📖</a> <a href="#design-negurvulkan" title="Design">🎨</a> <a href="#ideas-negurvulkan" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/KizamuBeam/kizamubeam/commits?author=negurvulkan" title="Tests">⚠️</a> <a href="#translation-negurvulkan" title="Translation">🌍</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/liquid-light"><img src="https://avatars.githubusercontent.com/u/21311036?v=4?s=80" width="80px;" alt="liquid-light"/><br /><sub><b>liquid-light</b></sub></a><br /><a href="https://github.com/KizamuBeam/kizamubeam/commits?author=liquid-light" title="Code">💻</a> <a href="#ideas-liquid-light" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/KizamuBeam/kizamubeam/issues?q=author%3Aliquid-light" title="Bug reports">🐛</a> <a href="https://github.com/KizamuBeam/kizamubeam/commits?author=liquid-light" title="Tests">⚠️</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/SimoCassan"><img src="https://avatars.githubusercontent.com/u/96295007?v=4?s=80" width="80px;" alt="SimoCassan"/><br /><sub><b>SimoCassan</b></sub></a><br /><a href="#translation-SimoCassan" title="Translation">🌍</a> <a href="https://github.com/KizamuBeam/kizamubeam/commits?author=SimoCassan" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Asiak3"><img src="https://avatars.githubusercontent.com/u/71585581?v=4?s=80" width="80px;" alt="Asiak C."/><br /><sub><b>Asiak C.</b></sub></a><br /><a href="https://github.com/KizamuBeam/kizamubeam/commits?author=Asiak3" title="Code">💻</a> <a href="#ideas-Asiak3" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/KizamuBeam/kizamubeam/issues?q=author%3AAsiak3" title="Bug reports">🐛</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Pietrogramma"><img src="https://avatars.githubusercontent.com/u/11855652?v=4?s=80" width="80px;" alt="Pietrogramma"/><br /><sub><b>Pietrogramma</b></sub></a><br /><a href="#translation-Pietrogramma" title="Translation">🌍</a> <a href="https://github.com/KizamuBeam/kizamubeam/commits?author=Pietrogramma" title="Code">💻</a></td>
     </tr>
   </tbody>
 </table>

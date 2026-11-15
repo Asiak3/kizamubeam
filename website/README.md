@@ -1,7 +1,7 @@
 # KizamuBeam website
 
 Static product page for KizamuBeam, served by GitHub Pages at
-<https://negurvulkan.github.io/kizamubeam/>. Plain HTML, one stylesheet, one small
+<https://kizamubeam.github.io/kizamubeam/>. Plain HTML, one stylesheet, one small
 script. No framework, no build tools, no third-party requests (no CDNs, fonts or
 analytics). The only external call is an optional GitHub API request in `main.js`
 that points the download buttons at the newest release's files (KizamuBeam itself and,
@@ -66,7 +66,7 @@ webspace domain. A host that deploys with `git pull` checks out that branch once
 and uses its `website/` folder as document root:
 
 ```sh
-git clone --branch webspace --single-branch https://github.com/negurvulkan/kizamubeam.git
+git clone --branch webspace --single-branch https://github.com/KizamuBeam/kizamubeam.git
 # later updates
 git pull
 ```

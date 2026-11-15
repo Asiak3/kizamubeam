@@ -94,6 +94,7 @@ export const ICONS: Record<string, string> = {
   check: svg('<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 21 21"/><path d="M7.6 10.6l2 2 3.5-4"/>'),
   preview: svg('<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M8 20h8M12 16v4"/><path d="M7 12l3-3 2 2 4-4"/>'),
   settings: svg('<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>'),
+  outline: svg('<path d="M4 7l5-3 4 3 5-1 2 6-3 7-6 1-6-3z"/><circle cx="10" cy="12" r="2.2" fill="currentColor" fill-opacity=".25"/><circle cx="15" cy="14" r="1.6" fill="currentColor" fill-opacity=".25"/>'),
   contour: svg('<path d="M5 8l6-4 8 5-2 10-9 1-4-6z" stroke-dasharray="3 2"/>'),
   connect: svg('<path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 01-12 0zM12 17v4"/>'),
   refresh: svg('<path d="M19 12a7 7 0 11-2.1-5M19 4v4h-4"/>'),

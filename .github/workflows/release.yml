@@ -92,6 +92,17 @@ jobs:
           node -e "const fs=require('fs');for(const f of ['package.json','src-tauri/tauri.conf.json']){const c=JSON.parse(fs.readFileSync(f));c.version=process.env.VERSION;fs.writeFileSync(f,JSON.stringify(c,null,2)+'\n')}"
           echo "Building version $VERSION"
 
+      # The tag must match the version in the repository (or the nightly version), otherwise the release
+      # would carry installers and a latest.json of another version. Bump the version before tagging.
+      - name: Check that the tag matches the version
+        shell: bash
+        run: |
+          v=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [[ "$TAG" != "v$v" ]]; then
+            echo "::error::Tag $TAG does not match version $v in src-tauri/tauri.conf.json (expected v$v). Bump the version (package.json, tauri.conf.json, Cargo.toml), merge it, then tag that commit."
+            exit 1
+          fi
+
       # Versionen mit Bindestrich (1.2.0-beta) werden als Vorabversion markiert.
       # Mit Update-Schlüssel zusätzlich signierte Update-Pakete bauen.
       - name: Version und Update-Signatur

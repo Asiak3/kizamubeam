@@ -99,7 +99,7 @@ Every object is checked: known shape kinds only, valid numbers, layers and paths
 
 ## Official catalogue
 
-File → Extensions … also shows the official catalogue. It lists the packs in the [`packs/`](../packs) folder of this repository and is published with the website at `https://negurvulkan.github.io/kizamubeam/catalog/catalog.json`. Installing or updating from there needs no file download by hand, and the app shows which installed packs have a newer version.
+File → Extensions … also shows the official catalogue. It lists the packs in the [`packs/`](../packs) folder of this repository and is published with the website at `https://kizamubeam.github.io/kizamubeam/catalog/catalog.json`. Installing or updating from there needs no file download by hand, and the app shows which installed packs have a newer version.
 
 The catalogue is protected twice: `catalog.json` is signed with an Ed25519 key of its own (not the app updater's key), and it names the SHA-256 checksum of every pack file. KizamuBeam ignores a catalogue whose signature does not match the public key built into the app (`CATALOG_PUBKEY` in `src/catalog.ts`) and refuses a pack whose checksum differs.
 

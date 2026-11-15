@@ -30,4 +30,4 @@ Beim Anlegen eines Geräts füllen Vorlagen für verbreitete Laser Arbeitsbereic
 
 ## Von Nutzern getestet
 
-Berichte von echten Maschinen helfen anderen. Erzähl uns auf [Discord](https://discord.gg/SSr8VHh7EJ) oder in einem [GitHub-Issue](https://github.com/negurvulkan/kizamubeam/issues), welchen Laser du mit KizamuBeam nutzt und wie gut es klappt.
+Berichte von echten Maschinen helfen anderen. Erzähl uns auf [Discord](https://discord.gg/SSr8VHh7EJ) oder in einem [GitHub-Issue](https://github.com/KizamuBeam/kizamubeam/issues), welchen Laser du mit KizamuBeam nutzt und wie gut es klappt.

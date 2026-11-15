@@ -56,7 +56,7 @@ Für eine ganze Serie von Seiten aus einer Tabelle siehe [Vorlagen und Bibliothe
 
 ## QR-Codes
 
-Klicke auf die QR-Schaltfläche in der Werkzeugleiste (oder suche sie im Werkzeugkasten). Ein QR-Code kann enthalten:
+Öffne **QR-Code** im Werkzeugkasten (oder suche dort danach). Ein Doppelklick auf einen vorhandenen QR-Code bearbeitet ihn. Ein QR-Code kann enthalten:
 
 - Text oder eine Webadresse,
 - WLAN-Zugangsdaten,
