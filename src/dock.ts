@@ -259,12 +259,35 @@ export function initDock() {
   floatLayer = h('div', { id: 'dock-floats' });
   document.getElementById('app')!.append(floatLayer);
   layout = normalize(load());
+  // scroll steigt nicht auf, daher in der Einfangphase; ein verdecktes Element (Position 0) nicht überschreiben
+  document.addEventListener('scroll', (e) => {
+    const el = e.target;
+    if (el instanceof HTMLElement && el.offsetParent !== null && el.closest('.win-body')) scrolled.set(el, [el.scrollTop, el.scrollLeft]);
+  }, true);
   render();
   started = true;
   window.addEventListener('resize', () => {
     clampFloats();
     render();
   });
+}
+
+/**
+ * Letzte Bildlaufposition der gescrollten Elemente in den Fenstern (Issue #264). render() nimmt die Fenster aus dem
+ * Dokument und hängt sie wieder ein, dabei setzt der Browser jede Liste an den Anfang zurück; ein verdeckter Reiter
+ * verliert seine Position ebenfalls. Gemerkt wird beim Scrollen, damit auch verdeckte Reiter ihre Position behalten.
+ */
+const scrolled = new Map<HTMLElement, [number, number]>();
+
+function restoreScroll() {
+  for (const [el, [top, left]] of scrolled) {
+    // Elemente, die ein Fenster nicht mehr enthält (neu aufgebaute Inhalte), vergessen
+    if (![...wins.values()].some((w) => w.body.contains(el))) scrolled.delete(el);
+    else if (el.offsetParent !== null) {
+      el.scrollTop = top;
+      el.scrollLeft = left;
+    }
+  }
 }
 
 function render() {
@@ -288,6 +311,7 @@ function render() {
     el.append(h('div', { class: 'float-resize', onpointerdown: (e: PointerEvent) => resizeFloat(e, f, el) }));
     floatLayer.append(el);
   }
+  restoreScroll();
   // Ein aus dem Dokument genommenes Video hält an: Kamera-Vorschau weiterlaufen lassen
   document.querySelectorAll<HTMLVideoElement>('.win-body video').forEach((v) => v.paused && v.srcObject && v.play().catch(() => {}));
   const now = shownNow();
