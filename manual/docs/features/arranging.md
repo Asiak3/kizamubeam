@@ -19,7 +19,7 @@ With several objects selected, the alignment button group in the main toolbar (a
 
 ## Nesting
 
-**Arrange → Nest …** (also on the tools toolbar and in the Toolbox) arranges the selected parts by their real outlines, not just their bounding boxes, to save material.
+**Arrange → Nest …** (also in the Toolbox) arranges the selected parts by their real outlines, not just their bounding boxes, to save material.
 
 **Where:**
 

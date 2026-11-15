@@ -13,9 +13,9 @@ description: A tour of the KizamuBeam main window, its toolbars, windows and men
 | Area | What you find there |
 |---|---|
 | **Menu bar** (top) | File, Edit, Tools, Arrange, Pages, Laser, View, Window and Help. |
-| **Main toolbar** (below the menu) | New, open, save, import and export, undo, clipboard, zoom, 3D view, camera, device settings, design check, preview, grouping, mirroring and alignment. |
+| **Main toolbar** (below the menu) | New, open, save, import and export, undo, clipboard, zoom, 3D view, camera, device settings, design check, preview, grouping, isolation, mirroring and alignment. |
 | **Numeric edits toolbar** | Position, size and rotation of the selection. Fields accept formulas with units, such as `100/3` or `2in`. With a text selected, the text toolbar appears with font, height and spacing. |
-| **Tools toolbar** (left) | Select and edit nodes, draw lines, curves, rectangles, ellipses, polygons and text, QR codes, the **Toolbox** with all generators, Boolean operations, offset, arrays, nesting and measuring. |
+| **Tools toolbar** (left) | Select and edit nodes, draw lines, curves, rectangles, ellipses, polygons and text, button groups for Boolean operations (with the shape builder), contour (offset), path tools and arrays, relations and measuring, and at the end the **Toolbox** with all generators and special tools. A small ▾ next to a button opens the rest of its group. |
 | **Project tabs** (above the workspace) | Several projects open at once, each with its own pages, selection and undo history. |
 | **Workspace** (centre) | The laser bed of the selected device. Drag guides out of the rulers. |
 | **Windows** (right) | Layers (Cuts), Objects and History; at the bottom right Laser, Move and Console. |

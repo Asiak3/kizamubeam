@@ -56,7 +56,7 @@ For a whole series of pages from a table, see [Templates and library](templates-
 
 ## QR codes
 
-Click the QR button on the tools toolbar (or find it in the Toolbox). A QR code can contain:
+Open **QR code** in the Toolbox (or search for it there). Double-click an existing QR code to edit it. A QR code can contain:
 
 - text or a web address,
 - Wi-Fi access data,

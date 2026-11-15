@@ -19,7 +19,7 @@ Con più oggetti selezionati, il gruppo di pulsanti di allineamento nella barra 
 
 ## Nesting
 
-**Disponi → Nesting …** (anche nella barra Strumenti e nella Casella degli strumenti) dispone i pezzi selezionati secondo i loro contorni reali, non solo i riquadri di delimitazione, per risparmiare materiale.
+**Disponi → Nesting …** (anche nella Casella degli strumenti) dispone i pezzi selezionati secondo i loro contorni reali, non solo i riquadri di delimitazione, per risparmiare materiale.
 
 **Dove:**
 

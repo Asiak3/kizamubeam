@@ -4749,5 +4749,6 @@
   "Bereiche": "Secciones",
   "Keine passende Einstellung gefunden.": "No se encontró ningún ajuste coincidente.",
   "Die Werte dieses Bereichs auf die Vorgaben setzen; wirksam erst mit OK": "Restablecer los valores de esta sección; se aplica al pulsar OK",
-  "Nicht übernommen: {names}": "No aplicado: {names}"
+  "Nicht übernommen: {names}": "No aplicado: {names}",
+  "Kontur (Gruppe)": "Contorno (grupo)"
 }

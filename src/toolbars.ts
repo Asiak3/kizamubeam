@@ -55,26 +55,32 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 10;
-/** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende) */
+const CONFIG_V = 11;
+/** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende).
+ *  Buttons that later left the default again (v6 vectorfit/shape-builder/isolate, v9 laserpos) are no longer
+ *  listed, so older bars do not pick them up on their way to v11. */
 const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 3, bar: 'tools', id: 'apps', after: 'grp:gen' },
   { v: 5, bar: 'tools', id: 'grp:relate', after: 'nest' },
   { v: 5, bar: 'tools', id: 'tool:measure', after: 'grp:relate' },
   { v: 7, bar: 'main', id: 'camera-overlays', after: 'view3d' },
   { v: 6, bar: 'tools', id: 'tool:pencil', after: 'tool:line' },
-  { v: 6, bar: 'tools', id: 'vectorfit', after: 'tool:node' },
-  { v: 6, bar: 'tools', id: 'shape-builder', after: 'vectorfit' },
-  { v: 6, bar: 'tools', id: 'isolate', after: 'shape-builder' },
-  { v: 9, bar: 'tools', id: 'laserpos', after: 'tool:measure' },
+  { v: 11, bar: 'main', id: 'isolate', after: 'ungroup' },
 ];
 /** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
  *  Leiste verliert sie nur, wenn die Folge seq noch genau so dasteht; sie wird durch keep ersetzt.
  *  Selbst umgestellte Leisten bleiben, wie sie sind. */
-const REMOVED: { v: number; bar: BarId; seq: string[]; keep: string[] }[] = [
+const REMOVED: { v: number; bar: BarId; seq: string[]; keep: string[]; tail?: string[] }[] = [
   { v: 4, bar: 'tools', seq: ['grp:gen', 'apps'], keep: ['apps'] },
   { v: 4, bar: 'tools', seq: ['tool:joint', 'lidhinge', 'hinge'], keep: [] },
   { v: 4, bar: 'main', seq: ['check', 'preview', 'devsettings'], keep: ['check', 'preview'] },
+  // v11: slimmer tools bar. Shape builder, path fitting and the contour tools move into button groups,
+  // isolate moves to the main bar, QR code, nesting, warp and laser positioning stay in the Toolbox,
+  // menus and Laser window; the Toolbox button gets its own section at the end (tail).
+  { v: 11, bar: 'tools', seq: ['tool:node', 'vectorfit', 'shape-builder', 'isolate'], keep: ['tool:node'] },
+  { v: 11, bar: 'tools', seq: ['tool:text', 'qr', 'apps'], keep: ['tool:text'], tail: [SEP, 'apps'] },
+  { v: 11, bar: 'tools', seq: ['grp:bool', 'outline', 'offset', 'warp', 'grp:path', 'grp:array', 'nest'], keep: ['grp:bool', 'grp:contour', 'grp:path', 'grp:array'] },
+  { v: 11, bar: 'tools', seq: ['tool:measure', 'laserpos'], keep: ['tool:measure'] },
 ];
 
 /** Gespeicherte Leiste auf die aktuelle Standardbelegung heben (raw: Version der gespeicherten Belegung) */
@@ -87,6 +93,7 @@ export function upgradeBar(bar: BarId, list: string[], raw: number): string[] {
     for (let i = 0; i + r.seq.length <= out.length; i++)
       if (r.seq.every((x, k) => out[i + k] === x)) {
         out.splice(i, r.seq.length, ...r.keep);
+        if (r.tail) out.push(...r.tail);
         break;
       }
   }
@@ -214,6 +221,11 @@ function load(): Config {
           list = upgradeBar(id, list, Number(raw.v) || 1);
           c.bars[id] = list.filter((x) => x === SEP || actions.has(x));
         }
+      }
+      // v11 moves „isolate" to the main bar; a customized tools bar that still has it keeps it there only
+      if (!(Number(raw.v) >= 11) && c.bars.tools.includes('isolate') && Array.isArray(raw.bars?.main) && !raw.bars.main.includes('isolate'))
+        c.bars.main = c.bars.main.filter((x) => x !== 'isolate');
+      for (const id of ['main', 'tools'] as BarId[]) {
         if (['s', 'm', 'l'].includes(raw.size?.[id])) c.size[id] = raw.size[id];
       }
       if (Array.isArray(raw.hidden)) c.hidden = raw.hidden.filter((x: unknown) => (x as string) in BAR_EL);

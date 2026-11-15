@@ -4749,5 +4749,6 @@
   "Bereiche": "Sezioni",
   "Keine passende Einstellung gefunden.": "Nessuna impostazione corrispondente.",
   "Die Werte dieses Bereichs auf die Vorgaben setzen; wirksam erst mit OK": "Riporta i valori di questa sezione ai predefiniti; hanno effetto solo con OK",
-  "Nicht übernommen: {names}": "Non applicato: {names}"
+  "Nicht übernommen: {names}": "Non applicato: {names}",
+  "Kontur (Gruppe)": "Contorno (gruppo)"
 }
