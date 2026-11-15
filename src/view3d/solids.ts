@@ -328,10 +328,22 @@ export function solidBounds(s: Solid): { min: V3; max: V3 } {
   return { min: [ax[0][0], ax[1][0], ax[2][0]], max: [ax[0][1], ax[1][1], ax[2][1]] };
 }
 
+/** Eindringtiefe in mm, bis zu der Platten als berührend gelten (Rundung der Koordinaten, z. B. Fachbreite 28,533…) */
+export const OVERLAP_TOLERANCE = 0.01;
+
+/** Platte auf beiden Flächen um die Toleranz verkleinern; dünnere Platten bleiben unverändert */
+function shrunk(s: Solid): Solid {
+  if (s.th <= 4 * OVERLAP_TOLERANCE) return s;
+  const o = add(s.pose.o, s.pose.n, OVERLAP_TOLERANCE);
+  return { ...s, pose: { ...s.pose, o }, th: s.th - 2 * OVERLAP_TOLERANCE };
+}
+
 /**
  * Paarweise Durchdringungen. Parallele, senkrechte und schräg zueinander stehende Platten.
+ * Eindringtiefen unter OVERLAP_TOLERANCE zählen als Berührung.
  */
 export function findOverlaps(solids: Solid[]): Overlap[] {
+  const cores = solids.map(shrunk);
   const boxes = solids.map(solidBounds);
   const out: Overlap[] = [];
   for (let i = 0; i < solids.length; i++)
@@ -340,8 +352,12 @@ export function findOverlaps(solids: Solid[]): Overlap[] {
         q = boxes[j];
       if ([0, 1, 2].some((k) => Math.min(p.max[k], q.max[k]) - Math.max(p.min[k], q.min[k]) <= 1e-9)) continue;
       const c = Math.abs(dot(solids[i].pose.n, solids[j].pose.n));
-      const r = c > 1 - 1e-9 ? parallel(solids[i], solids[j]) : c < 1e-9 ? perpendicular(solids[i], solids[j]) : oblique(solids[i], solids[j]);
-      if (r) out.push(r);
+      const test = c > 1 - 1e-9 ? parallel : c < 1e-9 ? perpendicular : oblique;
+      // Die verkleinerten Platten entscheiden, ob überhaupt eine Durchdringung vorliegt; Volumen und Bereiche kommen von den echten
+      if (test(cores[i], cores[j])) {
+        const r = test(solids[i], solids[j]);
+        if (r) out.push(r);
+      }
     }
   return out;
 }

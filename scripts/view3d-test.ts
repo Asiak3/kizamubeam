@@ -74,6 +74,16 @@ test('Box: Platten ergeben den Kasten, mit Spiel ohne und mit Presspassung mit D
   assert.ok(press.every((o) => o.pieces.length > 0 && o.volume > 0.01));
 });
 
+test('Überschneidungen: Rundungsrauschen (1 µm) gilt als Berührung, echte Durchdringung bleibt', () => {
+  // Fachtiefe 28,533… wird im Umriss gerundet, die Lage der Trennwand nicht
+  const rounded = solids('box-divided', { width: 150, depth: 100, height: 60, thickness: 3.6, top: 'open', compartmentsX: 3, compartmentsY: 3, dividerDrop: 2 });
+  assert.deepEqual(pairs(rounded), []);
+  // 0,1 mm tiefes Eindringen wird weiterhin gemeldet
+  const [a, b] = [0, 0.1].map((dz) => ({ key: dz ? 'b' : 'a', label: '', pose: { o: [0, 0, dz] as [number, number, number], u: [1, 0, 0] as [number, number, number], v: [0, 1, 0] as [number, number, number], n: [0, 0, 1] as [number, number, number] }, th: 3, polys: [[{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }]] }));
+  assert.equal(findOverlaps([a, b]).length, 1);
+  assert.equal(findOverlaps([a, { ...b, pose: { ...b.pose, o: [0, 0, 2.995] as [number, number, number] } }]).length, 0);
+});
+
 test('Box mit Trennwänden: offene und geschlossene Kisten mit individuellen Trennwänden', () => {
   const cases: Params[] = [
     { top: 'open' }, { top: 'closed' },
