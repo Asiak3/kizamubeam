@@ -1,7 +1,7 @@
 {
  "format": "kizamubeam-catalog",
  "version": 1,
- "generated": "2026-11-15T09:04:54.336Z",
+ "generated": "2026-11-15T15:38:01.247Z",
  "packs": [
   {
    "id": "org.kizamubeam.example",
@@ -16,14 +16,14 @@
     "de": "Zeigt alle Inhalte, die ein Paket haben kann. Die Werte sind Beispiele, keine gemessenen Einstellungen."
    },
    "author": "KizamuBeam",
-   "homepage": "https://github.com/negurvulkan/kizamubeam/blob/main/docs/packs.md",
+   "homepage": "https://github.com/KizamuBeam/kizamubeam/blob/main/docs/packs.md",
    "devices": 1,
    "templates": 1,
    "materials": 2,
    "assets": 3,
    "file": "org.kizamubeam.example.kzp",
-   "sha256": "9438cffa49db88669fb4d42c65bb173e78c04f46c6da1c4eb12eb02f1289987a",
-   "size": 5032
+   "sha256": "3dfb647e2fb6c1070e9933994c5119a228204f9199e8b2f960f06661b999e900",
+   "size": 5031
   }
  ]
 }
