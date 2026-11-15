@@ -81,7 +81,7 @@ Ruota la vista con il mouse o usa le viste predefinite (3D, dall’alto, frontal
 
 **Collisioni**: dove due pezzi si compenetrano (per esempio con un accoppiamento forzato o un’asola troppo stretta) l’area diventa rossa, e la riga di stato indica i pezzi e il volume.
 
-**Incisioni**: con la casella **Incisioni**, riempimenti, linee incise, testo e immagini elaborate compaiono sulla faccia che era in alto durante la lavorazione, con una leggera profondità.
+**Incisioni**: con la casella **Incisioni**, riempimenti, linee incise, testo e immagini elaborate compaiono sulla faccia che era in alto durante la lavorazione, con una leggera profondità. Le incisioni che non giacciono su nessuna parte non vengono disegnate e durante la lavorazione colpirebbero la superficie di lavoro. La riga di stato le conta (“1 incisione senza parte”); un clic sul numero le seleziona sull’area di lavoro.
 
 ### Aspetto del materiale {#material-look}
 

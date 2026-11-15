@@ -2727,6 +2727,15 @@ body.dock-resizing #canvas {
 .v3d-status.v3d-bad {
   color: #d32f2f;
 }
+.v3d-loose {
+  all: unset;
+  cursor: pointer;
+  color: #e69100;
+  text-decoration: underline;
+}
+.v3d-loose[hidden] {
+  display: none;
+}
 
 /* Fenster „Notizen“ */
 .note-section {

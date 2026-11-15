@@ -850,6 +850,20 @@ test('Steckprüfung sieht die ausgeschnittene Platte: ein ringsum freigeschnitte
   assert.deepEqual(findings(true, false), [], 'ohne pages wie bisher');
 });
 
+test('Gravuren ohne Platte: nur Gravuren, die auf keinem Teil liegen, und nur gezeigte (Issue #326)', () => {
+  const rect = (id: number, layer: number, x: number, y: number): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer, shape: { kind: 'rect', w: 40, h: 30, r: 0 } });
+  const plate = rect(1, 0, 20, 20), near = rect(2, 1, 30, 30), far = rect(3, 1, 200, 150);
+  const doc = loadDoc({ version: 2, bed: { w: 300, h: 200 }, page: 0, layers: {}, pages: [{ name: 'A', objs: [plate, near, far] }] });
+  // Layer 0 schneidet, Layer 1 füllt
+  const mk = (sel: Obj[]) => ({ doc, sel, layer: (i: number) => ({ mode: i === 1 ? 'fill' : 'line', output: true, show: true, material: undefined }) }) as never;
+  const ids = (sel: Obj[]) => collectScene(mk(sel), 3, false).loose.map((o) => o.id);
+  assert.deepEqual(ids([]), [3], 'ohne Auswahl: die ganze Seite');
+  assert.deepEqual(ids([plate, near, far]), [3], 'mit Auswahl aller Objekte');
+  assert.deepEqual(ids([far]), [3], 'nur die lose Gravur gewählt: sie hat keine Platte');
+  assert.deepEqual(ids([plate, near]), [], 'die lose Gravur ist nicht gewählt und wird nicht gemeldet');
+  assert.deepEqual(ids([plate]), [], 'nur die Platte gewählt');
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

@@ -81,7 +81,7 @@ Drehe die Ansicht mit der Maus oder nutze die festen Ansichten (3D, oben, vorn).
 
 **Kollisionen**: Wo sich zwei Teile durchdringen (etwa bei einer Presspassung oder einem zu schmalen Schlitz), färbt sich die Stelle rot, und die Statuszeile nennt die Teile und das Volumen.
 
-**Gravuren**: Mit dem Kästchen **Gravuren** erscheinen Füllungen, gravierte Linien, Text und bearbeitete Bilder auf der Seite, die beim Lasern oben lag, mit leichter Tiefe.
+**Gravuren**: Mit dem Kästchen **Gravuren** erscheinen Füllungen, gravierte Linien, Text und bearbeitete Bilder auf der Seite, die beim Lasern oben lag, mit leichter Tiefe. Gravuren, die auf keinem Teil liegen, werden nicht gezeichnet und würden beim Lasern die Arbeitsfläche treffen. Die Statuszeile zählt sie („1 Gravur ohne Teil“); ein Klick auf die Zahl wählt sie auf der Arbeitsfläche aus.
 
 ### Materialaussehen {#material-look}
 

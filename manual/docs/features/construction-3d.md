@@ -81,7 +81,7 @@ Turn the view with the mouse, or use the preset views (3D, top, front). The **Ex
 
 **Collisions**: where two parts intersect (for example with a press fit or a slot that is too narrow), the area turns red, and the status line names the parts and the volume.
 
-**Engravings**: with the checkbox **Engravings**, fills, engraved lines, text and processed images appear on the face that was up during lasering, with a slight depth.
+**Engravings**: with the checkbox **Engravings**, fills, engraved lines, text and processed images appear on the face that was up during lasering, with a slight depth. Engravings that lie on no part are not drawn, and when lasering they would hit the work surface. The status line counts them (“1 engraving without part”); a click on the count selects them on the workspace.
 
 ### Material look
 

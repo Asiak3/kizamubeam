@@ -100,6 +100,43 @@ function burnImage(cv: HTMLCanvasElement, mc: MarkColor): HTMLCanvasElement {
   return out;
 }
 
+/** Ausdehnung einer Platte lokal (x0, y0, x1, y1) und als Kasten auf der Arbeitsfläche (cb) */
+function plateExtent(s: Solid, pl: CanvasPlace) {
+  const pts = s.polys.flat();
+  if (!pts.length) return null;
+  const xs = pts.map((q) => q.x),
+    ys = pts.map((q) => q.y);
+  const x0 = Math.min(...xs),
+    y0 = Math.min(...ys),
+    x1 = Math.max(...xs),
+    y1 = Math.max(...ys);
+  const fromLocal = inv(pl.toLocal);
+  const corners = [apply(fromLocal, x0, y0), apply(fromLocal, x1, y0), apply(fromLocal, x0, y1), apply(fromLocal, x1, y1)];
+  const cb = [Math.min(...corners.map((q) => q.x)), Math.min(...corners.map((q) => q.y)), Math.max(...corners.map((q) => q.x)), Math.max(...corners.map((q) => q.y))];
+  return { x0, y0, x1, y1, cb };
+}
+
+const boxesTouch = (a: number[], b: number[]) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+
+/**
+ * Gravuren der aktuellen Seite, die auf keiner Platte liegen (Issue #326): Sie fehlen in der 3D-Ansicht und würden
+ * beim Lasern die Arbeitsfläche treffen. only: nur diese Objekte prüfen (die gezeigten); ohne Angabe alle Gravuren.
+ * Wie bei engravings() entscheidet der Kasten der Platte, nicht ihre genaue Form.
+ */
+export function looseMarks(ed: Editor, solids: Solid[], places: Map<string, CanvasPlace>, only?: Set<Obj>): Obj[] {
+  const page = ed.doc.page;
+  const boxes: number[][] = [];
+  for (const s of solids) {
+    const pl = places.get(s.key);
+    if (pl?.page !== page) continue;
+    const ext = plateExtent(s, pl);
+    if (ext) boxes.push(ext.cb);
+  }
+  return pageMarks(ed, page)
+    .filter((mk) => (!only || only.has(mk.o)) && !boxes.some((b) => boxesTouch(mk.box, b)))
+    .map((mk) => mk.o);
+}
+
 /**
  * Gravuren je Platte. places: Lage auf der Arbeitsfläche je Schlüssel der Platte (ohne Eintrag keine Gravur).
  * Liefert nur Einträge für Platten, auf denen wirklich etwas graviert wird. colorOf: Farbe der Gravur je Platte.
@@ -115,18 +152,10 @@ export function engravings(ed: Editor, solids: Solid[], places: Map<string, Canv
     const marks = marksOf.get(pl.page)!;
     if (!marks.length) continue;
     // Ausdehnung der Platte lokal und auf der Arbeitsfläche
-    const pts = s.polys.flat();
-    if (!pts.length) continue;
-    const xs = pts.map((q) => q.x),
-      ys = pts.map((q) => q.y);
-    const x0 = Math.min(...xs),
-      y0 = Math.min(...ys),
-      x1 = Math.max(...xs),
-      y1 = Math.max(...ys);
-    const fromLocal = inv(pl.toLocal);
-    const corners = [apply(fromLocal, x0, y0), apply(fromLocal, x1, y0), apply(fromLocal, x0, y1), apply(fromLocal, x1, y1)];
-    const cb = [Math.min(...corners.map((q) => q.x)), Math.min(...corners.map((q) => q.y)), Math.max(...corners.map((q) => q.x)), Math.max(...corners.map((q) => q.y))];
-    const hits = marks.filter((mk) => mk.box[0] < cb[2] && mk.box[2] > cb[0] && mk.box[1] < cb[3] && mk.box[3] > cb[1]);
+    const ext = plateExtent(s, pl);
+    if (!ext) continue;
+    const { x0, y0, x1, y1, cb } = ext;
+    const hits = marks.filter((mk) => boxesTouch(mk.box, cb));
     if (!hits.length) continue;
     const w = x1 - x0,
       h = y1 - y0;
