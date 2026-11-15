@@ -4,7 +4,7 @@
 import type { Editor } from '../editor';
 import type { ImageShape, Mat, Obj, TextShape } from '../model';
 import { apply, inv, leaves, mul, outputLeaves } from '../model';
-import { boundsOf, drawText, subsToPath2D, worldPath } from '../geom';
+import { boundsOf, drawText, subsToPath2D, textOutline, worldPath } from '../geom';
 import { displayCanvas } from '../images';
 import { cross, dot } from './poses';
 import type { Solid } from './solids';
@@ -158,25 +158,34 @@ export function engravings(ed: Editor, solids: Solid[], places: Map<string, Canv
       ctx.drawImage(burnImage(cv, mc), 0, 0, sh.w, sh.h);
       ctx.restore();
     }
+    // Füllungen je Layer in einem Pfad sammeln und gerade-ungerade füllen wie die Füllzeilen im G-Code: Eine Kontur
+    // in einer anderen bleibt ein Loch, auch wenn beide eigene Objekte sind (z. B. das Innere eines O)
+    const fills = new Map<number, Path2D>();
+    const fillOf = (layer: number) => {
+      let p = fills.get(layer);
+      if (!p) fills.set(layer, (p = new Path2D()));
+      return p;
+    };
     for (const mk of hits) {
       const sh = mk.o.shape;
       if (mk.kind === 'fill') {
         // Offene Pfade werden auf Füll-Layern nicht gefüllt
         const subs = sh.kind === 'path' ? sh.subs.filter((sp) => sp.closed) : null;
-        const p = new Path2D();
-        if (subs) p.addPath(subsToPath2D(subs), new DOMMatrix(mk.m));
-        else p.addPath(worldPath(sh, mk.m));
-        ctx.fill(p, 'evenodd');
+        if (subs) fillOf(mk.o.layer).addPath(subsToPath2D(subs), new DOMMatrix(mk.m));
+        else fillOf(mk.o.layer).addPath(worldPath(sh, mk.m));
+      } else if (mk.kind === 'text-fill' && textOutline(sh as TextShape)) {
+        fillOf(mk.o.layer).addPath(textOutline(sh as TextShape)!.path, new DOMMatrix(mk.m));
       } else if (mk.kind === 'line' && sh.kind === 'path') {
         const p = new Path2D();
         p.addPath(subsToPath2D(sh.subs.filter((sp) => !sp.closed)), new DOMMatrix(mk.m));
         ctx.lineWidth = lineW;
         ctx.stroke(p);
       } else if (mk.kind === 'text-fill' || mk.kind === 'text-line') {
-        // drawText teilt die Linienbreite selbst durch die Skalierung des Objekts
+        // Schrift noch nicht geladen (text-fill) oder Linie: drawText teilt die Linienbreite selbst durch die Skalierung
         drawText(ctx, sh as TextShape, mk.m, mk.kind === 'text-fill' ? 'fill' : 'stroke', lineW);
       }
     }
+    for (const p of fills.values()) ctx.fill(p, 'evenodd');
     // Gravur liegt auf der Seite, die beim Lasern nach oben zeigte; ist die Platte gespiegelt, ist das die andere
     const det = t[0] * t[3] - t[1] * t[2];
     const top = det * dot(cross(s.pose.u, s.pose.v), s.pose.n) < 0;
