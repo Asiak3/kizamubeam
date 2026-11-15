@@ -56,6 +56,8 @@ export function editorContextGroups(ed: Editor, callbacks: ContextCallbacks, bla
     action('vectorfit', t('Pfade vereinfachen / glätten…'), callbacks.vectorFit, editable && ed.nodeTargets().length > 0),
     action('shape-builder', t('Formerstellung …'), callbacks.builder, editable && !images.length),
     { id: 'path', label: t('Pfad'), run: () => {}, items: [
+      action('continue-path', t('Pfad fortsetzen'), () => { ed.setTool('curvature'); ed.continuePath(ed.sel[0], -1); },
+        editable && count === 1 && !!ed.continuableSub(ed.sel[0])),
       action('closepath', t('Pfad schließen'), () => ed.closeSel(), editable), action('join', t('Ausgewählte Formen verbinden'), () => ed.joinSel(), editable && count > 1),
       action('breakapart', t('Zerlegen'), () => ed.breakApartSel(), editable), action('reverse', t('Richtung umkehren'), () => ed.reverseSel(), editable)] },
     { id: 'booleans', label: t('Boolesche Operationen'), run: () => {}, items: [

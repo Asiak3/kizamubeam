@@ -91,11 +91,11 @@ export class EditorKeyboard {
         if (this.tool === 'relate' && this.relPicks.length) return this.clearRelPicks();
         if (this.tool === 'measure' && this.measure) return ((this.measure = null), this.redraw());
         if (nodeMode && (this.selectedNodes().length || this.nodeTargets().some((o) => this.segmentSelection(o).size))) return this.clearNodeSel();
-        if (this.draft) this.finishLine();
+        if (this.draft) { if (this.tool === 'curvature') { this.draft = null; this.continuedFrom = null; this.redraw(); } else this.finishLine(); }
         else if (this.tool !== 'select') this.setTool('select');
         else this.setSel([]);
       });
-    if (k === 'enter' && this.draft) return run(() => this.finishLine());
+    if (k === 'enter' && this.draft) return run(() => this.finishDraft());
     if (k === 'enter' && this.tool === 'joint' && this.jointPicks.length) return run(() => this.onJointDialog?.());
     if (nodeMode && !ctrl && !e.altKey) {
       if (k === 'd' || k === 'delete' || k === 'backspace') return run(() => this.deleteNodes());
@@ -109,6 +109,11 @@ export class EditorKeyboard {
       const st = e.shiftKey ? 10 : 1;
       const arrows: Record<string, [number, number]> = { arrowleft: [-st, 0], arrowright: [st, 0], arrowup: [0, -st], arrowdown: [0, st] };
       if (arrows[k] && (this.selectedNodes().length || this.nodeTargets().some((o) => this.segmentSelection(o).size))) return run(() => this.nudgeNodes(...arrows[k]));
+    }
+    if (this.tool === 'curvature' && this.draft) {
+      if (k === 'backspace' && !this.drag)
+        return run(() => { this.draft!.nodes.pop(); if (!this.draft!.nodes.length) { this.draft = null; this.continuedFrom = null; } this.redraw(); });
+      if (k === 'delete' || k === 'backspace') return run(() => {});
     }
     if (k === 'delete' || k === 'backspace') return run(() => this.deleteSel());
     const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1;

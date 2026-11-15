@@ -52,6 +52,19 @@ Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
   Bézierpfade an. Toleranz und explizites Schließen stehen in den Werkzeugoptionen.
   Loslassen erzeugt einen Undo-Schritt; Esc, Klicks ohne Strich und überlange
   Striche erzeugen keine Teilpfade.
+- **Werkzeuge → Kurven** setzt Ecken per Klick und formt Kurven durch Ziehen.
+  Anker und gezogene Anfasser bleiben beim Zeichnen sichtbar. Ein Klick nahe
+  einem offenen Endpunkt eines einfachen offenen Pfads setzt ihn fort (gleiche
+  Ebene, nicht gruppiert, keine Generator-Ausgabe). Drücken auf den Startpunkt schließt beim Loslassen, Ziehen formt die Schlusstangente
+  Doppelklick/Enter übernimmt, Rücktaste löscht den letzten Punkt, Esc verwirft.
+  Übernehmen — einschließlich Fortsetzen, das das Original im selben
+  Undo-Schritt ersetzt — ist ein Undo-Schritt. Tests: `npm run test:curvature`.
+
+Keine partielle Vereinfachung, Gauß-Glättung, Lasso, Mehrfach-Anfasserauswahl,
+Nachzeichnen oder Druckdarstellung. Text/Generatoren ausdrücklich
+umwandeln und Gruppen auflösen. Kleine Lücken, Löcher und Schnittpunkte prüfen:
+Die Abweichungsgrenze garantiert keine unveränderte Topologie.
+Tests: `npm run test:vector` (synthetische Geometrie und echte Editormethoden,
 - **Werkzeuge → Pfad → Freihandpfad bearbeiten …** setzt einen offenen Pfad an
   einem seiner Endknoten fort oder zeichnet den Abschnitt zwischen zwei vorhandenen
   Knoten desselben Teilpfads freihand neu. Ein fester Schnittstart bleibt erhalten,

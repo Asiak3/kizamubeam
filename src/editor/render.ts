@@ -1,5 +1,5 @@
 // Editor: Zeichnen der Arbeitsfläche.
-import { apply, IDENT, ImageShape, inv, leaves, Mat, mul, noLaserLeaves, Obj, PALETTE, Pt, SubPath, TextShape, visibleLeaves } from '../model';
+import { apply, IDENT, ImageShape, inv, leaves, Mat, mul, noLaserLeaves, Node, Obj, PALETTE, Pt, SubPath, TextShape, visibleLeaves } from '../model';
 import { displayCanvas } from '../images';
 import { EdgePick } from '../joints';
 import { bezierPt, Box, boundsOf, drawText, localPath, segments, shapeSubs, subsToPath2D, textOutline, worldPath } from '../geom';
@@ -11,6 +11,7 @@ import { CON_GLYPHS } from './sketch';
 import { dec, t } from '../i18n';
 import type { Editor } from '../editor';
 import { RULER, HANDLE_OFF, cachedWorldPath, SNAP_COLOR } from './shared';
+import { curvaturePreview } from './vector';
 import { GRID_MIN_PX, gridLevels, gridLines, LEVEL_ALPHA } from '../grid';
 
 function rectPath(w: number, h: number): Path2D {
@@ -44,7 +45,20 @@ function brightenForDark(hex: string): string {
 
 const fmt = (v: number) => (Math.abs(v) < 1e-9 ? '0' : String(Math.round(v * 100) / 100));
 
+/** Anker- und Anfasser-Markierungen für den Zeichen-Draft (Geisterknoten ausgenommen). */
+export function draftHandleMarks(nodes: Node[], count: number): { anchor: Node; arms: Pt[] }[] {
+  return nodes.slice(0, count).map((n) => ({ anchor: n, arms: [n.cin, n.cout].filter((p): p is Pt => !!p) }));
+}
+
 export class EditorRender {
+  draftCloseHit(this: Editor): boolean {
+    const ns = this.draft?.nodes;
+    if (!ns || ns.length < 2) return false;
+    if (this.drag?.type === 'linenode' && this.drag.close) return true;
+    if (this.drag && this.drag.type !== 'linenode') return false;
+    const f = this.toScreen(ns[0]), c = this.toScreen(this.cursor);
+    return Math.hypot(f.x - c.x, f.y - c.y) < 8;
+  }
   setDark(this: Editor, dark: boolean) {
     this.dark = dark;
     this.redraw();
@@ -68,6 +82,7 @@ export class EditorRender {
     const saved = {
       canvas: this.canvas, ctx: this.ctx, dpr: this.dpr, view: this.view, sel: this.sel,
       nodeHover: this.nodeHover, segHover: this.segHover, snapHit: this.snapHit, alignGuides: this.alignGuides, draft: this.draft,
+      continuedFrom: this.continuedFrom,
       centerMarks: this.centerMarks,
       isolation: this.isolation, builderSession: this.builderSession, overlapHover: this.overlapHover,
     };
@@ -80,6 +95,7 @@ export class EditorRender {
       this.nodeHover = this.segHover = this.snapHit = null;
       this.alignGuides = [];
       this.draft = null;
+      this.continuedFrom = null;
       this.centerMarks = 'off';
       this.isolation = null; this.builderSession = null; this.overlapHover = null;
       this.render();
@@ -259,10 +275,12 @@ export class EditorRender {
     }
     ctx.setLineDash([]);
 
-    // Linie im Entstehen
+    // Linie im Entstehen (nur Geometrie im Welt-Transform; Anker-/Anfasser-Markierungen liegen in renderOverlay)
     if (this.draft && this.draft.nodes.length) {
-      const sp: SubPath = { nodes: [...this.draft.nodes], closed: false };
-      if (!this.drag) sp.nodes.push({ x: this.cursor.x, y: this.cursor.y });
+      const closeHit = this.draftCloseHit();
+      const sp: SubPath = this.tool === 'curvature'
+        ? curvaturePreview(this.draft, this.drag ? null : this.cursor, closeHit)
+        : { nodes: !this.drag && !closeHit ? [...this.draft.nodes, { x: this.cursor.x, y: this.cursor.y }] : [...this.draft.nodes], closed: closeHit };
       const tmp: Obj = { id: 0, m: IDENT, layer: this.currentLayer, shape: { kind: 'path', subs: [sp] } };
       ctx.strokeStyle = this.layerDrawColor(this.currentLayer);
       ctx.lineWidth = 1.2 * px;
@@ -637,11 +655,40 @@ export class EditorRender {
     if (this.tool === 'measure') this.renderMeasure(ctx);
     if (this.sketchEdit) this.renderSketch(ctx);
     this.renderSnap(ctx);
+    // Kurvenwerkzeug: gesetzte Anker und Anfasser im Screen-Space (konsistent zum Knoten-Werkzeug)
+    if (this.tool === 'curvature' && this.draft && this.draft.nodes.length) {
+      const closeHit = this.draftCloseHit();
+      const preview = curvaturePreview(this.draft, this.drag ? null : this.cursor, closeHit);
+      const active = this.drag?.type === 'linenode' ? this.draft.nodes.indexOf(this.drag.node) : -1;
+      for (const [i, mk] of draftHandleMarks(preview.nodes, this.draft.nodes.length).entries()) {
+        const q = this.toScreen(mk.anchor);
+        for (const arm of mk.arms) {
+          const hq = this.toScreen(arm);
+          ctx.strokeStyle = T.nodeLine;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(q.x, q.y);
+          ctx.lineTo(hq.x, hq.y);
+          ctx.stroke();
+          ctx.fillStyle = T.handleFill;
+          ctx.beginPath();
+          ctx.arc(hq.x, hq.y, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.lineWidth = i === active ? 2 : 1.5;
+        ctx.strokeStyle = i === 0 ? '#20a040' : T.sel;
+        ctx.fillStyle = T.handleFill;
+        const r = 3.5;
+        ctx.fillRect(q.x - r, q.y - r, 2 * r, 2 * r);
+        ctx.strokeRect(q.x - r, q.y - r, 2 * r, 2 * r);
+      }
+    }
     // Startknoten der Linie hervorheben (Schließen)
     if (this.draft && this.draft.nodes.length >= 2) {
       const q = this.toScreen(this.draft.nodes[0]);
       ctx.strokeStyle = '#20a040';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = this.draftCloseHit() ? 2 : 1.5;
       ctx.strokeRect(q.x - 5, q.y - 5, 10, 10);
     }
   }

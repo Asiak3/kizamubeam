@@ -11,6 +11,7 @@ export const ICONS: Record<string, string> = {
   select: svg('<path d="M5 3l13 8-6 1.5L9 19z" fill="currentColor" fill-opacity=".15"/>'),
   node: svg('<path d="M4 18C8 4 16 4 20 18"/><rect x="2.5" y="16.5" width="3" height="3"/><rect x="18.5" y="16.5" width="3" height="3"/><circle cx="12" cy="7.5" r="1.6" fill="currentColor"/><path d="M7 7.5h10" stroke-dasharray="1.5 1.5"/>'),
   line: svg('<path d="M4 20l5-12 6 7 5-11"/><circle cx="4" cy="20" r="1.3" fill="currentColor"/><circle cx="20" cy="4" r="1.3" fill="currentColor"/>'),
+  curve: svg('<path d="M4 20C9 20 6 4 20 4"/><circle cx="4" cy="20" r="1.3" fill="currentColor"/><circle cx="20" cy="4" r="1.3" fill="currentColor"/>'),
   pencil: svg('<path d="M4 15 15.5 3.5l5 5L9 20l-6 1zM13.5 5.5l5 5M4 15l5 5M3 21l3-1"/><path d="M12 21c2-5 5 2 9-3"/>'),
   shapeBuilder: svg('<path d="M3 4h11v6h7v11H10v-6H3z" fill="currentColor" fill-opacity=".15"/><path d="M10 10h4v5h-4z" fill="currentColor" fill-opacity=".35" stroke-dasharray="1 2"/><path d="M17 3v5M14.5 5.5h5"/>'),
   rect: svg('<rect x="4" y="6" width="16" height="12" rx="1"/>'),

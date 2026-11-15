@@ -4,7 +4,7 @@ import { Box, worldPath } from '../geom';
 import { SnapSet } from '../snap';
 import { t } from '../i18n';
 
-export type Tool = 'freehand-edit' | 'lasso' | 'select' | 'node' | 'line' | 'pencil' | 'builder' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure' | 'sketch';
+export type Tool = 'freehand-edit' | 'lasso' | 'select' | 'node' | 'line' | 'curvature' | 'pencil' | 'builder' | 'rect' | 'ellipse' | 'polygon' | 'text' | 'joint' | 'trim' | 'start' | 'relate' | 'measure' | 'sketch';
 
 export const RULER = 22; // px
 
@@ -42,7 +42,7 @@ export type Drag =
   | { type: 'pivot' }
   | { type: 'marquee'; start: Pt; end: Pt; base: Obj[]; mode: 'set' | 'add' | 'toggle' | 'remove' }
   | { type: 'create'; start: Pt; obj: Obj | null; snapSet: SnapSet }
-  | { type: 'linenode'; node: Node }
+  | { type: 'linenode'; node: Node; close?: { cin?: Pt; cout?: Pt; smooth?: boolean } }
   | { type: 'pencil'; points: Pt[]; pointerId: number; overflow: boolean }
   | { type: 'builder'; last: Pt; pointerId: number }
   /** Textwerkzeug: Klicken setzt einen Text, Ziehen einen Textrahmen */
@@ -106,7 +106,8 @@ export const TOOL_HINTS: Record<Tool, string> = {
   lasso:t('Lasso: Objekte vollständig umschließen. Shift ergänzt, Ctrl schaltet um, Shift+Ctrl entfernt. Esc bricht ab.'),
   select: t('Drehen: knapp außerhalb einer Ecke ziehen oder Auswahl nochmals anklicken. Rahmen nach rechts: umschließend, nach links: kreuzend.'),
   node: t('Klick/Rahmen wählt Knoten, Shift ergänzt. Entf löschen, L Gerade, C Kurve, E Ecke, S glatt, I einfügen (oder Doppelklick auf Kante), B aufbrechen, T trimmen.'),
-  line: t('Klicken für Ecken, Ziehen für Kurven. Startpunkt anklicken schließt, Doppelklick/Enter/Rechtsklick beendet.'),
+  line: t('Klicken für Ecken, Ziehen für Kurven. Drücken auf den Startpunkt schließt beim Loslassen, Ziehen formt die Schlusstangente, Doppelklick/Enter/Rechtsklick beendet.'),
+  curvature: t('Klicken setzt Ecken, Ziehen formt Kurven. Nahe einem offenen Endpunkt klicken setzt den Pfad fort. Drücken auf den Startpunkt schließt beim Loslassen, Ziehen formt die Schlusstangente, Doppelklick/Enter beendet, Rücktaste löscht den letzten Punkt.'),
   rect: t('Ziehen zum Zeichnen. Shift: Quadrat, Ctrl: von der Mitte.'),
   ellipse: t('Ziehen zum Zeichnen. Shift: Kreis, Ctrl: von der Mitte.'),
   polygon: t('Von der Mitte aus ziehen. Shift: nicht drehen.'),

@@ -5,7 +5,7 @@ import { vectorError } from './vectorMessages';
 
 export function openVectorFitDialog(ed: Editor) {
   if (ed.drag) ed.cancelDrag();
-  if (ed.draft) ed.finishLine();
+  if (ed.draft) ed.finishDraft();
   const tolerance = h('input', { type: 'number', min: 0.002, max: 100, step: 0.01, value: '0.1', id: 'vector-fit-tolerance' });
   const curves = h('input', { type: 'checkbox', checked: true, id: 'vector-fit-curves' });
   const corners = h('input', { type: 'checkbox', checked: true, id: 'vector-fit-corners' });

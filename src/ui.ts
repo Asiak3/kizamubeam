@@ -305,6 +305,7 @@ function buildMenu(ed: Editor) {
       'sep',
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
       [t('Freihand / Bleistift'), '', () => ed.setTool('pencil')],
+      [t('Kurvenpfad zeichnen'), '', () => ed.setTool('curvature')],
       [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
       [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
       [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
@@ -1066,6 +1067,7 @@ function buildBars(ed: Editor) {
     { id: 'vectorfit', cat: W, icon: 'vectorfit', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
     { id: 'shape-builder', cat: W, icon: 'shapeBuilder', label: t('Formerstellung …'), run: () => beginShapeBuilder(ed), enabled: sel1, on: () => ed.tool === 'builder' },
     tool('pencil', 'pencil', t('Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad')),
+    tool('curvature', 'curve', t('Kurven zeichnen: Klicken setzt Ecken, Ziehen formt Kurven')),
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
     tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),
     tool('polygon', 'polygon', t('Polygon')),
@@ -1176,8 +1178,8 @@ function buildBars(ed: Editor) {
         'group', 'ungroup', 'isolate', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:pencil', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', SEP,
-        'grp:bool', 'grp:contour', 'grp:path', 'grp:array', SEP, 'grp:relate', 'tool:measure', SEP, 'apps',
+        'tool:select', 'tool:node', 'vectorfit', 'shape-builder', 'isolate', SEP, 'tool:line', 'tool:pencil', 'tool:curvature', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', SEP,
+        'grp:bool', 'grp:contour', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure', 'laserpos', SEP, 'apps',
       ],
     },
     // Gespeicherte Leisten von vor den Knopfgruppen: die alten Standardfolgen durch die Gruppe ersetzen

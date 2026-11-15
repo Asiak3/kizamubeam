@@ -234,7 +234,7 @@ export class EditorDocument {
     if (this.tool === 'builder') { this.tool = 'select'; this.hint = ''; }
     this.vectorPreview = null;
     if (this.drag) this.cancelDrag();
-    if (this.draft) this.finishLine();
+    if (this.draft) this.finishDraft();
     this.sel = [];
     this.pivot = null;
     this.rotateMode = false;

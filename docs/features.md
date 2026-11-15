@@ -47,6 +47,19 @@ Offline regressions: `npm run test:camera`. No hardware is acquired by the tests
 - **Tools → Freehand / Pencil** fits a dragged stroke to editable cubic paths.
   Tool options set tolerance and explicit closure. Release commits one Undo step;
   Escape, taps and excessive strokes do not create partial paths.
+- **Tools → Curvature** places corners with a click and shapes curves by
+  dragging. Anchors and drag handles stay visible while drawing. Clicking
+  near an open endpoint of a simple open path continues it (same layer,
+  ungrouped, no generator output); pressing the start anchor closes on release, dragging shapes the closing tangent, double-click/Enter commits, Backspace deletes the last anchor, Escape discards.
+  Committing — including a continuation, which replaces the original in the
+  same Undo step — is one Undo step. Test: `npm run test:curvature`.
+
+These are whole-path refitting tools, not a Gaussian smooth brush or partial-run
+simplification. No Lasso, multi-handle selection, redraw or pressure
+appearance is provided. Ungroup/convert text and generators explicitly. Inspect
+small gaps, holes and intersections: deviation limits do not certify topology.
+Tests: `npm run test:vector` (synthetic geometry and actual editor methods, with
+application/file/native/hardware boundaries excluded).
 - **Tools → Path → Edit freehand path …** continues an open path from one of its
   end nodes or redraws the section between two existing nodes of the same subpath
   with a freehand stroke. A fixed cut start point is kept unless you release it.
