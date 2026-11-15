@@ -1178,8 +1178,8 @@ function buildBars(ed: Editor) {
         'group', 'ungroup', 'isolate', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'tool:select', 'tool:node', 'vectorfit', 'shape-builder', 'isolate', SEP, 'tool:line', 'tool:pencil', 'tool:curvature', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', 'qr', SEP,
-        'grp:bool', 'grp:contour', 'warp', 'grp:path', 'grp:array', 'nest', SEP, 'grp:relate', 'tool:measure', 'laserpos', SEP, 'apps',
+        'tool:select', 'tool:node', SEP, 'tool:line', 'tool:pencil', 'tool:curvature', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', SEP,
+        'grp:bool', 'grp:contour', 'grp:path', 'grp:array', SEP, 'grp:relate', 'tool:measure', SEP, 'apps',
       ],
     },
     // Gespeicherte Leisten von vor den Knopfgruppen: die alten Standardfolgen durch die Gruppe ersetzen

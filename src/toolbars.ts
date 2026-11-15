@@ -66,10 +66,6 @@ const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 7, bar: 'main', id: 'camera-overlays', after: 'view3d' },
   { v: 6, bar: 'tools', id: 'tool:pencil', after: 'tool:line' },
   { v: 11, bar: 'tools', id: 'tool:curvature', after: 'tool:pencil' },
-  { v: 6, bar: 'tools', id: 'vectorfit', after: 'tool:node' },
-  { v: 6, bar: 'tools', id: 'shape-builder', after: 'vectorfit' },
-  { v: 6, bar: 'tools', id: 'isolate', after: 'shape-builder' },
-  { v: 9, bar: 'tools', id: 'laserpos', after: 'tool:measure' },
   { v: 11, bar: 'main', id: 'isolate', after: 'ungroup' },
 ];
 /** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
