@@ -1,0 +1,1 @@
+(globalThis.webpackChunkkizamubeam_manual||=[]).push([[5741],{5741(){}}]);

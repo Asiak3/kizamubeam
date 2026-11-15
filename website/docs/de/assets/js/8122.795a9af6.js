@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkkizamubeam_manual||=[]).push([[8122],{8122(a,e,c){c.d(e,{createPacketServices:()=>s.$});var s=c(8484);c(184)}}]);

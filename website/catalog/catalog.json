@@ -1,0 +1,29 @@
+{
+ "format": "kizamubeam-catalog",
+ "version": 1,
+ "generated": "2026-11-15T09:04:54.336Z",
+ "packs": [
+  {
+   "id": "org.kizamubeam.example",
+   "version": "1.1.0",
+   "minApp": "1.2.1-beta",
+   "name": {
+    "en": "Example pack",
+    "de": "Beispielpaket"
+   },
+   "description": {
+    "en": "Shows every kind of content a pack can hold. The values are examples, not measured settings.",
+    "de": "Zeigt alle Inhalte, die ein Paket haben kann. Die Werte sind Beispiele, keine gemessenen Einstellungen."
+   },
+   "author": "KizamuBeam",
+   "homepage": "https://github.com/negurvulkan/kizamubeam/blob/main/docs/packs.md",
+   "devices": 1,
+   "templates": 1,
+   "materials": 2,
+   "assets": 3,
+   "file": "org.kizamubeam.example.kzp",
+   "sha256": "9438cffa49db88669fb4d42c65bb173e78c04f46c6da1c4eb12eb02f1289987a",
+   "size": 5032
+  }
+ ]
+}

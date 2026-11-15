@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkkizamubeam_manual||=[]).push([[2194],{2194(a,e,r){r.d(e,{createTreemapServices:()=>s.d});var s=r(1048);r(184)}}]);

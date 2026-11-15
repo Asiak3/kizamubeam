@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkkizamubeam_manual||=[]).push([[3192],{3192(e,a,c){c.d(a,{createArchitectureServices:()=>r.S});var r=c(4549);c(184)}}]);

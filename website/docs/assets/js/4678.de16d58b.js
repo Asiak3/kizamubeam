@@ -1,0 +1,1 @@
+"use strict";(globalThis.webpackChunkkizamubeam_manual||=[]).push([[4678],{4678(a,e,i){i.d(e,{createPieServices:()=>s.f});var s=i(8701);i(184)}}]);

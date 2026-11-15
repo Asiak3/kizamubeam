@@ -1,0 +1,135 @@
+{
+  "format": "kizamubeam-pack",
+  "formatVersion": 1,
+  "id": "org.kizamubeam.example",
+  "version": "1.1.0",
+  "minApp": "1.2.1-beta",
+  "name": { "en": "Example pack", "de": "Beispielpaket" },
+  "description": {
+    "en": "Shows every kind of content a pack can hold. The values are examples, not measured settings.",
+    "de": "Zeigt alle Inhalte, die ein Paket haben kann. Die Werte sind Beispiele, keine gemessenen Einstellungen."
+  },
+  "author": "KizamuBeam",
+  "homepage": "https://github.com/negurvulkan/kizamubeam/blob/main/docs/packs.md",
+  "devices": [
+    {
+      "name": { "en": "Example: GRBL laser 300 × 200", "de": "Beispiel: GRBL-Laser 300 × 200" },
+      "fw": "grbl",
+      "bedW": 300,
+      "bedH": 200,
+      "baud": 115200,
+      "source": "Example values, not a real machine"
+    }
+  ],
+  "materials": [
+    {
+      "id": "poplar-3-cut",
+      "material": "Example poplar plywood",
+      "thickness": 3,
+      "title": "Cut",
+      "desc": "Example values, test before use",
+      "settings": { "mode": "line", "speed": 400, "power": 90, "passes": 1 }
+    },
+    {
+      "id": "poplar-3-engrave",
+      "material": "Example poplar plywood",
+      "thickness": 3,
+      "title": "Engrave",
+      "desc": "Example values, test before use",
+      "settings": { "mode": "fill", "speed": 3000, "power": 30, "interval": 0.1 }
+    }
+  ],
+  "templates": [
+    {
+      "version": 2,
+      "bed": { "w": 400, "h": 400 },
+      "page": 0,
+      "layers": {},
+      "pages": [
+        {
+          "name": "Coaster",
+          "objs": [
+            {
+              "id": 1,
+              "m": [1, 0, 0, 1, 60, 340],
+              "layer": 1,
+              "shape": { "kind": "ellipse", "rx": 50, "ry": 50 },
+              "bind": { "w": "Diameter", "h": "Diameter", "x": "10 + Diameter / 2", "y": "10 + Diameter / 2", "anchor": [0.5, 0.5] }
+            },
+            {
+              "id": 2,
+              "m": [1, 0, 0, 1, 60, 340],
+              "layer": 0,
+              "shape": {
+                "kind": "text", "text": "{Text}", "font": "Arial", "size": 12, "bold": true, "italic": false, "upper": false,
+                "align": "center", "hSpace": 0, "vSpace": 0, "fit": "shrink", "maxW": 70
+              },
+              "bind": { "size": "Diameter * 0.14", "maxW": "Diameter * 0.7", "x": "10 + Diameter / 2", "y": "10 + Diameter / 2", "anchor": [0.5, 0.5] }
+            }
+          ]
+        }
+      ],
+      "params": [
+        { "name": "Text", "type": "text", "value": "Cheers" },
+        { "name": "Diameter", "type": "number", "value": 100, "min": 60, "max": 140, "step": 1, "unit": "mm" }
+      ],
+      "template": {
+        "title": { "en": "Round coaster", "de": "Runder Untersetzer" },
+        "description": { "en": "Round coaster with a line of text", "de": "Runder Untersetzer mit einer Textzeile" },
+        "fields": [{ "name": "Text" }, { "name": "Diameter", "slider": true }],
+        "preview": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 110 110\"><circle cx=\"55\" cy=\"55\" r=\"50\" fill=\"none\" stroke=\"#0000ff\" stroke-width=\"1.5\"/><text x=\"55\" y=\"60\" font-family=\"Arial\" font-weight=\"bold\" font-size=\"14\" text-anchor=\"middle\">Cheers</text></svg>"
+      }
+    }
+  ],
+  "assets": [
+    {
+      "id": "heart",
+      "name": { "en": "Heart", "de": "Herz" },
+      "category": "motif",
+      "tags": [{ "en": "love", "de": "Liebe" }, { "en": "wedding", "de": "Hochzeit" }],
+      "w": 36,
+      "h": 34,
+      "objs": [
+        {
+          "m": [1, 0, 0, 1, -2, -2.5],
+          "layer": 0,
+          "shape": {
+            "kind": "path",
+            "subs": [
+              {
+                "closed": true,
+                "nodes": [
+                  { "x": 20, "y": 6, "cin": { "x": 14, "y": -2 }, "cout": { "x": 26, "y": -2 } },
+                  { "x": 38, "y": 12, "cin": { "x": 38, "y": 3 }, "cout": { "x": 38, "y": 22 }, "smooth": true },
+                  { "x": 20, "y": 36, "cin": { "x": 30, "y": 28 }, "cout": { "x": 10, "y": 28 } },
+                  { "x": 2, "y": 12, "cin": { "x": 2, "y": 22 }, "cout": { "x": 2, "y": 3 }, "smooth": true }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "frame",
+      "name": { "en": "Double frame", "de": "Doppelrahmen" },
+      "category": "element",
+      "tags": [{ "en": "border", "de": "Rand" }, { "en": "sign", "de": "Schild" }],
+      "w": 80,
+      "h": 50,
+      "objs": [
+        { "m": [1, 0, 0, 1, 0, 0], "layer": 0, "shape": { "kind": "rect", "w": 80, "h": 50, "r": 6 } },
+        { "m": [1, 0, 0, 1, 3, 3], "layer": 0, "shape": { "kind": "rect", "w": 74, "h": 44, "r": 4 } }
+      ]
+    },
+    {
+      "id": "star",
+      "name": { "en": "Star", "de": "Stern" },
+      "category": "element",
+      "tags": [{ "en": "christmas", "de": "Weihnachten" }],
+      "w": 30,
+      "h": 30,
+      "objs": [{ "m": [1, 0, 0, 1, 15, 15], "layer": 0, "shape": { "kind": "polygon", "sides": 5, "r": 15, "star": true, "inner": 0.45 } }]
+    }
+  ]
+}

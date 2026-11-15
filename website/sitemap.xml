@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://kizamubeam.com/</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://kizamubeam.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kizamubeam.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://kizamubeam.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://kizamubeam.com/pt/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kizamubeam.com/"/>
+  </url>
+  <url>
+    <loc>https://kizamubeam.com/en/</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://kizamubeam.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kizamubeam.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://kizamubeam.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://kizamubeam.com/pt/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kizamubeam.com/"/>
+  </url>
+  <url>
+    <loc>https://kizamubeam.com/it/</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://kizamubeam.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kizamubeam.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://kizamubeam.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://kizamubeam.com/pt/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kizamubeam.com/"/>
+  </url>
+  <url>
+    <loc>https://kizamubeam.com/pt/</loc>
+    <xhtml:link rel="alternate" hreflang="de" href="https://kizamubeam.com/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://kizamubeam.com/en/"/>
+    <xhtml:link rel="alternate" hreflang="it" href="https://kizamubeam.com/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://kizamubeam.com/pt/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kizamubeam.com/"/>
+  </url>
+</urlset>
