@@ -36,6 +36,16 @@ test('Nightly-Versionen: nach dem Stand davor, vor RC und stabiler Version, nach
   assert.ok(!isNightly('2.9.0-rc.1') && !isNightly('2.9.0') && !isNightly('1.2.0-beta'));
 });
 
+test('Nightly-Versionen in der RC-Phase: nach dem RC, vor dem nächsten RC und der stabilen Version (#318)', () => {
+  const order = ['2.9.0-nightly.20261115.13', '2.9.0-rc.1', '2.9.0-rc.1.nightly.20261116.5', '2.9.0-rc.1.nightly.20261117.6', '2.9.0-rc.2', '2.9.0'];
+  for (let i = 0; i < order.length - 1; i++) assert.ok(compareVersions(order[i], order[i + 1]) < 0, `${order[i]} < ${order[i + 1]}`);
+  assert.ok(isNightly('2.9.0-rc.1.nightly.20261116.5'));
+  assert.equal(defaultChannel('2.9.0-rc.1.nightly.20261116.5'), 'nightly');
+  const rels = [rel('v2.9.0-rc.1', true), rel('v2.9.0-rc.1.nightly.20261116.5', true)];
+  assert.equal(pickRelease(rels, 'nightly', '2.9.0-rc.1')?.version, '2.9.0-rc.1.nightly.20261116.5');
+  assert.equal(pickRelease(rels, 'stable', '2.9.0-rc.1'), null);
+});
+
 test('Vorgabe-Kanal: nur Nightly-Builds bleiben auf Nightly', () => {
   assert.equal(defaultChannel('2.9.0-nightly.20261114.3'), 'nightly');
   assert.equal(defaultChannel('1.2.0-beta'), 'stable');

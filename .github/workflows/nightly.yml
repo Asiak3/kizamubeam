@@ -2,9 +2,10 @@
 # v<next>-nightly.<YYYYMMDD>.<run> is created and built by release.yml (same installers and signed updater
 # packages as a normal release). The update channel "Nightly" in the app picks them up. Only the newest
 # KEEP nightlies are kept; a nightly whose build fails is removed again.
-# <next> is the next minor version after a stable version in tauri.conf.json (2.8.0 → 2.9.0), or the version
-# itself without its pre-release part (2.9.0-rc.1 → 2.9.0), so nightlies sort after the last stable release
-# and before the next one.
+# After a stable version in tauri.conf.json the nightly is v<next minor>-nightly.<YYYYMMDD>.<run> (2.8.0 →
+# 2.9.0-nightly.…), so it sorts after the last stable release and before the next one. During a release
+# candidate phase it is v<rc>.nightly.<YYYYMMDD>.<run> (2.9.0-rc.1 → 2.9.0-rc.1.nightly.…), so it sorts after
+# that RC and before the next RC or the stable version (#318).
 # Manually: Actions → Nightly → Run workflow ("force" builds even without new commits).
 name: Nightly
 
@@ -49,7 +50,7 @@ jobs:
         run: |
           sha=$(git rev-parse HEAD)
           last=$(gh release list --limit 100 --json tagName,createdAt \
-            --jq '[.[] | select(.tagName | test("-nightly\\."))] | sort_by(.createdAt) | last | .tagName // ""')
+            --jq '[.[] | select(.tagName | test("[-.]nightly\\."))] | sort_by(.createdAt) | last | .tagName // ""')
           if [[ -n "$last" && "$FORCE" != "true" ]] && [[ "$(git rev-list -n 1 "$last" 2>/dev/null)" == "$sha" ]]; then
             echo "::notice::No new commits on main since $last."
             exit 0
@@ -61,8 +62,8 @@ jobs:
             exit 0
           fi
           cur=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          next=$(node -e "const v=process.argv[1],[a,b]=v.split('-')[0].split('.');console.log(v.includes('-')?v.split('-')[0]:a+'.'+(+b+1)+'.0')" "$cur")
-          version="$next-nightly.$(date -u +%Y%m%d).$GITHUB_RUN_NUMBER"
+          base=$(node -e "const v=process.argv[1],[a,b]=v.split('.');console.log(v.includes('-')?v+'.':a+'.'+(+b+1)+'.0-')" "$cur")
+          version="${base}nightly.$(date -u +%Y%m%d).$GITHUB_RUN_NUMBER"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
@@ -112,7 +113,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName,createdAt \
-            --jq "[.[] | select(.tagName | test(\"-nightly\\\\.\"))] | sort_by(.createdAt) | reverse | .[$KEEP:] | .[].tagName" |
+            --jq "[.[] | select(.tagName | test(\"[-.]nightly\\\\.\"))] | sort_by(.createdAt) | reverse | .[$KEEP:] | .[].tagName" |
           while read -r tag; do
             echo "Removing $tag"
             gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes

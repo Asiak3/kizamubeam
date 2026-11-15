@@ -46,8 +46,8 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/** Nightly builds are versioned like 2.9.0-nightly.20261114.12 */
-export const isNightly = (version: string) => /-nightly(\.|$)/.test(version);
+/** Nightly builds are versioned like 2.9.0-nightly.20261114.12, during an RC phase like 2.9.0-rc.1.nightly.20261116.5 */
+export const isNightly = (version: string) => /-(.+\.)?nightly(\.|$)/.test(version);
 
 /** Default: a nightly build stays on nightly, everything else (stable, release candidates) gets stable updates */
 export const defaultChannel = (current: string): Channel => (isNightly(current) ? 'nightly' : 'stable');

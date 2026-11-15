@@ -1,5 +1,17 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "title": "KizamuBeam",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1000,
+        "minHeight": 640,
+        "dragDropEnabled": false
+      }
+    ]
+  },
   "bundle": {
     "targets": ["nsis"]
   }

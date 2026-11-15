@@ -640,8 +640,9 @@ export async function importModel(ed: Editor, gen: 'stack' | 'ribs') {
 
 /** Dateien aus dem Dateimanager auf die Arbeitsfläche ziehen; Bilder/SVG aus der Zwischenablage einfügen */
 export function installDropAndPaste(ed: Editor, stage: HTMLElement) {
-  // Native WebView2 drops do not reliably provide DOM File objects. Forward OS
-  // drops as in-memory File objects so canvas and library retain one import path.
+  // Forward native OS drops (macOS, Linux) as in-memory File objects so canvas and library keep one
+  // import path. On Windows native drag and drop is off (tauri.windows.conf.json, #258) because it blocks
+  // HTML5 drag and drop inside the page; dropped files arrive through installDomFileDrop below.
   if (isTauri()) {
     installNativeFileDrop({
       subscribe: async receive => {

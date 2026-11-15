@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { installNativeFileDrop, type NativeFileDrop, type NativeDropServices } from '../src/nativeFileDrop';
 const tick=()=>new Promise<void>(r=>setImmediate(r));
 let checks=0;
@@ -36,5 +37,11 @@ await test('invalid coordinates are rejected and disposal cancels an in-flight r
   const invalid=harness({scaleFactor:async()=>0});invalid.emit({type:'drop',paths:['C:/test.svg'],position:{x:10,y:10}});await tick();assert.equal(invalid.errors.length,1);assert.equal(invalid.reads.length,0);invalid.dispose();
   let finish!:(data:ArrayBuffer)=>void;const h=harness({read:()=>new Promise(resolve=>{finish=resolve;})});
   h.emit({type:'drop',paths:['C:/test.svg'],position:{x:10,y:10}});await tick();h.dispose();finish(new ArrayBuffer(4));await tick();assert.equal(h.drops.length,0);assert.equal(h.unlistened(),1);
+});
+await test('Windows turns native drag and drop off and keeps the main window otherwise identical (#258)',async()=>{
+  const read=(f:string)=>JSON.parse(readFileSync(new URL('../src-tauri/'+f,import.meta.url),'utf8'));
+  const main=read('tauri.conf.json').app.windows,win=read('tauri.windows.conf.json').app.windows;
+  assert.equal(win.length,main.length);assert.equal(win[0].dragDropEnabled,false);
+  assert.deepEqual({...win[0],dragDropEnabled:true},{...main[0],dragDropEnabled:true});
 });
 console.log(`Native file drop: ${checks} bridge checks passed; no OS drag or application startup.`);
