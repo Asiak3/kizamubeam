@@ -47,6 +47,10 @@ DOCS_URL=https://docs.kizamubeam.com DOCS_BASE_URL=/ npm run build
 
 `WEBSITE_URL` changes the link back to the product website.
 
+The workflow builds the manual a second time for the webspace mirror (`DOCS_BASE_URL=/docs/` on
+`WEBSPACE_URL`, output in `build-webspace/`) and commits it to the branch `webspace` (see
+`website/README.md`).
+
 ## Search
 
 The search is local (`@easyops-cn/docusaurus-search-local`), built into the static files, with no external
