@@ -58,6 +58,8 @@ export interface Node {
   cout?: Pt;
   /** Anfasser bleiben beim Ziehen gespiegelt */
   smooth?: boolean;
+  /** Inserted by the start point tool on an edge; removed again when the start moves while still unchanged (#333) */
+  split?: boolean;
 }
 
 export interface SubPath {

@@ -43,7 +43,7 @@ In **Strumenti → Percorso**:
 - **Unisci automaticamente le forme selezionate** (Alt+J) unisce in un unico percorso i percorsi aperti le cui estremità si incontrano (entro 0,05 mm).
 - **Separa** (Alt+B) divide percorsi, forme e testi nelle singole linee e curve.
 - **Ritaglia forme** (Ctrl+K): passando sopra una curva, il tratto fino alle intersezioni successive diventa rosso e viene rimosso con un clic. I pezzi rimanenti vengono uniti nelle intersezioni, così due cerchi sovrapposti diventano un unico contorno con due clic. Ctrl+clic non unisce, Maiusc+clic conserva il pezzo rimosso.
-- **Imposta punto iniziale**: fai clic su un nodo perché il taglio inizi lì, o su un bordo per inserire un nuovo nodo iniziale. Maiusc+clic inverte la direzione. Finché lo strumento è attivo, l’area di lavoro mostra tutti i punti iniziali, le direzioni, le entrate e le uscite esattamente come li taglierà il lavoro.
+- **Imposta punto iniziale**: fai clic su un nodo perché il taglio inizi lì, o su un bordo per inserire un nuovo nodo iniziale. Quel nodo viene rimosso quando sposti o reimposti il punto iniziale, a meno che tu non l’abbia modificato. Maiusc+clic inverte la direzione. Finché lo strumento è attivo, l’area di lavoro mostra tutti i punti iniziali, le direzioni, le entrate e le uscite esattamente come li taglierà il lavoro.
 - **Inverti direzione** inverte la direzione di taglio.
 - **Marca centri** aggiunge una piccola croce al centro di ogni cerchio e arco, per bulinare o forare.
 

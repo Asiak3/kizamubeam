@@ -102,6 +102,45 @@ export function splitAt(sp: SubPath, u: number, eps = 1e-6): number {
   return sg.ia + 1;
 }
 
+/**
+ * Undo splitAt(): remove node idx and merge its two segments into one, but only if the node still lies
+ * exactly where a split would have put it (straight: no handles and between its neighbours; curve: handles
+ * consistent with a de Casteljau split). Returns false and leaves the path unchanged otherwise.
+ */
+export function unsplit(sp: SubPath, idx: number, eps = 1e-6): boolean {
+  const n = sp.nodes.length;
+  if (idx < 0 || idx >= n || n < (sp.closed ? 3 : 2)) return false;
+  if (!sp.closed && (idx === 0 || idx === n - 1)) return false;
+  const p = sp.nodes[idx],
+    a = sp.nodes[(idx - 1 + n) % n],
+    b = sp.nodes[(idx + 1) % n];
+  const tol = eps * Math.max(1, dist(a, b));
+  if (!p.cin && !p.cout && !a.cout && !b.cin) {
+    // straight: p must lie on the line between a and b
+    if (Math.abs(dist(a, p) + dist(p, b) - dist(a, b)) > tol) return false;
+  } else {
+    if (!p.cin || !p.cout) return false;
+    const len = dist(p.cin, p.cout);
+    if (len <= tol) return false;
+    const t = dist(p.cin, p) / len;
+    if (t <= eps || t >= 1 - eps || dist(lerp(p.cin, p.cout, t), p) > tol) return false;
+    const p01 = a.cout ?? a,
+      p23 = b.cin ?? b;
+    // control points of the original curve, rebuilt from both halves; they must agree
+    const c1 = { x: a.x + (p01.x - a.x) / t, y: a.y + (p01.y - a.y) / t };
+    const c2 = { x: b.x + (p23.x - b.x) / (1 - t), y: b.y + (p23.y - b.y) / (1 - t) };
+    const p12 = lerp(c1, c2, t);
+    if (dist(lerp(p01, p12, t), p.cin) > tol || dist(lerp(p12, p23, t), p.cout) > tol) return false;
+    const same = (q: Pt, r: Pt) => dist(q, r) <= tol;
+    if (same(c1, a)) delete a.cout;
+    else a.cout = c1;
+    if (same(c2, b)) delete b.cin;
+    else b.cin = c2;
+  }
+  sp.nodes.splice(idx, 1);
+  return true;
+}
+
 // ---------- Schließen ----------
 
 /** Letzten Knoten mit dem ersten verschmelzen (an der Stelle p) und den Pfad schließen */

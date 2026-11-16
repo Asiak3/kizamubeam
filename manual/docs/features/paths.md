@@ -43,7 +43,7 @@ Under **Tools → Path**:
 - **Auto-join selected shapes** (Alt+J) joins open paths whose ends meet (within 0.05 mm) into one path.
 - **Break apart** (Alt+B) splits paths, shapes and texts into their individual lines and curves.
 - **Trim shapes** (Ctrl+K): hover over a curve, the piece up to the next intersections turns red and is removed with a click. The remaining pieces are joined at the intersections, so two overlapping circles become one outline after two clicks. Ctrl+click does not join, Shift+click keeps the removed piece.
-- **Set start point**: click a node to make the cut start there, or click an edge to insert a new start node. Shift+click reverses the direction. While the tool is active, all start points, directions, lead-ins and lead-outs are shown on the workspace exactly as the job will cut them.
+- **Set start point**: click a node to make the cut start there, or click an edge to insert a new start node. That node is removed again when you move or reset the start point, unless you have edited it. Shift+click reverses the direction. While the tool is active, all start points, directions, lead-ins and lead-outs are shown on the workspace exactly as the job will cut them.
 - **Reverse direction** flips the cut direction.
 - **Mark centers** adds a small cross at the centre of every circle and arc, for centre punching or drilling.
 
