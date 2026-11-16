@@ -5,7 +5,7 @@
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { readdirSync, readFileSync } from 'node:fs';
-const { GENERATORS, register, getGenerator } = await import('../src/generators/index');
+const { GENERATORS, register, getGenerator, ruleHolds, fieldActive, autoText, buildGen, defaultParams } = await import('../src/generators/index');
 const { appList } = await import('../src/apps');
 const { genFit } = await import('../src/fitcheck');
 
@@ -70,6 +70,34 @@ test('assembly poses come from the generator', () => {
     assert.ok(r && Object.keys(r.poses).length, g.id);
   }
   assert.equal(getGenerator('gear')?.poses, undefined);
+});
+
+test('showIf rules are data and evaluate like the old functions', () => {
+  const p = { a: 'x', n: 2, b: true, s: '' };
+  assert.ok(ruleHolds({ eq: ['a', 'x'] }, p) && !ruleHolds({ ne: ['a', 'x'] }, p));
+  assert.ok(ruleHolds({ gt: ['n', 1] }, p) && !ruleHolds({ lt: ['n', 2] }, p) && ruleHolds({ le: ['n', 2] }, p) && ruleHolds({ ge: ['n', 2] }, p));
+  assert.ok(ruleHolds({ in: ['a', ['y', 'x']] }, p) && !ruleHolds({ in: ['a', ['y']] }, p));
+  assert.ok(ruleHolds({ and: [{ eq: ['b', true] }, { eq: ['s', ''] }] }, p));
+  assert.ok(ruleHolds({ or: [{ eq: ['b', false] }, { gt: ['n', 1] }] }, p));
+  assert.ok(ruleHolds({ not: { eq: ['b', false] } }, p));
+  for (const g of GENERATORS) for (const s of g.schema) if (s.showIf) assert.equal(typeof s.showIf, 'object', `${g.id}.${s.key}`);
+  // drawer: handle height only with a front and a slot handle
+  const d = getGenerator('drawer')!, hh = d.schema.find((s) => s.key === 'handleHeight')!;
+  const dp = defaultParams(d);
+  assert.equal(fieldActive(hh, { ...dp, front: 'overlay', handle: 'slot' }), true);
+  assert.equal(fieldActive(hh, { ...dp, front: 'none', handle: 'slot' }), false);
+  assert.equal(fieldActive(hh, { ...dp, front: 'overlay', handle: 'hole' }), false);
+});
+
+test('suggested texts come from view(), issues carry codes', () => {
+  const g = getGenerator('box-divided')!;
+  const p = { ...defaultParams(g), compartmentsX: 3 };
+  assert.equal(autoText(g, 'ratiosX', p), '1:1:1');
+  assert.equal(autoText(g, 'width', p), '');
+  const r = buildGen(g, { ...p, ratiosX: '1:(2:1' });
+  const i = r.issues.find((x) => x.key === 'ratiosX');
+  assert.equal(i?.code, 'expr-bracket');
+  assert.ok(i && i.msg && i.msg !== i.code, 'translated text, not the code');
 });
 
 test('register adds a generator and replaces one with the same id', () => {

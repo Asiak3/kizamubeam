@@ -16,10 +16,10 @@ export function boreSchema(suffix = '', label = '', def: 'none' | 'round' = 'rou
       key: k('boreType'), type: 'enum', label: L(t('Bohrung')), def,
       options: [['none', t('Keine')], ['round', t('Rund')], ['dflat', t('D-Profil (abgeflacht)')], ['key', t('Mit Passfedernut')]],
     },
-    { key: k('boreDia'), type: 'length', label: L(t('Bohrungsdurchmesser')), min: 0.5, max: 2000, def: dia, showIf: (p) => p[k('boreType')] !== 'none' },
-    { key: k('boreFlat'), type: 'length', label: L(t('Maß über Abflachung')), min: 0.1, max: 2000, def: Math.round(dia * 0.917 * 10) / 10, showIf: (p) => p[k('boreType')] === 'dflat', title: t('Abstand von der Abflachung zur gegenüberliegenden Seite der Bohrung') },
-    { key: k('keyWidth'), type: 'length', label: L(t('Nutbreite')), min: 0.1, max: 200, def: 2, showIf: (p) => p[k('boreType')] === 'key' },
-    { key: k('keyDepth'), type: 'length', label: L(t('Nuttiefe')), min: 0.1, max: 200, def: 1, showIf: (p) => p[k('boreType')] === 'key', title: t('Tiefe der Nut über den Bohrungsrand hinaus') },
+    { key: k('boreDia'), type: 'length', label: L(t('Bohrungsdurchmesser')), min: 0.5, max: 2000, def: dia, showIf: { ne: [k('boreType'), 'none'] } },
+    { key: k('boreFlat'), type: 'length', label: L(t('Maß über Abflachung')), min: 0.1, max: 2000, def: Math.round(dia * 0.917 * 10) / 10, showIf: { eq: [k('boreType'), 'dflat'] }, title: t('Abstand von der Abflachung zur gegenüberliegenden Seite der Bohrung') },
+    { key: k('keyWidth'), type: 'length', label: L(t('Nutbreite')), min: 0.1, max: 200, def: 2, showIf: { eq: [k('boreType'), 'key'] } },
+    { key: k('keyDepth'), type: 'length', label: L(t('Nuttiefe')), min: 0.1, max: 200, def: 1, showIf: { eq: [k('boreType'), 'key'] }, title: t('Tiefe der Nut über den Bohrungsrand hinaus') },
   ];
 }
 

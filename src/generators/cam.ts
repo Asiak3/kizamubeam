@@ -132,7 +132,7 @@ export const CAM: Generator = {
       options: [['cycloid', t('Zykloide (ruckarm)')], ['poly5', t('Polynom 5. Grades')], ['harmonic', t('Harmonisch')]],
     },
     { key: 'follower', type: 'enum', label: t('Stößel'), def: 'roller', options: [['roller', t('Mit Rolle')], ['knife', t('Spitze')]] },
-    { key: 'rollerDia', type: 'length', label: t('Rollendurchmesser'), min: 0.5, max: 500, def: 10, showIf: (p) => p.follower === 'roller' },
+    { key: 'rollerDia', type: 'length', label: t('Rollendurchmesser'), min: 0.5, max: 500, def: 10, showIf: { eq: ['follower', 'roller'] } },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, damit der Nocken die Sollmaße hat. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
     ...boreSchema('', '', 'round', 6),
   ],

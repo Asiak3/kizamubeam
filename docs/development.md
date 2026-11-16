@@ -135,6 +135,9 @@ A generator declares everything the app needs to know about it on its `Generator
 - `poses(params, thickness)`: position of every part in space (3D view, assembly check); helpers in `src/generators/pose.ts`.
 - `assemblyCheck`: the parts form one assembly for the assembly check.
 - `inputs`: what the generator needs before its dialog opens (a 3D model, the selection).
+- `showIf` on a field is a rule (`{ eq: [key, value] }`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`), never a function; `ruleHolds()` evaluates it.
+- `view(params)`: values the dialog shows that depend on the parameters (`autoText` suggestions for empty text fields).
+- Issues carry a stable `code`; texts for codes that `generate()` throws come from `texts`. Internals throw codes, not UI text.
 
 Register a generator with `register()` in `src/generators/index.ts`. Its `id` is stored in projects and must never change.
 ## Security: CSP and markup

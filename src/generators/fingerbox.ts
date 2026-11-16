@@ -16,38 +16,46 @@ const names: Record<string, () => string> = {
   bottom: () => t('Boden'), top: () => t('Deckel'), front: () => t('Vorderwand'), back: () => t('Rückwand'),
   left: () => t('Seitenwand links'), right: () => t('Seitenwand rechts'),
 };
+/** Issue codes thrown by the box internals (fingerbox-*.ts) and their texts; the internals stay free of UI text */
 const issues: Record<string, () => string> = {
-  'Ungültiges Steckspiel.': () => t('Ungültiges Steckspiel.'),
-  'Das Steckspiel ist für einen Zinkenabschnitt zu groß.': () => t('Das Steckspiel ist für einen Zinkenabschnitt zu groß.'),
-  'Steckspiel führt zu überlappenden Schlitzen und Zinken.': () => t('Steckspiel führt zu überlappenden Schlitzen und Zinken.'),
-  'Ungültige Kontur für die Schnittfuge.': () => t('Ungültige Kontur für die Schnittfuge.'),
-  'Schnittfuge ist für eine Kontur oder einen Schlitz zu groß.': () => t('Schnittfuge ist für eine Kontur oder einen Schlitz zu groß.'),
-  'Schnittfuge erzeugt eine ungültige oder geteilte Kontur.': () => t('Schnittfuge erzeugt eine ungültige oder geteilte Kontur.'),
-  'Zu viele Konturen für die sichere Prüfung.': () => t('Zu viele Konturen für die sichere Prüfung.'),
-  'Ein Schlitz liegt auf oder außerhalb der Außenkontur.': () => t('Ein Schlitz liegt auf oder außerhalb der Außenkontur.'),
-  'Schlitze überlappen oder berühren sich.': () => t('Schlitze überlappen oder berühren sich.'),
-  'Fachzahl muss zwischen 1 und 100 liegen.': () => t('Fachzahl muss zwischen 1 und 100 liegen.'),
-  'Ungültige Maße.': () => t('Ungültige Maße.'),
-  'Eingabe ist zu lang.': () => t('Eingabe ist zu lang.'),
-  'Kein freier Platz für die Fächer.': () => t('Kein freier Platz für die Fächer.'),
-  'Die Anzahl der Werte muss der Fachzahl entsprechen.': () => t('Die Anzahl der Werte muss der Fachzahl entsprechen.'),
-  'Ungültiger Ausdruck.': () => t('Ungültiger Ausdruck.'),
-  'Klammer nicht geschlossen.': () => t('Klammer nicht geschlossen.'),
-  'Division durch null.': () => t('Division durch null.'),
-  'Ungültige Einheitenkombination.': () => t('Ungültige Einheitenkombination.'),
-  'Jeder Wert muss größer als null sein.': () => t('Jeder Wert muss größer als null sein.'),
-  'Werte sind zu groß.': () => t('Werte sind zu groß.'),
-  'Die festen Millimetermaße lassen keinen Platz für die übrigen Fächer.': () => t('Die festen Millimetermaße lassen keinen Platz für die übrigen Fächer.'),
-  'Die festen Millimetermaße müssen zusammen genau dem freien Platz entsprechen.': () => t('Die festen Millimetermaße müssen zusammen genau dem freien Platz entsprechen.'),
-  'Alle Fächer müssen einen positiven freien Abstand haben.': () => t('Alle Fächer müssen einen positiven freien Abstand haben.'),
-  'Ungültige Trennwandhöhe oder Maße.': () => t('Ungültige Trennwandhöhe oder Maße.'),
-  'Trennwände reichen in den Deckel.': () => t('Trennwände reichen in den Deckel.'),
-  'Zinkenabschnitte der Trennwand sind zu kurz für die Materialdicke.': () => t('Zinkenabschnitte der Trennwand sind zu kurz für die Materialdicke.'),
-  'Trennwände überlappen oder liegen außerhalb des Innenraums.': () => t('Trennwände überlappen oder liegen außerhalb des Innenraums.'),
-  'Schmales Fach ohne Bodenzinken.': () => t('Schmales Fach ohne Bodenzinken.'),
-  'Zu viele Zinken für diese Kante.': () => t('Zu viele Zinken für diese Kante.'),
+  'clearance-invalid': () => t('Ungültiges Steckspiel.'),
+  'clearance-too-large': () => t('Das Steckspiel ist für einen Zinkenabschnitt zu groß.'),
+  'clearance-overlap': () => t('Steckspiel führt zu überlappenden Schlitzen und Zinken.'),
+  'kerf-contour-invalid': () => t('Ungültige Kontur für die Schnittfuge.'),
+  'kerf-too-large': () => t('Schnittfuge ist für eine Kontur oder einen Schlitz zu groß.'),
+  'kerf-splits-contour': () => t('Schnittfuge erzeugt eine ungültige oder geteilte Kontur.'),
+  'too-many-contours': () => t('Zu viele Konturen für die sichere Prüfung.'),
+  'slot-outside': () => t('Ein Schlitz liegt auf oder außerhalb der Außenkontur.'),
+  'slots-overlap': () => t('Schlitze überlappen oder berühren sich.'),
+  'compartments-range': () => t('Fachzahl muss zwischen 1 und 100 liegen.'),
+  'size-invalid': () => t('Ungültige Maße.'),
+  'input-too-long': () => t('Eingabe ist zu lang.'),
+  'no-space': () => t('Kein freier Platz für die Fächer.'),
+  'ratio-count': () => t('Die Anzahl der Werte muss der Fachzahl entsprechen.'),
+  'expr-invalid': () => t('Ungültiger Ausdruck.'),
+  'expr-bracket': () => t('Klammer nicht geschlossen.'),
+  'expr-div-zero': () => t('Division durch null.'),
+  'expr-units': () => t('Ungültige Einheitenkombination.'),
+  'ratio-not-positive': () => t('Jeder Wert muss größer als null sein.'),
+  'ratio-too-large': () => t('Werte sind zu groß.'),
+  'fixed-no-space': () => t('Die festen Millimetermaße lassen keinen Platz für die übrigen Fächer.'),
+  'fixed-mismatch': () => t('Die festen Millimetermaße müssen zusammen genau dem freien Platz entsprechen.'),
+  'gap-not-positive': () => t('Alle Fächer müssen einen positiven freien Abstand haben.'),
+  'divider-height-invalid': () => t('Ungültige Trennwandhöhe oder Maße.'),
+  'divider-into-lid': () => t('Trennwände reichen in den Deckel.'),
+  'divider-fingers-short': () => t('Zinkenabschnitte der Trennwand sind zu kurz für die Materialdicke.'),
+  'dividers-overlap': () => t('Trennwände überlappen oder liegen außerhalb des Innenraums.'),
+  'narrow-no-bottom-fingers': () => t('Schmales Fach ohne Bodenzinken.'),
+  'too-many-fingers': () => t('Zu viele Zinken für diese Kante.'),
+  'finger-length-invalid': () => 'Länge und Zinkenbreite müssen positiv sein.',
+  'outer-size-invalid': () => 'Ungültige Maße: positive Werte und jede Außenabmessung größer als die doppelte Materialdicke erforderlich.',
 };
 const message = (e: unknown) => { const s = e instanceof Error ? e.message : String(e); return issues[s]?.() ?? s; };
+/** Issue with its code (Issue.code) and the translated text */
+const issueOf = (e: unknown, level: Issue['level'], key?: string): Issue => {
+  const code = e instanceof Error ? e.message : String(e);
+  return { ...(key ? { key } : {}), level, msg: message(e), ...(issues[code] ? { code } : {}) };
+};
 const dividerParams = (p: FingerParams): DividerParams => ({ ...p, dividerHeight: p.height - p.dividerDrop });
 const hasDividers = (p: FingerParams) => p.compartmentsX > 1 || p.compartmentsY > 1;
 const fmt = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 });
@@ -123,6 +131,8 @@ export function fingerboxPoses(raw: Params): AsmPoses | null {
 
 export const FINGERBOX: Generator = {
   id: 'box-divided', version: 3, kind: 'assembly', icon: 'box',
+  view: (p) => ({ autoText: { ratiosX: defaultDistribution(Number(p.compartmentsX)), ratiosY: defaultDistribution(Number(p.compartmentsY)) } }),
+  texts: issues,
   poses: (p) => fingerboxPoses(p),
   tile: {
     group: 'box',
@@ -144,10 +154,10 @@ export const FINGERBOX: Generator = {
     { key: 'thickness', type: 'length', label: t('Materialdicke'), min: 0.3, max: 50, def: 3 },
     { key: 'top', type: 'enum', label: t('Oben'), def: 'open', options: [['open', t('Offen')], ['closed', t('Geschlossen (Deckel mit Zinken)')]] },
     { key: 'compartmentsX', type: 'int', label: t('Fächer in Breitenrichtung'), min: 1, max: 20, def: 1 },
-    { key: 'ratiosX', type: 'text', label: t('Verteilung in Breitenrichtung'), def: '', autoText: (p) => defaultDistribution(Number(p.compartmentsX)), title: t('Freie Fachbreiten als Verhältnis oder mm, getrennt mit Doppelpunkt, z. B. 50mm:1:2. Rechenzeichen + - * / und Klammern sind möglich.') },
+    { key: 'ratiosX', type: 'text', label: t('Verteilung in Breitenrichtung'), def: '', title: t('Freie Fachbreiten als Verhältnis oder mm, getrennt mit Doppelpunkt, z. B. 50mm:1:2. Rechenzeichen + - * / und Klammern sind möglich.') },
     { key: 'compartmentsY', type: 'int', label: t('Fächer in Tiefenrichtung'), min: 1, max: 20, def: 1 },
-    { key: 'ratiosY', type: 'text', label: t('Verteilung in Tiefenrichtung'), def: '', autoText: (p) => defaultDistribution(Number(p.compartmentsY)), title: t('Freie Fachbreiten als Verhältnis oder mm, getrennt mit Doppelpunkt, z. B. 50mm:1:2. Rechenzeichen + - * / und Klammern sind möglich.') },
-    { key: 'dividerDrop', type: 'length', label: t('Trennwände niedriger als Box'), min: 0, max: 3000, def: 10, showIf: (p) => Number(p.compartmentsX) > 1 || Number(p.compartmentsY) > 1 },
+    { key: 'ratiosY', type: 'text', label: t('Verteilung in Tiefenrichtung'), def: '', title: t('Freie Fachbreiten als Verhältnis oder mm, getrennt mit Doppelpunkt, z. B. 50mm:1:2. Rechenzeichen + - * / und Klammern sind möglich.') },
+    { key: 'dividerDrop', type: 'length', label: t('Trennwände niedriger als Box'), min: 0, max: 3000, def: 10, showIf: { or: [{ gt: ['compartmentsX', 1] }, { gt: ['compartmentsY', 1] }] } },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, damit die Teile die Sollmaße haben. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
     { key: 'finger', type: 'length', label: t('Zinkenbreite'), min: 0.5, max: 500, def: 10, advanced: true },
     { key: 'clearance', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0, advanced: true, title: t('Jede Zinke wird um so viel schmaler; negativ = Presspassung') },
@@ -168,7 +178,7 @@ export const FINGERBOX: Generator = {
     } catch { out.push({ key: 'finger', level: 'error', msg: t('Zu viele Zinken für diese Kante.') }); }
     for (const [key, length, count, spec] of [['ratiosX',p.width,p.compartmentsX,p.ratiosX],['ratiosY',p.depth,p.compartmentsY,p.ratiosY]] as const) {
       try { distributeGaps(length,p.thickness,count,spec); }
-      catch (e) { out.push({ key, level: 'error', msg: message(e) }); }
+      catch (e) { out.push(issueOf(e, 'error', key)); }
     }
     if (out.some((i) => i.level === 'error')) return out;
     if (hasDividers(p)) {
@@ -180,8 +190,8 @@ export const FINGERBOX: Generator = {
       }
     }
     if (hasDividers(p)) {
-      try { for (const warning of new Set(makeDividers(dividerParams(p)).warnings)) out.push({ level: 'warn', msg: message(warning) }); }
-      catch (e) { out.push({ level: 'error', msg: message(e) }); }
+      try { for (const warning of new Set(makeDividers(dividerParams(p)).warnings)) out.push(issueOf(warning, 'warn')); }
+      catch (e) { out.push(issueOf(e, 'error')); }
     }
     return out;
   },

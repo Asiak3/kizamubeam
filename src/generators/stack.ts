@@ -241,7 +241,7 @@ export const STACK: Generator = {
       title: t('Mitte: Querschnitt in halber Schichthöhe. Außen: nichts vom Modell fehlt, Stufen stehen über und lassen sich abschleifen. Innen: keine Schicht steht über das Modell hinaus.'),
     },
     { key: 'numbers', type: 'bool', label: t('Nummern gravieren'), def: true, title: t('Jede Scheibe bekommt ihre Nummer (von unten gezählt) als feine Gravur auf einem eigenen Layer.') },
-    { key: 'numberSize', type: 'length', label: t('Größte Schrifthöhe'), min: 1.5, max: 30, def: 6, advanced: true, showIf: (p) => !!p.numbers },
+    { key: 'numberSize', type: 'length', label: t('Größte Schrifthöhe'), min: 1.5, max: 30, def: 6, advanced: true, showIf: { eq: ['numbers', true] } },
     { key: 'minArea', type: 'number', label: t('Kleinste Fläche (mm²)'), min: 0, max: 10000, def: 4, advanced: true, title: t('Inseln und Löcher, die kleiner sind, werden weggelassen bzw. gefüllt.') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.1, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],

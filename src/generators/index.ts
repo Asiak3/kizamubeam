@@ -19,10 +19,10 @@ import { SKETCH } from '../sketch/generator';
 import { SLOT_PLACEMENT, SLOT_GENERATOR, isSlotGenerator } from '../slotPlacement';
 import { CONTOUR_OFFSET, CONTOUR_OFFSET_ID, LEGACY_CONTOUR_OFFSET_ID } from '../contourOffset';
 import { PATTERN_GEN, PATTERN_GEN_ID } from '../pattern';
-import type { Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet } from './types';
+import type { Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet, Rule } from './types';
 import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
-export type { GenInput, GenPart, GenTile, Generator, Issue, Params, ParamSpec } from './types';
+export type { Rule, GenInput, GenPart, GenTile, Generator, Issue, Params, ParamSpec } from './types';
 
 /** Registered generators in toolbox order. Use register() to add one; the built-in generators register below. */
 export const GENERATORS: Generator[] = [];
@@ -38,8 +38,33 @@ for (const g of [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, FINGERBOX, DRAWER, INSE
 
 export const getGenerator = (id: string): Generator | undefined => (id === PATTERN_GEN_ID ? PATTERN_GEN : id === CONTOUR_OFFSET_ID ? CONTOUR_OFFSET : id === LEGACY_CONTOUR_OFFSET_ID ? { ...CONTOUR_OFFSET, id, version: 1 } : id === SLOT_GENERATOR ? SLOT_PLACEMENT : isSlotGenerator(id) ? { ...SLOT_PLACEMENT, id } : id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
 
+/** Does the rule hold for these parameters? Unknown operators count as false. */
+export function ruleHolds(r: Rule, p: Params): boolean {
+  const num = (k: string) => Number(p[k]);
+  if ('eq' in r) return p[r.eq[0]] === r.eq[1];
+  if ('ne' in r) return p[r.ne[0]] !== r.ne[1];
+  if ('lt' in r) return num(r.lt[0]) < r.lt[1];
+  if ('le' in r) return num(r.le[0]) <= r.le[1];
+  if ('gt' in r) return num(r.gt[0]) > r.gt[1];
+  if ('ge' in r) return num(r.ge[0]) >= r.ge[1];
+  if ('in' in r) return r.in[1].includes(p[r.in[0]]);
+  if ('and' in r) return r.and.every((x) => ruleHolds(x, p));
+  if ('or' in r) return r.or.some((x) => ruleHolds(x, p));
+  if ('not' in r) return !ruleHolds(r.not, p);
+  return false;
+}
+
 /** Gilt das Feld bei diesen Parametern (showIf)? */
-export const fieldActive = (s: ParamSpec, p: Params) => !s.showIf || s.showIf(p);
+export const fieldActive = (s: ParamSpec, p: Params) => !s.showIf || ruleHolds(s.showIf, p);
+
+/** Suggested text for an empty text field (Generator.view().autoText) */
+export const autoText = (g: Generator, key: string, p: Params): string => {
+  try {
+    return g.view?.(p).autoText?.[key] ?? '';
+  } catch {
+    return '';
+  }
+};
 
 /** Standardwerte aller Felder */
 export function defaultParams(g: Generator): Params {
@@ -119,7 +144,9 @@ export function buildGen(g: Generator, params: Params): BuildResult {
     });
     return r.plan ? { parts, issues, info: r.info, plan: r.plan } : { parts, issues, info: r.info };
   } catch (e) {
-    return { parts: [], issues: [...issues, { level: 'error', msg: String(e instanceof Error ? e.message : e) }], info: [] };
+    const code = String(e instanceof Error ? e.message : e);
+    const text = g.texts?.[code];
+    return { parts: [], issues: [...issues, text ? { level: 'error', msg: text(), code } : { level: 'error', msg: code }], info: [] };
   }
 }
 

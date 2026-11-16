@@ -693,8 +693,8 @@ const ENUM = <T extends string>(list: T[], label: (v: T) => string): [string, st
 const SCHEMA: ParamSpec[] = [
   { key: 'recipe', type: 'data', label: t('Muster-Rezept'), def: '' },
   { key: 'repeat', type: 'enum', label: t('Wiederholung'), options: ENUM(PATTERN_REPEATS, repeatLabel), def: 'grid' },
-  { key: 'shift', type: 'number', label: t('Versatz (Anteil der Kachel)'), min: 0, max: 1, def: 0.5, showIf: (p) => p.repeat === 'brick' || p.repeat === 'halfdrop' },
-  { key: 'mirror', type: 'enum', label: t('Spiegeln'), options: ENUM(PATTERN_MIRRORS, mirrorLabel), def: 'xy', showIf: (p) => p.repeat === 'mirror' },
+  { key: 'shift', type: 'number', label: t('Versatz (Anteil der Kachel)'), min: 0, max: 1, def: 0.5, showIf: { in: ['repeat', ['brick', 'halfdrop']] } },
+  { key: 'mirror', type: 'enum', label: t('Spiegeln'), options: ENUM(PATTERN_MIRRORS, mirrorLabel), def: 'xy', showIf: { eq: ['repeat', 'mirror'] } },
   { key: 'gapX', type: 'length', label: t('Abstand waagerecht'), min: -500, max: 500, def: 0 },
   { key: 'gapY', type: 'length', label: t('Abstand senkrecht'), min: -500, max: 500, def: 0 },
   { key: 'scale', type: 'number', label: t('Maßstab'), min: 0.05, max: 20, def: 1 },

@@ -135,6 +135,9 @@ Ein Generator gibt alles, was die App über ihn wissen muss, an seinem `Generato
 - `poses(params, thickness)`: Lage jedes Teils im Raum (3D-Ansicht, Baugruppen-Prüfung); Hilfen in `src/generators/pose.ts`.
 - `assemblyCheck`: Die Teile bilden eine Baugruppe für die Baugruppen-Prüfung.
 - `inputs`: Was der Generator vor dem Dialog braucht (3D-Modell, Auswahl).
+- `showIf` an einem Feld ist eine Regel (`{ eq: [key, value] }`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`), nie eine Funktion; `ruleHolds()` wertet sie aus.
+- `view(params)`: Werte im Dialog, die von den Parametern abhängen (`autoText`-Vorschläge für leere Textfelder).
+- Meldungen haben einen festen `code`; Texte für Codes, die `generate()` wirft, kommen aus `texts`. Interne Funktionen werfen Codes, keinen Oberflächentext.
 
 Einen Generator mit `register()` in `src/generators/index.ts` anmelden. Seine `id` steht in Projekten und darf sich nie ändern.
 ## Sicherheit: CSP und Markup

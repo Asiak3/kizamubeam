@@ -8,7 +8,7 @@ import type { GenShape, Obj } from '../model';
 import type { BuildResult } from './index';
 import { subsToPath2D } from '../geom';
 import { dec, t, tn } from '../i18n';
-import { buildGen, defaultParams, fieldActive, genLabel, getGenerator, normalizeParams, resolveBinds } from './index';
+import { autoText, buildGen, defaultParams, fieldActive, genLabel, getGenerator, normalizeParams, resolveBinds } from './index';
 import { evalExpr, f2 } from '../dom';
 import { evaluate, formatNumber, namesIn, projectParams } from '../params';
 import type { Generator, Params, ParamSpec } from './types';
@@ -86,7 +86,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     const id = `gen-${s.key}`;
     if (s.type === 'data') return [];
     if (s.type === 'text') {
-      const control = h('input', { type: 'text', id, value: String(p[s.key] || s.autoText?.(p) || ''), maxlength: 2000 }) as HTMLInputElement;
+      const control = h('input', { type: 'text', id, value: String(p[s.key] || autoText(g, s.key, p) || ''), maxlength: 2000 }) as HTMLInputElement;
       if (s.title) control.title = s.title;
       textInputs.set(s.key, control);
       control.addEventListener('input', () => { p[s.key] = control.value; update(); });
@@ -95,12 +95,12 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
           const count = Number(p[s.key === 'ratiosX' ? 'compartmentsX' : 'compartmentsY']);
           if (isDefaultDistribution(String(p[s.key] ?? ''), count)) {
             p[s.key] = '';
-            control.value = s.autoText?.(p) ?? '';
+            control.value = autoText(g, s.key, p);
             update();
             return;
           }
         }
-        if (!p[s.key]) control.value = s.autoText?.(p) ?? '';
+        if (!p[s.key]) control.value = autoText(g, s.key, p);
       });
       return [h('label', { for: id, title: s.title ?? '' }, s.label), control];
     }
@@ -231,7 +231,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     const np = rb.params;
     for (const s of g.schema) if (s.type === 'text' && !p[s.key] && document.activeElement !== textInputs.get(s.key)) {
       const control = textInputs.get(s.key);
-      if (control) control.value = s.autoText?.(np) ?? '';
+      if (control) control.value = autoText(g, s.key, np);
     }
     for (const s of g.schema) rows.get(s.key)!.forEach((el) => (el.hidden = !fieldActive(s, np)));
     const r = buildGen(g, np);

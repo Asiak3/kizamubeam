@@ -7,6 +7,22 @@ import type { AsmPoses } from './pose';
 export type ParamValue = number | string | boolean;
 export type Params = Record<string, ParamValue>;
 
+/**
+ * Condition on parameter values, evaluated by the app (same small language as the plugin dialogs in #335):
+ * comparisons take [key, value]; and/or/not combine rules. No generator code runs for visibility.
+ */
+export type Rule =
+  | { eq: [string, ParamValue] }
+  | { ne: [string, ParamValue] }
+  | { lt: [string, number] }
+  | { le: [string, number] }
+  | { gt: [string, number] }
+  | { ge: [string, number] }
+  | { in: [string, ParamValue[]] }
+  | { and: Rule[] }
+  | { or: Rule[] }
+  | { not: Rule };
+
 interface SpecBase {
   key: string;
   label: string;
@@ -15,7 +31,7 @@ interface SpecBase {
   /** Abschnitt im Dialog: Hauptfelder oder eingeklappt unter „Erweitert“ */
   advanced?: boolean;
   /** Feld nur zeigen (und beachten), wenn diese Bedingung gilt */
-  showIf?: (p: Params) => boolean;
+  showIf?: Rule;
 }
 
 export type ParamSpec =
@@ -29,7 +45,8 @@ export type ParamSpec =
   | (SpecBase & { type: 'enum'; options: [string, string][]; def: string })
   | (SpecBase & { type: 'bool'; def: boolean })
   /** Text für frei editierbare Generatorparameter. */
-  | (SpecBase & { type: 'text'; def: string; autoText?: (p: Params) => string })
+  /** Empty text fields show the suggestion from Generator.view().autoText */
+  | (SpecBase & { type: 'text'; def: string })
   /** Text, der nicht im Dialog erscheint (z. B. Kennung eines eingelesenen 3D-Modells) */
   | (SpecBase & { type: 'data'; def: string });
 
@@ -39,6 +56,8 @@ export interface Issue {
   /** error sperrt Erzeugen, warn nicht */
   level: 'error' | 'warn';
   msg: string;
+  /** Stable code of the problem (key into Generator.texts), so tools and plugins can tell issues apart */
+  code?: string;
 }
 
 /** Ein erzeugtes Teil. Bauteil-Generatoren liefern genau eines, Baugruppen mehrere. */
@@ -119,6 +138,10 @@ export interface Generator {
   /** Kurzer Name für das Objekte-Fenster, z. B. „Zahnrad z=24 m=2“; bei Baugruppen mit dem Schlüssel des Teils */
   label(p: Params, part?: string): string;
   migrate?(p: Params, from: number): Params;
+  /** Values the dialog shows that depend on the parameters: suggestions for empty text fields (by key) */
+  view?(p: Params): { autoText?: Record<string, string> };
+  /** Texts for issue codes that generate() may throw (Error.message = code); buildGen translates them */
+  texts?: Record<string, () => string>;
   /** Plug-in joints: kind of fit and the parameter that holds the play (design check, material calibration) */
   fit?: { kind: 'pair' | 'slot'; play: string };
   /** Position of every part in space (3D view, assembly check); th = material thickness of the view as fallback */

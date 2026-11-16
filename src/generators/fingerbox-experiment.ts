@@ -12,19 +12,19 @@ type Run = { from: number; to: number; offset: number };
 
 /** Ungerade Zahl gleicher Abschnitte, mindestens drei. */
 export function fingerboxSegments(length: number, finger: number): number {
-  if (!Number.isFinite(length) || !Number.isFinite(finger) || length <= 0 || finger <= 0) throw new Error('Länge und Zinkenbreite müssen positiv sein.');
+  if (!Number.isFinite(length) || !Number.isFinite(finger) || length <= 0 || finger <= 0) throw new Error('finger-length-invalid');
   const n = Math.floor(length / finger);
   const count = Math.max(3, n % 2 ? n : n - 1);
-  if (count > 5001) throw new Error('Zu viele Zinken für diese Kante.');
+  if (count > 5001) throw new Error('too-many-fingers');
   return count;
 }
 
 /** Like the original box generator: at least one odd field between the corners. */
 export function horizontalSegments(length: number, finger: number): number {
-  if (!Number.isFinite(length) || !Number.isFinite(finger) || length <= 0 || finger <= 0) throw new Error('Länge und Zinkenbreite müssen positiv sein.');
+  if (!Number.isFinite(length) || !Number.isFinite(finger) || length <= 0 || finger <= 0) throw new Error('finger-length-invalid');
   const n = Math.floor(length / finger);
   const count = Math.max(1, n % 2 ? n : n - 1);
-  if (count > 5001) throw new Error('Zu viele Zinken für diese Kante.');
+  if (count > 5001) throw new Error('too-many-fingers');
   return count;
 }
 
@@ -51,7 +51,7 @@ function edge(target: Point[], rs: Run[], map: (s: number, offset: number) => Po
     adjusted[i].to += shift;
     adjusted[i + 1].from += shift;
   }
-  if (adjusted.some((r) => r.to - r.from <= 1e-7)) throw new Error('Das Steckspiel ist für einen Zinkenabschnitt zu groß.');
+  if (adjusted.some((r) => r.to - r.from <= 1e-7)) throw new Error('clearance-too-large');
   const points = adjusted.flatMap((r) => [map(r.from, r.offset), map(r.to, r.offset)]);
   target.push(...(reverse ? points.reverse() : points));
 }
@@ -66,10 +66,10 @@ function clean(points: Point[]): Point[] {
 export function fingerboxParts(p: FingerboxParams): GenPart[] {
   const { width: W, depth: D, height: H, thickness: t, finger } = p;
   if (![W, D, H, t, finger].every((x) => Number.isFinite(x) && x > 0) || W <= 2 * t || D <= 2 * t || H <= 2 * t) {
-    throw new Error('Ungültige Maße: positive Werte und jede Außenabmessung größer als die doppelte Materialdicke erforderlich.');
+    throw new Error('outer-size-invalid');
   }
   const clearance = p.clearance ?? 0;
-  if (!Number.isFinite(clearance)) throw new Error('Ungültiges Steckspiel.');
+  if (!Number.isFinite(clearance)) throw new Error('clearance-invalid');
   const legacy = p.jointLayout === 'legacy';
   const wx = runs(W - 2 * t, finger, t, !legacy, legacy);
   const wy = runs(D - 2 * t, finger, t, !legacy, legacy);

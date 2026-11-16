@@ -36,14 +36,14 @@ function bottomFingers(start: number, end: number, crossings: number[], t: numbe
   let cursor = start;
   for (const c of crossings) {
     const a = c-t/2, b = c+t/2;
-    if (a <= cursor || b >= end) throw new Error('Trennwände überlappen oder liegen außerhalb des Innenraums.');
+    if (a <= cursor || b >= end) throw new Error('dividers-overlap');
     fields.push({ a: cursor, b: a }); cursor = b;
   }
   fields.push({a:cursor,b:end});
   const spans: Span[] = [];
   for (const field of fields) {
     const len = field.b-field.a;
-    if (crossings.length && len < 3*t-1e-9) { warnings.push('Schmales Fach ohne Bodenzinken.'); continue; }
+    if (crossings.length && len < 3*t-1e-9) { warnings.push('narrow-no-bottom-fingers'); continue; }
     const n = fingerboxSegments(len, finger), step = len/n;
     for (let i=1; i<n; i+=2) spans.push({a:field.a+i*step,b:field.a+(i+1)*step});
   }
@@ -73,14 +73,14 @@ function topEdge(start: number, end: number, crossings: number[], t: number, hei
 
 export function makeDividers(p: DividerParams): DividerResult {
   const {width:W,depth:D,height:H,thickness:t,finger,dividerHeight:hd} = p;
-  if (![W,D,H,t,finger,hd].every((n)=>Number.isFinite(n) && n>0) || hd>H || hd<=2*t) throw new Error('Ungültige Trennwandhöhe oder Maße.');
-  if (p.top === 'closed' && hd > H-t+1e-9) throw new Error('Trennwände reichen in den Deckel.');
+  if (![W,D,H,t,finger,hd].every((n)=>Number.isFinite(n) && n>0) || hd>H || hd<=2*t) throw new Error('divider-height-invalid');
+  if (p.top === 'closed' && hd > H-t+1e-9) throw new Error('divider-into-lid');
   const clearance = p.clearance ?? 0, slotClearance = p.slotClearance ?? clearance, slotWidth = t + slotClearance;
-  if (!Number.isFinite(clearance) || !Number.isFinite(slotClearance) || slotWidth <= 0) throw new Error('Ungültiges Steckspiel.');
+  if (!Number.isFinite(clearance) || !Number.isFinite(slotClearance) || slotWidth <= 0) throw new Error('clearance-invalid');
   const x = distributeGaps(W,t,p.compartmentsX,p.ratiosX), y = distributeGaps(D,t,p.compartmentsY,p.ratiosY);
   const nx=x.centres, ny=y.centres;
   const nh=fingerboxSegments(hd,finger), dy=hd/nh;
-  if (dy<=t+1e-9) throw new Error('Zinkenabschnitte der Trennwand sind zu kurz für die Materialdicke.');
+  if (dy<=t+1e-9) throw new Error('divider-fingers-short');
   const result: DividerResult = {dividers:[],holes:{bottom:[],front:[],back:[],left:[],right:[]},gapsX:x.gaps,gapsY:y.gaps,warnings:[]};
   const vertical: Span[] = [];
   for (let i=1;i<nh;i+=2) vertical.push({a:i*dy,b:(i+1)*dy});
@@ -89,8 +89,8 @@ export function makeDividers(p: DividerParams): DividerResult {
     const fs=bottomFingers(t,length-t,crossings,t,finger,result.warnings);
     const teeth = fs.map(({a,b}) => ({a:a+clearance/2,b:b-clearance/2}));
     const vt = vertical.map(({a,b}) => ({a:a+clearance/2,b:b-clearance/2}));
-    if ([...teeth,...vt].some(({a,b}) => b-a<=1e-7)) throw new Error('Das Steckspiel ist für einen Zinkenabschnitt zu groß.');
-    for (const c of crossings) if (teeth.some(({a,b}) => a < c + slotWidth/2 && b > c - slotWidth/2)) throw new Error('Steckspiel führt zu überlappenden Schlitzen und Zinken.');
+    if ([...teeth,...vt].some(({a,b}) => b-a<=1e-7)) throw new Error('clearance-too-large');
+    for (const c of crossings) if (teeth.some(({a,b}) => a < c + slotWidth/2 && b > c - slotWidth/2)) throw new Error('clearance-overlap');
     const points = bottomEdge(t,length-t,teeth,axis==='y'?crossings:[],t,hd/2,slotWidth);
     for (let i=0;i<nh;i++) {
       const offset=i%2 ? t : 0, a=i===0?t:i%2 ? vt[(i-1)/2].a : vertical[(i/2)-1].b - clearance/2, b=i%2 ? vt[(i-1)/2].b : i===nh-1 ? hd : vertical[i/2].a+clearance/2;
