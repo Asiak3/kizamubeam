@@ -2,6 +2,7 @@
 // Ein Generator ist eine reine Funktion von Parametern auf Geometrie: kein Zugriff auf Editor, DOM oder Maschine.
 // Damit lässt er sich testen, über MCP aufrufen und später auch als Community-Generator laden.
 import type { Pt, SubPath } from '../model';
+import type { AsmPoses } from './pose';
 
 export type ParamValue = number | string | boolean;
 export type Params = Record<string, ParamValue>;
@@ -120,6 +121,8 @@ export interface Generator {
   migrate?(p: Params, from: number): Params;
   /** Plug-in joints: kind of fit and the parameter that holds the play (design check, material calibration) */
   fit?: { kind: 'pair' | 'slot'; play: string };
+  /** Position of every part in space (3D view, assembly check); th = material thickness of the view as fallback */
+  poses?(p: Params, th: number): AsmPoses | null;
   /** The parts form one connected assembly that the assembly check examines */
   assemblyCheck?: boolean;
   /** Toolbox tile and action; generators without one are only reachable through files, MCP and code */

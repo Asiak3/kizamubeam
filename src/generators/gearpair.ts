@@ -7,6 +7,7 @@ import { flipY, layoutParts, PathBuilder } from './build';
 import { boreIssues, boreSchema } from './bore';
 import { GEAR, gearGeometry, GearParams } from './gear';
 import type { GenPart, Generator, Issue, Params } from './types';
+import { flatPose, rotatePose, type AsmPoses, type Pose } from './pose';
 
 export interface GearPairParams {
   teeth1: number;
@@ -71,12 +72,30 @@ function plateOutline(p: GearPairParams, w: number, h: number, x1: number, x2: n
   return out;
 }
 
+function gearPairPoses(raw: Params, th: number): AsmPoses {
+  const p = raw as unknown as GearPairParams;
+  const g1 = gearGeometry(pairGear(raw, 1) as unknown as GearParams);
+  const g2 = gearGeometry(pairGear(raw, 2) as unknown as GearParams);
+  const a = centerDistance(p);
+  // Achsen wie in der Grundplatte; ohne Platte liegen die Räder auf Z = 0
+  const c0 = (g2.ra - g1.ra) / 2;
+  const z = p.plate ? th : 0;
+  // Der erste Zahn zeigt nach oben (+Y). Rad 1: Zahn zu Rad 2 (+X); Rad 2: Lücke zu Rad 1 (−X)
+  const out: Record<string, Pose> = {
+    gear1: rotatePose(flatPose(-a / 2 - c0, 0, z), -Math.PI / 2),
+    gear2: rotatePose(flatPose(a / 2 - c0, 0, z), Math.PI / 2 + Math.PI / p.teeth2),
+  };
+  if (p.plate) out.plate = flatPose();
+  return { poses: out, spin: { gear1: 1, gear2: -p.teeth1 / p.teeth2 } };
+}
+
 export const GEARPAIR: Generator = {
   id: 'gearpair',
   version: 2,
   kind: 'assembly',
   name: t('Zahnradpaar'),
   icon: 'gearpair',
+  poses: (p, th) => gearPairPoses(p, th),
   tile: {
     group: 'mech',
     text: (t) => ({

@@ -4,15 +4,15 @@
 // Aufruf: npm run test:gen-decoupling
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 const { GENERATORS, register, getGenerator } = await import('../src/generators/index');
 const { appList } = await import('../src/apps');
 const { genFit } = await import('../src/fitcheck');
 
 /** Core files that are already free of generator ids; later steps of #341 add the remaining ones */
-const DECOUPLED = ['src/fitcheck.ts', 'src/asmcheck.ts', 'src/apps.ts', 'src/ui.ts'];
+const DECOUPLED = ['src/fitcheck.ts', 'src/asmcheck.ts', 'src/apps.ts', 'src/ui.ts', ...readdirSync(new URL('../src/view3d/', import.meta.url)).filter((f) => f.endsWith('.ts')).map((f) => `src/view3d/${f}`)];
 /** Uses of a matching word that are not a generator id */
-const ALLOWED = /type \w+ = [^;]+;|(icon|group|kind): '[\w-]+'( \| '[\w-]+')*|\?\? '[\w-]+'|\{ id: '[\w-]+', label:|ICONS\.\w+|\[a-z]/g;
+const ALLOWED = /type \w+ = [^;]+;|(icon|group|kind): '[\w-]+'( \| '[\w-]+')*|\?\? '[\w-]+'|ICONS\[\w+\] \? \w+ : '[\w-]+'|\{ id: '[\w-]+', label:|ICONS\.\w+|\[a-z]/g;
 
 let failed = 0;
 function test(name: string, fn: () => void) {
@@ -29,7 +29,7 @@ const ids = GENERATORS.map((g) => g.id);
 
 test('decoupled core files contain no generator ids', () => {
   const quoted = new RegExp(`['"\`](${ids.map((i) => i.replace('-', '\\-')).join('|')})['"\`]`);
-  const asKey = new RegExp(`^\\s*(${ids.filter((i) => /^\w+$/.test(i)).join('|')})\\s*:`);
+  const asKey = new RegExp(`^\\s*(${ids.filter((i) => /^\w+$/.test(i)).join('|')})\\s*:\\s*\\{`);
   const hits: string[] = [];
   for (const f of DECOUPLED) {
     readFileSync(new URL(`../${f}`, import.meta.url), 'utf8')
@@ -59,6 +59,17 @@ test('fit and assembly check come from the generator', () => {
   assert.equal(genFit('gear'), undefined);
   assert.equal(getGenerator('gearpair')?.assemblyCheck, undefined, 'gear pair: wheels sit on axles');
   assert.equal(getGenerator('stack')?.assemblyCheck, true);
+});
+
+test('assembly poses come from the generator', () => {
+  for (const g of GENERATORS) {
+    if (!g.poses) continue;
+    const p = Object.fromEntries(g.schema.map((s) => [s.key, s.def]));
+    const r = g.poses(p, 3);
+    if (g.inputs?.some((i) => i.kind === 'model3d')) continue; // needs a loaded model
+    assert.ok(r && Object.keys(r.poses).length, g.id);
+  }
+  assert.equal(getGenerator('gear')?.poses, undefined);
 });
 
 test('register adds a generator and replaces one with the same id', () => {

@@ -875,6 +875,10 @@ export const RIBS: Generator = {
   kind: 'assembly',
   name: t('Rippenmodell'),
   icon: 'ribs',
+  poses: (p) => {
+    const poses = ribsPoses(p);
+    return poses ? { poses } : null;
+  },
   fit: { kind: 'slot', play: 'play' },
   assemblyCheck: true,
   inputs: [{ kind: 'model3d' }],

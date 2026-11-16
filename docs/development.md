@@ -132,6 +132,7 @@ A generator declares everything the app needs to know about it on its `Generator
 
 - `tile`: toolbox group, position (`before`), texts for the tile and the toolbar action. The toolbox, the actions in `ui.ts` and the legacy generator toolbar group are built from the registry.
 - `fit`: kind of plug-in fit and the parameter holding the play (design check, material calibration).
+- `poses(params, thickness)`: position of every part in space (3D view, assembly check); helpers in `src/generators/pose.ts`.
 - `assemblyCheck`: the parts form one assembly for the assembly check.
 - `inputs`: what the generator needs before its dialog opens (a 3D model, the selection).
 

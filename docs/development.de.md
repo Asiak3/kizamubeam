@@ -132,6 +132,7 @@ Ein Generator gibt alles, was die App über ihn wissen muss, an seinem `Generato
 
 - `tile`: Gruppe im Werkzeugkasten, Position (`before`), Texte für Kachel und Aktion. Werkzeugkasten, Aktionen in `ui.ts` und die alte Generatoren-Gruppe der Leiste entstehen aus dem Verzeichnis.
 - `fit`: Art der Steckpassung und der Parameter mit dem Spiel (Konstruktion prüfen, Material-Kalibrierung).
+- `poses(params, thickness)`: Lage jedes Teils im Raum (3D-Ansicht, Baugruppen-Prüfung); Hilfen in `src/generators/pose.ts`.
 - `assemblyCheck`: Die Teile bilden eine Baugruppe für die Baugruppen-Prüfung.
 - `inputs`: Was der Generator vor dem Dialog braucht (3D-Modell, Auswahl).
 

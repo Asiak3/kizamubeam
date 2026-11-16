@@ -202,6 +202,10 @@ export const STACK: Generator = {
   kind: 'assembly',
   name: t('Schichtmodell'),
   icon: 'stack',
+  poses: (p) => {
+    const poses = stackPoses(p);
+    return poses ? { poses } : null;
+  },
   assemblyCheck: true,
   inputs: [{ kind: 'model3d' }],
   tile: {

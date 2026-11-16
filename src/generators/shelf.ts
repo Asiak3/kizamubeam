@@ -6,6 +6,7 @@ import { t } from '../i18n';
 import { arrangeParts, polySub } from './build';
 import { cleanup, offsetOrtho } from './box';
 import type { Generator, Issue, Params } from './types';
+import { pose, neg, X, Y, Z, type AsmPoses, type Pose } from './pose';
 
 export interface ShelfParams {
   width: number;
@@ -60,12 +61,21 @@ export function boardOutline(p: ShelfParams): Pt[] {
   return cleanup(pts);
 }
 
+function shelfPoses(p: ShelfParams): AsmPoses {
+  const th = p.thickness;
+  const out: Record<string, Pose> = {};
+  sideCenters(p).forEach((x, i) => (out[`side${i + 1}`] = pose([x - th / 2, p.depth / 2, p.height / 2], Y, neg(Z), X)));
+  shelfHeights(p).forEach((z, i) => (out[`board${i + 1}`] = pose([p.width / 2, p.depth / 2, z], X, Y, Z)));
+  return { poses: out };
+}
+
 export const SHELF: Generator = {
   id: 'shelf',
   version: 2,
   kind: 'assembly',
   name: t('Steckregal'),
   icon: 'shelf',
+  poses: (p) => shelfPoses(p as unknown as ShelfParams),
   fit: { kind: 'slot', play: 'play' },
   assemblyCheck: true,
   tile: {

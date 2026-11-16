@@ -7,6 +7,8 @@ import { t } from '../i18n';
 import { arrangeParts, flipY, PathBuilder, polySub } from './build';
 import { BoxParams, panelPolys } from './box';
 import type { Generator, Issue, Params } from './types';
+import { boxPoses } from './box';
+import { moved, neg, pose, X, Y, Z, type AsmPoses, type Pose, type V3 } from './pose';
 
 export interface DrawerParams {
   width: number;
@@ -84,12 +86,34 @@ const PART_NAMES: Record<string, () => string> = {
   front: () => t('Blende'),
 };
 
+function drawerPoses(p: DrawerParams): AsmPoses {
+  const th = p.thickness;
+  const { box, front } = drawerDims(p);
+  const out: Record<string, Pose> = {};
+  const boxOf = (W: number, D: number, H: number): BoxParams => ({
+    sizeMode: 'outer', width: W, depth: D, height: H, thickness: th, top: 'open', finger: p.finger, clearance: p.clearance, kerf: 0,
+  });
+  if (p.carcass) {
+    // Korpus = Box mit Breite × Höhe × Tiefe, gekippt: ihr Boden wird die Rückwand, ihre offene Oberseite zeigt nach vorne
+    const names: Record<string, string> = { bottom: 'back', front: 'bottom', back: 'top' };
+    const R: [V3, V3, V3] = [X, Z, neg(Y)];
+    for (const [k, ps] of Object.entries(boxPoses(boxOf(p.width, p.height, p.depth)))) out['c_' + (names[k] ?? k)] = moved(ps, R, [0, p.depth, 0]);
+  }
+  const c = p.carcass ? th : 0;
+  const inset = p.front === 'inset' ? th : 0;
+  // Schubkasten mit der Luft seitlich in der Öffnung, hinter einer eingelegten Blende
+  for (const [k, ps] of Object.entries(boxPoses(boxOf(box.W, box.D, box.H)))) out['d_' + k] = moved(ps, [X, Y, Z], [c + p.sidePlay, inset, c]);
+  if (front) out.front = pose([p.width / 2, p.front === 'overlay' ? -th : 0, p.height / 2], X, neg(Z), Y);
+  return { poses: out };
+}
+
 export const DRAWER: Generator = {
   id: 'drawer',
   version: 2,
   kind: 'assembly',
   name: t('Schublade'),
   icon: 'drawer',
+  poses: (p) => drawerPoses(p as unknown as DrawerParams),
   fit: { kind: 'pair', play: 'clearance' },
   assemblyCheck: true,
   tile: {

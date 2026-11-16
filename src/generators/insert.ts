@@ -6,6 +6,7 @@ import { t } from '../i18n';
 import { arrangeParts, polySub } from './build';
 import { offsetOrtho } from './box';
 import type { Generator, Issue, Params } from './types';
+import { neg, pose, X, Y, Z, type AsmPoses, type Pose } from './pose';
 
 export interface InsertParams {
   width: number;
@@ -58,12 +59,21 @@ export function insertStrips(p: InsertParams): { key: string; L: number; pts: Pt
   return out;
 }
 
+function insertPoses(p: InsertParams): AsmPoses {
+  const th = p.thickness;
+  const out: Record<string, Pose> = {};
+  dividerCenters(p.width, p.cellsX, th).forEach((x, i) => (out[`x${i + 1}`] = pose([x - th / 2, p.depth / 2, p.height / 2], Y, neg(Z), X)));
+  dividerCenters(p.depth, p.cellsY, th).forEach((y, i) => (out[`y${i + 1}`] = pose([p.width / 2, y - th / 2, p.height / 2], X, neg(Z), Y)));
+  return { poses: out };
+}
+
 export const INSERT: Generator = {
   id: 'insert',
   version: 2,
   kind: 'assembly',
   name: t('Einsatz'),
   icon: 'insert',
+  poses: (p) => insertPoses(p as unknown as InsertParams),
   fit: { kind: 'slot', play: 'play' },
   assemblyCheck: true,
   tile: {

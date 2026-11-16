@@ -6,6 +6,8 @@ import { defaultDistribution, distributeGaps } from './fingerbox-distribution';
 import { makeDividers, type DividerParams } from './fingerbox-dividers';
 import { panelPolys, offsetOrtho } from './box';
 import { layoutParts } from './build';
+import { boxPoses } from './box';
+import { neg, pose, X, Y, Z, type AsmPoses } from './pose';
 
 type FingerParams = FingerboxParams & { partLayout: string; slotClearance: number; compartmentsX: number; compartmentsY: number; ratiosX: string; ratiosY: string; dividerDrop: number; kerf: number; clearance: number };
 // clearance/kerf kommen aus dem Dialog; slotClearance folgt dem Steckspiel (Standard der Trennwand-Geometrie).
@@ -101,8 +103,27 @@ function adjustedParts(p: FingerParams): GenPart[] {
   return layoutParts(parts, 5 + p.kerf, p.partLayout);
 }
 
+/** Fingerbox: reuse Box axes and place each divider at its calculated compartment centre. */
+export function fingerboxPoses(raw: Params): AsmPoses | null {
+  try {
+    const p = raw as Params & { width: number; depth: number; height: number; thickness: number; compartmentsX: number; compartmentsY: number; ratiosX: string; ratiosY: string; dividerDrop: number };
+    const shell = boxPoses({ sizeMode: 'outer', width: p.width, depth: p.depth, height: p.height,
+      thickness: p.thickness, top: p.top === 'closed' ? 'closed' : 'open', finger: Number(p.finger),
+      clearance: 0, kerf: 0 });
+    const xs = distributeGaps(p.width, p.thickness, p.compartmentsX, p.ratiosX).centres;
+    const ys = distributeGaps(p.depth, p.thickness, p.compartmentsY, p.ratiosY).centres;
+    const hd = p.height - p.dividerDrop;
+    xs.forEach((x, i) => { shell[`divx-${i + 1}`] = pose([x - p.thickness / 2, p.depth / 2, hd / 2], Y, neg(Z), X); });
+    ys.forEach((y, i) => { shell[`divy-${i + 1}`] = pose([p.width / 2, y - p.thickness / 2, hd / 2], X, neg(Z), Y); });
+    return { poses: shell };
+  } catch {
+    return null;
+  }
+}
+
 export const FINGERBOX: Generator = {
   id: 'box-divided', version: 3, kind: 'assembly', icon: 'box',
+  poses: (p) => fingerboxPoses(p),
   tile: {
     group: 'box',
     before: 'lidhinge',
