@@ -48,6 +48,7 @@
     "test:joints": "node scripts/run-ts.mjs scripts/joints-test.ts",
     "test:fingerbox": "node scripts/run-ts.mjs scripts/fingerbox-experiment-test.ts && node scripts/run-ts.mjs scripts/fingerbox-layout-test.ts && node scripts/run-ts.mjs scripts/fingerbox-dividers-test.ts && node scripts/run-ts.mjs scripts/fingerbox-distribution-test.ts && node scripts/run-ts.mjs scripts/fingerbox-divider-integration-test.ts && node scripts/run-ts.mjs scripts/fingerbox-resize-test.ts && node scripts/run-ts.mjs scripts/fingerbox-integration-test.ts && node scripts/run-ts.mjs scripts/fingerbox-joints-test.ts && node scripts/run-ts.mjs scripts/fingerbox-dialog-layout-test.ts && node scripts/run-ts.mjs scripts/fingerbox-placement-test.ts && node scripts/run-ts.mjs scripts/fingerbox-kerf-test.ts",
     "test:gen-decoupling": "node scripts/run-ts.mjs scripts/generator-decoupling-test.ts",
+    "test:plugins": "node scripts/run-ts.mjs scripts/plugin-runtime-test.ts",
     "test:generators": "node scripts/run-ts.mjs scripts/generators-test.ts && node scripts/run-ts.mjs scripts/single-part-marks-test.ts && node scripts/run-ts.mjs scripts/box-corner-clearance-test.ts && node scripts/run-ts.mjs scripts/part-layout-test.ts && node scripts/vector-offline-test.mjs scripts/asm-select-test.ts",
     "test:params": "node scripts/run-ts.mjs scripts/params-test.ts",
     "test:templates": "node scripts/run-ts.mjs scripts/templates-test.ts",
@@ -109,6 +110,7 @@
   },
   "dependencies": {
     "@fontsource/roboto": "^5.3.0",
+    "@jitl/quickjs-wasmfile-release-sync": "^0.32.0",
     "@noble/ed25519": "^3.1.0",
     "@salusoft89/planegcs": "1.3.0",
     "@tauri-apps/api": "^2.12.4",
@@ -116,6 +118,7 @@
     "fflate": "0.8.2",
     "opentype.js": "^1.3.4",
     "qrcode-generator": "^2.0.4",
+    "quickjs-emscripten-core": "^0.32.0",
     "three": "^0.180.0",
     "utif": "^3.1.0"
   },
