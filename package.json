@@ -7,6 +7,7 @@
     "test:freehand-edit": "node scripts/vector-offline-test.mjs scripts/freehand-edit-test.ts",
     "test:component-selection": "node scripts/vector-offline-test.mjs scripts/component-selection-test.ts",
     "test:curvature": "node scripts/vector-offline-test.mjs scripts/curvature-test.ts",
+    "test:arc-tool": "node scripts/vector-offline-test.mjs scripts/arc-tool-test.ts",
     "test:path-islands": "node scripts/vector-offline-test.mjs scripts/path-islands-test.ts",
     "test:contour-topology": "node scripts/vector-offline-test.mjs scripts/contour-topology-test.ts",
     "dev": "vite",

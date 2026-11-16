@@ -15,6 +15,7 @@ Die Zeichenwerkzeuge liegen in der Werkzeugleiste links und im Menü **Werkzeuge
 | Werkzeug | Kürzel | So geht's |
 |---|---|---|
 | **Linien zeichnen** | Ctrl+L | Klicken setzt Ecken, Klicken und Ziehen erzeugt eine Bézierkurve. Ein Klick auf den Startpunkt schließt die Form; Doppelklick, Enter oder Rechtsklick beendet. |
+| **Bogen** | | Mitte, dann Radius und Startwinkel, dann Endwinkel setzen — oder Start, Durchgangspunkt und Ende anklicken (3-Punkt). Shift rastet Winkel auf 15°, Enter übernimmt, Esc verwirft den Bogen. Modus und Richtung stehen in den Werkzeugoptionen; im Mitte-Modus wählt die Richtung den Komplementärbogen, im 3-Punkt-Modus kehrt sie die Knotenreihenfolge um, der Schnitt beginnt dann am zuletzt gesetzten Punkt. |
 | **Freihand / Bleistift** | | Einen Strich ziehen; beim Loslassen wird er in glatte, bearbeitbare Kurven umgerechnet. In den Werkzeugoptionen stellst du die Toleranz ein und ob der Strich geschlossen wird. |
 | **Rechteck** | Ctrl+R | Ein Rechteck aufziehen. Shift zeichnet ein Quadrat, Ctrl von der Mitte aus. Den Eckenradius stellst du in der Eigenschaftenleiste ein. |
 | **Ellipse** | Ctrl+E | Eine Ellipse aufziehen. Shift zeichnet einen Kreis, Ctrl von der Mitte aus. |

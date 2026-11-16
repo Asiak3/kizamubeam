@@ -61,6 +61,16 @@ Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
   Doppelklick/Enter übernimmt, Rücktaste löscht den letzten Punkt, Esc verwirft.
   Übernehmen — einschließlich Fortsetzen, das das Original im selben
   Undo-Schritt ersetzt — ist ein Undo-Schritt. Tests: `npm run test:curvature`.
+- **Werkzeuge → Bogen** zeichnet einen Kreisbogen aus Mitte, Radius und Winkeln
+  oder durch drei Punkte (Start, Durchgang, Ende). Jeder Schritt lässt sich
+  klicken oder ziehen; Shift rastet Winkel auf 15°, Enter übernimmt, Esc
+  verwirft den ganzen Bogen. Die Werkzeugoptionen wechseln den Modus und
+  wählen die Richtung; im Mitte-Modus wählt die Richtung den Komplementärbogen,
+  im 3-Punkt-Modus kehrt sie die Knotenreihenfolge um, der Schnitt beginnt
+  dann am zuletzt gesetzten Punkt. Das Ergebnis ist ein gewöhnlicher offener
+  Pfad aus kubischen Segmenten von höchstens 90°; die Abweichung zum exakten
+  Kreis bleibt ≤ 2,7e-4·r.
+  Übernehmen ist ein Undo-Schritt. Test: `npm run test:arc-tool`.
 
 Keine partielle Vereinfachung, Gauß-Glättung, Lasso, Mehrfach-Anfasserauswahl,
 Nachzeichnen oder Druckdarstellung. Text/Generatoren ausdrücklich

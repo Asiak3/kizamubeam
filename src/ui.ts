@@ -306,6 +306,7 @@ function buildMenu(ed: Editor) {
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
       [t('Freihand / Bleistift'), '', () => ed.setTool('pencil')],
       [t('Kurvenpfad zeichnen'), '', () => ed.setTool('curvature')],
+      [t('Bogen zeichnen'), '', () => ed.setTool('arc')],
       [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
       [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
       [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
@@ -859,6 +860,19 @@ function buildNumbar(ed: Editor) {
   const pencilProps = h('span', { class: 'field' }, h('label', {}, t('Anpassungstoleranz (mm)'), pencilTolerance),
     h('label', { class: 'check' }, pencilClosed, t('Geschlossener Pfad')));
 
+  // Bogen: Modus und Richtung (natives Auswahlfeld: Tastatur und Fokus inklusive)
+  const arcModeSel = h('select', {
+    id: 'arc-mode', title: t('Modus: Mitte–Radius–Winkel oder drei Punkte'),
+    onchange: () => ed.setArcOptions({ mode: arcModeSel.value === '3point' ? '3point' : 'center' }),
+  }, h('option', { value: 'center' }, t('Mitte–Radius–Winkel')), h('option', { value: '3point' }, t('3-Punkt')));
+  const arcDirSel = h('select', {
+    id: 'arc-direction', title: t('Richtung: wählt im Mitte-Modus den Komplementärbogen, im 3-Punkt-Modus kehrt sie die Knotenreihenfolge um'),
+    onchange: () => ed.setArcOptions({ cw: arcDirSel.value === 'cw' }),
+  }, h('option', { value: 'ccw' }, t('Gegen den Uhrzeigersinn')), h('option', { value: 'cw' }, t('Im Uhrzeigersinn')));
+  const arcProps = h('span', { class: 'field', id: 'arcbar' },
+    h('label', {}, t('Bogen'), arcModeSel),
+    h('label', {}, t('Richtung'), arcDirSel));
+
   // Bilder
   const imgInfo = h('span', { class: 'muted' });
   const imgProps = h(
@@ -896,7 +910,7 @@ function buildNumbar(ed: Editor) {
   const sepGen = sep();
 
   const sepShape = sep();
-  bar.append(geo, pencilProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
+  bar.append(geo, pencilProps, arcProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
   // Text options get their own bar below the properties bar (can be hidden in the Window menu)
   $('#textbar').append(textProps);
 
@@ -915,6 +929,9 @@ function buildNumbar(ed: Editor) {
 
     nodeProps.hidden = sepNode.hidden = ed.tool !== 'node';
     pencilProps.hidden = ed.tool !== 'pencil';
+    arcProps.hidden = ed.tool !== 'arc';
+    arcModeSel.value = ed.arcMode;
+    arcDirSel.value = ed.arcCw ? 'cw' : 'ccw';
     nodeLassoButton.setAttribute('aria-pressed',String(ed.nodeLasso));nodeLassoButton.classList.toggle('active',ed.nodeLasso);
     const imgs = ed.selImages();
     imgProps.hidden = sepImg.hidden = !imgs.length;
@@ -1068,6 +1085,7 @@ function buildBars(ed: Editor) {
     { id: 'shape-builder', cat: W, icon: 'shapeBuilder', label: t('Formerstellung …'), run: () => beginShapeBuilder(ed), enabled: sel1, on: () => ed.tool === 'builder' },
     tool('pencil', 'pencil', t('Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad')),
     tool('curvature', 'curve', t('Kurven zeichnen: Klicken setzt Ecken, Ziehen formt Kurven')),
+    tool('arc', 'arc', t('Bogen zeichnen: Mitte, Radius und Winkel oder drei Punkte')),
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
     tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),
     tool('polygon', 'polygon', t('Polygon')),
@@ -1160,6 +1178,7 @@ function buildBars(ed: Editor) {
     { id: 'apps', cat: W, icon: 'apps', label: t('Werkzeugkasten: alle Generatoren und Werkzeuge mit Suche'), run: () => toggleWindow('apps'), on: () => !isHidden('apps') },
     // Knopfgruppen: ein Knopf für die zuletzt benutzte Aktion, der Pfeil daneben zeigt die übrigen
     { id: 'grp:select', cat: W, label: t('Auswählen (Gruppe)'), items: ['tool:select', 'tool:lasso'], run: () => {} },
+    { id: 'grp:draw', cat: W, label: t('Zeichnen (Gruppe)'), items: ['tool:line', 'tool:pencil', 'tool:curvature', 'tool:arc'], run: () => {} },
     { id: 'grp:transform', cat: A, label: t('Spiegeln und drehen (Gruppe)'), items: ['mirrorh', 'mirrorv', 'rotccw', 'rotcw'], run: () => {} },
     { id: 'grp:align', cat: A, label: t('Ausrichten und verteilen (Gruppe)'), items: ['alignl', 'alignhc', 'alignr', 'alignt', 'alignvc', 'alignb', 'disth', 'distv'], run: () => {} },
     { id: 'grp:zoom', cat: V, label: t('Zoom (Gruppe)'), items: ['zoompage', 'zoomsel', 'zoomin', 'zoomout'], run: () => {} },
@@ -1179,7 +1198,7 @@ function buildBars(ed: Editor) {
         'group', 'ungroup', 'isolate', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'grp:select', 'tool:node', SEP, 'tool:line', 'tool:pencil', 'tool:curvature', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', SEP,
+        'grp:select', 'tool:node', SEP, 'grp:draw', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', SEP,
         'grp:bool', 'grp:contour', 'grp:path', 'grp:array', SEP, 'grp:relate', 'tool:measure', SEP, 'apps',
       ],
     },

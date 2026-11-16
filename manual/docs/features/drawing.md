@@ -15,6 +15,7 @@ The drawing tools are on the tools toolbar on the left and in the **Tools** menu
 | Tool | Shortcut | How to use it |
 |---|---|---|
 | **Lines and curves** | Ctrl+L | Click to set corners; click and drag to make a Bézier curve. Clicking the start point closes the shape; double-click, Enter or right-click finishes. |
+| **Arc** | | Set the center, then radius and start angle, then end angle — or click start, through point and end (3-point). Shift snaps angles to 15°, Enter commits, Esc discards the arc. Mode and direction are in the tool options; in center mode the direction picks the complementary arc, in 3-point mode it reverses the node order, so the cut starts at the last point. |
 | **Freehand / Pencil** | | Drag a stroke; it is fitted to smooth, editable curves when you release the mouse. Tool options set the tolerance and whether the stroke is closed. |
 | **Rectangle** | Ctrl+R | Drag a rectangle. Shift draws a square, Ctrl draws from the centre. Corner radius in the numeric edits toolbar. |
 | **Ellipse** | Ctrl+E | Drag an ellipse. Shift draws a circle, Ctrl draws from the centre. |

@@ -55,6 +55,15 @@ Offline regressions: `npm run test:camera`. No hardware is acquired by the tests
   ungrouped, no generator output); pressing the start anchor closes on release, dragging shapes the closing tangent, double-click/Enter commits, Backspace deletes the last anchor, Escape discards.
   Committing — including a continuation, which replaces the original in the
   same Undo step — is one Undo step. Test: `npm run test:curvature`.
+- **Tools → Arc** draws a circular arc from center, radius and angles, or
+  through three points (start, through, end). Each step can be clicked or
+  dragged; Shift snaps angles to 15°, Enter commits, Esc discards the whole
+  arc. The tool options switch the mode and set the direction; in center mode
+  the direction picks the complementary arc, in 3-point mode it reverses the
+  node order, so the cut starts at the last point. The result is an ordinary
+  open path of cubic segments of at most 90° each; its distance from the
+  exact circle stays ≤ 2.7e-4·r. Committing
+  is one Undo step. Test: `npm run test:arc-tool`.
 
 These are whole-path refitting tools, not a Gaussian smooth brush or partial-run
 simplification. No Lasso, multi-handle selection, redraw or pressure

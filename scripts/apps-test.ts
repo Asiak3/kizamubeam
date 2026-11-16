@@ -88,8 +88,9 @@ test('Zuletzt benutzt: vorne, ohne Doppelte, begrenzt', () => {
 const { upgradeBar } = await import('../src/toolbars');
 
 test('Gespeicherte Leisten: Generatoren und Verbindungen wandern in den Werkzeugkasten', () => {
-  // v11 keeps only tool:pencil from the v6 vector tools; QR code and laser positioning leave the bar,
-  // and the Toolbox button moves to its own section at the end
+  // v11 kept only tool:pencil from the v6 vector tools and adds curvature;
+  // v12 folds line/pencil/curvature into grp:draw (the arc rides along inside the group).
+  // QR code and laser positioning leave the bar, and the Toolbox button moves to its own section at the end
   const v3 = ['tool:select', 'tool:text', 'qr', 'grp:gen', 'apps', '|', 'grp:bool', 'nest', 'tool:joint', 'lidhinge', 'hinge'];
   assert.deepEqual(upgradeBar('tools', v3, 3), ['grp:select', 'tool:text', '|', 'grp:bool', 'nest', 'grp:relate', 'tool:measure', 'tool:pencil', 'tool:curvature', '|', 'apps']);
   // v2 (ohne Werkzeugkasten-Knopf): erst einfügen, dann die Generatoren-Gruppe entfernen
@@ -100,7 +101,7 @@ test('Gespeicherte Leisten: Generatoren und Verbindungen wandern in den Werkzeug
   const own = ['grp:gen', 'tool:select', 'apps', 'hinge', 'tool:joint'];
   assert.deepEqual(upgradeBar('tools', own, 3), ['grp:gen', 'grp:select', 'apps', 'hinge', 'tool:joint', 'grp:relate', 'tool:measure', 'tool:pencil', 'tool:curvature']);
   assert.deepEqual(upgradeBar('main', ['devsettings', 'check'], 3), ['devsettings', 'check', 'camera-overlays', 'isolate']);
-  // schon aktuell (v11): v12 ersetzt nur tool:select durch grp:select, sonst kommt nichts dazu
+  // schon aktuell (v11): v12 ersetzt nur tool:select durch grp:select und die Zeichenfolge durch grp:draw, sonst kommt nichts dazu
   assert.deepEqual(upgradeBar('tools', ['grp:gen', 'apps'], 11), ['grp:gen', 'apps']);
   // v4 → v5: Beziehungen und Messen kommen hinter Verschachteln dazu
   assert.deepEqual(upgradeBar('tools', ['tool:select', 'nest', 'apps'], 4), ['grp:select', 'nest', 'grp:relate', 'tool:measure', 'apps', 'tool:pencil', 'tool:curvature']);
@@ -110,15 +111,17 @@ test('Vektorwerkzeuge: Bleistift kommt dazu, ohne Verlust der Benutzerreihenfolg
   const before = ['tool:select', 'tool:node', '|', 'tool:line', 'custom-action', 'apps'];
   const after = upgradeBar('tools', before, 5);
   assert.deepEqual(before, ['tool:select', 'tool:node', '|', 'tool:line', 'custom-action', 'apps']);
-  assert.deepEqual(after, ['grp:select', 'tool:node', '|', 'tool:line', 'tool:pencil', 'tool:curvature', 'custom-action', 'apps']);
-  assert.deepEqual(after.filter((id) => before.includes(id) || id === 'grp:select'), ['grp:select', 'tool:node', '|', 'tool:line', 'custom-action', 'apps']);
-  assert.deepEqual(upgradeBar('tools', after, 5), after, 'keine doppelten Knöpfe');
-  const removed = after.filter(id => id !== 'tool:pencil');
-  assert.deepEqual(upgradeBar('tools', removed, 6), removed, 'bewusst entfernte v6-Aktion bleibt entfernt');
+  assert.deepEqual(after, ['grp:select', 'tool:node', '|', 'grp:draw', 'custom-action', 'apps']);
+  assert.deepEqual(after.filter((id) => before.includes(id) || id === 'grp:select' || id === 'grp:draw'), ['grp:select', 'tool:node', '|', 'grp:draw', 'custom-action', 'apps']);
+  assert.deepEqual(upgradeBar('tools', after, 13), after, 'einmal gehoben, bleibt stabil');
+  // v12 bars saved after #332 still carry single draw tools: v13 folds them into grp:draw
+  assert.deepEqual(upgradeBar('tools', ['grp:select', 'tool:node', '|', 'tool:line', 'tool:pencil', 'tool:curvature', 'tool:rect'], 12), ['grp:select', 'tool:node', '|', 'grp:draw', 'tool:rect']);
+  const removed = after.filter((id) => id !== 'grp:draw');
+  assert.deepEqual(upgradeBar('tools', removed, 13), removed, 'bewusst entfernte Gruppe bleibt entfernt');
   assert.deepEqual(upgradeBar('main', ['save', 'undo'], 5), ['save', 'undo', 'camera-overlays', 'isolate', 'devsettings']);
 });
 
-test('v11: schlanke Werkzeugleiste aus der v10-Standardbelegung', () => {
+test('v12: schlanke Werkzeugleiste aus der v10-Standardbelegung', () => {
   const defaults = /initToolbars\(\s*list,\s*\{([\s\S]*?)\n\s*\},/.exec(ui)![1];
   const bar = (name: string) => [...new RegExp(`${name}: \\[([\\s\\S]*?)\\]`).exec(defaults)![1].matchAll(/'([^']+)'|SEP/g)].map((m) => m[1] ?? '|');
   const v10 = [
@@ -127,13 +130,13 @@ test('v11: schlanke Werkzeugleiste aus der v10-Standardbelegung', () => {
   ];
   assert.deepEqual(upgradeBar('tools', v10, 10), bar('tools'));
   for (const id of ['qr', 'nest', 'warp', 'laserpos', 'vectorfit', 'shape-builder', 'outline', 'offset', 'isolate']) assert.ok(!bar('tools').includes(id), id);
-  assert.equal(bar('tools').filter((x) => x !== '|').length, 16);
+  assert.equal(bar('tools').filter((x) => x !== '|').length, 14);
   // isolate joins group/ungroup in the main bar
   const mainV10 = ['undo', '|', 'group', 'ungroup', 'grp:transform', 'tolines'];
   assert.deepEqual(upgradeBar('main', mainV10, 10), ['undo', '|', 'group', 'ungroup', 'isolate', 'grp:transform', 'tolines']);
   assert.ok(bar('main').includes('isolate'));
-  // customized sequences stay as they are
-  const own = ['tool:select', 'qr', 'tool:text', 'nest', 'laserpos', 'tool:curvature'];
+  // customized sequences stay as they are, only curvature is appended
+  const own = ['tool:select', 'qr', 'tool:text', 'nest', 'laserpos'];
   assert.deepEqual(upgradeBar('tools', own, 10), ['grp:select', 'qr', 'tool:text', 'nest', 'laserpos', 'tool:curvature']);
   // the removed buttons are still reachable: Toolbox tiles, button groups or the Laser window
   const tiles = new Set(apps.map((a) => a.id));
@@ -142,6 +145,7 @@ test('v11: schlanke Werkzeugleiste aus der v10-Standardbelegung', () => {
   assert.match(items('grp:bool'), /'shape-builder'/);
   assert.match(items('grp:path'), /'vectorfit'/);
   assert.match(items('grp:contour'), /'offset', 'outline', 'contouroffset'/);
+  assert.match(items('grp:draw'), /'tool:line', 'tool:pencil', 'tool:curvature', 'tool:arc'/);
   // contour group: outer contour has its own icon, not the union cloud of the Boolean group
   assert.equal(actionIcons.get('outline'), 'outline');
   assert.notEqual(ICONS.outline, ICONS.union);

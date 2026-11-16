@@ -91,10 +91,13 @@ export class EditorKeyboard {
         if (this.tool === 'relate' && this.relPicks.length) return this.clearRelPicks();
         if (this.tool === 'measure' && this.measure) return ((this.measure = null), this.redraw());
         if (nodeMode && (this.selectedNodes().length || this.nodeTargets().some((o) => this.segmentSelection(o).size))) return this.clearNodeSel();
+        // Esc verwirft den gesamten laufenden Bogen, auch zwischen zwei Klicks.
+        if (this.tool === 'arc' && this.arcDraft) return this.cancelArc();
         if (this.draft) { if (this.tool === 'curvature') { this.draft = null; this.continuedFrom = null; this.redraw(); } else this.finishLine(); }
         else if (this.tool !== 'select') this.setTool('select');
         else this.setSel([]);
       });
+    if (k === 'enter' && this.tool === 'arc' && this.arcDraft) return run(() => this.finishArc());
     if (k === 'enter' && this.draft) return run(() => this.finishDraft());
     if (k === 'enter' && this.tool === 'joint' && this.jointPicks.length) return run(() => this.onJointDialog?.());
     if (nodeMode && !ctrl && !e.altKey) {
