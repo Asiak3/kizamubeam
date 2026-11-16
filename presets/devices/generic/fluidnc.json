@@ -1,0 +1,13 @@
+{
+  "id": "generic.fluidnc",
+  "name": {
+    "de": "FluidNC-Laser (allgemein)",
+    "en": "FluidNC laser (generic)",
+    "it": "Laser FluidNC (generico)",
+    "es": "Láser FluidNC (genérico)",
+    "pt-BR": "Laser FluidNC (genérico)"
+  },
+  "fw": "fluidnc",
+  "bedW": 400,
+  "bedH": 400
+}

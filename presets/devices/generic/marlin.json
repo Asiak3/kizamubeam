@@ -1,0 +1,14 @@
+{
+  "id": "generic.marlin",
+  "name": {
+    "de": "Marlin mit Laser",
+    "en": "Marlin with laser",
+    "it": "Marlin con laser",
+    "es": "Marlin con láser",
+    "pt-BR": "Marlin com laser"
+  },
+  "fw": "marlin",
+  "bedW": 300,
+  "bedH": 300,
+  "baud": 250000
+}

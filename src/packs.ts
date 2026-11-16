@@ -2,7 +2,8 @@
 // nachladen lassen. Ein Paket enthält nur Daten, keinen Code; alles wird beim Lesen gegen das Format geprüft und
 // auf erlaubte Felder beschränkt. Gespeichert wird in der Desktop-App im Einstellungsordner (Rust: packs.rs),
 // im Browser im lokalen Speicher. Die Prüflogik wird mit `npm run test:packs` getestet.
-import { Device, Firmware, FIRMWARES, PRESETS } from './gcode';
+import { Device, Firmware, FIRMWARES } from './gcode';
+import { builtinPresetFiles } from './builtinPresets';
 import { library, MaterialEntry, sanitizeEntry } from './materials';
 import { loadDoc } from './model';
 import { normalizeTemplate, TemplateInfo } from './templates';
@@ -26,6 +27,16 @@ export type LocalText = string | Record<string, string>;
 /** Gerätevorlage aus einem Paket: nur Felder, die keine Befehle an die Maschine enthalten */
 export type PackDevice = Partial<Device> & { name: string; fw: Firmware };
 
+/** A checked device preset. id and vendor stay outside `preset`, so they never end up in a stored device. */
+export interface PresetEntry {
+  preset: PackDevice;
+  source?: string;
+  /** Stable id such as „ortur.laser-master-3“; a pack preset with the id of a built-in one replaces it */
+  id?: string;
+  /** Manufacturer; presets without one are generic */
+  vendor?: string;
+}
+
 export interface PackTemplate {
   info: TemplateInfo;
   /** Inhalt wie eine .kzt-Datei, Titel und Beschreibung schon in der Sprache der Oberfläche */
@@ -40,7 +51,7 @@ export interface Pack {
   description?: string;
   author?: string;
   homepage?: string;
-  devices: { preset: PackDevice; source?: string }[];
+  devices: PresetEntry[];
   templates: PackTemplate[];
   materials: MaterialEntry[];
   /** Einträge für die Bibliothek (Motive, Bilder, Designelemente); id = eigene Kennung im Paket */
@@ -52,15 +63,27 @@ export class PackError extends Error {}
 const ID_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
 const VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
+const PRESET_ID_RE = /^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$/;
+
+/** Presets may only point at this computer (e.g. the KizamuBeam Virtual Machine), never at other hosts. */
+export function isLoopbackHost(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  const host = v.trim().toLowerCase();
+  if (host === 'localhost') return true;
+  const m = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  return !!m && m.slice(1).every((n) => Number(n) <= 255);
+}
+
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const numIn = (v: unknown, min: number, max: number) => (typeof v === 'number' && isFinite(v) && v >= min && v <= max ? v : undefined);
 
 /**
  * Gerätevorlage prüfen. Erlaubt sind Name, Firmware, Arbeitsbereich und Werte für Verbindung und Zeitschätzung.
  * Start-/End-Skripte, Drehachse, Adressen und Grenzen für KI-Agenten fallen weg, weil sie Befehle oder
- * persönliche Einstellungen sind.
+ * persönliche Einstellungen sind. Only a loopback host (localhost, 127.x.x.x) is kept.
+ * Built-in presets (presets/devices) go through the same check.
  */
-export function sanitizeDevice(raw: unknown, where: string): { preset: PackDevice; source?: string } {
+export function sanitizeDevice(raw: unknown, where: string): PresetEntry {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const name = str(localText(r.name), 80);
   if (!name) throw new PackError(t('{where}: Name fehlt', { where }));
@@ -88,8 +111,16 @@ export function sanitizeDevice(raw: unknown, where: string): { preset: PackDevic
   if (r.airCmd === 'M7' || r.airCmd === 'M8') p.airCmd = r.airCmd;
   if (r.limitSwitches === 'yes' || r.limitSwitches === 'no' || r.limitSwitches === 'unknown') p.limitSwitches = r.limitSwitches;
   if (typeof r.homeOnConnect === 'boolean') p.homeOnConnect = r.homeOnConnect;
+  const frameSpeed = numIn(r.frameSpeed, 10, 200_000);
+  if (frameSpeed !== undefined) p.frameSpeed = frameSpeed;
+  if (isLoopbackHost(r.host)) p.host = r.host.trim();
+  const entry: PresetEntry = { preset: p };
   const source = str(r.source, 300);
-  return source ? { preset: p, source } : { preset: p };
+  if (source) entry.source = source;
+  if (typeof r.id === 'string' && PRESET_ID_RE.test(r.id)) entry.id = r.id;
+  const vendor = str(localText(r.vendor), 60);
+  if (vendor) entry.vendor = vendor;
+  return entry;
 }
 
 /** Vorlage prüfen: muss sich als Projekt laden lassen und Vorlagen-Angaben haben */
@@ -211,9 +242,57 @@ export const brokenPacks = () => broken;
 export const onPacksChanged = (f: () => void) => void listeners.add(f);
 export const packFileName = (id: string) => `${id}.${PACK_EXT}`;
 
-/** Gerätevorlagen: eingebaute zuerst, dann die aus Erweiterungen */
-export function presetList(): { preset: PackDevice; source?: string; pack?: string }[] {
-  return [...PRESETS.map((preset) => ({ preset })), ...installed.flatMap(({ pack }) => pack.devices.map((d) => ({ ...d, pack: pack.name })))];
+/** Built-in presets from presets/devices, checked like pack presets; a broken file is skipped (the tests catch it) */
+export function builtinPresets(): PresetEntry[] {
+  const out: PresetEntry[] = [];
+  for (const [file, raw] of Object.entries(builtinPresetFiles())) {
+    try {
+      out.push(sanitizeDevice(raw, file));
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+  return out;
+}
+
+export type PresetListEntry = PresetEntry & { pack?: string };
+
+/** Gerätevorlagen: eingebaute zuerst, dann die aus Erweiterungen. A pack preset with the id of an earlier one replaces it in place. */
+export function presetList(): PresetListEntry[] {
+  const list: PresetListEntry[] = builtinPresets();
+  for (const { pack } of installed)
+    for (const d of pack.devices) {
+      const e = { ...d, pack: pack.name };
+      const at = d.id ? list.findIndex((x) => x.id === d.id) : -1;
+      if (at >= 0) list[at] = e;
+      else list.push(e);
+    }
+  return list;
+}
+
+/** Group key for presets without a manufacturer */
+export const GENERIC_VENDOR = '';
+
+/**
+ * Presets grouped by manufacturer for the „New device from template“ selects: manufacturers alphabetically,
+ * models alphabetically within each, then generic presets, then extension presets without a manufacturer.
+ * `index` points into `list`.
+ */
+export function groupPresets(list: PresetListEntry[], lang?: string): { vendor: string; fromPack: boolean; items: { entry: PresetListEntry; index: number }[] }[] {
+  const cmp = (a: string, b: string) => a.localeCompare(b, lang, { sensitivity: 'base', numeric: true });
+  const groups = new Map<string, { vendor: string; fromPack: boolean; items: { entry: PresetListEntry; index: number }[] }>();
+  list.forEach((entry, index) => {
+    const vendor = entry.vendor ?? GENERIC_VENDOR;
+    const fromPack = !entry.vendor && !!entry.pack;
+    const key = entry.vendor ? `v:${entry.vendor.toLowerCase()}` : fromPack ? 'pack' : 'generic';
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = { vendor, fromPack, items: [] }));
+    g.items.push({ entry, index });
+  });
+  const rank = (g: { vendor: string; fromPack: boolean }) => (g.vendor ? 0 : g.fromPack ? 2 : 1);
+  const out = [...groups.values()].sort((a, b) => rank(a) - rank(b) || cmp(a.vendor, b.vendor));
+  for (const g of out) g.items.sort((a, b) => cmp(a.entry.preset.name, b.entry.preset.name));
+  return out;
 }
 
 /** Bibliotheks-Einträge aus Erweiterungen; key = „Paket-Kennung/Eintrag“ */

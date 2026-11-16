@@ -1,0 +1,13 @@
+{
+  "id": "generic.grblhal",
+  "name": {
+    "de": "grblHAL-Laser (allgemein)",
+    "en": "grblHAL laser (generic)",
+    "it": "Laser grblHAL (generico)",
+    "es": "Láser grblHAL (genérico)",
+    "pt-BR": "Laser grblHAL (genérico)"
+  },
+  "fw": "grblhal",
+  "bedW": 400,
+  "bedH": 400
+}

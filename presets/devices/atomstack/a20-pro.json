@@ -1,0 +1,9 @@
+{
+  "id": "atomstack.a20-pro",
+  "vendor": "Atomstack",
+  "name": "Atomstack A20 Pro",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 365,
+  "source": "atomstack.com/products/atomstack-a20-pro-130w"
+}

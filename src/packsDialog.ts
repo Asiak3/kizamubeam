@@ -5,17 +5,26 @@ import { entryLabel } from './materials';
 import { FIRMWARES } from './gcode';
 import { Catalog, CatalogEntry, catalogState, fetchCatalog, fetchCatalogPack } from './catalog';
 import { version as APP_VERSION } from '../package.json';
-import { t, tn } from './i18n';
+import { lang, t, tn } from './i18n';
 import {
-  brokenPacks, countSummary, ensurePacks, hasPackFolder, installedPacks, installKind, installPack, localText, openPackFolder, Pack, PACK_EXT, packSummary, parsePack, presetList, removePack,
+  brokenPacks, countSummary, ensurePacks, hasPackFolder, installedPacks, installKind, installPack, localText, openPackFolder, Pack, PACK_EXT, packSummary, parsePack, removePack,
+  groupPresets, PresetListEntry,
 } from './packs';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Eintrag der Auswahl „Neues Gerät aus Vorlage“; Vorlagen aus Erweiterungen nennen das Paket, die Quelle steht im Tooltip */
-export function presetOption(p: ReturnType<typeof presetList>[number], i: number) {
+export function presetOption(p: PresetListEntry, i: number) {
   const label = `${p.preset.name} · ${FIRMWARES[p.preset.fw].label}${p.pack ? ` (${p.pack})` : ''}`;
   return h('option', { value: String(i), title: p.source ?? '' }, label);
+}
+
+/** Select „Neues Gerät aus Vorlage“, grouped by manufacturer; option values are indices into `presets` */
+export function presetSelect(presets: PresetListEntry[]): HTMLSelectElement {
+  const groups = groupPresets(presets, lang).map((g) =>
+    h('optgroup', { label: g.vendor || (g.fromPack ? t('Aus Erweiterungen') : t('Allgemein|Gerätehersteller')) }, ...g.items.map(({ entry, index }) => presetOption(entry, index))),
+  );
+  return h('select', {}, ...groups) as HTMLSelectElement;
 }
 
 /** Inhalt eines Pakets als Liste (Rückfrage beim Installieren) */

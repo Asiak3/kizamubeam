@@ -47,7 +47,9 @@ A pack with a mistake anywhere (unknown firmware, a template that cannot be load
 
 ### Device presets (`devices`)
 
-Each entry appears under “New device from template” (Laser → Device → Devices … and the Set up laser assistant), with the pack name in brackets.
+Each entry appears under “New device from template” (Laser → Device → Devices … and the Set up laser assistant), with the pack name in brackets. The list is grouped by `vendor`; presets without one appear under “From extensions” at the end.
+
+The presets built into KizamuBeam use exactly this format, one file per device in [`presets/devices`](../presets/devices). They go through the same checks.
 
 | Field | Required | Meaning |
 | --- | --- | --- |
@@ -62,9 +64,13 @@ Each entry appears under “New device from template” (Laser → Device → De
 | `airCmd` | no | `M8` or `M7` for air assist |
 | `limitSwitches` | no | `yes`, `no` or `unknown` |
 | `homeOnConnect` | no | `true` or `false` |
+| `id` | no | Stable id: lower-case letters, digits, `.` and `-`, e.g. `acme.laser-10w`. A preset with the id of a built-in one (file path without `.json`, `/` as `.`, e.g. `ortur.laser-master-3`) replaces the built-in one, e.g. to correct its values |
+| `vendor` | no | Localised manufacturer, e.g. `"Ortur"`; groups the list |
+| `frameSpeed` | no | Speed for framing (mm/min) |
+| `host` | no | Only `localhost` or `127.x.x.x` (a program on the same computer, like the KizamuBeam Virtual Machine); other addresses are dropped |
 | `source` | no | Where the values come from (shown as a tooltip). Please always give one. |
 
-Start and end scripts, rotary settings, addresses and AI agent limits cannot come from a pack, because they send commands to the machine or are personal settings. Invalid optional values are dropped; the preset keeps the default.
+Start and end scripts, rotary settings, addresses other than this computer and AI agent limits cannot come from a pack, because they send commands to the machine or are personal settings. Invalid optional values are dropped; the preset keeps the default.
 
 ### Templates (`templates`)
 

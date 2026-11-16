@@ -740,11 +740,6 @@
   "Zwischenablage.png": "Clipboard.png",
   "Zwischenablage.svg": "Clipboard.svg",
   "bild-bearbeitet.png": "image-processed.png",
-  "GRBL-Laser (allgemein)": "GRBL laser (generic)",
-  "grblHAL-Laser (allgemein)": "grblHAL laser (generic)",
-  "FluidNC-Laser (allgemein)": "FluidNC laser (generic)",
-  "Marlin mit Laser": "Marlin with laser",
-  "Smoothieware-Laser": "Smoothieware laser",
   "{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).": "{n} open line on fill layers skipped (fill needs closed shapes).",
   "{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).": "{n} open lines on fill layers skipped (fill needs closed shapes).",
   "Der Job ist {h} mm hoch, der Umfang des Objekts aber nur {c} mm: Er überlappt sich beim Drehen.": "The job is {h} mm tall, but the object's circumference is only {c} mm: it will overlap itself when rotating.",
@@ -4778,5 +4773,6 @@
   "Bogen zeichnen: Mitte, Radius und Winkel oder drei Punkte": "Draw arc: center, radius and angle, or three points",
   "Bogen: Radius muss größer als null sein.": "Arc: the radius must be greater than zero.",
   "3-Punkt-Bogen: Durchgangspunkt muss sich vom Startpunkt unterscheiden.": "Three-point arc: the point in between must differ from the start point.",
-  "Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.": "No arc: the three points must not coincide or lie on a straight line."
+  "Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.": "No arc: the three points must not coincide or lie on a straight line.",
+  "Allgemein|Gerätehersteller": "Generic"
 }

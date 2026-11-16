@@ -79,7 +79,7 @@ La **Console** mostra i messaggi del controller e permette di inviare comandi, c
 
 ## Dispositivi e impostazioni del dispositivo
 
-Ogni laser è un **dispositivo** con connessione, area di lavoro e impostazioni proprie. Scegli il dispositivo in cima alla finestra Laser o gestisci i dispositivi in **Laser → Dispositivo → Dispositivi …**. I nuovi dispositivi possono partire da modelli per i laser più diffusi.
+Ogni laser è un **dispositivo** con connessione, area di lavoro e impostazioni proprie. Scegli il dispositivo in cima alla finestra Laser o gestisci i dispositivi in **Laser → Dispositivo → Dispositivi …**. I nuovi dispositivi possono partire da modelli per i laser più diffusi; l’elenco è raggruppato per produttore, con i modelli generici per controller in fondo.
 
 **Laser → Dispositivo → Impostazioni dispositivo …** contiene, tra l’altro:
 

@@ -1,0 +1,9 @@
+{
+  "id": "ortur.laser-master-3",
+  "vendor": "Ortur",
+  "name": "Ortur Laser Master 3",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 400,
+  "source": "3dprintbeginner.com/ortur-laser-master-3-preview, clevercreations.org"
+}

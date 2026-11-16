@@ -1,0 +1,14 @@
+{
+  "id": "atomstack.p1",
+  "vendor": "Atomstack",
+  "name": "Atomstack P1",
+  "fw": "grbl",
+  "bedW": 110,
+  "bedH": 110,
+  "baud": 115200,
+  "rapid": 3000,
+  "accel": 1000,
+  "sMax": 1000,
+  "frameSpeed": 1500,
+  "source": "Work area 110 × 110 mm, interchangeable modules (5 W diode / 1.2 W infrared)"
+}

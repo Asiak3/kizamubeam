@@ -1,0 +1,9 @@
+{
+  "id": "longer.ray5-20w",
+  "vendor": "Longer",
+  "name": "Longer Ray5 20 W",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 365,
+  "source": "longer.net, Ray5 20 W (40 W: 385 × 385 mm); 115200 baud"
+}

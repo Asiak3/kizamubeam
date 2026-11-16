@@ -471,11 +471,6 @@
   "Zwischenablage.png": "Clipboard.png",
   "Zwischenablage.svg": "Clipboard.svg",
   "bild-bearbeitet.png": "image-processed.png",
-  "GRBL-Laser (allgemein)": "Laser GRBL (generico)",
-  "grblHAL-Laser (allgemein)": "Laser grblHAL (generico)",
-  "FluidNC-Laser (allgemein)": "Laser FluidNC (generico)",
-  "Marlin mit Laser": "Marlin con laser",
-  "Smoothieware-Laser": "Laser Smoothieware (generico)",
   "{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).": "{n} linea aperta saltata nei livelli di riempimento (il riempimento richiede forme chiuse).",
   "{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).": "{n} linee aperte saltate nei livelli di riempimento (il riempimento richiede forme chiuse).",
   "Der Job ist {h} mm hoch, der Umfang des Objekts aber nur {c} mm: Er überlappt sich beim Drehen.": "Il lavoro è alto {h} mm, ma la circonferenza dell'oggetto è di soli {c} mm: durante la rotazione si sovrapporrà a se stesso.",
@@ -4778,5 +4773,6 @@
   "Bogen zeichnen: Mitte, Radius und Winkel oder drei Punkte": "Disegna arco: centro, raggio e angolo oppure tre punti",
   "Bogen: Radius muss größer als null sein.": "Arco: il raggio deve essere maggiore di zero.",
   "3-Punkt-Bogen: Durchgangspunkt muss sich vom Startpunkt unterscheiden.": "Arco a tre punti: il punto intermedio deve essere diverso dal punto iniziale.",
-  "Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.": "Nessun arco: i tre punti non devono coincidere né trovarsi su una retta."
+  "Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.": "Nessun arco: i tre punti non devono coincidere né trovarsi su una retta.",
+  "Allgemein|Gerätehersteller": "Generico"
 }

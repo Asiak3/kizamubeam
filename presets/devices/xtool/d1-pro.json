@@ -1,0 +1,10 @@
+{
+  "id": "xtool.d1-pro",
+  "vendor": "xTool",
+  "name": "xTool D1 Pro",
+  "fw": "grbl",
+  "bedW": 430,
+  "bedH": 400,
+  "baud": 230400,
+  "source": "atomm.com (approx.); 230400 baud per LightBurn forum"
+}

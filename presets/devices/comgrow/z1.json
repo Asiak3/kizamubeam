@@ -1,0 +1,9 @@
+{
+  "id": "comgrow.z1",
+  "vendor": "Comgrow",
+  "name": "Comgrow Z1",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 400,
+  "source": "COMGO Z1 manual V1.1; 115200 baud"
+}

@@ -1384,11 +1384,6 @@
   "Nicht bei Google Fonts: {fonts}. Diese Texte werden mit Roboto gezeichnet.": "No están en Google Fonts: {fonts}. Estos textos se dibujan con Roboto.",
   "Fehlende Schriften künftig ohne Rückfrage laden": "En adelante, descargar sin preguntar las fuentes que falten",
   "Nicht jetzt": "Ahora no",
-  "GRBL-Laser (allgemein)": "Láser GRBL (genérico)",
-  "grblHAL-Laser (allgemein)": "Láser grblHAL (genérico)",
-  "FluidNC-Laser (allgemein)": "Láser FluidNC (genérico)",
-  "Marlin mit Laser": "Marlin con láser",
-  "Smoothieware-Laser": "Láser Smoothieware",
   "{n} Objekt liegt ganz außerhalb des Arbeitsbereichs (geparkt) und wird nicht gelasert.": "{n} objeto queda totalmente fuera del área de trabajo (aparcado) y no se enviará al láser.",
   "{n} ausgeblendetes Objekt nimmt am Job teil (Ausgabe eingeschaltet).": "{n} objeto oculto participa en el trabajo (salida activada).",
   "{n} ausgeblendete Objekte nehmen am Job teil (Ausgabe eingeschaltet).": "{n} objetos ocultos participan en el trabajo (salida activada).",
@@ -4778,5 +4773,6 @@
   "Bogen zeichnen: Mitte, Radius und Winkel oder drei Punkte": "Dibujar arco: centro, radio y ángulo, o tres puntos",
   "Bogen: Radius muss größer als null sein.": "Arco: el radio debe ser mayor que cero.",
   "3-Punkt-Bogen: Durchgangspunkt muss sich vom Startpunkt unterscheiden.": "Arco de tres puntos: el punto intermedio debe ser distinto del punto inicial.",
-  "Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.": "No hay arco: los tres puntos no deben coincidir ni estar en una línea recta."
+  "Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.": "No hay arco: los tres puntos no deben coincidir ni estar en una línea recta.",
+  "Allgemein|Gerätehersteller": "Genérico"
 }

@@ -17,7 +17,7 @@ I pacchetti di estensione (file `.kzp`) aggiungono a KizamuBeam **modelli di dis
 Dopo l’installazione:
 
 - i modelli compaiono in **File → Nuovo dal modello … → Dalle estensioni**,
-- i modelli di dispositivo compaiono nell’elenco dei dispositivi, contrassegnati con il nome del pacchetto,
+- i modelli di dispositivo compaiono nell’elenco dei dispositivi sotto il loro produttore (o sotto «Dalle estensioni»), contrassegnati con il nome del pacchetto,
 - i materiali vengono copiati nella libreria materiali,
 - motivi ed elementi grafici compaiono nella libreria.
 

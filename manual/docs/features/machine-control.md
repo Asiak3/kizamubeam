@@ -79,7 +79,7 @@ The **Console** shows the messages of the controller and lets you send commands,
 
 ## Devices and device settings
 
-Each laser is a **device** with its own connection, work area and settings. Pick the device at the top of the Laser window, or manage them under **Laser → Device → Devices …**. New devices can start from templates for common lasers.
+Each laser is a **device** with its own connection, work area and settings. Pick the device at the top of the Laser window, or manage them under **Laser → Device → Devices …**. New devices can start from templates for common lasers; the list is grouped by manufacturer, with generic templates per controller at the end.
 
 **Laser → Device → Device Settings …** holds, among others:
 

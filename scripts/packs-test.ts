@@ -3,7 +3,8 @@
 // Aufruf: npm run test:packs
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative } from 'node:path';
 const g = globalThis as Record<string, unknown>;
 // Meldungen auf Deutsch prüfen, unabhängig von der Sprache des Systems
 const mem = new Map<string, string>([['kizamubeam.lang', 'de']]);
@@ -15,7 +16,18 @@ g.localStorage = {
 const P = await import('../src/packs');
 const { library } = await import('../src/materials');
 const { builtinTemplates } = await import('../src/builtinTemplates');
-const { PRESETS } = await import('../src/gcode');
+const { setBuiltinPresetFiles } = await import('../src/builtinPresets');
+
+// Built-in presets: read the files like Vite would bundle them (the test runner has no import.meta.glob)
+const PRESET_DIR = 'presets/devices';
+const presetFiles: Record<string, unknown> = {};
+for (const e of readdirSync(PRESET_DIR, { recursive: true, withFileTypes: true }))
+  if (e.isFile() && e.name.endsWith('.json')) {
+    const path = join(e.parentPath, e.name);
+    presetFiles[relative(PRESET_DIR, path)] = JSON.parse(readFileSync(path, 'utf8'));
+  }
+setBuiltinPresetFiles(presetFiles);
+const PRESET_COUNT = Object.keys(presetFiles).length;
 
 let failed = 0;
 async function test(name: string, fn: () => void | Promise<void>) {
@@ -79,6 +91,66 @@ await test('Gerätevorlagen: nur erlaubte Felder, keine Skripte oder Adressen', 
   assert.equal(d.source, 'https://example.com');
 });
 
+await test('Gerätevorlagen: id, vendor, frameSpeed und nur Loopback-Adressen', () => {
+  const dev = (extra: Record<string, unknown>) => P.parsePack(pack({ devices: [{ name: 'L', fw: 'grbl', bedW: 300, bedH: 200, ...extra }] })).devices[0];
+  const d = dev({ id: 'acme.l1', vendor: { de: 'Acme', en: 'Acme Inc.' }, frameSpeed: 1500, host: '127.0.0.1' });
+  assert.equal(d.id, 'acme.l1');
+  assert.equal(d.vendor, 'Acme');
+  assert.equal(d.preset.frameSpeed, 1500);
+  assert.equal(d.preset.host, '127.0.0.1');
+  // id and vendor never reach the device itself
+  assert.equal((d.preset as Record<string, unknown>).vendor, undefined);
+  assert.equal(dev({ host: 'localhost' }).preset.host, 'localhost');
+  assert.equal(dev({ host: '127.10.0.255' }).preset.host, '127.10.0.255');
+  for (const host of ['10.0.0.1', '192.168.1.5', 'fluidnc.local', '127.0.0.256', '127.0.0.1.evil.com', 'localhost:80', '::1', 5])
+    assert.equal(dev({ host }).preset.host, undefined, String(host));
+  assert.equal(dev({ id: 'Bad Id' }).id, undefined);
+  assert.equal(dev({ vendor: '   ' }).vendor, undefined);
+});
+
+await test('Eingebaute Gerätevorlagen: jede Datei gültig, id passt zum Pfad, keine doppelten', () => {
+  assert.ok(PRESET_COUNT >= 20);
+  const ids = new Set<string>();
+  for (const [file, raw] of Object.entries(presetFiles)) {
+    const e = P.sanitizeDevice(raw, file);
+    const expected = file.replace(/\\/g, '/').replace(/\.json$/, '').replace('/', '.');
+    assert.equal(e.id, expected, file);
+    assert.ok(!ids.has(e.id!), `doppelte id ${e.id}`);
+    ids.add(e.id!);
+    // Every field in the file must survive the check, otherwise it is silently lost
+    const kept = { ...e.preset, id: e.id, vendor: e.vendor, source: e.source };
+    for (const k of Object.keys(raw as object)) if (k !== 'name' && k !== 'vendor') assert.deepEqual(kept[k as keyof typeof kept], (raw as Record<string, unknown>)[k], `${file}: ${k}`);
+    // Manufacturer presets name a source; generic ones have no manufacturer and live in generic/
+    if (e.vendor) assert.ok(e.source, `${file}: source fehlt`);
+    else assert.ok(file.replace(/\\/g, '/').startsWith('generic/'), `${file}: vendor fehlt`);
+  }
+  assert.equal(P.builtinPresets().length, PRESET_COUNT);
+  const vm = P.builtinPresets().find((e) => e.id === 'kizamubeam.virtual-machine')!;
+  assert.equal(vm.preset.host, '127.0.0.1');
+  assert.equal(vm.preset.tcpPort, 2323);
+});
+
+await test('Gerätevorlagen gruppieren: Hersteller alphabetisch, dann allgemein, dann Pakete ohne Hersteller', () => {
+  const e = (name: string, vendor?: string, pack?: string) => ({ preset: { name, fw: 'grbl' as const }, vendor, pack });
+  const list = [e('Zeta Z', 'zeta'), e('GRBL'), e('Acme B', 'Acme'), e('Fremd', undefined, 'Paket'), e('Acme A', 'Acme', 'Paket'), e('Alpha', undefined)];
+  const g = P.groupPresets(list, 'de');
+  assert.deepEqual(g.map((x) => [x.vendor, x.fromPack]), [['Acme', false], ['zeta', false], ['', false], ['', true]]);
+  assert.deepEqual(g[0].items.map((x) => x.entry.preset.name), ['Acme A', 'Acme B']);
+  assert.deepEqual(g[0].items.map((x) => x.index), [4, 2]);
+  assert.deepEqual(g[2].items.map((x) => x.entry.preset.name), ['Alpha', 'GRBL']);
+});
+
+await test('Paket-Vorlage mit der id einer eingebauten ersetzt diese', async () => {
+  await P.installPack(pack({ id: 'de.test.fix', devices: [{ id: 'ortur.laser-master-3', vendor: 'Ortur', name: 'Ortur Laser Master 3', fw: 'grbl', bedW: 390, bedH: 390 }] }));
+  const list = P.presetList();
+  assert.equal(list.length, PRESET_COUNT);
+  const e = list.find((x) => x.id === 'ortur.laser-master-3')!;
+  assert.equal(e.preset.bedW, 390);
+  assert.equal(e.pack, 'Werkstatt');
+  await P.removePack(P.installedPacks()[0].file);
+  assert.equal(P.presetList().find((x) => x.id === 'ortur.laser-master-3')!.preset.bedW, 400);
+});
+
 await test('Gerätevorlagen: fehlende Pflichtfelder und Unsinn', () => {
   throws(pack({ devices: [{ fw: 'grbl', bedW: 300, bedH: 200 }] }), /Gerätevorlage 1: Name/);
   throws(pack({ devices: [{ name: 'x', fw: 'mach3', bedW: 300, bedH: 200 }] }), /Firmware/);
@@ -114,7 +186,7 @@ await test('Installieren, Update, Materialien übernehmen und Entfernen', async 
   const m = (title: string, power: number) => ({ id: title, material: 'Pappel', thickness: 3, title, settings: { mode: 'line', speed: 600, power } });
   await P.installPack(pack({ materials: [m('cut', 80), m('mark', 10)] }));
   assert.equal(P.installedPacks().length, 1);
-  assert.equal(P.presetList().length, PRESETS.length + 1);
+  assert.equal(P.presetList().length, PRESET_COUNT + 1);
   assert.equal(P.presetList().at(-1)!.pack, 'Werkstatt');
   assert.deepEqual(library.entries.map((e) => e.id), ['pk:de.test.werkstatt:cut', 'pk:de.test.werkstatt:mark']);
   // Hier geänderter Eintrag gehört danach der Person und bleibt beim Update

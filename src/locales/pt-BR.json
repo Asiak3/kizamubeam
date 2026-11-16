@@ -744,11 +744,6 @@
   "Zwischenablage.png": "Área de transferência.png",
   "Zwischenablage.svg": "Área de transferência.svg",
   "bild-bearbeitet.png": "imagem-processada.png",
-  "GRBL-Laser (allgemein)": "Laser GRBL (genérico)",
-  "grblHAL-Laser (allgemein)": "Laser grblHAL (genérico)",
-  "FluidNC-Laser (allgemein)": "Laser FluidNC (genérico)",
-  "Marlin mit Laser": "Marlin com laser",
-  "Smoothieware-Laser": "Laser Smoothieware",
   "{n} offene Linie auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).": "{n} linha aberta em layers de preenchimento ignorada (preencher precisa de formas fechadas).",
   "{n} offene Linien auf Füll-Layern übersprungen (Füllen braucht geschlossene Formen).": "{n} linhas abertas em layers de preenchimento ignoradas (preencher precisa de formas fechadas).",
   "Der Job ist {h} mm hoch, der Umfang des Objekts aber nur {c} mm: Er überlappt sich beim Drehen.": "O job tem {h} mm de altura, mas a circunferência do objeto é só {c} mm: ele se sobreporá ao girar.",
@@ -4778,5 +4773,6 @@
   "Bogen zeichnen: Mitte, Radius und Winkel oder drei Punkte": "Desenhar arco: centro, raio e ângulo ou três pontos",
   "Bogen: Radius muss größer als null sein.": "Arco: o raio deve ser maior que zero.",
   "3-Punkt-Bogen: Durchgangspunkt muss sich vom Startpunkt unterscheiden.": "Arco de três pontos: o ponto intermediário deve ser diferente do ponto inicial.",
-  "Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.": "Nenhum arco: os três pontos não podem coincidir nem ficar em uma linha reta."
+  "Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.": "Nenhum arco: os três pontos não podem coincidir nem ficar em uma linha reta.",
+  "Allgemein|Gerätehersteller": "Genérico"
 }

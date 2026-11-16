@@ -17,7 +17,7 @@ Erweiterungspakete (`.kzp`-Dateien) fügen KizamuBeam **Gerätevorlagen, Projekt
 Nach der Installation:
 
 - erscheinen Vorlagen unter **Datei → Neu aus Vorlage … → Aus Erweiterungen**,
-- erscheinen Gerätevorlagen in der Geräteliste, mit dem Paketnamen markiert,
+- erscheinen Gerätevorlagen in der Geräteliste beim Hersteller (oder unter „Aus Erweiterungen“), mit dem Paketnamen markiert,
 - werden Materialien in die Materialbibliothek kopiert,
 - erscheinen Motive und Gestaltungselemente in der Bibliothek.
 

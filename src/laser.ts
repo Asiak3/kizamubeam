@@ -20,7 +20,7 @@ import { dockWindow, windowBody } from './dock';
 import { loadCheckSettings } from './check';
 import { openCheck } from './checkPanel';
 import { presetList } from './packs';
-import { presetOption } from './packsDialog';
+import { presetSelect } from './packsDialog';
 import { dec, locale, t, tBackend, tn } from './i18n';
 import { isNightly } from './updates';
 import { version as APP_VERSION } from '../package.json';
@@ -1382,7 +1382,7 @@ export function openDevicesDialog(ed: Editor) {
     }
   };
   const presets = presetList();
-  const presetSel = h('select', {}, ...presets.map((p, i) => presetOption(p, i))) as HTMLSelectElement;
+  const presetSel = presetSelect(presets);
   const add = () => {
     const d = newDevice(presets[Number(presetSel.value)].preset);
     store.devices.push(d);
