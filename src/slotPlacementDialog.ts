@@ -59,7 +59,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
     const apply = h('button', { class: 'btn primary' }, t('Übernehmen'));
     const toolbar = h('div', { class: 'slot-feature-toolbar', role: 'toolbar', 'aria-label': t('Ausklinkungswerkzeuge') });
     const buttons = new Map<string, HTMLButtonElement>();
-    const iconButton = (id: string, label: string, icon: string, run: () => void) => h('button', { class: 'btn slot-icon-button', id, type: 'button', title: label, 'aria-label': label, html: SLOT_TOOL_ICONS[icon] ?? SLOT_TOOL_ICONS.node, onclick: run });
+    const iconButton = (id: string, label: string, icon: string, run: () => void) => h('button', { class: 'btn slot-icon-button', id, type: 'button', title: label, 'aria-label': label, svg: SLOT_TOOL_ICONS[icon] ?? SLOT_TOOL_ICONS.node, onclick: run });
     const button = (id: string, label: string, icon: string, run: () => void) => {
       const b = iconButton(id, label, icon, run); buttons.set(id, b); toolbar.append(b); return b;
     };

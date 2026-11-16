@@ -1,8 +1,7 @@
 // Laser-Panel (Laser, Verschieben, Konsole), Geräteeinstellungen, Vorschau und G-Code-Ausgabe.
 import type { Editor } from './editor';
 import { commandMatches } from './commandKeys';
-import { h, numInput } from './dom';
-import { ICONS } from './icons';
+import { escapeXml, h, numInput, setIcon, setTrustedSvg } from './dom';
 import { saveText } from './files';
 import { native } from './native';
 import {
@@ -460,12 +459,12 @@ function buildFrameViewRow() {
 function laserTab(ed: Editor): HTMLElement {
   const root = h('div', { class: 'laser-tab' });
   const big = (icon: string, label: string, title: string, onclick: () => void) =>
-    h('button', { class: 'btn', title, onclick }, h('span', { html: ICONS[icon] }), label);
+    h('button', { class: 'btn', title, onclick }, h('span', { icon }), label);
   const dot = h('span', { class: 'dot' });
   const stTxt = h('span', {});
   const posTxt = h('span', { class: 'pos' });
   const portSel = h('select', { class: 'port', title: t('Schnittstelle oder Netzwerk') }) as HTMLSelectElement;
-  const refreshBtn = h('button', { class: 'ib small', title: t('Schnittstellen neu suchen'), html: ICONS.refresh, onclick: () => loadPorts() });
+  const refreshBtn = h('button', { class: 'ib small', title: t('Schnittstellen neu suchen'), icon: 'refresh', onclick: () => loadPorts() });
   const connBtn = h('button', { class: 'btn' }, t('Verbinden')) as HTMLButtonElement;
   connBtn.addEventListener('click', async () => {
     if (machine.connected) return machine.disconnect();
@@ -574,7 +573,7 @@ function laserTab(ed: Editor): HTMLElement {
       h('button', { class: 'btn small', title: t('Drehachse (Rotary) einrichten'), onclick: () => openRotaryDialog() }, t('Drehachse …')),
     ),
     h('div', { class: 'conn-row' },
-      h('button', { class: 'btn', onclick: () => openDeviceDialog(ed) }, h('span', { html: ICONS.settings }), t('Geräteeinstellungen')),
+      h('button', { class: 'btn', onclick: () => openDeviceDialog(ed) }, h('span', { icon: 'settings' }), t('Geräteeinstellungen')),
       h('button', { class: 'btn', title: t('Schritt für Schritt von der Verbindung bis zum ersten Testauftrag'), onclick: () => import('./setupWizard').then((m) => m.openSetupWizard(ed)) }, t('Laser einrichten …')),
     ),
     msg,
@@ -643,7 +642,7 @@ function laserTab(ed: Editor): HTMLElement {
     stopB.disabled = !on;
     const hold = machine.status.state.startsWith('Hold');
     pauseB.lastChild!.textContent = hold ? t('Weiter') : t('Pause');
-    (pauseB.firstChild as HTMLElement).innerHTML = hold ? ICONS.play : ICONS.pause;
+    setIcon(pauseB.firstChild as HTMLElement, hold ? 'play' : 'pause');
     const pr = machine.progress;
     const stored = machine.storedJob;
     const showProg = (!!pr && !machine.jobIsFrame) || !!stored || !!uploading;
@@ -1089,15 +1088,17 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     const s = 4, cx = 110, cy = 60; // px pro mm; Zeigerpunkt in der Mitte
     const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
     const bx = clamp(cx + o.x * s, 14, 206), by = clamp(cy - o.y * s, 14, 106); // +Y = hinten/oben
-    poDiagram.innerHTML =
+    setTrustedSvg(
+      poDiagram,
       `<svg viewBox="0 0 220 120" width="220" height="120" role="img">` +
       `<rect x="4" y="4" width="212" height="112" fill="none" stroke="currentColor" stroke-opacity="0.3" rx="4"/>` +
       `<text x="10" y="18" font-size="9" fill="currentColor" fill-opacity="0.6">+Y ↑ · +X →</text>` +
       `<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="currentColor" stroke-dasharray="4 3"/>` +
       `<circle cx="${cx}" cy="${cy}" r="5" fill="#4da3ff"/>` +
-      `<text x="${cx + 9}" y="${cy + 4}" font-size="10" fill="#4da3ff">${t('Zeiger')}</text>` +
+      `<text x="${cx + 9}" y="${cy + 4}" font-size="10" fill="#4da3ff">${escapeXml(t('Zeiger'))}</text>` +
       `<g stroke="#ff5252" stroke-width="2"><line x1="${bx - 6}" y1="${by}" x2="${bx + 6}" y2="${by}"/><line x1="${bx}" y1="${by - 6}" x2="${bx}" y2="${by + 6}"/></g>` +
-      `<text x="${bx + 9}" y="${by + 4}" font-size="10" fill="#ff5252">${t('Strahl')}</text></svg>`;
+      `<text x="${bx + 9}" y="${by + 4}" font-size="10" fill="#ff5252">${escapeXml(t('Strahl'))}</text></svg>`,
+    );
     poSentence.textContent =
       (o.enabled ? '' : t('Derzeit ausgeschaltet. ')) +
       t('Der Strahl trifft {x} mm in X und {y} mm in Y vom Zeigerpunkt entfernt.', { x: poFmt(o.x), y: poFmt(o.y) });
@@ -1439,7 +1440,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
   const acc = document.createElement('canvas');
   const slider = h('input', { type: 'range', min: '0', max: '1000', value: '1000', step: '1' }) as HTMLInputElement;
   const timeTxt = h('span', { class: 'preview-time' });
-  const playBtn = h('button', { class: 'btn', title: t('Abspielen') }, h('span', { html: ICONS.play }));
+  const playBtn = h('button', { class: 'btn', title: t('Abspielen') }, h('span', { icon: 'play' }));
   const hereBtn = h('button', {
     class: 'btn',
     title: t('Den Job ab der Stelle des Schiebereglers lasern, z. B. nach einem Abbruch'),
@@ -1667,7 +1668,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
   };
   const setPlaying = (p: boolean) => {
     playing = p;
-    playBtn.innerHTML = p ? ICONS.pause : ICONS.play;
+    setIcon(playBtn, p ? 'pause' : 'play');
     if (p) {
       if (time >= est.total) time = 0;
       last = performance.now();

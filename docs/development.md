@@ -126,6 +126,14 @@ UI texts are written in German in the code inside `t('…')` (placeholders in cu
 
 Internally the editor works in mm with y pointing down; the display uses machine coordinates (origin at the bottom left).
 
+## Security: CSP and markup
+
+The WebView runs under a strict Content Security Policy (`app.security.csp` in `src-tauri/tauri.conf.json`): scripts only from the app itself (plus WebAssembly), no `eval`, no inline scripts, no frames or objects. Network access from the WebView is limited to the update check (api.github.com), the extension catalog and the Google Fonts preview; everything else (machines, network cameras, settings sync, font downloads) goes through Rust. `devCsp` adds the Vite dev server. `style-src` keeps `'unsafe-inline'` because the UI sets inline styles; Tauri is told not to add nonces there (`dangerousDisableAssetCspModification`), since a nonce would switch `'unsafe-inline'` off.
+
+Markup is only inserted through `src/dom.ts`: `h(tag, { icon: 'name' })` and `setIcon()` for entries of `ICONS`, `h(tag, { svg })` and `setTrustedSvg()` for SVG the app builds itself (escape text with `escapeXml()`). Text from files, plugins, the catalog or the network is always inserted as text. `npm run check:html` (part of CI) fails on any other `innerHTML`, `insertAdjacentHTML`, `document.write`, `eval` or `new Function` in `src/`.
+
+Plugins never get their own Tauri capability set; `src-tauri/capabilities/default.json` stays minimal.
+
 ## Logo
 
 Logo files are in [`docs/brand/`](brand/): logo with symbol, wordmark, symbol in color and monochrome, symbol above the wordmark, each also as `-dark` for dark backgrounds, plus the app icon (`kizamubeam-app-icon.png`, source for `npx tauri icon`).

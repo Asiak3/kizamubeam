@@ -12,7 +12,8 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   for (const [k, v] of Object.entries(props)) {
     if (v === undefined || v === null || v === false) continue;
     if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v as EventListener);
-    else if (k === 'html') el.innerHTML = String(v);
+    else if (k === 'icon') setIcon(el, String(v));
+    else if (k === 'svg') setTrustedSvg(el, String(v));
     else if (k === 'class') el.className = String(v);
     else if (k in el && typeof v !== 'string') (el as unknown as Record<string, unknown>)[k] = v;
     else el.setAttribute(k, v === true ? '' : String(v));
@@ -21,8 +22,26 @@ export function h<K extends keyof HTMLElementTagNameMap>(
   return el;
 }
 
+/**
+ * The only places where markup is inserted into the page. `icon` takes a name from ICONS; `svg` takes markup that the
+ * app itself builds (fixed icons, previews from buildSvg with escaped text). Never pass text from files, plugins,
+ * catalogs or the network here: use children (text nodes) or textContent instead. scripts/check-inner-html.mjs
+ * fails the build on any other innerHTML use.
+ */
+export function setIcon(el: Element, name: string) {
+  el.innerHTML = ICONS[name] ?? '';
+}
+
+export function setTrustedSvg(el: Element, svg: string) {
+  el.innerHTML = svg;
+}
+
+/** Escape text for use inside markup that the app builds itself */
+export const escapeXml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+
 export const iconBtn = (icon: string, title: string, onclick: () => void, id?: string) =>
-  h('button', { class: 'ib', title, html: ICONS[icon], onclick, id });
+  h('button', { class: 'ib', title, icon, onclick, id });
 
 export const sep = () => h('div', { class: 'sep' });
 

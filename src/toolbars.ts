@@ -2,8 +2,7 @@
 // Auswahl und Reihenfolge der Nutzer festlegt (Fenster → Funktionsleisten anpassen … oder Rechtsklick auf
 // eine Leiste). Außerdem lassen sich alle Leisten (auch Eigenschaften, Palette, Statusleiste) ausblenden.
 // Gespeichert wird je Nutzer im localStorage („kizamubeam.toolbars“).
-import { ICONS } from './icons';
-import { $, h } from './dom';
+import { $, h, setIcon } from './dom';
 import { t } from './i18n';
 
 export interface Action {
@@ -169,7 +168,7 @@ export function refreshBars() {
 
       if (a.dyn) {
         const d = a.dyn();
-        if (d.icon && b.dataset.icon !== d.icon) ((b.innerHTML = ICONS[d.icon]), (b.dataset.icon = d.icon));
+        if (d.icon && b.dataset.icon !== d.icon) (setIcon(b, d.icon), (b.dataset.icon = d.icon));
         if (d.label) b.title = d.label;
       }
       if (g.items) (el.lastElementChild as HTMLElement).title = t('Weitere: {name}', { name: g.label });
@@ -193,7 +192,7 @@ function paint(b: HTMLElement, a: Action) {
   b.className = `ib${a.icon ? '' : ' text'}${a.small ? ' small' : ''}`;
   b.title = a.label;
   if (a.icon) {
-    b.innerHTML = ICONS[a.icon];
+    setIcon(b, a.icon);
     b.dataset.icon = a.icon;
   } else {
     b.textContent = a.short ?? a.label;
@@ -340,7 +339,7 @@ function groupMenu(bar: BarId, g: Action, anchor: HTMLElement) {
       },
     },
       h('span', { class: 'check-mark' }, id === cur ? '✓' : ''),
-      h('span', { class: 'tb-icon', html: a.icon ? ICONS[a.icon] : '' }),
+      h('span', { class: 'tb-icon', icon: a.icon ?? '' }),
       ...menuLabel(a.dyn?.().label ?? a.label),
     );
     menu.append(b);
@@ -408,7 +407,7 @@ export function openToolbarDialog(start: BarId = 'main') {
     // Knopfgruppen zeigen das Symbol der Aktion, die sie gerade tragen
     const ic = a?.items ? groupCurrent(a) : a;
     return h('div', { class: 'tb-row', ...extra },
-      ic ? h('span', { class: `tb-icon${ic.icon ? '' : ' text'}`, html: ic.icon ? ICONS[ic.icon] : '' }, ic.icon ? null : ic.short ?? '') : h('span', { class: 'tb-icon' }),
+      ic ? h('span', { class: `tb-icon${ic.icon ? '' : ' text'}`, icon: ic.icon ?? '' }, ic.icon ? null : ic.short ?? '') : h('span', { class: 'tb-icon' }),
       h('span', {}, a ? a.label : t('— Trennlinie —')),
     );
   };

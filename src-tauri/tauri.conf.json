@@ -21,7 +21,39 @@
         "dragDropEnabled": true
       }
     ],
-    "security": { "csp": null }
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data: blob: https://fonts.gstatic.com",
+        "media-src": "'self' blob: mediastream:",
+        "connect-src": "'self' ipc: http://ipc.localhost data: blob: https://api.github.com https://kizamubeam.github.io https://kizamubeam.com https://negurvulkan.github.io https://api.fontsource.org",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "frame-src": "'none'",
+        "form-action": "'none'"
+      },
+      "devCsp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "img-src": "'self' data: blob:",
+        "font-src": "'self' data: blob: https://fonts.gstatic.com",
+        "media-src": "'self' blob: mediastream:",
+        "connect-src": "'self' ipc: http://ipc.localhost data: blob: https://api.github.com https://kizamubeam.github.io https://kizamubeam.com https://negurvulkan.github.io https://api.fontsource.org ws://localhost:1420 http://localhost:1420",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "frame-src": "'none'",
+        "form-action": "'none'"
+      },
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
+    }
   },
   "bundle": {
     "publisher": "Hanjo Winter",

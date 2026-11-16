@@ -4,7 +4,6 @@
 // zusammen, Bild für Bild an der jeweiligen Kopfposition oder per „Bereich erfassen“ in einem Rutsch.
 import type { Editor } from './editor';
 import { h, numInput } from './dom';
-import { ICONS } from './icons';
 import { openText, saveText } from './files';
 import { CameraProfileError, fineTunePoint, inverseFineTunePoint, normalizeFineTune, normalizeImageAdjustments, parseCameraProfile, serializeCameraProfile } from './cameraProfile';
 import { fineTuneControls, fineTunedCalibration, fineTunedHeadShift } from './cameraFineTune';
@@ -579,7 +578,7 @@ export function cameraTab(ed: Editor): HTMLElement {
   const root = h('div', { class: 'camera-tab' });
   const listSel = h('select', { title: t('Kameras dieses Geräts') }) as HTMLSelectElement;
   const addBtn = h('button', { class: 'ib small', title: t('Kamera hinzufügen'), }, '+') as HTMLButtonElement;
-  const delBtn = h('button', { class: 'ib small', title: t('Kamera entfernen'), html: ICONS.delete }) as HTMLButtonElement;
+  const delBtn = h('button', { class: 'ib small', title: t('Kamera entfernen'), icon: 'delete' }) as HTMLButtonElement;
   const nameIn = h('input', { type: 'text', title: t('Name der Kamera') }) as HTMLInputElement;
   const mountSel = h('select', { title: t('Wo die Kamera sitzt') },
     h('option', { value: 'fixed' }, t('Fest über dem Bett')),
@@ -967,7 +966,7 @@ export function cameraTab(ed: Editor): HTMLElement {
     h('div', { class: 'form' },
       h('label', {}, t('Name')), nameIn,
       h('label', {}, t('Montage')), mountSel,
-      h('label', {}, t('Kamera')), h('div', { class: 'conn-row' }, camSel, h('button', { class: 'ib small', title: t('Kameras neu suchen'), html: ICONS.refresh, onclick: () => loadCams() })),
+      h('label', {}, t('Kamera')), h('div', { class: 'conn-row' }, camSel, h('button', { class: 'ib small', title: t('Kameras neu suchen'), icon: 'refresh', onclick: () => loadCams() })),
       urlLbl, urlIn,
       resLbl, resSel,
     ),
@@ -1117,7 +1116,7 @@ function openCalibration(ed: Editor, u: CamUnit) {
   for (const el of [cx, cy]) el.style.width = '5em';
   cx.value = fmt(center.x);
   cy.value = fmt(center.y);
-  const hereBtn = h('button', { class: 'ib small', title: t('Aktuelle Kopfposition als Mitte übernehmen'), html: ICONS.target }) as HTMLButtonElement;
+  const hereBtn = h('button', { class: 'ib small', title: t('Aktuelle Kopfposition als Mitte übernehmen'), icon: 'target' }) as HTMLButtonElement;
   hereBtn.addEventListener('click', () => {
     const p = headPos();
     if (!p) return void (info.textContent = t('Die aktuelle Position ist noch nicht bekannt.'));

@@ -15,7 +15,7 @@ import { assetImage, displayCanvas, onImageReady, outputGrid } from './images';
 import { onFontListChanged, refreshFonts, requestLocalFonts, systemFonts } from './fonts';
 import { openFontManager } from './fontManager';
 import { createFontPicker } from './fontPicker';
-import { $, evalExpr, f2, h, iconBtn, numInput, sep, setVal } from './dom';
+import { $, evalExpr, f2, h, iconBtn, numInput, sep, setIcon, setVal } from './dom';
 import { openCircularArrayDialog, openGridArrayDialog } from './arrayDialogs';
 import { openNestDialog } from './nestDialog';
 import { openWorkpieceDialog } from './workpieceDialog';
@@ -707,11 +707,11 @@ function buildNumbar(ed: Editor) {
     if (!b) return;
     ed.rotateBy(v - currentRot(), { x: b.x + ax * b.w, y: b.y + ay * b.h });
   }), t('Drehung in Grad (gegen den Uhrzeigersinn)'), formula('rot'));
-  const lockBtn = h('button', { class: 'ib on', title: t('Seitenverhältnis sperren'), html: ICONS.lock });
+  const lockBtn = h('button', { class: 'ib on', title: t('Seitenverhältnis sperren'), icon: 'lock' });
   lockBtn.addEventListener('click', () => {
     lock = !lock;
     lockBtn.classList.toggle('on', lock);
-    lockBtn.innerHTML = lock ? ICONS.lock : ICONS.unlock;
+    setIcon(lockBtn, lock ? 'lock' : 'unlock');
   });
   const anchor = h('div', { class: 'anchor', title: t('Bezugspunkt') });
   const anchorBtns: HTMLButtonElement[] = [];
@@ -824,7 +824,7 @@ function buildNumbar(ed: Editor) {
   const textProps = h(
     'div',
     { class: 'field' },
-    h('span', { html: ICONS.text, class: 'icon-inline', style: 'color: var(--muted)', title: t('Textleiste') }),
+    h('span', { icon: 'text', class: 'icon-inline', style: 'color: var(--muted)', title: t('Textleiste') }),
     h('label', {}, t('Schrift'), fontSel), h('label', {}, t('Höhe'), fSize), bBold, bItal, bUp, ...alignBtns, sep(),
     h('label', {}, t('Abst. H'), fHs), h('label', {}, 'V', fVs), sep(),
     h('label', {}, t('Max. Breite'), fMaxW), h('label', {}, t('Max. Höhe'), fMaxH), bShrink, bWrap, sep(),
@@ -878,7 +878,7 @@ function buildNumbar(ed: Editor) {
   const imgProps = h(
     'div',
     { class: 'field' },
-    h('span', { html: ICONS.image, class: 'muted icon-inline' }), imgInfo,
+    h('span', { icon: 'image', class: 'muted icon-inline' }), imgInfo,
     h('button', { class: 'toggle', title: t('Helligkeit, Kontrast, Gamma, Schärfen, Bildmodus'), onclick: () => openAdjustDialog(ed) }, t('Anpassen …')),
     h('button', { class: 'toggle', title: t('Bild in Vektoren umwandeln (Alt+T)'), onclick: () => openTraceDialog(ed) }, t('Nachzeichnen …')),
     h('button', { class: 'toggle', title: t('Hintergrund freistellen: ähnliche Farben werden transparent und nicht gelasert'), onclick: () => openBackgroundDialog(ed) }, t('Freistellen …')),
@@ -894,14 +894,14 @@ function buildNumbar(ed: Editor) {
   // QR-Codes
   const qrInfo = h('span', { class: 'muted' });
   const qrProps = h('div', { class: 'field' },
-    h('span', { html: ICONS.qr, class: 'muted icon-inline' }), qrInfo,
+    h('span', { icon: 'qr', class: 'muted icon-inline' }), qrInfo,
     h('button', { class: 'toggle', title: t('Inhalt, Größe und Einstellungen ändern (Doppelklick)'), onclick: () => ed.selBarcodes()[0] && editBarcode(ed, ed.selBarcodes()[0]) }, t('Bearbeiten …')),
   );
   const sepQr = sep();
 
   // Parametrische Bauteile
   const genInfo = h('span', { class: 'muted' });
-  const genIcon = h('span', { html: ICONS.gear, class: 'muted icon-inline' });
+  const genIcon = h('span', { icon: 'gear', class: 'muted icon-inline' });
   const genProps = h('div', { class: 'field' },
     genIcon, genInfo,
     h('button', { class: 'toggle', title: t('Parameter ändern, die Kontur wird neu berechnet (Doppelklick)'), onclick: () => ed.selGens()[0] && ed.onGenEdit?.(ed.selGens()[0]) }, t('Parameter …')),
@@ -955,7 +955,10 @@ function buildNumbar(ed: Editor) {
     if (gens.length) {
       const gs = gens[0].shape as GenShape;
       genInfo.textContent = gens.length > 1 ? t('{n} Bauteile', { n: gens.length }) : genLabel(gs);
-      genIcon.innerHTML = ICONS[getGenerator(gs.gen)?.icon ?? 'gear'] ?? ICONS.gear;
+      {
+        const gi = getGenerator(gs.gen)?.icon ?? '';
+        setIcon(genIcon, ICONS[gi] ? gi : 'gear');
+      }
     }
     const nn = ed.nodeSelCount;
     const ns = ed.nodeTargets().reduce((n, o) => n + ed.segmentSelection(o).size, 0);
@@ -1589,8 +1592,8 @@ function buildLayers(ed: Editor) {
       h(
         'div',
         { class: 'layer-tools' },
-        h('button', { title: t('Nach oben (früher ausgeben)'), onclick: () => ed.moveLayer(a, -1), html: '▲' }),
-        h('button', { title: t('Nach unten (später ausgeben)'), onclick: () => ed.moveLayer(a, 1), html: '▼' }),
+        h('button', { title: t('Nach oben (früher ausgeben)'), onclick: () => ed.moveLayer(a, -1) }, '▲'),
+        h('button', { title: t('Nach unten (später ausgeben)'), onclick: () => ed.moveLayer(a, 1) }, '▼'),
         h('button', { onclick: () => ed.selectLayer(a) }, t('Formen auswählen')),
         h('button', { title: t('Alle Einstellungen dieses Layers (Doppelklick auf den Layer)'), onclick: () => openLayerDialog(ed, a) }, t('Einstellungen …')),
       ),
