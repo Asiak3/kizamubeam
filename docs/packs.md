@@ -1,6 +1,6 @@
 # Extension packs (`.kzp`)
 
-An extension pack adds device presets, templates, material library entries and library items (motifs, images, design elements) to KizamuBeam without installing a new version of the app. A pack is a single JSON file. It contains data only, never program code, and KizamuBeam checks every entry before it installs anything.
+An extension pack adds device presets, templates, material library entries and library items (motifs, images, design elements) to KizamuBeam without installing a new version of the app. A pack is a single JSON file, and KizamuBeam checks every entry before it installs anything. Since format version 2 a pack can also bring plugins: generators whose program code runs in a sandbox (see [Plugins](#plugins-plugins-format-version-2)). A pack without plugins contains data only.
 
 Install a pack with File → Extensions … → Install …, or drag the `.kzp` file onto the workspace. The same window lists installed packs and removes them. A complete example is [`packs/org.kizamubeam.example.kzp`](../packs/org.kizamubeam.example.kzp).
 
@@ -32,14 +32,14 @@ Install a pack with File → Extensions … → Install …, or drag the `.kzp` 
 | Field | Required | Meaning |
 | --- | --- | --- |
 | `format` | yes | Always `kizamubeam-pack` |
-| `formatVersion` | no | Format version, currently `1`. A newer number is refused with a hint to update KizamuBeam. |
+| `formatVersion` | no | Format version, currently `2`. A pack with `plugins` must say `2`, so older apps refuse it with a hint to update; a pack without plugins can stay at `1`. A newer number is refused with a hint to update KizamuBeam. |
 | `id` | yes | Unique id in reverse domain style: lowercase letters, digits and hyphens, at least two parts separated by dots, at most 64 characters |
 | `version` | yes | Version of the pack, e.g. `1.0.0` or `1.1.0-beta`. Installing a pack with the same id replaces the installed one; the dialog says whether it is an update, the same version or an older one. |
 | `minApp` | no | Oldest KizamuBeam version that can use the pack |
 | `name` | yes | Name shown in the app, at most 80 characters |
 | `description`, `author` | no | Shown in the Extensions window |
 | `homepage` | no | An `https://` address, shown as text |
-| `devices`, `templates`, `materials`, `assets` | at least one entry in total | The content, described below |
+| `devices`, `templates`, `materials`, `assets`, `plugins` | at least one entry in total | The content, described below |
 
 Texts marked as *localised* may be a plain string or an object with one string per language code (`"en"`, `"de"`, …). KizamuBeam shows the interface language, then English, then German, then the first one given.
 
@@ -113,6 +113,12 @@ Motifs, images and design elements for the Library window (Window → Library). 
 
 Every object is checked: known shape kinds only, valid numbers, layers and paths, images only as embedded data. Formulas (`bind`), visibility conditions (`showIf`), hidden and locked flags are dropped, because they belong to the project an item came from. The example pack has three items (heart, double frame, star).
 
+### Plugins (`plugins`, format version 2)
+
+Each entry is a plugin with its parameters, texts and program code. Stage 1 knows generator plugins: the toolbox shows them in the group “From extensions”, and they open the usual generator dialog. The fields, the call protocol and the limits are described in [docs/plugins.md](plugins.md); the example [`plugins/hole-plate`](../plugins/hole-plate) is built into a pack with `npm run plugin:pack plugins/hole-plate`.
+
+Installing a pack with plugins from a file asks the user to confirm that they trust its source, because the file is not signed. A plugin may not use the id of a generator built into the app or of a plugin from another installed pack. Parts made by a plugin remember the name of the extension: when it is missing, they keep their outline, can still be lasered, and the app names the extension that is needed to change their parameters.
+
 ## Official catalogue
 
 File → Extensions … also shows the official catalogue. It lists the packs in the [`packs/`](../packs) folder of this repository and is published with the website at `https://kizamubeam.github.io/kizamubeam/catalog/catalog.json`. Installing or updating from there needs no file download by hand, and the app shows which installed packs have a newer version.
@@ -125,4 +131,4 @@ A new key pair comes from `node scripts/catalog-keygen.mjs`: the secret part goe
 
 ## Safety
 
-Packs contain data only. KizamuBeam never runs code from a pack, and a pack cannot send anything to the laser. Still, a wrong work area or wrong laser values can damage material or the machine, so only install packs from sources you trust and check the values before the first job.
+A pack cannot send anything to the laser. Packs without plugins contain data only. Plugin code runs only in its own Web Worker without imports: it has no access to files, the network, the project, the window or Tauri, it gets parameters as JSON and returns geometry that the app checks before using it, and every call has a time and memory limit. Still, a wrong work area or wrong laser values can damage material or the machine, so only install packs from sources you trust and check the values before the first job.

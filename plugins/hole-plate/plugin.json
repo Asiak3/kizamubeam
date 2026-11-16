@@ -1,0 +1,74 @@
+{
+  "format": "kizamubeam-pack",
+  "formatVersion": 2,
+  "id": "org.kizamubeam.hole-plate",
+  "version": "1.0.0",
+  "name": { "en": "Hole plate (example plugin)", "de": "Lochplatte (Beispiel-Plugin)", "it": "Piastra forata (plugin di esempio)" },
+  "description": {
+    "en": "Example of a generator plugin in Rust/WebAssembly: a plate with a square or hexagonal pattern of holes.",
+    "de": "Beispiel für ein Generator-Plugin in Rust/WebAssembly: eine Platte mit quadratischem oder sechseckigem Lochmuster.",
+    "it": "Esempio di plugin generatore in Rust/WebAssembly: una piastra con uno schema di fori quadrato o esagonale."
+  },
+  "author": "KizamuBeam",
+  "plugins": [
+    {
+      "id": "org.kizamubeam.hole-plate",
+      "type": "generator",
+      "api": 1,
+      "version": 1,
+      "kind": "part",
+      "runtime": "wasm",
+      "code": "@dist/hole-plate.wasm",
+      "icon": "pattern",
+      "preview": { "center": true },
+      "params": [
+        { "key": "width", "type": "length", "min": 10, "max": 2000, "def": 120 },
+        { "key": "height", "type": "length", "min": 10, "max": 2000, "def": 80 },
+        { "key": "holeDia", "type": "length", "min": 0.5, "max": 200, "def": 6 },
+        { "key": "pitch", "type": "length", "min": 1, "max": 400, "def": 10 },
+        { "key": "pattern", "type": "enum", "options": ["hex", "square"], "def": "hex" },
+        { "key": "holeShape", "type": "enum", "options": ["circle", "hex"], "def": "circle" },
+        { "key": "margin", "type": "length", "min": 0, "max": 500, "def": 6, "advanced": true },
+        { "key": "corner", "type": "length", "min": 0, "max": 500, "def": 3, "advanced": true }
+      ],
+      "texts": {
+        "en": {
+          "name": "Hole plate", "desc": "Plate with a pattern of round or hexagonal holes, e.g. for speaker grilles or ventilation.",
+          "keys": "perforated vent grille holes pattern voronoi", "label": "Hole plate {width} × {height}",
+          "width": "Width", "height": "Height", "holeDia": "Hole size", "holeDia.title": "Diameter of a round hole, or width across corners of a hexagonal one",
+          "pitch": "Pitch", "pitch.title": "Distance between the centres of neighbouring holes",
+          "pattern": "Pattern", "pattern.hex": "Hexagonal", "pattern.square": "Square",
+          "holeShape": "Hole shape", "holeShape.circle": "Round", "holeShape.hex": "Hexagon",
+          "margin": "Margin", "corner": "Corner radius",
+          "holes-touch": "The holes touch: make the hole size smaller than the pitch.", "corner-too-large": "The corner radius is larger than half the plate.",
+          "no-holes": "No hole fits inside the margin.", "too-many-holes": "Too many holes ({n}): increase the pitch.",
+          "holes": "Holes", "open-area": "Open area"
+        },
+        "de": {
+          "name": "Lochplatte", "desc": "Platte mit Muster aus runden oder sechseckigen Löchern, z. B. für Lautsprechergitter oder Lüftung.",
+          "keys": "Lochblech Lüftung Gitter Löcher Muster", "label": "Lochplatte {width} × {height}",
+          "width": "Breite", "height": "Höhe", "holeDia": "Lochgröße", "holeDia.title": "Durchmesser eines runden Lochs oder Eckmaß eines Sechsecks",
+          "pitch": "Abstand", "pitch.title": "Abstand zwischen den Mitten benachbarter Löcher",
+          "pattern": "Muster", "pattern.hex": "Sechseckig", "pattern.square": "Quadratisch",
+          "holeShape": "Lochform", "holeShape.circle": "Rund", "holeShape.hex": "Sechseck",
+          "margin": "Rand", "corner": "Eckenradius",
+          "holes-touch": "Die Löcher berühren sich: Lochgröße kleiner als den Abstand wählen.", "corner-too-large": "Der Eckenradius ist größer als die halbe Platte.",
+          "no-holes": "Innerhalb des Rands passt kein Loch.", "too-many-holes": "Zu viele Löcher ({n}): Abstand vergrößern.",
+          "holes": "Löcher", "open-area": "Offene Fläche"
+        },
+        "it": {
+          "name": "Piastra forata", "desc": "Piastra con uno schema di fori rotondi o esagonali, ad es. per griglie di altoparlanti o ventilazione.",
+          "keys": "lamiera forata ventilazione griglia fori schema", "label": "Piastra forata {width} × {height}",
+          "width": "Larghezza", "height": "Altezza", "holeDia": "Dimensione foro", "holeDia.title": "Diametro di un foro rotondo o misura tra gli spigoli di un esagono",
+          "pitch": "Passo", "pitch.title": "Distanza tra i centri di fori vicini",
+          "pattern": "Schema", "pattern.hex": "Esagonale", "pattern.square": "Quadrato",
+          "holeShape": "Forma del foro", "holeShape.circle": "Rotondo", "holeShape.hex": "Esagono",
+          "margin": "Margine", "corner": "Raggio degli angoli",
+          "holes-touch": "I fori si toccano: scegli una dimensione minore del passo.", "corner-too-large": "Il raggio degli angoli è maggiore di metà piastra.",
+          "no-holes": "Nessun foro entra nel margine.", "too-many-holes": "Troppi fori ({n}): aumenta il passo.",
+          "holes": "Fori", "open-area": "Superficie aperta"
+        }
+      }
+    }
+  ]
+}

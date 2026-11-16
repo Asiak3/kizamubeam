@@ -1,6 +1,6 @@
 // Erweiterungen (Inhaltspakete, .kzp): Gerätevorlagen, Vorlagen, Materialien und Bibliotheks-Einträge, die sich ohne App-Update
-// nachladen lassen. Ein Paket enthält nur Daten, keinen Code; alles wird beim Lesen gegen das Format geprüft und
-// auf erlaubte Felder beschränkt. Gespeichert wird in der Desktop-App im Einstellungsordner (Rust: packs.rs),
+// nachladen lassen. Alles wird beim Lesen gegen das Format geprüft und auf erlaubte Felder beschränkt. Since format
+// version 2 a pack may also bring plugins (program code, issue #205); they run only in the sandbox of src/plugins. Gespeichert wird in der Desktop-App im Einstellungsordner (Rust: packs.rs),
 // im Browser im lokalen Speicher. Die Prüflogik wird mit `npm run test:packs` getestet.
 import { Device, Firmware, FIRMWARES, LASER_TYPES, LaserModule, LaserType } from './gcode';
 import { builtinPresetFiles } from './builtinPresets';
@@ -11,13 +11,16 @@ import type { ProjectParam } from './params';
 import { compareVersions } from './updates';
 import { AssetData, AssetError, parseAsset } from './assetFormat';
 import { localText, t, tn } from './i18n';
+import { ManifestError, parsePlugin, type PluginManifest } from './plugins/manifest';
 
 export { localText };
 import { version as APP_VERSION } from '../package.json';
 
 export const PACK_EXT = 'kzp';
 export const PACK_FORMAT = 'kizamubeam-pack';
-export const PACK_FORMAT_VERSION = 1;
+export const PACK_FORMAT_VERSION = 2;
+/** Packs with plugins need format version 2, so older apps refuse them with an update hint */
+export const PLUGIN_FORMAT_VERSION = 2;
 /** Größte Paketdatei (Vorlagen können Bilder enthalten) */
 export const PACK_MAX_BYTES = 20 * 1024 * 1024;
 
@@ -81,6 +84,8 @@ export interface Pack {
   materials: MaterialEntry[];
   /** Einträge für die Bibliothek (Motive, Bilder, Designelemente); id = eigene Kennung im Paket */
   assets: (AssetData & { id: string })[];
+  /** Plugins (program code, run in the sandbox); only in format version 2 */
+  plugins: PluginManifest[];
 }
 
 export class PackError extends Error {}
@@ -284,8 +289,18 @@ export function parsePack(text: string, appVersion: string = APP_VERSION): Pack 
     }
   });
   if (new Set(assets.map((a) => a.id)).size !== assets.length) throw new PackError(t('Bibliotheks-Einträge mit doppelter Kennung'));
-  if (!devices.length && !templates.length && !materials.length && !assets.length) throw new PackError(t('Die Erweiterung ist leer'));
-  const pack: Pack = { id, version, name, devices, templates, materials, assets };
+  const pluginList = list('plugins');
+  if (pluginList.length && fv < PLUGIN_FORMAT_VERSION) throw new PackError(t('Plugins brauchen „formatVersion“: {n}', { n: PLUGIN_FORMAT_VERSION }));
+  const plugins = pluginList.map((x, i) => {
+    try {
+      return parsePlugin(x, t('Plugin {n}', { n: i + 1 }));
+    } catch (e) {
+      throw new PackError(e instanceof ManifestError ? e.message : String(e));
+    }
+  });
+  if (new Set(plugins.map((x) => x.id)).size !== plugins.length) throw new PackError(t('Plugins mit doppelter Kennung'));
+  if (!devices.length && !templates.length && !materials.length && !assets.length && !plugins.length) throw new PackError(t('Die Erweiterung ist leer'));
+  const pack: Pack = { id, version, name, devices, templates, materials, assets, plugins };
   if (minApp) pack.minApp = minApp;
   const description = str(localText(raw.description), 1000);
   if (description) pack.description = description;
@@ -297,14 +312,15 @@ export function parsePack(text: string, appVersion: string = APP_VERSION): Pack 
 }
 
 /** Kurzbeschreibung des Inhalts, z. B. „3 Gerätevorlagen · 1 Vorlage“ */
-export const packSummary = (p: Pack) => countSummary(p.devices.length, p.templates.length, p.materials.length, p.assets.length);
+export const packSummary = (p: Pack) => countSummary(p.devices.length, p.templates.length, p.materials.length, p.assets.length, p.plugins.length);
 
-export function countSummary(devices: number, templates: number, materials: number, assets = 0): string {
+export function countSummary(devices: number, templates: number, materials: number, assets = 0, plugins = 0): string {
   const parts: string[] = [];
   if (devices) parts.push(tn('{n} Gerätevorlage', '{n} Gerätevorlagen', devices));
   if (templates) parts.push(tn('{n} Vorlage', '{n} Vorlagen', templates));
   if (materials) parts.push(tn('{n} Material', '{n} Materialien', materials));
   if (assets) parts.push(tn('{n} Bibliotheks-Eintrag', '{n} Bibliotheks-Einträge', assets));
+  if (plugins) parts.push(tn('{n} Plugin', '{n} Plugins', plugins));
   return parts.join(' · ');
 }
 

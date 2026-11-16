@@ -100,6 +100,8 @@ export interface GenShape {
   asm?: string;
   /** Felder, die aus Projekt-Parametern berechnet werden: Schlüssel → Formel (z. B. thickness: 'Dicke') */
   bind?: Record<string, string>;
+  /** Name of the extension whose plugin made the part; shown when the extension is missing */
+  ext?: string;
 }
 
 /** Bildanpassungen je Bild (wie „Adjust Image“ in LightBurn) */

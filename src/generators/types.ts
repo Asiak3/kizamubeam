@@ -178,6 +178,13 @@ export interface Generator {
   inputs?: GenInput[];
   /** Parameters for a new object from the declared inputs (e.g. workpiece outlines from the selection) */
   fromInputs?(inputs: GenInputs): Params | undefined;
+  /**
+   * Generators that compute elsewhere (plugins in a Worker) compute these parameters here; until it resolves,
+   * validate() reports „being computed“. Built-in generators compute synchronously and leave it out.
+   */
+  prepare?(p: Params): Promise<void>;
+  /** Name of the extension that provides the generator; saved with its parts (GenShape.ext) for when it is missing */
+  ext?: string;
   /** Extra area in the dialog; it reads the app only through the host and writes only parameters */
   panel?(p: Params, set: (patch: Params) => void, host?: GenHost): GenPanel;
 }

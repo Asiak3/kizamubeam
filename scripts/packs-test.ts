@@ -66,7 +66,7 @@ await test('parsePack: gültiges Paket, Name in der Sprache der Oberfläche', ()
 await test('parsePack: Aufbau-Fehler lehnen das ganze Paket ab', () => {
   throws('nicht json', /JSON/);
   throws(JSON.stringify({ ...base(), format: 'etwas' }), /Keine KizamuBeam-Erweiterung/);
-  throws(pack({ formatVersion: 2 }), /neuere Version/);
+  throws(pack({ formatVersion: 3 }), /neuere Version/);
   throws(pack({ id: 'Ohne Punkt' }), /Kennung/);
   throws(pack({ id: 'werkstatt' }), /Kennung/);
   throws(pack({ version: '1.0' }), /Version/);

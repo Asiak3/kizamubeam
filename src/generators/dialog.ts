@@ -14,6 +14,7 @@ import type { GenChange, Generator, Params, ParamSpec, ParamValue } from './type
 import { library, entryLabel } from '../materials';
 import { genFitPatch } from '../fitcheck';
 import { genHost } from '../genHost';
+import { onPluginResult } from '../plugins/generator';
 
 /** Generatoren mit eigener Zeichenfläche unter den Feldern */
 
@@ -53,7 +54,9 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   const old = o?.shape.kind === 'gen' ? o.shape : null;
   const g = getGenerator(old?.gen ?? genId);
   if (!g) {
-    ed.hint = t('Generator „{id}“ ist in dieser Programmversion nicht vorhanden. Die gespeicherte Kontur bleibt erhalten.', { id: old?.gen ?? genId });
+    ed.hint = old?.ext
+      ? t('Die Erweiterung „{name}“ fehlt. Die gespeicherte Kontur bleibt erhalten; zum Ändern der Parameter die Erweiterung installieren.', { name: old.ext })
+      : t('Generator „{id}“ ist in dieser Programmversion nicht vorhanden. Die gespeicherte Kontur bleibt erhalten.', { id: old?.gen ?? genId });
     ed.emit('tool');
     return;
   }
@@ -418,9 +421,14 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   });
   // Vor dem Klick: Knöpfe und Vorschau auf den aktuellen Stand bringen
   dlg.addEventListener('pointerdown', flushPending, true);
+  // Plugins answer from their Worker: show the result as soon as it arrives (until then „being computed“)
+  const stopListening = onPluginResult((id) => {
+    if (id === g.id && !pending) flush();
+  });
   dlg.addEventListener('close', () => {
     if (pending) clearTimeout(pending);
     pending = 0;
+    stopListening();
     dlg.remove();
   });
   document.body.append(dlg);

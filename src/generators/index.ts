@@ -34,6 +34,12 @@ export function register(g: Generator) {
   else GENERATORS.push(g);
 }
 
+/** Remove a generator added with register() (an extension was removed); saved parts keep their geometry */
+export function unregister(id: string) {
+  const i = GENERATORS.findIndex((x) => x.id === id);
+  if (i >= 0) GENERATORS.splice(i, 1);
+}
+
 for (const g of [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, FINGERBOX, DRAWER, INSERT, SHELF, STACK, RIBS, DISCSPHERE, JIG]) register(g);
 
 export const getGenerator = (id: string): Generator | undefined => (id === PATTERN_GEN_ID ? PATTERN_GEN : id === CONTOUR_OFFSET_ID ? CONTOUR_OFFSET : id === LEGACY_CONTOUR_OFFSET_ID ? { ...CONTOUR_OFFSET, id, version: 1 } : id === SLOT_GENERATOR ? SLOT_PLACEMENT : isSlotGenerator(id) ? { ...SLOT_PLACEMENT, id } : id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
@@ -131,6 +137,15 @@ export interface BuildResult {
   plan?: PlanSheet;
 }
 
+/**
+ * Like buildGen, but first waits for generators that compute elsewhere (plugins, Generator.prepare). Use it where
+ * the caller can wait (MCP tools); interactive code calls buildGen and listens to onPluginResult.
+ */
+export async function buildGenAsync(g: Generator, params: Params): Promise<BuildResult> {
+  await g.prepare?.(params);
+  return buildGen(g, params);
+}
+
 /** Parameter prüfen und, wenn kein Fehler vorliegt, die Teile erzeugen (Baugruppen: part = Schlüssel des Teils) */
 export function buildGen(g: Generator, params: Params): BuildResult {
   const issues = g.validate(params);
@@ -139,6 +154,7 @@ export function buildGen(g: Generator, params: Params): BuildResult {
     const r = g.generate(params);
     const parts = r.parts.map((p) => {
       const shape: GenShape = { kind: 'gen', gen: g.id, v: g.version, params: { ...params }, subs: p.subs };
+      if (g.ext) shape.ext = g.ext;
       if (g.kind === 'assembly') shape.part = p.key;
       return p.marks?.length ? { shape, at: p.at, marks: p.marks } : { shape, at: p.at };
     });
@@ -153,7 +169,7 @@ export function buildGen(g: Generator, params: Params): BuildResult {
 /** Name eines Generator-Objekts für Objekte-Fenster und Verlauf */
 export function genLabel(s: GenShape): string {
   const g = getGenerator(s.gen);
-  if (!g) return t('Generator „{id}“ (unbekannt)', { id: s.gen });
+  if (!g) return s.ext ? t('„{id}“ (Erweiterung „{name}“ fehlt)', { id: s.gen, name: s.ext }) : t('Generator „{id}“ (unbekannt)', { id: s.gen });
   try {
     return g.label(normalizeParams(g, s.params), s.part);
   } catch {

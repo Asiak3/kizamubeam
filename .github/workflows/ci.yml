@@ -37,7 +37,7 @@ jobs:
       - name: No markup from strings outside src/dom.ts (CSP, #283)
         run: npm run check:html
 
-      - name: Plugin runtime tests (#205)
+      - name: Plugin runtime and plugin pack tests (#205)
         run: npm run test:plugins
 
       - name: G-code regression tests

@@ -10,6 +10,8 @@ import {
   brokenPacks, countSummary, ensurePacks, hasPackFolder, installedPacks, installKind, installPack, localText, openPackFolder, Pack, PACK_EXT, packSummary, parsePack, removePack,
   groupPresets, PresetFeature, PresetListEntry,
 } from './packs';
+import { pluginConflict, pluginProblems } from './plugins/registry';
+import { pluginText } from './plugins/manifest';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -89,6 +91,8 @@ function contentList(p: Pack): HTMLElement {
     ul.append(h('li', { title: d.source ?? '' }, t('Gerätevorlage: {name} · {fw}, {w} × {h} mm', { name: d.preset.name, fw: FIRMWARES[d.preset.fw].label, w: d.preset.bedW!, h: d.preset.bedH! })));
   for (const tp of p.templates) ul.append(h('li', {}, t('Vorlage: {name}', { name: tp.info.title })));
   for (const m of p.materials) ul.append(h('li', {}, t('Material: {name}', { name: entryLabel(m) })));
+  for (const x of p.plugins)
+    ul.append(h('li', {}, t('Plugin: {name} ({runtime})', { name: pluginText(x.texts, lang, 'name') ?? x.id, runtime: x.runtime === 'js' ? 'JavaScript' : 'WebAssembly' })));
   return ul;
 }
 
@@ -105,6 +109,12 @@ export async function installPackFile(name: string, text: string, fromCatalog = 
     alert(t('„{file}“ lässt sich nicht installieren: {message}', { file: name, message: errText(e) }));
     return null;
   }
+  // A plugin must not take the id of a built-in generator or of another extension's plugin
+  const clash = p.plugins.map((x) => pluginConflict(p, x.id)).find(Boolean);
+  if (clash) {
+    alert(t('„{file}“ lässt sich nicht installieren: {message}', { file: name, message: clash }));
+    return null;
+  }
   const { kind, old } = installKind(p);
   const status = {
     new: '',
@@ -116,6 +126,14 @@ export async function installPackFile(name: string, text: string, fromCatalog = 
     let result: Pack | null = null;
     const err = h('p', { class: 'error' });
     const ok = h('button', { class: 'btn primary' }, kind === 'update' ? t('Aktualisieren') : t('Installieren')) as HTMLButtonElement;
+    // Unsigned program code: the user confirms the source before Install becomes available
+    let trust: HTMLElement | null = null;
+    if (p.plugins.length && !fromCatalog) {
+      const box = h('input', { type: 'checkbox' }) as HTMLInputElement;
+      box.onchange = () => (ok.disabled = !box.checked);
+      ok.disabled = true;
+      trust = h('label', { class: 'check' }, box, ' ', t('Ich vertraue der Quelle dieser Erweiterung'));
+    }
     ok.onclick = async () => {
       ok.disabled = true;
       try {
@@ -132,9 +150,14 @@ export async function installPackFile(name: string, text: string, fromCatalog = 
       p.description ? h('p', { class: 'muted' }, p.description) : null,
       contentList(p),
       status ? h('p', { class: kind === 'downgrade' ? 'warn' : 'note' }, status) : null,
-      h('p', { class: 'note' }, fromCatalog
-        ? t('Aus dem signierten KizamuBeam-Katalog. Erweiterungen enthalten nur Daten, keinen Programmcode. Prüfe Maße und Laserwerte trotzdem vor dem ersten Job.')
-        : t('Erweiterungen enthalten nur Daten, keinen Programmcode. Diese Datei ist nicht signiert: Installiere sie nur, wenn du der Quelle vertraust, und prüfe Maße und Laserwerte vor dem ersten Job.')),
+      p.plugins.length
+        ? h('p', { class: fromCatalog ? 'note' : 'warn' }, fromCatalog
+          ? t('Aus dem signierten KizamuBeam-Katalog. Die Erweiterung enthält Programmcode (Plugins). Er läuft abgeschottet: ohne Zugriff auf Dateien, Netzwerk und das Projekt, mit Zeit- und Speichergrenze. Prüfe die erzeugten Teile trotzdem vor dem ersten Job.')
+          : t('Ungeprüfte Erweiterung mit Programmcode (Plugins). Diese Datei ist nicht signiert. Der Code läuft abgeschottet, ohne Zugriff auf Dateien, Netzwerk und das Projekt, kann aber falsche Teile erzeugen. Installiere sie nur, wenn du der Quelle vertraust.'))
+        : h('p', { class: 'note' }, fromCatalog
+          ? t('Aus dem signierten KizamuBeam-Katalog. Erweiterungen enthalten nur Daten, keinen Programmcode. Prüfe Maße und Laserwerte trotzdem vor dem ersten Job.')
+          : t('Erweiterungen enthalten nur Daten, keinen Programmcode. Diese Datei ist nicht signiert: Installiere sie nur, wenn du der Quelle vertraust, und prüfe Maße und Laserwerte vor dem ersten Job.')),
+      trust,
       err,
       h('div', { class: 'dialog-buttons' }, ok, h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen'))),
     ) as HTMLDialogElement;
@@ -169,6 +192,7 @@ export async function openPacksDialog() {
           },
         }, t('Entfernen')),
       ));
+    for (const msg of pluginProblems()) list.append(h('p', { class: 'error' }, msg));
     for (const b of brokenPacks())
       list.append(h('div', { class: 'pack-card broken' },
         h('div', { class: 'pack-text' }, h('b', {}, b.file), h('div', { class: 'error' }, b.error)),

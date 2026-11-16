@@ -1,6 +1,6 @@
 # Plugins (developer notes)
 
-Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205), runtime only. Packaging, installation and dialogs follow in the next steps (pack format 2, [#335](https://github.com/KizamuBeam/kizamubeam/issues/335)).
+Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205): runtime, plugins in extension packs (format version 2) and generator plugins in the toolbox. The richer dialog schema of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335) (sections, `view`, `onChange`, lists, surfaces) follows.
 
 A plugin computes geometry from parameters. It gets JSON in and gives JSON out. It cannot reach files, the network, the DOM, Tauri or the editor. Every plugin runs in its own Web Worker, and the app checks every answer before anything reaches the drawing.
 
@@ -10,6 +10,58 @@ Two runtimes are supported:
 - **WebAssembly** (for example Rust) is instantiated without any imports.
 
 Code: [`src/plugins/`](../src/plugins). `contract.ts` holds the limits and the output checks, `engine.ts` the two runtimes, `worker.ts` the Worker and `client.ts` the main-thread side (`workerProcess` in the app, `inProcess` for Node tests).
+
+## Manifest
+
+A plugin is an entry of `plugins` in an extension pack ([docs/packs.md](packs.md)). The pack needs `"formatVersion": 2`.
+
+```jsonc
+{
+  "id": "org.example.hole-plate",   // generator id, stored in projects; lowercase letters, digits, dots, hyphens
+  "type": "generator",              // the only kind in stage 1
+  "api": 1,                         // call protocol (PLUGIN_API); a newer one is refused with an update hint
+  "version": 1,                     // version of the parameters (Generator.version)
+  "kind": "part",                   // part or assembly
+  "runtime": "wasm",                // wasm or js
+  "code": "AGFzbQEAAAAB…",          // WebAssembly as Base64, JavaScript as text
+  "sha256": "9f2c…",                // SHA-256 of the code bytes (hex), checked on every load
+  "icon": "pattern",                // optional, a name from src/icons.ts
+  "preview": { "center": true },    // optional, centre the dialog preview on the parts
+  "params": [
+    { "key": "width", "type": "length", "min": 10, "max": 2000, "def": 120 },
+    { "key": "pattern", "type": "enum", "options": ["hex", "square"], "def": "hex" },
+    { "key": "margin", "type": "length", "min": 0, "max": 500, "def": 6, "advanced": true,
+      "showIf": { "ne": ["pattern", "square"] } }
+  ],
+  "texts": {
+    "en": { "name": "Hole plate", "width": "Width", "pattern": "Pattern", "pattern.hex": "Hexagonal", … },
+    "de": { "name": "Lochplatte", … }
+  }
+}
+```
+
+Parameter types are the same as for built-in generators: `length` (mm), `angle` (degrees), `int`, `number`, `enum`, `bool`, `text` and `data` (hidden text). `showIf` uses the rule language of the app (`eq`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`); no plugin code runs for visibility. `advanced` puts a field under “Advanced”, `resetOnNew` starts new parts with `def`.
+
+**Texts** are plain text, looked up in the interface language, then English (`en` is required). Keys:
+
+| Key | Used for |
+| --- | --- |
+| `name` (required), `desc`, `keys` | toolbox tile: name, tooltip, more search words |
+| `label` | name in the Objects window, placeholders `{param}`, e.g. `"Hole plate {width} × {height}"` |
+| `<param>`, `<param>.title` | field label and tooltip |
+| `<param>.<option>` | label of an enum option given as plain value; `["value", "text key"]` names another key |
+| `part.<key>` | name of an assembly part |
+| issue and info codes | messages from `validate`/`generate` and rows of the info table; `{name}` is filled from `values` |
+
+A missing text falls back to its key. The app checks everything before it registers a plugin: ids, types, ranges, rules, text keys, code size and checksum. A mistake refuses the whole pack.
+
+`npm run plugin:pack <folder>` builds a pack from `<folder>/plugin.json`: every `"code": "@path"` is replaced by the file and its checksum. Output: `<folder>/dist/<pack id>.kzp`.
+
+## How the app uses a plugin generator
+
+- Installed packs register their plugins as generators (`src/plugins/registry.ts`); removing the pack removes them. A plugin may not take the id of a built-in generator or of another pack's plugin.
+- The editor calls generators synchronously, plugins answer asynchronously. `src/plugins/generator.ts` keeps the last answers per plugin: the first call for new parameters reports “Computing …” (OK stays disabled) and starts the plugin; when the answer arrives, the dialog and parts with formulas are updated. MCP tools wait for the answer (`buildGenAsync`).
+- Parts store the generator id, its version, the parameters, the geometry and the extension's name (`GenShape.ext`). Without the extension they stay visible and can be lasered; editing their parameters names the missing extension.
 
 ## Calls
 
