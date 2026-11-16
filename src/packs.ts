@@ -2,7 +2,7 @@
 // nachladen lassen. Ein Paket enthält nur Daten, keinen Code; alles wird beim Lesen gegen das Format geprüft und
 // auf erlaubte Felder beschränkt. Gespeichert wird in der Desktop-App im Einstellungsordner (Rust: packs.rs),
 // im Browser im lokalen Speicher. Die Prüflogik wird mit `npm run test:packs` getestet.
-import { Device, Firmware, FIRMWARES } from './gcode';
+import { Device, Firmware, FIRMWARES, LASER_TYPES, LaserModule, LaserType } from './gcode';
 import { builtinPresetFiles } from './builtinPresets';
 import { library, MaterialEntry, sanitizeEntry } from './materials';
 import { loadDoc } from './model';
@@ -35,6 +35,31 @@ export interface PresetEntry {
   id?: string;
   /** Manufacturer; presets without one are generic */
   vendor?: string;
+  /** Link to the source (https only) */
+  sourceUrl?: string;
+  /** Date the values were last checked against the source (YYYY-MM-DD) */
+  checked?: string;
+  /** true when the work area was measured on a real machine, not only taken from the manufacturer */
+  measured?: boolean;
+  /** Equipment of the machine, informational (see PRESET_FEATURES) */
+  features?: PresetFeature[];
+  /** Variants of one model (e.g. laser modules with different work areas); the list shows one entry per variant */
+  variants?: PresetVariant[];
+  /** Set on entries expanded from a variant: id of the file they come from */
+  base?: string;
+}
+
+/** Equipment a preset can list; shown next to the preset, never changes the generated G-code */
+export const PRESET_FEATURES = ['air-assist', 'autofocus', 'camera', 'enclosure', 'wifi', 'bluetooth', 'offline'] as const;
+export type PresetFeature = (typeof PRESET_FEATURES)[number];
+
+/** One variant of a preset: its own name suffix and the values that differ */
+export interface PresetVariant {
+  id: string;
+  name: string;
+  bedW?: number;
+  bedH?: number;
+  laser?: LaserModule;
 }
 
 export interface PackTemplate {
@@ -77,10 +102,43 @@ export function isLoopbackHost(v: unknown): v is string {
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const numIn = (v: unknown, min: number, max: number) => (typeof v === 'number' && isFinite(v) && v >= min && v <= max ? v : undefined);
 
+const VARIANT_ID_RE = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
+const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const MAX_VARIANTS = 12;
+
+/** Laser module: kind, optical power (W) and wavelength (nm); invalid parts are dropped, an empty module is undefined */
+export function sanitizeLaser(v: unknown): LaserModule | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const r = v as Record<string, unknown>;
+  const m: LaserModule = {};
+  if (LASER_TYPES.includes(r.type as LaserType)) m.type = r.type as LaserType;
+  const power = numIn(r.power, 0.1, 1000);
+  if (power !== undefined) m.power = power;
+  const wavelength = numIn(r.wavelength, 200, 11_000);
+  if (wavelength !== undefined) m.wavelength = Math.round(wavelength);
+  return Object.keys(m).length ? m : undefined;
+}
+
+function sanitizeVariant(v: unknown, where: string): PresetVariant {
+  const r = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  if (typeof r.id !== 'string' || !VARIANT_ID_RE.test(r.id)) throw new PackError(t('{where}: Variante ohne gültige Kennung', { where }));
+  const name = str(localText(r.name), 40);
+  if (!name) throw new PackError(t('{where}: Variante „{id}“ ohne Name', { where, id: r.id }));
+  const out: PresetVariant = { id: r.id, name };
+  const bedW = numIn(r.bedW, 10, 5000);
+  const bedH = numIn(r.bedH, 10, 5000);
+  if (bedW !== undefined) out.bedW = bedW;
+  if (bedH !== undefined) out.bedH = bedH;
+  const laser = sanitizeLaser(r.laser);
+  if (laser) out.laser = laser;
+  return out;
+}
+
 /**
- * Gerätevorlage prüfen. Erlaubt sind Name, Firmware, Arbeitsbereich und Werte für Verbindung und Zeitschätzung.
- * Start-/End-Skripte, Drehachse, Adressen und Grenzen für KI-Agenten fallen weg, weil sie Befehle oder
- * persönliche Einstellungen sind. Only a loopback host (localhost, 127.x.x.x) is kept.
+ * Gerätevorlage prüfen. Erlaubt sind Name, Firmware, Arbeitsbereich und Werte für Verbindung und Zeitschätzung,
+ * plus laser module, Z axis, red-dot offset, receive buffer and metadata (source, equipment, variants).
+ * Start-/End-Skripte, Drehachse, Rahmen mit Laser, Adressen und Grenzen für KI-Agenten fallen weg, weil sie Befehle,
+ * Laserleistung oder persönliche Einstellungen sind. Only a loopback host (localhost, 127.x.x.x) is kept.
  * Built-in presets (presets/devices) go through the same check.
  */
 export function sanitizeDevice(raw: unknown, where: string): PresetEntry {
@@ -114,12 +172,41 @@ export function sanitizeDevice(raw: unknown, where: string): PresetEntry {
   const frameSpeed = numIn(r.frameSpeed, 10, 200_000);
   if (frameSpeed !== undefined) p.frameSpeed = frameSpeed;
   if (isLoopbackHost(r.host)) p.host = r.host.trim();
+  const httpPort = numIn(r.httpPort, 1, 65535);
+  if (httpPort !== undefined) p.httpPort = Math.round(httpPort);
+  const rxBuffer = numIn(r.rxBuffer, 64, 16_384);
+  if (rxBuffer !== undefined) p.rxBuffer = Math.round(rxBuffer);
+  if (typeof r.zAxis === 'boolean') p.zAxis = r.zAxis;
+  if (typeof r.zFlip === 'boolean') p.zFlip = r.zFlip;
+  const po = r.pointerOffset as Record<string, unknown> | undefined;
+  if (po && typeof po === 'object') {
+    const x = numIn(po.x, -200, 200);
+    const y = numIn(po.y, -200, 200);
+    if (x !== undefined && y !== undefined) p.pointerOffset = { x, y, enabled: po.enabled === true };
+  }
+  const laser = sanitizeLaser(r.laser);
+  if (laser) p.laser = laser;
   const entry: PresetEntry = { preset: p };
   const source = str(r.source, 300);
   if (source) entry.source = source;
   if (typeof r.id === 'string' && PRESET_ID_RE.test(r.id)) entry.id = r.id;
   const vendor = str(localText(r.vendor), 60);
   if (vendor) entry.vendor = vendor;
+  const url = str(r.sourceUrl, 300);
+  if (/^https:\/\/[^\s]+$/i.test(url)) entry.sourceUrl = url;
+  if (typeof r.checked === 'string' && DATE_RE.test(r.checked)) entry.checked = r.checked;
+  if (typeof r.measured === 'boolean') entry.measured = r.measured;
+  if (Array.isArray(r.features)) {
+    const f = PRESET_FEATURES.filter((x) => (r.features as unknown[]).includes(x));
+    if (f.length) entry.features = f;
+  }
+  if (r.variants !== undefined) {
+    if (!Array.isArray(r.variants) || !r.variants.length || r.variants.length > MAX_VARIANTS)
+      throw new PackError(t('{where}: „variants“ muss 1 bis {n} Einträge haben', { where, n: MAX_VARIANTS }));
+    const variants = r.variants.map((v) => sanitizeVariant(v, where));
+    if (new Set(variants.map((v) => v.id)).size !== variants.length) throw new PackError(t('{where}: Varianten mit doppelter Kennung', { where }));
+    entry.variants = variants;
+  }
   return entry;
 }
 
@@ -257,15 +344,37 @@ export function builtinPresets(): PresetEntry[] {
 
 export type PresetListEntry = PresetEntry & { pack?: string };
 
-/** Gerätevorlagen: eingebaute zuerst, dann die aus Erweiterungen. A pack preset with the id of an earlier one replaces it in place. */
+/**
+ * One list entry per variant: name „Model (variant)“, the variant's work area and laser module, id „base:variant“.
+ * A preset without variants stays as it is.
+ */
+export function expandVariants<T extends PresetEntry>(e: T): T[] {
+  if (!e.variants?.length) return [e];
+  return e.variants.map((v) => {
+    const { variants: _drop, ...rest } = e;
+    const preset: PackDevice = { ...e.preset, name: `${e.preset.name} (${v.name})` };
+    if (v.bedW !== undefined) preset.bedW = v.bedW;
+    if (v.bedH !== undefined) preset.bedH = v.bedH;
+    if (v.laser) preset.laser = { ...e.preset.laser, ...v.laser };
+    return { ...rest, preset, id: e.id ? `${e.id}:${v.id}` : undefined, base: e.id } as unknown as T;
+  });
+}
+
+/**
+ * Gerätevorlagen: eingebaute zuerst, dann die aus Erweiterungen, variants expanded into one entry each. A pack
+ * preset with the id of an earlier one replaces it (with all its variants) in place.
+ */
 export function presetList(): PresetListEntry[] {
-  const list: PresetListEntry[] = builtinPresets();
+  const list: PresetListEntry[] = builtinPresets().flatMap((e) => expandVariants(e));
   for (const { pack } of installed)
     for (const d of pack.devices) {
-      const e = { ...d, pack: pack.name };
-      const at = d.id ? list.findIndex((x) => x.id === d.id) : -1;
-      if (at >= 0) list[at] = e;
-      else list.push(e);
+      const items = expandVariants({ ...d, pack: pack.name } as PresetListEntry);
+      const key = d.id;
+      const at = key ? list.findIndex((x) => (x.base ?? x.id) === key) : -1;
+      if (at >= 0) {
+        const n = list.filter((x) => (x.base ?? x.id) === key).length;
+        list.splice(at, n, ...items);
+      } else list.push(...items);
     }
   return list;
 }

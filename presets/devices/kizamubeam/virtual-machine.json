@@ -10,5 +10,6 @@
   "tcpPort": 2323,
   "wsPort": 8181,
   "limitSwitches": "yes",
-  "source": "Virtual machine for testing without hardware (vm/ in this repository); ports as preset there"
+  "source": "Virtual machine for testing without hardware (vm/ in this repository); ports as preset there",
+  "checked": "2026-11-16"
 }

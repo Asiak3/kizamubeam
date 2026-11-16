@@ -5,5 +5,9 @@
   "fw": "grbl",
   "bedW": 400,
   "bedH": 415,
-  "source": "filament2print.com"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "filament2print.com",
+  "checked": "2026-10-19"
 }

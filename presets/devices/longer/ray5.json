@@ -1,0 +1,47 @@
+{
+  "id": "longer.ray5",
+  "vendor": "Longer",
+  "name": "Longer Ray5",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 400,
+  "laser": {
+    "type": "diode"
+  },
+  "variants": [
+    {
+      "id": "5w",
+      "name": "5 W",
+      "laser": {
+        "power": 5
+      }
+    },
+    {
+      "id": "10w",
+      "name": "10 W",
+      "laser": {
+        "power": 10
+      }
+    },
+    {
+      "id": "20w",
+      "name": "20 W",
+      "bedH": 365,
+      "laser": {
+        "power": 20
+      }
+    },
+    {
+      "id": "40w",
+      "name": "40 W",
+      "bedW": 385,
+      "bedH": 385,
+      "laser": {
+        "power": 40
+      }
+    }
+  ],
+  "baud": 115200,
+  "source": "longer.net: 400 × 400 mm with 5 W/10 W, 400 × 365 mm with 20 W, 385 × 385 mm with 40 W; 115200 baud",
+  "checked": "2026-10-19"
+}

@@ -5,5 +5,10 @@
   "fw": "grbl",
   "bedW": 300,
   "bedH": 200,
-  "source": "clevercreations.org/two-trees-ts3-laser-engraver-cutter-review: 300 × 200 mm, LaserGRBL/LightBurn"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "clevercreations.org review: 300 × 200 mm, LaserGRBL/LightBurn",
+  "sourceUrl": "https://clevercreations.org/two-trees-ts3-laser-engraver-cutter-review/",
+  "checked": "2026-11-16"
 }

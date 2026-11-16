@@ -5,6 +5,10 @@
   "fw": "grbl",
   "bedW": 430,
   "bedH": 400,
+  "laser": {
+    "type": "diode"
+  },
   "baud": 230400,
-  "source": "atomm.com (approx.); 230400 baud per LightBurn forum"
+  "source": "atomm.com (approx.); 230400 baud per LightBurn forum",
+  "checked": "2026-10-19"
 }

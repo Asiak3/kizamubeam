@@ -6,7 +6,7 @@ import { ICONS } from './icons';
 import { saveText } from './files';
 import { native } from './native';
 import {
-  anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, formatDuration, frameGCode, Job, jogLines, jogToLines, loadDevices, Moves, newDevice,
+  anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, formatDuration, frameGCode, Job, jogLines, jogToLines, LASER_TYPES, LaserModule, LaserType, loadDevices, Moves, newDevice,
   posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, sameMoves, saveDevices, StartFrom, startHere, zJogLines,
 } from './gcode';
 import { isTauri, machine, PortInfo } from './machine';
@@ -20,7 +20,7 @@ import { dockWindow, windowBody } from './dock';
 import { loadCheckSettings } from './check';
 import { openCheck } from './checkPanel';
 import { presetList } from './packs';
-import { presetSelect } from './packsDialog';
+import { laserTypeLabel, presetPicker } from './packsDialog';
 import { dec, locale, t, tBackend, tn } from './i18n';
 import { isNightly } from './updates';
 import { version as APP_VERSION } from '../package.json';
@@ -927,6 +927,28 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   const bw = num(t('Breite (mm)'), () => bed.w, (v) => (bed.w = v), t('Arbeitsbereich X'));
   const bh = num(t('Höhe (mm)'), () => bed.h, (v) => (bed.h = v), t('Arbeitsbereich Y'));
   sMaxRef.el = num(t('S-Wert für 100 %'), () => d.sMax, (v) => (d.sMax = v), t('GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1'));
+  head(t('Lasermodul'));
+  {
+    const laserTip = t('Nur zur Information, z. B. für passende Materialeinstellungen; ändert den G-Code nicht');
+    const setLaser = (patch: Partial<LaserModule>) => {
+      const m: LaserModule = { ...d.laser, ...patch };
+      for (const k of Object.keys(m) as (keyof LaserModule)[]) if (m[k] === undefined) delete m[k];
+      d.laser = Object.keys(m).length ? m : undefined;
+    };
+    rows.push(h('label', { title: laserTip }, t('Art')), h('select', { onchange: (e: Event) => setLaser({ type: ((e.target as HTMLSelectElement).value || undefined) as LaserType | undefined }) },
+      h('option', { value: '', selected: !d.laser?.type }, t('unbekannt')),
+      ...LASER_TYPES.map((k) => h('option', { value: k, selected: d.laser?.type === k }, laserTypeLabel(k))),
+    ));
+    const opt = (label: string, get: () => number | undefined, set: (v: number | undefined) => void) => {
+      const el = h('input', { type: 'text', inputmode: 'decimal', value: String(get() ?? ''), placeholder: t('unbekannt'), oninput: (e: Event) => {
+        const v = parseFloat((e.target as HTMLInputElement).value.replace(',', '.'));
+        set(Number.isFinite(v) && v > 0 ? v : undefined);
+      } });
+      rows.push(h('label', { title: laserTip }, label), el);
+    };
+    opt(t('Optische Leistung (W)'), () => d.laser?.power, (v) => setLaser({ power: v }));
+    opt(t('Wellenlänge (nm)'), () => d.laser?.wavelength, (v) => setLaser({ wavelength: v === undefined ? undefined : Math.round(v) }));
+  }
   head(t('Bewegung (für die Zeitschätzung)'));
   const rapid = num(t('Eilgang (mm/min)'), () => d.rapid, (v) => (d.rapid = v));
   const accel = num(t('Beschleunigung (mm/s²)'), () => d.accel, (v) => (d.accel = v));
@@ -1382,7 +1404,7 @@ export function openDevicesDialog(ed: Editor) {
     }
   };
   const presets = presetList();
-  const presetSel = presetSelect(presets);
+  const { select: presetSel, details: presetInfo } = presetPicker(presets);
   const add = () => {
     const d = newDevice(presets[Number(presetSel.value)].preset);
     store.devices.push(d);
@@ -1394,6 +1416,7 @@ export function openDevicesDialog(ed: Editor) {
     h('h3', {}, t('Geräte')),
     list,
     h('div', { class: 'conn-row' }, h('label', {}, t('Neues Gerät aus Vorlage')), presetSel, h('button', { class: 'btn primary', onclick: add }, t('Hinzufügen'))),
+    presetInfo,
     h('div', { class: 'note' }, t('Die Maße der Vorlagen stammen aus den Herstellerangaben. Bitte vor dem ersten Job prüfen, am einfachsten mit „Von der Maschine lesen“ in den Geräteeinstellungen (FluidNC, GRBL, grblHAL).')),
     h('div', { class: 'dialog-buttons' }, h('button', { class: 'btn', onclick: () => dlg.close() }, t('Schließen'))),
   );

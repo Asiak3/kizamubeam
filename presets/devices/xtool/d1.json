@@ -5,6 +5,10 @@
   "fw": "grbl",
   "bedW": 432,
   "bedH": 406,
+  "laser": {
+    "type": "diode"
+  },
   "baud": 230400,
-  "source": "atomm.com/blog/2535-what-is-xtool-d1 (approx.); 230400 baud per LightBurn forum"
+  "source": "atomm.com/blog/2535-what-is-xtool-d1 (approx.); 230400 baud per LightBurn forum",
+  "checked": "2026-10-19"
 }

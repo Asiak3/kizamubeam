@@ -5,5 +5,10 @@
   "fw": "grbl",
   "bedW": 410,
   "bedH": 420,
-  "source": "crealityfalcon.com/blogs/product-reviews/sculpfun-s9-review"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "crealityfalcon.com/blogs/product-reviews/sculpfun-s9-review",
+  "sourceUrl": "https://www.crealityfalcon.com/blogs/product-reviews/sculpfun-s9-review",
+  "checked": "2026-10-19"
 }

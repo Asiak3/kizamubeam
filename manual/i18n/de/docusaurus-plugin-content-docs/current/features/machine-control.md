@@ -79,7 +79,7 @@ Die **Konsole** zeigt die Meldungen der Steuerung und lässt dich Befehle senden
 
 ## Geräte und Geräteeinstellungen
 
-Jeder Laser ist ein **Gerät** mit eigener Verbindung, eigenem Arbeitsbereich und eigenen Einstellungen. Wähle das Gerät oben im Fenster Laser oder verwalte die Geräte unter **Laser → Gerät → Geräte …**. Neue Geräte können von Vorlagen für verbreitete Laser ausgehen; die Liste ist nach Hersteller gruppiert, allgemeine Vorlagen je Steuerung stehen am Ende.
+Jeder Laser ist ein **Gerät** mit eigener Verbindung, eigenem Arbeitsbereich und eigenen Einstellungen. Wähle das Gerät oben im Fenster Laser oder verwalte die Geräte unter **Laser → Gerät → Geräte …**. Neue Geräte können von Vorlagen für verbreitete Laser ausgehen; die Liste ist nach Hersteller gruppiert, allgemeine Vorlagen je Steuerung stehen am Ende. Modelle mit mehreren Lasermodulen haben einen Eintrag je Modul. Unter der Liste stehen Lasermodul, Arbeitsbereich, Ausstattung und Herkunft der Werte der gewählten Vorlage; prüfe den Arbeitsbereich vor dem ersten Job. Das Lasermodul (Art, optische Leistung, Wellenlänge) lässt sich auch später in den Geräteeinstellungen eintragen.
 
 **Laser → Gerät → Geräteeinstellungen …** enthält unter anderem:
 

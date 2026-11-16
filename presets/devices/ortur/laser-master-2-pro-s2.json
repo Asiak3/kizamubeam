@@ -5,5 +5,10 @@
   "fw": "grbl",
   "bedW": 400,
   "bedH": 400,
-  "source": "techradar.com/reviews/ortur-laser-master-2-pro"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "techradar.com/reviews/ortur-laser-master-2-pro",
+  "sourceUrl": "https://www.techradar.com/reviews/ortur-laser-master-2-pro",
+  "checked": "2026-10-19"
 }

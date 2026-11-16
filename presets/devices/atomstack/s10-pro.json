@@ -5,5 +5,11 @@
   "fw": "grbl",
   "bedW": 410,
   "bedH": 400,
-  "source": "410 × 400 mm, LightBurn and LaserGRBL listed: geekbuying.com/item/ATOMSTACK-S10-Pro-10W-Laser-Engraver-Cutter-EU-Plug-510141.html"
+  "laser": {
+    "type": "diode",
+    "power": 10
+  },
+  "source": "geekbuying.com: 410 × 400 mm, 10 W, LightBurn and LaserGRBL listed",
+  "sourceUrl": "https://www.geekbuying.com/item/ATOMSTACK-S10-Pro-10W-Laser-Engraver-Cutter-EU-Plug-510141.html",
+  "checked": "2026-11-16"
 }

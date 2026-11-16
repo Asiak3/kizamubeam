@@ -5,5 +5,12 @@
   "fw": "fluidnc",
   "bedW": 365,
   "bedH": 305,
-  "source": "365 × 305 mm per notebookcheck.com and macitynet.it (manufacturer page not readable); controller confirmed on a real machine"
+  "laser": {
+    "type": "diode"
+  },
+  "features": [
+    "wifi"
+  ],
+  "source": "365 × 305 mm per notebookcheck.com and macitynet.it (manufacturer page not readable); controller confirmed on a real machine",
+  "checked": "2026-10-19"
 }

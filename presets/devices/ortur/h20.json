@@ -1,0 +1,48 @@
+{
+  "id": "ortur.h20",
+  "vendor": "Ortur",
+  "name": "Ortur H20",
+  "fw": "grbl",
+  "bedW": 420,
+  "bedH": 300,
+  "laser": {
+    "type": "diode"
+  },
+  "variants": [
+    {
+      "id": "10w",
+      "name": "10 W",
+      "laser": {
+        "power": 10
+      }
+    },
+    {
+      "id": "20w",
+      "name": "20 W",
+      "laser": {
+        "power": 20
+      }
+    },
+    {
+      "id": "40w",
+      "name": "40 W",
+      "bedW": 410,
+      "bedH": 275,
+      "laser": {
+        "power": 40
+      }
+    },
+    {
+      "id": "ir-2w",
+      "name": "2 W IR",
+      "bedH": 275,
+      "laser": {
+        "type": "ir",
+        "power": 2
+      }
+    }
+  ],
+  "source": "ortur.net: 420 × 300 mm with 10/20 W module, 410 × 275 mm with 40 W, 420 × 275 mm with 2 W IR; LightBurn and LaserGRBL listed",
+  "sourceUrl": "https://ortur.net/products/ortur-h20-laser-engraver-cutter-machine",
+  "checked": "2026-11-16"
+}

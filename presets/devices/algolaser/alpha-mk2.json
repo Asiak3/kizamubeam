@@ -5,5 +5,10 @@
   "fw": "grbl",
   "bedW": 400,
   "bedH": 410,
-  "source": "algolaser.com/products/algolaser-alpha-mk2-10w-diode-laser-engraver: 400 × 410 mm, LightBurn/LaserGRBL"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "algolaser.com/products/algolaser-alpha-mk2-10w-diode-laser-engraver: 400 × 410 mm, LightBurn/LaserGRBL",
+  "sourceUrl": "https://algolaser.com/products/algolaser-alpha-mk2-10w-diode-laser-engraver",
+  "checked": "2026-11-16"
 }

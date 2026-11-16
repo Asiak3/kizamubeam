@@ -1,9 +1,0 @@
-{
-  "id": "longer.ray5-5-10w",
-  "vendor": "Longer",
-  "name": "Longer Ray5 5/10 W",
-  "fw": "grbl",
-  "bedW": 400,
-  "bedH": 400,
-  "source": "longer.net, Ray5 5 W/10 W; 115200 baud"
-}

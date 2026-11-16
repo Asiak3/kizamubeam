@@ -5,5 +5,11 @@
   "fw": "grbl",
   "bedW": 120,
   "bedH": 120,
-  "source": "sculpfun.com/products/sculpfun-icube-portable-laser-engraving-machine: 120 × 120 mm, LightBurn/LaserGRBL"
+  "laser": {
+    "type": "diode",
+    "power": 10
+  },
+  "source": "sculpfun.com: iCube Pro Max 10 W, 120 × 120 mm, LightBurn/LaserGRBL",
+  "sourceUrl": "https://sculpfun.com/products/sculpfun-icube-portable-laser-engraving-machine",
+  "checked": "2026-11-16"
 }

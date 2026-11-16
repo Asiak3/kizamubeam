@@ -5,5 +5,11 @@
   "fw": "grbl",
   "bedW": 400,
   "bedH": 415,
-  "source": "crealityfalcon.com/products/10w-cr-laser-falcon-engraver"
+  "laser": {
+    "type": "diode",
+    "power": 10
+  },
+  "source": "crealityfalcon.com/products/10w-cr-laser-falcon-engraver",
+  "sourceUrl": "https://crealityfalcon.com/products/10w-cr-laser-falcon-engraver",
+  "checked": "2026-10-19"
 }

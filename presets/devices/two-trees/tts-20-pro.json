@@ -5,5 +5,10 @@
   "fw": "grbl",
   "bedW": 418,
   "bedH": 418,
-  "source": "gadgetexplained.com/2024/01/twotrees-tts-20-pro-review-laser.html: 418 × 418 mm, LaserGRBL/LightBurn"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "gadgetexplained.com review: 418 × 418 mm, LaserGRBL/LightBurn",
+  "sourceUrl": "https://www.gadgetexplained.com/2024/01/twotrees-tts-20-pro-review-laser.html",
+  "checked": "2026-11-16"
 }

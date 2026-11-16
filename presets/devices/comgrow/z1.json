@@ -5,5 +5,11 @@
   "fw": "grbl",
   "bedW": 400,
   "bedH": 400,
-  "source": "COMGO Z1 manual V1.1; 115200 baud"
+  "laser": {
+    "type": "diode"
+  },
+  "baud": 115200,
+  "source": "COMGO Z1 manual V1.1: 400 × 400 mm, LaserGRBL/LightBurn, 115200 baud",
+  "sourceUrl": "https://drucktipps3d.de/wp-content/uploads/2022/02/COMGO-Z1-manual-V1.1.pdf",
+  "checked": "2026-11-16"
 }

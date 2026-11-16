@@ -5,5 +5,9 @@
   "fw": "grbl",
   "bedW": 400,
   "bedH": 400,
-  "source": "PHECDA user manual 2023-10-20 (download.elegoo.com): 400 × 400 mm, LaserGRBL/LightBurn"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "PHECDA user manual 2023-10-20 (download.elegoo.com): 400 × 400 mm, LaserGRBL/LightBurn",
+  "checked": "2026-11-16"
 }

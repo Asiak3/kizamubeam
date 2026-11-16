@@ -79,7 +79,7 @@ The **Console** shows the messages of the controller and lets you send commands,
 
 ## Devices and device settings
 
-Each laser is a **device** with its own connection, work area and settings. Pick the device at the top of the Laser window, or manage them under **Laser → Device → Devices …**. New devices can start from templates for common lasers; the list is grouped by manufacturer, with generic templates per controller at the end.
+Each laser is a **device** with its own connection, work area and settings. Pick the device at the top of the Laser window, or manage them under **Laser → Device → Devices …**. New devices can start from templates for common lasers; the list is grouped by manufacturer, with generic templates per controller at the end. Models sold with several laser modules have one entry per module. Below the list you see the selected template's laser module, work area, equipment and where the values come from; check the work area before the first job. The laser module (type, optical power, wavelength) can also be entered later in the device settings.
 
 **Laser → Device → Device Settings …** holds, among others:
 

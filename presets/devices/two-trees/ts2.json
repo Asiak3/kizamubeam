@@ -5,5 +5,10 @@
   "fw": "grbl",
   "bedW": 450,
   "bedH": 450,
-  "source": "techradar.com/reviews/two-trees-ts2-laser-engraver"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "techradar.com/reviews/two-trees-ts2-laser-engraver",
+  "sourceUrl": "https://www.techradar.com/reviews/two-trees-ts2-laser-engraver",
+  "checked": "2026-10-19"
 }

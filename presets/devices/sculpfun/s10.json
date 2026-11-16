@@ -5,7 +5,16 @@
   "fw": "grbl",
   "bedW": 410,
   "bedH": 400,
+  "laser": {
+    "type": "diode",
+    "power": 10
+  },
+  "features": [
+    "air-assist"
+  ],
   "baud": 115200,
   "airCmd": "M7",
-  "source": "sculpfun.com/blogs/blog/sculpfun-s10: 410 × 400 mm (about 385 × 390 with limit switches), air assist on M7; user manual: GRBL, 115200 baud (manual says 410 × 420)"
+  "source": "sculpfun.com/blogs/blog/sculpfun-s10: 410 × 400 mm (about 385 × 390 with limit switches), air assist on M7; user manual: GRBL, 115200 baud (manual says 410 × 420)",
+  "sourceUrl": "https://sculpfun.com/blogs/blog/sculpfun-s10",
+  "checked": "2026-11-16"
 }

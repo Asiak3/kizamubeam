@@ -76,6 +76,17 @@ export const FIRMWARES: Record<Firmware, FirmwareInfo> = {
 /** Achse, auf der die Drehung ausgegeben wird: Y = Rotary steckt am Y-Anschluss, sonst eine eigene Achse */
 export type RotaryAxis = 'Y' | 'Z' | 'A' | 'B' | 'C';
 
+/** Kind of laser source; decides which material settings fit */
+export type LaserType = 'diode' | 'ir' | 'co2' | 'fiber';
+export const LASER_TYPES: LaserType[] = ['diode', 'ir', 'co2', 'fiber'];
+
+/** The laser module in a device: kind, optical output power in W and wavelength in nm (each optional) */
+export interface LaserModule {
+  type?: LaserType;
+  power?: number;
+  wavelength?: number;
+}
+
 /** Drehachse (Rotary): Die Y-Richtung des Entwurfs wird zur Umfangsrichtung des Objekts */
 export interface Rotary {
   enabled: boolean;
@@ -182,6 +193,8 @@ export interface Device {
    * (LightBurn-Verhalten, zugleich Kollisionsprüfung Kopf gegen Material/Spannpratzen).
    */
   frameView: 'pointer' | 'tool';
+  /** Laser module (from the preset or entered by hand); informational, not used for G-code */
+  laser?: LaserModule;
 }
 
 export const DEFAULT_DEVICE: Device = {
@@ -240,6 +253,8 @@ export function newDevice(preset: Partial<Device> & { fw: Firmware }): Device {
     sMax: fw.sMax,
     ...preset,
     rotary: { ...DEFAULT_ROTARY, ...preset.rotary },
+    pointerOffset: { ...DEFAULT_DEVICE.pointerOffset, ...preset.pointerOffset },
+    ...(preset.laser ? { laser: { ...preset.laser } } : {}),
     id: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
   };
 }

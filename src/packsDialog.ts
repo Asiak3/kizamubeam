@@ -2,13 +2,13 @@
 import { h, showDialog } from './dom';
 import { openText } from './files';
 import { entryLabel } from './materials';
-import { FIRMWARES } from './gcode';
+import { FIRMWARES, LaserModule, LaserType } from './gcode';
 import { Catalog, CatalogEntry, catalogState, fetchCatalog, fetchCatalogPack } from './catalog';
 import { version as APP_VERSION } from '../package.json';
 import { lang, t, tn } from './i18n';
 import {
   brokenPacks, countSummary, ensurePacks, hasPackFolder, installedPacks, installKind, installPack, localText, openPackFolder, Pack, PACK_EXT, packSummary, parsePack, removePack,
-  groupPresets, PresetListEntry,
+  groupPresets, PresetFeature, PresetListEntry,
 } from './packs';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -25,6 +25,61 @@ export function presetSelect(presets: PresetListEntry[]): HTMLSelectElement {
     h('optgroup', { label: g.vendor || (g.fromPack ? t('Aus Erweiterungen') : t('Allgemein|Gerätehersteller')) }, ...g.items.map(({ entry, index }) => presetOption(entry, index))),
   );
   return h('select', {}, ...groups) as HTMLSelectElement;
+}
+
+/** Name of a laser type for the interface */
+export function laserTypeLabel(type: LaserType): string {
+  return { diode: t('Diode'), ir: t('Infrarot (IR)'), co2: t('CO2'), fiber: t('Faser') }[type];
+}
+
+/** Laser module as short text, e.g. „10 W Diode · 455 nm“; empty when nothing is known */
+export function laserText(m: LaserModule | undefined): string {
+  if (!m) return '';
+  const parts: string[] = [];
+  const kind = [m.power !== undefined ? `${m.power.toLocaleString(lang)} W` : '', m.type ? laserTypeLabel(m.type) : ''].filter(Boolean).join(' ');
+  if (kind) parts.push(kind);
+  if (m.wavelength !== undefined) parts.push(`${m.wavelength} nm`);
+  return parts.join(' · ');
+}
+
+function featureLabel(f: PresetFeature): string {
+  return {
+    'air-assist': t('Air Assist'),
+    autofocus: t('Autofokus'),
+    camera: t('Kamera'),
+    enclosure: t('Gehäuse'),
+    wifi: t('WLAN'),
+    bluetooth: t('Bluetooth'),
+    offline: t('Offline-Betrieb'),
+  }[f];
+}
+
+/** Details of a preset below the select: laser, work area, equipment and where the values come from */
+export function presetDetails(p: PresetListEntry | undefined): HTMLElement {
+  const box = h('div', { class: 'note preset-details' });
+  if (!p) return box;
+  const d = p.preset;
+  const facts: string[] = [t('{w} × {h} mm', { w: d.bedW!, h: d.bedH! })];
+  const laser = laserText(d.laser);
+  if (laser) facts.unshift(laser);
+  if (d.zAxis) facts.push(t('Z-Achse'));
+  if (p.features?.length) facts.push(...p.features.map(featureLabel));
+  box.append(h('div', {}, facts.join(' · ')));
+  const origin = p.measured ? t('Maße an einer Maschine gemessen') : t('Maße laut Hersteller oder Testbericht');
+  const checked = p.checked ? t('geprüft am {date}', { date: p.checked }) : '';
+  box.append(h('div', {}, [origin, checked].filter(Boolean).join(', ')));
+  if (p.source || p.sourceUrl) box.append(h('div', { class: 'muted' }, t('Quelle: {source}', { source: [p.source, p.sourceUrl].filter(Boolean).join(' · ') })));
+  return box;
+}
+
+/** Select plus details that follow the selection; option values are indices into `presets` */
+export function presetPicker(presets: PresetListEntry[]): { select: HTMLSelectElement; details: HTMLElement } {
+  const select = presetSelect(presets);
+  const details = h('div', {});
+  const show = () => details.replaceChildren(presetDetails(presets[Number(select.value)]));
+  select.addEventListener('change', show);
+  show();
+  return { select, details };
 }
 
 /** Inhalt eines Pakets als Liste (Rückfrage beim Installieren) */

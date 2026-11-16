@@ -5,5 +5,9 @@
   "fw": "grbl",
   "bedW": 410,
   "bedH": 400,
-  "source": "Manufacturer: 410 × 400 mm; users in the LightBurn forum measure about 374 × 362 mm"
+  "laser": {
+    "type": "diode"
+  },
+  "source": "Manufacturer: 410 × 400 mm; users in the LightBurn forum measure about 374 × 362 mm",
+  "checked": "2026-10-19"
 }

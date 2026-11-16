@@ -5,7 +5,17 @@
   "fw": "grbl",
   "bedW": 590,
   "bedH": 595,
+  "laser": {
+    "type": "diode",
+    "power": 22
+  },
+  "features": [
+    "air-assist",
+    "bluetooth"
+  ],
   "airCmd": "M8",
   "limitSwitches": "yes",
-  "source": "eu.sculpfun.com/products/sculpfun-s30-ultra-22w-laser-engraving-machine: 590 × 595 mm with limit switch; LightBurn with air assist M8, LaserGRBL"
+  "source": "eu.sculpfun.com (22 W): 590 × 595 mm with limit switch, Bluetooth; LightBurn with air assist M8, LaserGRBL",
+  "sourceUrl": "https://eu.sculpfun.com/products/sculpfun-s30-ultra-22w-laser-engraving-machine",
+  "checked": "2026-11-16"
 }

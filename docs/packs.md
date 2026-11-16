@@ -68,9 +68,19 @@ The presets built into KizamuBeam use exactly this format, one file per device i
 | `vendor` | no | Localised manufacturer, e.g. `"Ortur"`; groups the list |
 | `frameSpeed` | no | Speed for framing (mm/min) |
 | `host` | no | Only `localhost` or `127.x.x.x` (a program on the same computer, like the KizamuBeam Virtual Machine); other addresses are dropped |
-| `source` | no | Where the values come from (shown as a tooltip). Please always give one. |
+| `source` | no | Where the values come from (shown below the list). Please always give one. |
+| `sourceUrl` | no | Link to the source; only `https://` |
+| `checked` | no | Date the values were last checked against the source, `YYYY-MM-DD` |
+| `measured` | no | `true` if the work area was measured on a real machine, not only taken from the manufacturer |
+| `laser` | no | Laser module: `type` (`diode`, `ir`, `co2` or `fiber`), `power` (optical output in W) and `wavelength` (nm), each optional. Copied into the new device; informational, does not change the G-code |
+| `features` | no | Equipment, shown below the list: any of `air-assist`, `autofocus`, `camera`, `enclosure`, `wifi`, `bluetooth`, `offline`. Unknown values are dropped |
+| `variants` | no | 1 to 12 variants of the model, e.g. laser modules with their own work area. Each has `id` (lower-case letters, digits, `-`), `name` (localised, added in brackets to the model name) and optionally `bedW`, `bedH` and `laser` (merged into the model's `laser`). The list shows one entry per variant |
+| `zAxis`, `zFlip` | no | Motorised Z axis present; Z+ moves towards the material |
+| `pointerOffset` | no | Red-dot offset `{ "x": …, "y": …, "enabled": true }` in mm (−200 to 200) |
+| `rxBuffer` | no | Controller receive buffer in bytes for streaming (64 to 16384) |
+| `httpPort` | no | Port of the controller's web interface (FluidNC) |
 
-Start and end scripts, rotary settings, addresses other than this computer and AI agent limits cannot come from a pack, because they send commands to the machine or are personal settings. Invalid optional values are dropped; the preset keeps the default.
+Start and end scripts, rotary settings, framing with the laser on, addresses other than this computer and AI agent limits cannot come from a pack, because they send commands to the machine, fire the laser or are personal settings. Invalid optional values are dropped; the preset keeps the default.
 
 ### Templates (`templates`)
 
