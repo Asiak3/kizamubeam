@@ -126,6 +126,15 @@ export const PULLEY: Generator = {
   kind: 'part',
   name: t('Riemenscheibe'),
   icon: 'pulley',
+  tile: {
+    group: 'mech',
+    text: (t) => ({
+      name: t('Riemenscheibe'),
+      desc: t('Zahnriemenscheibe für GT2- oder HTD-Riemen, mit Bordscheiben.'),
+      keys: t('Riemen Zahnriemen GT2 HTD Pulley|Suchwörter'),
+      action: t('Riemenscheibe erstellen (GT2, HTD; Parameter bleiben erhalten)'),
+    }),
+  },
   schema: [
     { key: 'profile', type: 'enum', label: t('Riemenprofil'), def: 'gt2_2', options: Object.entries(PROFILE_NAMES) },
     { key: 'teeth', type: 'int', label: t('Zähnezahl'), min: 8, max: 400, def: 20 },

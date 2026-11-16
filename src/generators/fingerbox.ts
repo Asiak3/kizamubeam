@@ -103,6 +103,16 @@ function adjustedParts(p: FingerParams): GenPart[] {
 
 export const FINGERBOX: Generator = {
   id: 'box-divided', version: 3, kind: 'assembly', icon: 'box',
+  tile: {
+    group: 'box',
+    before: 'lidhinge',
+    text: (t) => ({
+      name: t('Box mit Fingerzinken und Trennwänden'),
+      desc: t('Box mit parametrischen Trennwänden.'),
+      keys: t('Box Fächer Trennwände Fingerzinken|Suchwörter'),
+      action: t('Box mit Fingerzinken und Trennwänden'),
+    }),
+  },
   name: t('Box mit Fingerzinken und Trennwänden'),
   schema: [
     { key: 'jointLayout', type: 'data', label: '', def: 'current' },

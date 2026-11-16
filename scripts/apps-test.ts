@@ -4,6 +4,7 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 const { appGroups, appList, fold, isNewIn, pushRecent, searchApps } = await import('../src/apps');
 const { ICONS } = await import('../src/icons');
+const { GENERATORS } = await import('../src/generators/index');
 
 let failed = 0;
 function test(name: string, fn: () => void) {
@@ -22,6 +23,8 @@ const ui = readFileSync(new URL('../src/ui.ts', import.meta.url), 'utf8');
 const actionIcons = new Map<string, string | undefined>();
 for (const m of ui.matchAll(/\{\s*id: '([^']+)', cat: \w+,(?: icon: '([^']+)')?/g)) actionIcons.set(m[1], m[2]);
 for (const m of ui.matchAll(/tool\('([^']+)', '([^']+)'/g)) actionIcons.set(`tool:${m[1]}`, m[2]);
+// Generators with a tile get their action from the registry (ui.ts maps GENERATORS, #341)
+for (const g of GENERATORS) if (g.tile) actionIcons.set(g.id, g.icon);
 
 test('Kennungen eindeutig, Gruppen bekannt, Texte vorhanden', () => {
   const ids = apps.map((a) => a.id);

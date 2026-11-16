@@ -90,6 +90,18 @@ export const DRAWER: Generator = {
   kind: 'assembly',
   name: t('Schublade'),
   icon: 'drawer',
+  fit: { kind: 'pair', play: 'clearance' },
+  assemblyCheck: true,
+  tile: {
+    group: 'box',
+    before: 'lidhinge',
+    text: (t) => ({
+      name: t('Schublade'),
+      desc: t('Korpus, Schubkasten und Blende mit Griff als Baugruppe.'),
+      keys: t('Schublade Schubfach Kommode Korpus|Suchwörter'),
+      action: t('Schublade erstellen (Korpus, Schubkasten und Blende als Baugruppe)'),
+    }),
+  },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'width', type: 'length', label: t('Breite'), min: 20, max: 3000, def: 160, title: t('Außenmaß des Korpus (ohne Korpus: Breite des Fachs)') },

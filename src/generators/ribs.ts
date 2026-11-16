@@ -875,6 +875,19 @@ export const RIBS: Generator = {
   kind: 'assembly',
   name: t('Rippenmodell'),
   icon: 'ribs',
+  fit: { kind: 'slot', play: 'play' },
+  assemblyCheck: true,
+  inputs: [{ kind: 'model3d' }],
+  tile: {
+    group: 'model3d',
+    since: '1.16.0',
+    text: (t) => ({
+      name: t('Rippenmodell'),
+      desc: t('3D-Modell (STL, OBJ) als Rippen, die mit Schlitzen auf einem Rückgrat stecken.'),
+      keys: t('3D STL OBJ Rippen Spanten Rückgrat Steckmodell Tier Figur Waffel|Suchwörter'),
+      action: t('Rippenmodell aus einem 3D-Modell (STL, OBJ) erstellen'),
+    }),
+  },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'model', type: 'data', label: t('Modell'), def: '' },

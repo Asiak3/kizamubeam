@@ -64,6 +64,18 @@ export const INSERT: Generator = {
   kind: 'assembly',
   name: t('Einsatz'),
   icon: 'insert',
+  fit: { kind: 'slot', play: 'play' },
+  assemblyCheck: true,
+  tile: {
+    group: 'box',
+    before: 'lidhinge',
+    text: (t) => ({
+      name: t('Einsatz mit Fächern'),
+      desc: t('Gesteckte Trennstege, die eine Box oder Schublade in Fächer teilen.'),
+      keys: t('Einsatz Fächer Trennwand Sortierkasten Box|Suchwörter'),
+      action: t('Einsatz mit Fächern erstellen (gesteckte Stege für Box oder Schublade)'),
+    }),
+  },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'width', type: 'length', label: t('Innenbreite'), min: 10, max: 3000, def: 150, title: t('Innenmaß der Box oder Schublade, in die der Einsatz kommt') },

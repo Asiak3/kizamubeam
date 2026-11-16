@@ -75,6 +75,33 @@ export interface GenResult {
   plan?: PlanSheet;
 }
 
+/** Toolbox tile and toolbar action of a generator (texts as German source strings, translated by the given t) */
+export interface GenTile {
+  /** Toolbox group (AppGroup in apps.ts) */
+  group: string;
+  /** Place the tile before this tile of the same group; without it the tile goes to the end of the group */
+  before?: string;
+  /** Version that added the generator (marks the tile as new) */
+  since?: string;
+  text(t: (s: string) => string): {
+    /** Name under the tile */
+    name: string;
+    /** One sentence for the tooltip */
+    desc: string;
+    /** More search words, separated by spaces */
+    keys: string;
+    /** Tooltip of the toolbar/menu action */
+    action: string;
+  };
+}
+
+/** What a generator needs before its dialog opens */
+export type GenInput =
+  /** A 3D model (STL, OBJ) picked by the user; the generator is opened through the model import */
+  | { kind: 'model3d' }
+  /** The current selection, encoded into the given parameter */
+  | { kind: 'selection'; param: string };
+
 export interface Generator {
   id: string;
   /** Wird erhöht, wenn sich Parameter ändern; migrate() bringt ältere Parameter auf den Stand */
@@ -91,4 +118,11 @@ export interface Generator {
   /** Kurzer Name für das Objekte-Fenster, z. B. „Zahnrad z=24 m=2“; bei Baugruppen mit dem Schlüssel des Teils */
   label(p: Params, part?: string): string;
   migrate?(p: Params, from: number): Params;
+  /** Plug-in joints: kind of fit and the parameter that holds the play (design check, material calibration) */
+  fit?: { kind: 'pair' | 'slot'; play: string };
+  /** The parts form one connected assembly that the assembly check examines */
+  assemblyCheck?: boolean;
+  /** Toolbox tile and action; generators without one are only reachable through files, MCP and code */
+  tile?: GenTile;
+  inputs?: GenInput[];
 }

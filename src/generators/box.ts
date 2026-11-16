@@ -274,6 +274,18 @@ export const BOX: Generator = {
   kind: 'assembly',
   name: t('Box'),
   icon: 'box',
+  fit: { kind: 'pair', play: 'clearance' },
+  assemblyCheck: true,
+  tile: {
+    group: 'box',
+    before: 'lidhinge',
+    text: (t) => ({
+      name: t('Box mit Fingerzinken'),
+      desc: t('Kiste aus Platten mit Fingerzinken, mit oder ohne Deckel, als Baugruppe.'),
+      keys: t('Kiste Kasten Gehäuse Schachtel Fingerzinken Deckel|Suchwörter'),
+      action: t('Box mit Fingerzinken erstellen (Baugruppe, Parameter bleiben erhalten)'),
+    }),
+  },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'sizeMode', type: 'enum', label: t('Maße'), def: 'outer', options: [['outer', t('Außenmaß')], ['inner', t('Innenmaß')]] },

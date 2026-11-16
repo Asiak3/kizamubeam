@@ -112,6 +112,15 @@ export const CAM: Generator = {
   kind: 'part',
   name: t('Nocken'),
   icon: 'cam',
+  tile: {
+    group: 'mech',
+    text: (t) => ({
+      name: t('Nocken'),
+      desc: t('Nockenscheibe für Rolle oder Spitze mit Hub, Rast und Rückhub.'),
+      keys: t('Nocke Kurvenscheibe Hub Exzenter Automat|Suchwörter'),
+      action: t('Nocken erstellen (Hub, Rast, Rückhub; Parameter bleiben erhalten)'),
+    }),
+  },
   schema: [
     { key: 'baseRadius', type: 'length', label: t('Grundkreisradius'), min: 2, max: 1000, def: 20, title: t('Kleinster Radius des Nockens: Hier steht der Stößel ganz unten') },
     { key: 'lift', type: 'length', label: t('Hub'), min: 0.1, max: 1000, def: 8 },

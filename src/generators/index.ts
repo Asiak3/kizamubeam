@@ -22,9 +22,19 @@ import { PATTERN_GEN, PATTERN_GEN_ID } from '../pattern';
 import type { Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet } from './types';
 import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
-export type { GenPart, Generator, Issue, Params, ParamSpec } from './types';
+export type { GenInput, GenPart, GenTile, Generator, Issue, Params, ParamSpec } from './types';
 
-export const GENERATORS: Generator[] = [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, FINGERBOX, DRAWER, INSERT, SHELF, DISCSPHERE, STACK, RIBS, JIG];
+/** Registered generators in toolbox order. Use register() to add one; the built-in generators register below. */
+export const GENERATORS: Generator[] = [];
+
+/** Add a generator (or replace one with the same id). Its id must stay stable: saved projects refer to it. */
+export function register(g: Generator) {
+  const i = GENERATORS.findIndex((x) => x.id === g.id);
+  if (i >= 0) GENERATORS[i] = g;
+  else GENERATORS.push(g);
+}
+
+for (const g of [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, FINGERBOX, DRAWER, INSERT, SHELF, STACK, RIBS, DISCSPHERE, JIG]) register(g);
 
 export const getGenerator = (id: string): Generator | undefined => (id === PATTERN_GEN_ID ? PATTERN_GEN : id === CONTOUR_OFFSET_ID ? CONTOUR_OFFSET : id === LEGACY_CONTOUR_OFFSET_ID ? { ...CONTOUR_OFFSET, id, version: 1 } : id === SLOT_GENERATOR ? SLOT_PLACEMENT : isSlotGenerator(id) ? { ...SLOT_PLACEMENT, id } : id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
 

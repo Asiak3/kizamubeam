@@ -275,6 +275,18 @@ export const JIG: Generator = {
   kind: 'assembly',
   name: t('Jig'),
   icon: 'jig',
+  inputs: [{ kind: 'selection', param: 'shapes' }],
+  tile: {
+    group: 'arrange',
+    before: 'jigfill',
+    since: '1.17.0',
+    text: (t) => ({
+      name: t('Jig'),
+      desc: t('Halteplatte mit passgenauen Aussparungen für Werkstücke aus Vektorgrafik, Bild oder Kamera, mit Nummern und Passermarken.'),
+      keys: t('Jig Halterung Vorrichtung Schablone Aussparung Serie Schlüsselanhänger Rohlinge Fächer|Suchwörter'),
+      action: t('Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken'),
+    }),
+  },
   schema: [
     { key: 'shapes', type: 'data', label: t('Werkstücke'), def: '[]' },
     {

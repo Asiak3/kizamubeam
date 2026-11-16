@@ -405,6 +405,18 @@ export const DISCSPHERE: Generator = {
   kind: 'assembly',
   name: t('Scheibenkugel'),
   icon: 'discsphere',
+  fit: { kind: 'slot', play: 'play' },
+  assemblyCheck: true,
+  tile: {
+    group: 'model3d',
+    since: '1.10.0',
+    text: (t) => ({
+      name: t('Scheibenkugel'),
+      desc: t('Kugel oder Lampe aus Kreisscheiben, die sich über schräge Schlitze gegenseitig halten.'),
+      keys: t('Lampe Kugel Scheiben Steckmodell Lampenschirm Polyeder Papier Karton|Suchwörter'),
+      action: t('Scheibenkugel erstellen (Lampe aus gesteckten Scheiben)'),
+    }),
+  },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'diameter', type: 'length', label: t('Durchmesser'), min: 40, max: 2000, def: 250, title: t('Außendurchmesser der fertigen Kugel') },

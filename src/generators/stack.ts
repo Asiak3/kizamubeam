@@ -202,6 +202,19 @@ export const STACK: Generator = {
   kind: 'assembly',
   name: t('Schichtmodell'),
   icon: 'stack',
+  assemblyCheck: true,
+  inputs: [{ kind: 'model3d' }],
+  tile: {
+    group: 'model3d',
+    before: 'multilayer',
+    since: '1.10.0',
+    text: (t) => ({
+      name: t('Schichtmodell'),
+      desc: t('3D-Modell (STL, OBJ) in gestapelte Scheiben zerlegen, die verleimt wieder das Modell ergeben.'),
+      keys: t('3D STL OBJ Scheiben Schichten stapeln Slicer Skulptur Relief Kopf|Suchwörter'),
+      action: t('Schichtmodell aus einem 3D-Modell (STL, OBJ) erstellen'),
+    }),
+  },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'model', type: 'data', label: t('Modell'), def: '' },

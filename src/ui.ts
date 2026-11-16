@@ -9,7 +9,7 @@ import { ImageAdjust, ImageShape, Layer, layerLabel, Obj, ObjBindKey, pageName, 
 import { evaluate, formatNumber, namesIn } from './params';
 import { deletePreset, loadPresets, presetOutput, savePreset } from './imagePresets';
 import { openFillDialog, openSaveTemplateDialog, openSeriesDialog, openTemplateLibrary } from './templateDialogs';
-import { exportDxf, exportPdf, exportSvg, importFile, importModel, installDropAndPaste, openProject, saveProcessedBitmap, saveProject } from './files';
+import { exportDxf, exportPdf, exportSvg, importFile, installDropAndPaste, openProject, saveProcessedBitmap, saveProject } from './files';
 import { onMeshReady } from './model3d/store';
 import { assetImage, displayCanvas, onImageReady, outputGrid } from './images';
 import { onFontListChanged, refreshFonts, requestLocalFonts, systemFonts } from './fonts';
@@ -39,7 +39,7 @@ import { openBarcodeDialog } from './barcodeDialog';
 import { LINEAR_NAMES } from './barcode1d';
 import { askGenConvert, openGenDialog } from './generators/dialog';
 import { assignLayerAsk, needsChildLayersQuestion } from './layerAssign';
-import { genLabel, getGenerator } from './generators';
+import { GENERATORS, genLabel, getGenerator } from './generators';
 import { maybeOfferSetup, openSetupWizard } from './setupWizard';
 import { maybeCheckForUpdates, nightlyBuild, nightlyWarning, openUpdateDialog } from './updateDialog';
 import { openPacksDialog } from './packsDialog';
@@ -62,8 +62,7 @@ import { buildCheckPanel, openCheck } from './checkPanel';
 import { openCalibrateDialog } from './calibrateDialog';
 import { openFocusTestDialog } from './focustestDialog';
 import { openPrintCutDialog } from './printcutDialog';
-import { encodeShapes } from './generators/jig';
-import { shapesFromSelection } from './generators/jigPanel';
+import { openGenerator } from './generators/run';
 import { openJigFillDialog } from './jigFillDialog';
 import { openMultiLayerDialog } from './multilayerDialog';
 import { buildParamsPanel, openShowIfDialog } from './paramsPanel';
@@ -1109,21 +1108,9 @@ function buildBars(ed: Editor) {
     { id: 'sketchconv', cat: W, icon: 'sketchconv', label: t('Gewählte Formen in eine Skizze umwandeln (Beziehungen und Maße setzen)'), run: () => void ed.convertSelToSketch(), enabled: sel1 },
     { id: 'qr', cat: W, icon: 'qr', label: t('QR-Code erstellen'), run: () => openQrDialog(ed) },
     { id: 'barcode', cat: W, icon: 'barcode', label: t('Strichcode erstellen (Code 128, EAN, UPC, Code 39, ITF)'), run: () => openBarcodeDialog(ed) },
-    { id: 'jig', cat: W, icon: 'jig', label: t('Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken'), run: () => openGenDialog(ed, 'jig', undefined, ed.sel.length ? { shapes: encodeShapes(shapesFromSelection(ed)) } : undefined) },
-    { id: 'gear', cat: W, icon: 'gear', label: t('Zahnrad erstellen (Evolventenverzahnung, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'gear') },
-    { id: 'rack', cat: W, icon: 'rack', label: t('Zahnstange erstellen (passend zum Zahnrad, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'rack') },
-    { id: 'pulley', cat: W, icon: 'pulley', label: t('Riemenscheibe erstellen (GT2, HTD; Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'pulley') },
-    { id: 'cam', cat: W, icon: 'cam', label: t('Nocken erstellen (Hub, Rast, Rückhub; Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'cam') },
-    { id: 'gearpair', cat: W, icon: 'gearpair', label: t('Zahnradpaar erstellen (Baugruppe mit Achsabstand und Grundplatte)'), run: () => openGenDialog(ed, 'gearpair') },
-    { id: 'drawer', cat: W, icon: 'drawer', label: t('Schublade erstellen (Korpus, Schubkasten und Blende als Baugruppe)'), run: () => openGenDialog(ed, 'drawer') },
-    { id: 'insert', cat: W, icon: 'insert', label: t('Einsatz mit Fächern erstellen (gesteckte Stege für Box oder Schublade)'), run: () => openGenDialog(ed, 'insert') },
-    { id: 'shelf', cat: W, icon: 'shelf', label: t('Steckregal erstellen (Seiten und Böden gesteckt)'), run: () => openGenDialog(ed, 'shelf') },
-    { id: 'stack', cat: W, icon: 'stack', label: t('Schichtmodell aus einem 3D-Modell (STL, OBJ) erstellen'), run: () => importModel(ed, 'stack') },
+    // One action per registered generator (Generator.tile); the toolbox shows the same ones as tiles
+    ...GENERATORS.filter((g) => g.tile).map((g) => ({ id: g.id, cat: W, icon: g.icon, label: g.tile!.text(t).action, run: () => openGenerator(ed, g) })),
     { id: 'multilayer', cat: W, icon: 'stack', label: t('Mehrlagenarbeit aus den ausgewählten Formen erstellen oder bearbeiten'), run: () => openMultiLayerDialog(ed), enabled: sel1 },
-    { id: 'ribs', cat: W, icon: 'ribs', label: t('Rippenmodell aus einem 3D-Modell (STL, OBJ) erstellen'), run: () => importModel(ed, 'ribs') },
-    { id: 'discsphere', cat: W, icon: 'discsphere', label: t('Scheibenkugel erstellen (Lampe aus gesteckten Scheiben)'), run: () => openGenDialog(ed, 'discsphere') },
-    { id: 'box', cat: W, icon: 'box', label: t('Box mit Fingerzinken erstellen (Baugruppe, Parameter bleiben erhalten)'), run: () => openGenDialog(ed, 'box') },
-    { id: 'box-divided', cat: W, icon: 'box', label: t('Box mit Fingerzinken und Trennwänden'), run: () => openGenDialog(ed, 'box-divided') },
     { id: 'vartext', cat: W, icon: 'vartext', short: t('Var. Text'), label: t('Variabler Text …'), run: () => openVarTextDialog(ed) },
     { id: 'textpath', cat: W, short: t('Auf Pfad'), label: t('Text auf Pfad'), run: () => ed.applyPathToText(), enabled: sel2 },
     {
@@ -1186,7 +1173,7 @@ function buildBars(ed: Editor) {
     { id: 'grp:align', cat: A, label: t('Ausrichten und verteilen (Gruppe)'), items: ['alignl', 'alignhc', 'alignr', 'alignt', 'alignvc', 'alignb', 'disth', 'distv'], run: () => {} },
     { id: 'grp:zoom', cat: V, label: t('Zoom (Gruppe)'), items: ['zoompage', 'zoomsel', 'zoomin', 'zoomout'], run: () => {} },
     { id: 'grp:bool', cat: M, label: t('Boolesche Operationen (Gruppe)'), items: ['union', 'subtract', 'intersect', 'shape-builder', 'boolopts'], run: () => {} },
-    { id: 'grp:gen', cat: W, label: t('Generatoren (Gruppe)'), items: ['gear', 'rack', 'pulley', 'cam', 'gearpair', 'box', 'drawer', 'insert', 'shelf', 'discsphere', 'stack', 'ribs'], run: () => {} },
+    { id: 'grp:gen', cat: W, label: t('Generatoren (Gruppe)'), items: GENERATORS.filter((g) => g.tile).map((g) => g.id), run: () => {} },
     { id: 'grp:array', cat: M, label: t('Arrays (Gruppe)'), items: ['gridarray', 'circarray'], run: () => {} },
     { id: 'grp:relate', cat: A, label: t('Beziehungen (Gruppe)'), items: REL_MODES.map((m) => `rel:${m}`), run: () => {} },
     { id: 'grp:path', cat: M, label: t('Pfad-Werkzeuge (Gruppe)'), items: ['tool:trim', 'tool:start', 'closepath', 'join', 'breakapart', 'reverse', 'corners', 'vectorfit'], run: () => {} },

@@ -66,6 +66,18 @@ export const SHELF: Generator = {
   kind: 'assembly',
   name: t('Steckregal'),
   icon: 'shelf',
+  fit: { kind: 'slot', play: 'play' },
+  assemblyCheck: true,
+  tile: {
+    group: 'box',
+    before: 'lidhinge',
+    text: (t) => ({
+      name: t('Steckregal'),
+      desc: t('Regal aus Seiten und Böden, die ineinander gesteckt werden.'),
+      keys: t('Regal Böden Stecksystem Möbel|Suchwörter'),
+      action: t('Steckregal erstellen (Seiten und Böden gesteckt)'),
+    }),
+  },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'width', type: 'length', label: t('Breite'), min: 30, max: 3000, def: 300, title: t('Länge der Böden') },

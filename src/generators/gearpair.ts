@@ -77,6 +77,15 @@ export const GEARPAIR: Generator = {
   kind: 'assembly',
   name: t('Zahnradpaar'),
   icon: 'gearpair',
+  tile: {
+    group: 'mech',
+    text: (t) => ({
+      name: t('Zahnradpaar'),
+      desc: t('Zwei passende Zahnräder mit Achsabstand und Grundplatte als Baugruppe.'),
+      keys: t('Getriebe Übersetzung Zahnräder Achsabstand|Suchwörter'),
+      action: t('Zahnradpaar erstellen (Baugruppe mit Achsabstand und Grundplatte)'),
+    }),
+  },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest' },
     { key: 'teeth1', type: 'int', label: t('Zähnezahl Rad 1'), min: 5, max: 400, def: 18 },
