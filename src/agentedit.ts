@@ -453,7 +453,7 @@ export const EDIT_TOOLS: ToolDef[] = [
     tier: Tier.Edit,
     inputSchema: obj({
       path: { type: 'string' },
-      kind: { type: 'string', enum: ['stack', 'ribs'] },
+      kind: { type: 'string', enum: GENERATORS.filter((g) => g.inputs?.some((i) => i.kind === 'model3d')).map((g) => g.id) },
       suggest: { type: 'boolean' },
       params: { type: 'object' },
       x: { type: 'number' }, y: { type: 'number' }, layer: LAYER,
@@ -477,9 +477,10 @@ export const EDIT_TOOLS: ToolDef[] = [
       } catch (e) {
         throw new ToolError(`${file}: ${(e as Error).message}`);
       }
-      const kind = a.kind === 'stack' ? 'stack' : 'ribs';
-      const g = getGenerator(kind)!;
-      const raw = { ...paramArg(a), model: addMesh(mesh), name: file.replace(/\.[^.]*$/, '') };
+      const g = getGenerator(String(a.kind ?? ''));
+      if (!g?.inputs?.some((i) => i.kind === 'model3d')) throw new ToolError(`kind: ${String(a.kind)}`);
+      const kind = g.id;
+      const raw = { ...paramArg(a), ...g.fromInputs?.({ model: { id: addMesh(mesh), name: file.replace(/\.[^.]*$/, '') } }) };
       const bad = checkInput(g, raw);
       if (bad.length) throw new ToolError(bad.map((i) => i.msg).join('; '));
       let params = normalizeParams(g, raw);

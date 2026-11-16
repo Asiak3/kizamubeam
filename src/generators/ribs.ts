@@ -28,6 +28,7 @@ import {
   regionIslands, sliceAt, sliceRegion, subtractRegions, unionRegions, V3,
 } from '../model3d/slice';
 import { numberStrokes, numberWidth, placeNumber, worldOf } from './stack';
+import { ribsPanel } from '../model3d/ribsPanel';
 
 export interface RibsParams {
   model: string;
@@ -883,6 +884,8 @@ export const RIBS: Generator = {
   fit: { kind: 'slot', play: 'play' },
   assemblyCheck: true,
   inputs: [{ kind: 'model3d' }],
+  fromInputs: (inp) => (inp.model ? { model: inp.model.id, name: inp.model.name } : undefined),
+  panel: (p, set) => ribsPanel(p, set),
   tile: {
     group: 'model3d',
     since: '1.16.0',

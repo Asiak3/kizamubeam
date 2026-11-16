@@ -1485,7 +1485,6 @@
   "{name} erstellen": "Crear {name}",
   "Erweitert": "Avanzado",
   "Was soll aus dem 3D-Modell werden?": "¿En qué debe convertirse el modelo 3D?",
-  "Schichtmodell: dicht gestapelte Scheiben, die verleimt werden. Rippenmodell: Rippen mit Abstand, die mit Schlitzen auf einem Rückgrat stecken.": "Modelo en capas: láminas muy apiladas que se pegan. Modelo de costillas: costillas espaciadas que encajan con ranuras en una espina.",
   "{n} parametrisches Bauteil": "{n} pieza paramétrica",
   "{n} parametrische Bauteile": "{n} piezas paramétricas",
   "Parametrisches Bauteil ändern?": "¿Cambiar la pieza paramétrica?",

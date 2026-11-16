@@ -7,17 +7,15 @@ import type { GenShape, Obj } from '../model';
 import type { BuildResult } from './index';
 import { subsToPath2D } from '../geom';
 import { dec, t, tn } from '../i18n';
-import { autoText, buildGen, defaultParams, fieldActive, genLabel, getGenerator, normalizeParams, resolveBinds } from './index';
+import { autoText, buildGen, defaultParams, fieldActive, GENERATORS, genLabel, getGenerator, normalizeParams, resolveBinds } from './index';
 import { evalExpr, f2 } from '../dom';
 import { evaluate, formatNumber, namesIn, projectParams } from '../params';
 import type { GenChange, Generator, Params, ParamSpec, ParamValue } from './types';
 import { library, entryLabel } from '../materials';
 import { genFitPatch } from '../fitcheck';
-import { ribsPanel, type GenPanel } from '../model3d/ribsPanel';
-import { jigPanel } from './jigPanel';
+import { genHost } from '../genHost';
 
 /** Generatoren mit eigener Zeichenfläche unter den Feldern */
-const PANELS: Record<string, (p: Params, set: (patch: Params) => void, ed: Editor) => GenPanel> = { ribs: ribsPanel, jig: jigPanel };
 
 const LAST_KEY = (id: string) => `kizamubeam.gen.${id}`;
 
@@ -217,10 +215,10 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   const infoEl = h('div', { class: 'gen-info' });
   const kerfNote = h('div', { class: 'note' });
   let built: BuildResult | null = null;
-  const panel = PANELS[g.id]?.(p, (patch) => {
+  const panel = g.panel?.(p, (patch) => {
     Object.assign(p, patch);
     update();
-  }, ed);
+  }, genHost(ed));
 
   const render = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde
@@ -457,20 +455,25 @@ function askTooLarge(): Promise<'create' | 'back' | 'cancel'> {
   });
 }
 
-/** Beim Import eines 3D-Modells: Schichtmodell oder Rippenmodell? null = abgebrochen */
-export function askModelKind(): Promise<'stack' | 'ribs' | null> {
+/** Generators that take a 3D model (Generator.inputs), in registry order */
+export const modelGenerators = () => GENERATORS.filter((g) => g.inputs?.some((i) => i.kind === 'model3d'));
+
+/** On importing a 3D model: which generator should it go to? One button per model generator; null = cancelled */
+export function askModelKind(): Promise<string | null> {
   return new Promise((resolve) => {
-    let answer: 'stack' | 'ribs' | null = null;
+    let answer: string | null = null;
     const done = (a: typeof answer) => ((answer = a), dlg.close());
+    const gens = modelGenerators();
+    const texts = gens.map((g) => ({ g, ...(g.tile?.text(t) ?? { name: g.name, desc: '' }) }));
     const dlg = h(
       'dialog',
       { class: 'offset-dialog gen-guard' },
       h('h3', {}, t('Was soll aus dem 3D-Modell werden?')),
-      h('p', {}, t('Schichtmodell: dicht gestapelte Scheiben, die verleimt werden. Rippenmodell: Rippen mit Abstand, die mit Schlitzen auf einem Rückgrat stecken.')),
+      ...texts.map((x) => h('p', {}, h('b', {}, x.name), x.desc ? ` ${x.desc}` : '')),
       h('div', { class: 'dialog-buttons' },
         h('button', { class: 'btn', onclick: () => done(null) }, t('Abbrechen')),
-        h('button', { class: 'btn', onclick: () => done('ribs') }, t('Rippenmodell')),
-        h('button', { class: 'btn primary', onclick: () => done('stack') }, t('Schichtmodell')),
+        // The first registered generator is the default and sits last, as the primary button
+        ...texts.slice().reverse().map((x, i, all) => h('button', { class: i === all.length - 1 ? 'btn primary' : 'btn', onclick: () => done(x.g.id) }, x.name)),
       ),
     );
     dlg.addEventListener('keydown', (e) => e.stopPropagation());

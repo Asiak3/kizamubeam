@@ -9,8 +9,8 @@ const { GENERATORS, register, getGenerator, ruleHolds, fieldActive, autoText, bu
 const { appList } = await import('../src/apps');
 const { genFit } = await import('../src/fitcheck');
 
-/** Core files that are already free of generator ids; later steps of #341 add the remaining ones */
-const DECOUPLED = ['src/fitcheck.ts', 'src/asmcheck.ts', 'src/apps.ts', 'src/ui.ts', ...readdirSync(new URL('../src/view3d/', import.meta.url)).filter((f) => f.endsWith('.ts')).map((f) => `src/view3d/${f}`)];
+/** Core files that must stay free of generator ids (acceptance of #341) */
+const DECOUPLED = ['src/fitcheck.ts', 'src/asmcheck.ts', 'src/apps.ts', 'src/ui.ts', 'src/files.ts', 'src/generators/dialog.ts', ...readdirSync(new URL('../src/view3d/', import.meta.url)).filter((f) => f.endsWith('.ts')).map((f) => `src/view3d/${f}`)];
 /** Uses of a matching word that are not a generator id */
 const ALLOWED = /type \w+ = [^;]+;|(icon|group|kind): '[\w-]+'( \| '[\w-]+')*|\?\? '[\w-]+'|ICONS\[\w+\] \? \w+ : '[\w-]+'|\{ id: '[\w-]+', label:|ICONS\.\w+|\[a-z]/g;
 
@@ -108,6 +108,17 @@ test('onChange: box-divided keeps ratios and asks before dropping values', () =>
   assert.ok(r && r.ask && r.ask.options[0].patch.ratiosX === '1:2');
   assert.equal(g.onChange!('width', 100, p), undefined);
   assert.equal(g.preview?.center, true);
+});
+
+test('inputs: selection and 3D model become parameters through fromInputs', () => {
+  const jig = getGenerator('jig')!;
+  const sq = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 10 }, { x: 0, y: 10 }];
+  const p = jig.fromInputs!({ selection: [{ name: 'Tag', polys: [sq] }] })!;
+  assert.ok(String(p.shapes).includes('Tag'));
+  assert.equal(jig.fromInputs!({ selection: [] }), undefined);
+  for (const id of ['stack', 'ribs']) assert.deepEqual(getGenerator(id)!.fromInputs!({ model: { id: 'm1', name: 'cat' } }), { model: 'm1', name: 'cat' });
+  assert.equal(typeof getGenerator('ribs')!.panel, 'function');
+  assert.equal(typeof jig.panel, 'function');
 });
 
 test('register adds a generator and replaces one with the same id', () => {

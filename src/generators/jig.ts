@@ -14,6 +14,7 @@ import { IDENT } from '../model';
 import { markSubs } from '../printcut';
 import { numberStrokes } from './stack';
 import type { Generator, GenPart, Issue, Params } from './types';
+import { jigPanel, shapesFromSelection } from './jigPanel';
 
 /** Eine Werkstückart: Name, Anzahl, Drehung im Jig (0/90°) und Außenumriss (Mitte im Ursprung) */
 export interface JigShape {
@@ -275,7 +276,9 @@ export const JIG: Generator = {
   kind: 'assembly',
   name: t('Jig'),
   icon: 'jig',
-  inputs: [{ kind: 'selection', param: 'shapes' }],
+  inputs: [{ kind: 'selection' }],
+  fromInputs: (inp) => (inp.selection?.length ? { shapes: encodeShapes(shapesFromSelection(inp.selection)) } : undefined),
+  panel: (p, set, host) => jigPanel(p, set, host),
   tile: {
     group: 'arrange',
     before: 'jigfill',

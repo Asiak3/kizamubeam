@@ -134,7 +134,8 @@ Ein Generator gibt alles, was die App über ihn wissen muss, an seinem `Generato
 - `fit`: Art der Steckpassung und der Parameter mit dem Spiel (Konstruktion prüfen, Material-Kalibrierung).
 - `poses(params, thickness)`: Lage jedes Teils im Raum (3D-Ansicht, Baugruppen-Prüfung); Hilfen in `src/generators/pose.ts`.
 - `assemblyCheck`: Die Teile bilden eine Baugruppe für die Baugruppen-Prüfung.
-- `inputs`: Was der Generator vor dem Dialog braucht (3D-Modell, Auswahl).
+- `inputs`: Was der Generator vor dem Dialog braucht (3D-Modell, Auswahl); `fromInputs()` macht daraus Parameter. Der Import eines 3D-Modells bietet jeden Generator mit `model3d`-Eingabe an.
+- `panel(params, set, host)`: zusätzlicher Dialogbereich, der die App nur über `GenHost` liest (Umrisse der Auswahl, Bettgröße, Kamerabilder; `src/generators/host.ts`) und nur Parameter schreibt.
 - `showIf` an einem Feld ist eine Regel (`{ eq: [key, value] }`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`), nie eine Funktion; `ruleHolds()` wertet sie aus.
 - `view(params)`: Werte im Dialog, die von den Parametern abhängen (`autoText`-Vorschläge für leere Textfelder).
 - `onChange(key, old, params)`: wird beim Übernehmen eines Feldes aufgerufen; liefert `patch` und/oder `ask` (Frage mit Optionen, Abbrechen stellt das Feld wieder her). `preview.center` zentriert die Vorschau; `resetOnNew` an einem Feld lässt neue Objekte mit dem Standardwert beginnen.

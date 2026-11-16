@@ -3,6 +3,7 @@ import type { Editor } from './editor';
 import { parseMeshFile } from './model3d/mesh';
 import { addMesh } from './model3d/store';
 import { askModelKind, openGenDialog } from './generators/dialog';
+import { getGenerator } from './generators/index';
 import { IDENT, Mat, mul, Obj, pageName, TextShape, visibleLeaves, PALETTE } from './model';
 import { boundsOf, subsToD, shapeSubs, textLayout, textOutline } from './geom';
 import { assetImage, assetUrl, flipImageV, hashId, processedPng, readDpi, registerAsset } from './images';
@@ -602,17 +603,17 @@ export async function importFile(ed: Editor) {
  * 3D-Modell einlesen und den Dialog des Schichtmodells bzw. Rippenmodells öffnen (ohne Vorgabe wird gefragt).
  * Das Netz kommt in den Modell-Speicher; die Teile tragen nur seine Kennung. Fehler werden geworfen.
  */
-export async function openModel(ed: Editor, name: string, bytes: Uint8Array, gen?: 'stack' | 'ribs') {
+export async function openModel(ed: Editor, name: string, bytes: Uint8Array, gen?: string) {
   const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   const mesh = parseMeshFile(name, buf);
-  const kind = gen ?? (await askModelKind());
-  if (!kind) return;
+  const g = getGenerator(gen ?? (await askModelKind()) ?? '');
+  if (!g) return;
   const id = addMesh(mesh);
-  openGenDialog(ed, kind, undefined, { model: id, name: name.replace(/\.[^.]*$/, '') });
+  openGenDialog(ed, g.id, undefined, g.fromInputs?.({ model: { id, name: name.replace(/\.[^.]*$/, '') } }));
 }
 
-/** Kachel Schichtmodell/Rippenmodell: nur STL und OBJ anbieten */
-export async function importModel(ed: Editor, gen: 'stack' | 'ribs') {
+/** Tile of a generator with a 3D model input: offer only STL and OBJ */
+export async function importModel(ed: Editor, gen: string) {
   const run = async (name: string, bytes: Uint8Array) => {
     try {
       await openModel(ed, name, bytes, gen);

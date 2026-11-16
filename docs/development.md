@@ -134,7 +134,8 @@ A generator declares everything the app needs to know about it on its `Generator
 - `fit`: kind of plug-in fit and the parameter holding the play (design check, material calibration).
 - `poses(params, thickness)`: position of every part in space (3D view, assembly check); helpers in `src/generators/pose.ts`.
 - `assemblyCheck`: the parts form one assembly for the assembly check.
-- `inputs`: what the generator needs before its dialog opens (a 3D model, the selection).
+- `inputs`: what the generator needs before its dialog opens (a 3D model, the selection); `fromInputs()` turns them into parameters. Importing a 3D model offers every generator with a `model3d` input.
+- `panel(params, set, host)`: extra dialog area that reads the app only through `GenHost` (selection outlines, bed size, camera images; `src/generators/host.ts`) and writes only parameters.
 - `showIf` on a field is a rule (`{ eq: [key, value] }`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`), never a function; `ruleHolds()` evaluates it.
 - `view(params)`: values the dialog shows that depend on the parameters (`autoText` suggestions for empty text fields).
 - `onChange(key, old, params)`: called when a field is committed; returns a `patch` and/or an `ask` (question with options, cancelling restores the field). `preview.center` centres the dialog preview; `resetOnNew` on a field makes new objects start with its default.

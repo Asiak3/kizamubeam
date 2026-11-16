@@ -208,6 +208,7 @@ export const STACK: Generator = {
   },
   assemblyCheck: true,
   inputs: [{ kind: 'model3d' }],
+  fromInputs: (inp) => (inp.model ? { model: inp.model.id, name: inp.model.name } : undefined),
   tile: {
     group: 'model3d',
     before: 'multilayer',

@@ -3,6 +3,7 @@
 // Damit lässt er sich testen, über MCP aufrufen und später auch als Community-Generator laden.
 import type { Pt, SubPath } from '../model';
 import type { AsmPoses } from './pose';
+import type { GenHost, GenInputs, GenPanel } from './host';
 
 export type ParamValue = number | string | boolean;
 export type Params = Record<string, ParamValue>;
@@ -119,10 +120,10 @@ export interface GenTile {
 
 /** What a generator needs before its dialog opens */
 export type GenInput =
-  /** A 3D model (STL, OBJ) picked by the user; the generator is opened through the model import */
+  /** A 3D model (STL, OBJ) picked by the user; offered when a model is imported, see GenInputs.model */
   | { kind: 'model3d' }
-  /** The current selection, encoded into the given parameter */
-  | { kind: 'selection'; param: string };
+  /** The current selection (top-level objects as outlines); Generator.fromInputs turns it into parameters */
+  | { kind: 'selection' };
 
 /**
  * Question the app asks the user after a change (the only way a generator can ask anything, #335).
@@ -175,4 +176,8 @@ export interface Generator {
   /** Toolbox tile and action; generators without one are only reachable through files, MCP and code */
   tile?: GenTile;
   inputs?: GenInput[];
+  /** Parameters for a new object from the declared inputs (e.g. workpiece outlines from the selection) */
+  fromInputs?(inputs: GenInputs): Params | undefined;
+  /** Extra area in the dialog; it reads the app only through the host and writes only parameters */
+  panel?(p: Params, set: (patch: Params) => void, host?: GenHost): GenPanel;
 }
