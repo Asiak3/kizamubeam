@@ -105,6 +105,7 @@ It finds, among other things:
 - bridges between two cuts narrower than the minimum bridge (default 1 mm, kerf taken into account),
 - cut-outs too small for the kerf,
 - objects outside the work area,
+- engravings that lie on no cut part (they are missing in the 3D view and would hit the work surface; nothing is reported if the page has no cut part at all, because then everything lies on a finished object),
 - elements that an SVG or DXF import had to skip,
 - the **fit** of slot-together joints from the generators and the Joint tool against material thickness and kerf (too tight, very tight, very loose).
 

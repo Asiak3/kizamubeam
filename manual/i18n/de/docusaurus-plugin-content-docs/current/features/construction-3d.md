@@ -105,6 +105,7 @@ Gefunden werden unter anderem:
 - Stege zwischen zwei Schnitten, die schmaler als der Mindeststeg sind (Standard 1 mm, Schnittbreite eingerechnet),
 - Ausschnitte, die für die Schnittbreite zu klein sind,
 - Objekte außerhalb des Arbeitsbereichs,
+- Gravuren, die auf keinem Schnittteil liegen (sie fehlen in der 3D-Ansicht und würden die Arbeitsfläche treffen; gibt es auf der Seite gar kein Schnittteil, wird nichts gemeldet, weil dann alles auf einem fertigen Gegenstand liegt),
 - Elemente, die ein SVG- oder DXF-Import überspringen musste,
 - die **Passung** von Steckverbindungen aus den Generatoren und dem Werkzeug Verbindung gegenüber Materialdicke und Kerf (zu eng, sehr eng, sehr locker).
 

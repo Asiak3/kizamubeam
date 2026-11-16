@@ -2519,6 +2519,8 @@
   "Die Schnitte berühren sich hier: Das Material wird durchtrennt.": "The cuts touch here: the material will be cut through.",
   "Steg nur {w} mm breit: Er könnte beim Schneiden brechen.": "Bridge only {w} mm wide: it could break while cutting.",
   "Liegt außerhalb des Arbeitsbereichs.": "Lies outside the work area.",
+  "Diese Gravur liegt auf keinem Teil und würde die Arbeitsfläche treffen.": "This engraving lies on no part and would hit the work surface.",
+  "Gravur": "Engraving",
   "Ragt über den Arbeitsbereich hinaus.": "Extends beyond the work area.",
   "Einige Elemente der Quelldatei wurden nicht übernommen. {note}": "Some elements of the source file were not imported. {note}",
   "Doppelte Linie": "Duplicate line",

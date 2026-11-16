@@ -105,6 +105,7 @@ Trova, tra l’altro:
 - ponti tra due tagli più stretti del ponte minimo (predefinito 1 mm, larghezza di taglio inclusa),
 - ritagli troppo piccoli per la larghezza di taglio,
 - oggetti fuori dall’area di lavoro,
+- incisioni che non giacciono su nessuna parte di taglio (mancano nella vista 3D e colpirebbero la superficie di lavoro; se la pagina non ha alcuna parte di taglio non viene segnalato nulla, perché allora tutto giace su un oggetto finito),
 - elementi che un’importazione SVG o DXF ha dovuto saltare,
 - l’**accoppiamento** delle giunzioni a incastro dei generatori e dello strumento Giunzione rispetto a spessore del materiale e kerf (troppo stretto, molto stretto, molto lasco).
 

@@ -3,7 +3,7 @@
 // des Arbeitsbereichs und Import-Hinweise. Jeder Befund nennt die betroffenen Objekte, die Stellen zum Markieren
 // (Weltkoordinaten) und, wo es geht, eine Korrektur. Ohne DOM, damit es auch in den Tests läuft.
 import ClipperLib from 'clipper-lib';
-import { apply, IDENT, Layer, Mat, mul, Obj, Pt, selfOutputOff, SubPath } from './model';
+import { apply, IDENT, inv, isCutLayer, Layer, leaves, Mat, mul, Obj, outputLeaves, Pt, selfOutputOff, SubPath } from './model';
 import { conditionHolds } from './params';
 import { boundsOf, shapeSubs, textOutline } from './geom';
 import { parkedObjs } from './parking';
@@ -15,7 +15,7 @@ import { checkFits, FitFinding } from './fitcheck';
 import { AsmFinding, checkAssemblies } from './asmcheck';
 import type { Params } from './generators/types';
 
-export type CheckKind = 'double' | 'open' | 'unjoined' | 'web' | 'hole' | 'bed' | 'import' | 'fit' | 'thickness' | 'loose' | 'insert';
+export type CheckKind = 'double' | 'open' | 'unjoined' | 'web' | 'hole' | 'bed' | 'import' | 'fit' | 'thickness' | 'loose' | 'insert' | 'engrave';
 export type CheckLevel = 'error' | 'warn' | 'info';
 
 /** Korrektur zu einem Befund; ausgeführt vom Editor (src/editor/check.ts) */
@@ -727,6 +727,53 @@ function checkImport(inp: CheckInput, out: CheckIssue[]) {
   }
 }
 
+/**
+ * Gravuren, die auf keinem Schnittteil liegen (Issue #326): Sie fehlen in der 3D-Ansicht und würden beim Lasern die
+ * Arbeitsfläche treffen. Ein Teil ist eine geschlossene Form auf einem Schnitt-Layer (auch bei ausgeschalteter Ausgabe:
+ * so wird eine Platte gezeichnet), es zählt sein Umgebungskasten wie in der 3D-Ansicht. Ohne Teile auf der Seite wird
+ * nichts gemeldet: Dann liegt alles auf einem fertigen Gegenstand (Becher, Handyhülle).
+ */
+function checkLooseEngravings(inp: CheckInput, out: CheckIssue[]) {
+  const box = (o: Obj, m: Mat) => {
+    const b = boundsOf([o], mul(m, inv(o.m)));
+    return b ? { b, r: [b.x, b.y, b.x + b.w, b.y + b.h] } : null;
+  };
+  const plates: number[][] = [];
+  for (const [o, m] of leaves(inp.objs)) {
+    const s = o.shape;
+    if (!isCutLayer(inp.layer(o.layer)) || s.kind === 'text' || s.kind === 'image') continue;
+    if (s.kind === 'path' && (s.mark || !s.subs.some((sp) => sp.closed))) continue;
+    const x = box(o, m);
+    if (x) plates.push(x.r);
+  }
+  if (!plates.length) return;
+  const parked = parkedObjs(inp.objs, inp.bed, inp.layer);
+  for (const top of inp.objs) {
+    if (parked.has(top)) continue;
+    const lines: Pt[][] = [];
+    for (const [o, m] of outputLeaves([top])) {
+      const L = inp.layer(o.layer);
+      const s = o.shape;
+      if (!L.output) continue;
+      const mark = s.kind === 'image' || s.kind === 'text' || L.mode === 'fill' || (s.kind === 'path' && (s.mark || s.subs.some((sp) => !sp.closed)));
+      if (!mark) continue;
+      const x = box(o, m);
+      if (!x || plates.some((p) => x.r[0] < p[2] && x.r[2] > p[0] && x.r[1] < p[3] && x.r[3] > p[1])) continue;
+      lines.push(boxLine(x.b));
+    }
+    if (!lines.length) continue;
+    out.push({
+      key: `engrave:${top.id}`,
+      kind: 'engrave',
+      level: 'warn',
+      msg: t('Diese Gravur liegt auf keinem Teil und würde die Arbeitsfläche treffen.'),
+      objs: [top],
+      lines,
+      pts: [],
+    });
+  }
+}
+
 const ORDER: Record<CheckLevel, number> = { error: 0, warn: 1, info: 2 };
 
 /** Alle Prüfungen für die Objekte einer Seite; Ergebnis nach Schwere sortiert */
@@ -738,6 +785,7 @@ export function checkDesign(inp: CheckInput): CheckIssue[] {
   checkOpen(cs, inp.settings, out);
   checkWebsAndHoles(cs, inp.settings, out);
   checkImport(inp, out);
+  checkLooseEngravings(inp, out);
   const fits: FitFinding[] = [];
   checkFits(inp.objs, inp.layer, inp.settings.beam, fits);
   for (const f of fits)

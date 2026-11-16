@@ -735,6 +735,8 @@
   "Die Schnitte berühren sich hier: Das Material wird durchtrennt.": "Los cortes se tocan aquí: el material se separará.",
   "Steg nur {w} mm breit: Er könnte beim Schneiden brechen.": "Puente de solo {w} mm de ancho: podría romperse al cortar.",
   "Liegt außerhalb des Arbeitsbereichs.": "Queda fuera del área de trabajo.",
+  "Diese Gravur liegt auf keinem Teil und würde die Arbeitsfläche treffen.": "Este grabado no está sobre ninguna pieza y alcanzaría la superficie de trabajo.",
+  "Gravur": "Grabado",
   "Ragt über den Arbeitsbereich hinaus.": "Sobresale del área de trabajo.",
   "Einige Elemente der Quelldatei wurden nicht übernommen. {note}": "Algunos elementos del archivo de origen no se importaron. {note}",
   "Doppelte Linie": "Línea duplicada",

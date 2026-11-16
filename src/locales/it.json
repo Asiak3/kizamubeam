@@ -2250,6 +2250,8 @@
   "Die Schnitte berühren sich hier: Das Material wird durchtrennt.": "I tagli si toccano qui: il materiale verrà tagliato completamente.",
   "Steg nur {w} mm breit: Er könnte beim Schneiden brechen.": "Ponte largo solo {w} mm: potrebbe rompersi durante il taglio.",
   "Liegt außerhalb des Arbeitsbereichs.": "Si trova fuori dall'area di lavoro.",
+  "Diese Gravur liegt auf keinem Teil und würde die Arbeitsfläche treffen.": "Questa incisione non si trova su nessuna parte e colpirebbe la superficie di lavoro.",
+  "Gravur": "Incisione",
   "Ragt über den Arbeitsbereich hinaus.": "Si estende oltre l'area di lavoro.",
   "Einige Elemente der Quelldatei wurden nicht übernommen. {note}": "Alcuni elementi del file sorgente non sono stati importati. {note}",
   "Doppelte Linie": "Linea duplicata",

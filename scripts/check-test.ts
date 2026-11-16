@@ -117,12 +117,44 @@ test('Schmaler Steg zwischen Loch und Rand: gemeldet mit Breite', () => {
 });
 
 test('Füll- und Gravur-Konturen davor stören die Suche nicht', () => {
-  const engr = rect(20, 20, 200, 200, 0);
+  const engr = rect(10, 10, 45, 45, 0);
   const plate = rect(50, 50, 10, 10);
   const hole = rect(10, 10, 20, 10.6);
   const dup = rect(30, 30, 100, 100);
   const dup2 = rect(30, 30, 100, 100);
   assert.deepEqual(kinds(run([engr, plate, hole, dup, dup2])), ['double', 'web']);
+});
+
+test('Gravur auf keinem Teil wird gemeldet, auf einem Teil oder ohne Teile nicht (Issue #326)', () => {
+  const plate = rect(50, 50, 10, 10);
+  const onPlate = rect(10, 10, 45, 45, 0);
+  const far = rect(20, 20, 200, 200, 0);
+  assert.deepEqual(run([plate, onPlate]), [], 'auf dem Teil');
+  const xs = run([plate, onPlate, far]);
+  assert.deepEqual(kinds(xs), ['engrave']);
+  assert.equal(xs[0].level, 'warn');
+  assert.deepEqual(xs[0].objs, [far]);
+  assert.equal(xs[0].fix, undefined);
+  assert.deepEqual(run([far]), [], 'ohne Teile liegt alles auf einem fertigen Gegenstand');
+  // Teile am Rand: der Kasten des Teils genügt (wie in der 3D-Ansicht)
+  assert.deepEqual(run([plate, rect(10, 10, 55, 55, 0)]), [], 'ragt über den Rand, berührt aber das Teil');
+});
+
+test('Gravur: Platte mit ausgeschalteter Ausgabe zählt als Teil, gravierte Linien und Gruppen werden geprüft', () => {
+  layers[7] = { ...defaultLayer(7), mode: 'line', output: false };
+  const sheet = rect(250, 150, 10, 10, 7);
+  const inSheet = rect(20, 20, 200, 120, 0);
+  assert.deepEqual(run([sheet, inSheet]), [], 'auf der Platte ohne Ausgabe');
+  // Offene Linie auf einem Schnitt-Layer ist eine Gravur
+  const plate = rect(50, 50, 10, 10);
+  const scratch = path([line([[300, 300], [340, 300]])]);
+  assert.ok(run([plate, scratch]).some((x) => x.kind === 'engrave' && x.objs[0] === scratch));
+  // Gruppe: eine Gravur in der Gruppe, die auf keinem Teil liegt
+  const inner = rect(20, 20, 200, 200, 0);
+  const grp = obj({ kind: 'group', children: [inner] });
+  const xs = run([plate, grp]).filter((x) => x.kind === 'engrave');
+  assert.equal(xs.length, 1);
+  assert.deepEqual(xs[0].objs, [grp]);
 });
 
 test('Steg breit genug und Kerf-Ausgleich zählt mit', () => {
