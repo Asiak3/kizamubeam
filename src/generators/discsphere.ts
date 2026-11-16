@@ -429,7 +429,7 @@ export const DISCSPHERE: Generator = {
     }),
   },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'diameter', type: 'length', label: t('Durchmesser'), min: 40, max: 2000, def: 250, title: t('Außendurchmesser der fertigen Kugel') },
     {
       key: 'shape',

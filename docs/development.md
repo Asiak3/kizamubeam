@@ -137,6 +137,7 @@ A generator declares everything the app needs to know about it on its `Generator
 - `inputs`: what the generator needs before its dialog opens (a 3D model, the selection).
 - `showIf` on a field is a rule (`{ eq: [key, value] }`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`), never a function; `ruleHolds()` evaluates it.
 - `view(params)`: values the dialog shows that depend on the parameters (`autoText` suggestions for empty text fields).
+- `onChange(key, old, params)`: called when a field is committed; returns a `patch` and/or an `ask` (question with options, cancelling restores the field). `preview.center` centres the dialog preview; `resetOnNew` on a field makes new objects start with its default.
 - Issues carry a stable `code`; texts for codes that `generate()` throws come from `texts`. Internals throw codes, not UI text.
 
 Register a generator with `register()` in `src/generators/index.ts`. Its `id` is stored in projects and must never change.

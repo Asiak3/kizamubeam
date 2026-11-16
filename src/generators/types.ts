@@ -30,6 +30,8 @@ interface SpecBase {
   title?: string;
   /** Abschnitt im Dialog: Hauptfelder oder eingeklappt unter „Erweitert“ */
   advanced?: boolean;
+  /** New objects always start with def instead of the last-used value (layout choices of saved objects) */
+  resetOnNew?: boolean;
   /** Feld nur zeigen (und beachten), wenn diese Bedingung gilt */
   showIf?: Rule;
 }
@@ -122,6 +124,21 @@ export type GenInput =
   /** The current selection, encoded into the given parameter */
   | { kind: 'selection'; param: string };
 
+/**
+ * Question the app asks the user after a change (the only way a generator can ask anything, #335).
+ * Each option applies its patch; cancelling restores the value before the change.
+ */
+export interface GenAsk {
+  question: string;
+  options: { label: string; patch: Params }[];
+}
+
+/** Answer of Generator.onChange: parameters to change as well, or a question first */
+export interface GenChange {
+  patch?: Params;
+  ask?: GenAsk;
+}
+
 export interface Generator {
   id: string;
   /** Wird erhöht, wenn sich Parameter ändern; migrate() bringt ältere Parameter auf den Stand */
@@ -140,6 +157,13 @@ export interface Generator {
   migrate?(p: Params, from: number): Params;
   /** Values the dialog shows that depend on the parameters: suggestions for empty text fields (by key) */
   view?(p: Params): { autoText?: Record<string, string> };
+  /**
+   * Called when the user commits a field (number fields on leaving them, choices at once) with its previous value.
+   * The returned patch is checked against the schema like user input.
+   */
+  onChange?(key: string, old: ParamValue, p: Params): GenChange | void;
+  /** Preview in the dialog: center = centre the parts' bounding box instead of the assembly origin */
+  preview?: { center?: boolean };
   /** Texts for issue codes that generate() may throw (Error.message = code); buildGen translates them */
   texts?: Record<string, () => string>;
   /** Plug-in joints: kind of fit and the parameter that holds the play (design check, material calibration) */

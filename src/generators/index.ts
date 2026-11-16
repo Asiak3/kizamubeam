@@ -22,7 +22,7 @@ import { PATTERN_GEN, PATTERN_GEN_ID } from '../pattern';
 import type { Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet, Rule } from './types';
 import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
-export type { Rule, GenInput, GenPart, GenTile, Generator, Issue, Params, ParamSpec } from './types';
+export type { GenAsk, GenChange, Rule, GenInput, GenPart, GenTile, Generator, Issue, Params, ParamSpec } from './types';
 
 /** Registered generators in toolbox order. Use register() to add one; the built-in generators register below. */
 export const GENERATORS: Generator[] = [];

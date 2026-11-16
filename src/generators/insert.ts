@@ -87,7 +87,7 @@ export const INSERT: Generator = {
     }),
   },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'width', type: 'length', label: t('Innenbreite'), min: 10, max: 3000, def: 150, title: t('Innenmaß der Box oder Schublade, in die der Einsatz kommt') },
     { key: 'depth', type: 'length', label: t('Innentiefe'), min: 10, max: 3000, def: 100 },
     { key: 'height', type: 'length', label: t('Höhe der Stege'), min: 4, max: 1000, def: 40 },

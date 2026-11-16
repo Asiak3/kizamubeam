@@ -3,6 +3,7 @@ import { t } from '../i18n';
 import type { GenPart, Generator, Issue, Params } from './types';
 import { fingerboxParts, fingerboxSegments, horizontalSegments, type FingerboxParams } from './fingerbox-experiment';
 import { defaultDistribution, distributeGaps } from './fingerbox-distribution';
+import { resizeDistribution } from './fingerbox-resize';
 import { makeDividers, type DividerParams } from './fingerbox-dividers';
 import { panelPolys, offsetOrtho } from './box';
 import { layoutParts } from './build';
@@ -131,6 +132,18 @@ export function fingerboxPoses(raw: Params): AsmPoses | null {
 
 export const FINGERBOX: Generator = {
   id: 'box-divided', version: 3, kind: 'assembly', icon: 'box',
+  preview: { center: true },
+  onChange(key, old, p) {
+    // Changing the compartment count keeps the user's ratios: cut or extended with 1, asking before values are dropped
+    const ratioKey = key === 'compartmentsX' ? 'ratiosX' : key === 'compartmentsY' ? 'ratiosY' : '';
+    const count = Number(p[key]);
+    if (!ratioKey || !Number.isInteger(count) || count < 1 || count > 20 || count === Number(old)) return;
+    const resized = resizeDistribution(String(p[ratioKey] ?? ''), Number(old), count);
+    if (!resized) return;
+    const patch = { [ratioKey]: resized.text };
+    if (!resized.removed.length) return { patch };
+    return { ask: { question: t('Diese Fachwerte werden entfernt: {values}. Fortfahren?', { values: resized.removed.join(' : ') }), options: [{ label: t('OK'), patch }] } };
+  },
   view: (p) => ({ autoText: { ratiosX: defaultDistribution(Number(p.compartmentsX)), ratiosY: defaultDistribution(Number(p.compartmentsY)) } }),
   texts: issues,
   poses: (p) => fingerboxPoses(p),
@@ -146,8 +159,8 @@ export const FINGERBOX: Generator = {
   },
   name: t('Box mit Fingerzinken und Trennwänden'),
   schema: [
-    { key: 'jointLayout', type: 'data', label: '', def: 'current' },
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'jointLayout', type: 'data', label: '', def: 'current', resetOnNew: true },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'width', type: 'length', label: t('Breite'), min: 5, max: 3000, def: 100 },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 5, max: 3000, def: 80 },
     { key: 'height', type: 'length', label: t('Höhe'), min: 5, max: 3000, def: 50 },

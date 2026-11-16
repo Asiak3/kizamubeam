@@ -89,7 +89,7 @@ export const SHELF: Generator = {
     }),
   },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'width', type: 'length', label: t('Breite'), min: 30, max: 3000, def: 300, title: t('Länge der Böden') },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 20, max: 1000, def: 150 },
     { key: 'height', type: 'length', label: t('Höhe'), min: 30, max: 3000, def: 300 },

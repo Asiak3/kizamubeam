@@ -1,6 +1,5 @@
 // Dialoge für Generatoren: Parameter-Dialog (aus dem Schema gebaut, mit Vorschau) und die Rückfrage,
 // bevor eine Aktion ein parametrisches Bauteil in Pfade umwandelt.
-import { isDefaultDistribution, resizeDistribution } from './fingerbox-resize';
 import type { Editor } from '../editor';
 import { check, numField, select } from '../arrayDialogs';
 import { h } from '../dom';
@@ -11,7 +10,7 @@ import { dec, t, tn } from '../i18n';
 import { autoText, buildGen, defaultParams, fieldActive, genLabel, getGenerator, normalizeParams, resolveBinds } from './index';
 import { evalExpr, f2 } from '../dom';
 import { evaluate, formatNumber, namesIn, projectParams } from '../params';
-import type { Generator, Params, ParamSpec } from './types';
+import type { GenChange, Generator, Params, ParamSpec, ParamValue } from './types';
 import { library, entryLabel } from '../materials';
 import { genFitPatch } from '../fitcheck';
 import { ribsPanel, type GenPanel } from '../model3d/ribsPanel';
@@ -33,13 +32,18 @@ function lastParams(g: Generator): Params {
 /** Last-used settings must not carry a legacy layout into a newly created object. */
 export function initialDialogParams(g: Generator, old: GenShape | null, init?: Params): Params {
   const p = old ? normalizeParams(g, old.params) : init ? normalizeParams(g, init, lastParams(g)) : lastParams(g);
-  if (!old && g.id === 'box-divided') p.jointLayout = 'current';
-  // New multi-part objects are nested compactly, even if the last-used settings came from a saved one.
-  if (!old && g.schema.some((s) => s.key === 'partLayout')) p.partLayout = 'nest';
+  // E.g. new multi-part objects are nested compactly, even if the last-used settings came from a saved one
+  if (!old) for (const s of g.schema) if (s.resetOnNew) p[s.key] = s.def;
   return p;
 }
 
 const UNIT: Record<string, string> = { length: 'mm', angle: '°' };
+
+/** A text field that says the same as its suggestion (ignoring spaces) is stored empty, so it follows later changes */
+const isSuggested = (g: Generator, key: string, p: Params) => {
+  const v = String(p[key] ?? '').replace(/\s+/g, '');
+  return !!v && v === autoText(g, key, p).replace(/\s+/g, '');
+};
 
 /** Dauert eine Vorschau länger (große Baugruppen), wird sie erst kurz nach der letzten Eingabe neu berechnet */
 const SLOW_PREVIEW_MS = 40;
@@ -56,9 +60,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     return;
   }
   const p = initialDialogParams(g, old, init);
-  if (g.id === 'box-divided') for (const [ratio, count] of [['ratiosX', 'compartmentsX'], ['ratiosY', 'compartmentsY']] as const) {
-    if (isDefaultDistribution(String(p[ratio] ?? ''), Number(p[count]))) p[ratio] = '';
-  }
+  for (const s of g.schema) if (s.type === 'text' && isSuggested(g, s.key, p)) p[s.key] = '';
   // Felder mit Formel aus Projekt-Parametern (z. B. Dicke); beim Erstellen ohne Formeln
   const binds: Record<string, string> = { ...(old?.bind ?? {}) };
   const hasParams = projectParams().length > 0;
@@ -91,14 +93,11 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       textInputs.set(s.key, control);
       control.addEventListener('input', () => { p[s.key] = control.value; update(); });
       control.addEventListener('blur', () => {
-        if (g.id === 'box-divided' && (s.key === 'ratiosX' || s.key === 'ratiosY')) {
-          const count = Number(p[s.key === 'ratiosX' ? 'compartmentsX' : 'compartmentsY']);
-          if (isDefaultDistribution(String(p[s.key] ?? ''), count)) {
-            p[s.key] = '';
-            control.value = autoText(g, s.key, p);
-            update();
-            return;
-          }
+        if (isSuggested(g, s.key, p)) {
+          p[s.key] = '';
+          control.value = autoText(g, s.key, p);
+          update();
+          return;
         }
         if (!p[s.key]) control.value = autoText(g, s.key, p);
       });
@@ -107,9 +106,17 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     const unit = s.type === 'length' || s.type === 'angle' ? ` (${UNIT[s.type]})` : '';
     let input: HTMLElement;
     if (s.type === 'enum' || s.type === 'bool') {
-      const control = s.type === 'enum'
-        ? select(id, String(p[s.key]), s.options, (v) => ((p[s.key] = v), update()))
-        : check(!!p[s.key], (v) => ((p[s.key] = v), update()), s.label);
+      const set = (v: ParamValue) => {
+        const before = p[s.key];
+        p[s.key] = v;
+        const undo = () => {
+          p[s.key] = before;
+          if (control instanceof HTMLSelectElement) control.value = String(before);
+          else (control.querySelector('input') as HTMLInputElement).checked = !!before;
+        };
+        if (!changed(s.key, before, undo)) update();
+      };
+      const control: HTMLElement = s.type === 'enum' ? select(id, String(p[s.key]), s.options, set) : check(!!p[s.key], set, s.label);
       const els = s.type === 'enum' ? [h('label', { for: id, title: s.title ?? '' }, s.label), control] : [h('span'), control];
       if (s.title) control.title = s.title;
       if (!hasParams && !binds[s.key]) return els;
@@ -134,28 +141,19 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     } else if (hasParams || binds[s.key]) input = formulaField(s, id);
     else input = numField(id, Number(p[s.key]), (v) => ((p[s.key] = v), update()), s.title);
     if (s.title) input.title = s.title;
-    if (g.id === 'box-divided' && (s.key === 'compartmentsX' || s.key === 'compartmentsY')) {
+    if (g.onChange) {
+      // Committed value goes to Generator.onChange; a declined question restores the value and formula from before
       const el = input instanceof HTMLInputElement ? input : input.querySelector('input');
-      const ratioKey = s.key === 'compartmentsX' ? 'ratiosX' : 'ratiosY';
-      let previous = Number(p[s.key]), previousBind = binds[s.key], previousText = '';
-      el?.addEventListener('focus', () => { previous = Number(p[s.key]); previousBind = binds[s.key]; previousText = el.value; });
+      let previous = p[s.key], previousBind = binds[s.key], previousText = '';
+      el?.addEventListener('focus', () => { previous = p[s.key]; previousBind = binds[s.key]; previousText = el.value; });
       el?.addEventListener('blur', () => {
-        const count = Number(p[s.key]);
-        if (!Number.isInteger(count) || count < 1 || count > 20 || count === previous) return;
-        const resized = resizeDistribution(String(p[ratioKey] ?? ''), previous, count);
-        if (resized?.removed.length && !confirm(t('Diese Fachwerte werden entfernt: {values}. Fortfahren?', { values: resized.removed.join(' : ') }))) {
+        if (p[s.key] === previous) return;
+        const undo = () => {
           p[s.key] = previous;
           if (previousBind) binds[s.key] = previousBind; else delete binds[s.key];
           el.value = previousText;
-          update();
-          return;
-        }
-        if (resized) {
-          p[ratioKey] = isDefaultDistribution(resized.text, count) ? '' : resized.text;
-          const target = textInputs.get(ratioKey);
-          if (target) target.value = resized.text;
-        }
-        update();
+        };
+        if (!changed(s.key, previous, undo)) update();
       });
     }
     return [h('label', { for: id, title: s.title ?? '' }, s.label + unit), input];
@@ -255,8 +253,9 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     const pts = built.parts.flatMap((pt) => pt.shape.subs.flatMap((sp) => sp.nodes.map((q) => ({ x: q.x + pt.at.x, y: q.y + pt.at.y }))));
     const minX = Math.min(...pts.map((q) => q.x)), maxX = Math.max(...pts.map((q) => q.x));
     const minY = Math.min(...pts.map((q) => q.y)), maxY = Math.max(...pts.map((q) => q.y));
-    const previewX = g.id === 'box-divided' && pts.length ? (minX + maxX) / 2 : 0;
-    const previewY = g.id === 'box-divided' && pts.length ? (minY + maxY) / 2 : 0;
+    const centre = !!g.preview?.center && pts.length > 0;
+    const previewX = centre ? (minX + maxX) / 2 : 0;
+    const previewY = centre ? (minY + maxY) / 2 : 0;
     const ext = Math.max(1e-6, ...pts.map((q) => Math.max(Math.abs(q.x - previewX), Math.abs(q.y - previewY))));
     const k = (canvas.width / 2 - 6) / ext;
     const css = getComputedStyle(canvas);
@@ -314,6 +313,43 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   const flushPending = () => {
     if (pending) flush();
   };
+  /**
+   * Hand a committed field to Generator.onChange. Returns true when it handled the change (and updated the
+   * dialog); undo restores the field when the user declines the generator's question.
+   */
+  function changed(key: string, before: ParamValue, undo: () => void): boolean {
+    if (!g!.onChange) return false;
+    let r: GenChange | void;
+    try {
+      r = g!.onChange(key, before, normalizeParams(g!, p));
+    } catch {
+      return false;
+    }
+    if (!r || (!r.patch && !r.ask)) return false;
+    let patch = r.patch ?? {};
+    if (r.ask) {
+      // Until the in-dialog question of #335 stage 2: a confirmation that applies the first option
+      const opt = r.ask.options[0];
+      if (!opt || !confirm(r.ask.question)) {
+        undo();
+        update();
+        return true;
+      }
+      patch = { ...patch, ...opt.patch };
+    }
+    // Checked against the schema like user input; text fields show the new text
+    const keys = Object.keys(patch).filter((k) => k !== key && g!.schema.some((s) => s.key === k));
+    const np = normalizeParams(g!, { ...p, ...patch }, p);
+    for (const k of keys) {
+      p[k] = np[k];
+      delete binds[k];
+      const control = textInputs.get(k);
+      if (control) control.value = String(np[k]);
+      if (isSuggested(g!, k, p)) p[k] = '';
+    }
+    update();
+    return true;
+  }
   const update = () => {
     if (renderMs <= SLOW_PREVIEW_MS) return flush();
     if (pending) clearTimeout(pending);

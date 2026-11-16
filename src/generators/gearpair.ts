@@ -106,7 +106,7 @@ export const GEARPAIR: Generator = {
     }),
   },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'teeth1', type: 'int', label: t('Zähnezahl Rad 1'), min: 5, max: 400, def: 18 },
     { key: 'teeth2', type: 'int', label: t('Zähnezahl Rad 2'), min: 5, max: 400, def: 36 },
     { key: 'module', type: 'length', label: t('Modul'), min: 0.3, max: 20, def: 2, title: t('Teilkreisdurchmesser geteilt durch Zähnezahl') },

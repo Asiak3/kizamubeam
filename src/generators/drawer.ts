@@ -127,7 +127,7 @@ export const DRAWER: Generator = {
     }),
   },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'width', type: 'length', label: t('Breite'), min: 20, max: 3000, def: 160, title: t('Außenmaß des Korpus (ohne Korpus: Breite des Fachs)') },
     { key: 'height', type: 'length', label: t('Höhe'), min: 15, max: 3000, def: 80 },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 20, max: 3000, def: 150 },

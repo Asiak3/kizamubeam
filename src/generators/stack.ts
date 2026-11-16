@@ -220,7 +220,7 @@ export const STACK: Generator = {
     }),
   },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'model', type: 'data', label: t('Modell'), def: '' },
     { key: 'name', type: 'data', label: t('Dateiname'), def: '' },
     {

@@ -100,6 +100,16 @@ test('suggested texts come from view(), issues carry codes', () => {
   assert.ok(i && i.msg && i.msg !== i.code, 'translated text, not the code');
 });
 
+test('onChange: box-divided keeps ratios and asks before dropping values', () => {
+  const g = getGenerator('box-divided')!;
+  const p = { ...defaultParams(g), compartmentsX: 4, ratiosX: '1:2:3' };
+  assert.deepEqual(g.onChange!('compartmentsX', 3, p), { patch: { ratiosX: '1:2:3:1' } });
+  const r = g.onChange!('compartmentsX', 3, { ...p, compartmentsX: 2 });
+  assert.ok(r && r.ask && r.ask.options[0].patch.ratiosX === '1:2');
+  assert.equal(g.onChange!('width', 100, p), undefined);
+  assert.equal(g.preview?.center, true);
+});
+
 test('register adds a generator and replaces one with the same id', () => {
   const n = GENERATORS.length;
   const g = { ...getGenerator('gear')!, id: 'test-plugin', tile: { group: 'mech', text: (t: (s: string) => string) => ({ name: t('X'), desc: 'x', keys: 'x', action: 'x' }) } };

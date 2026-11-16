@@ -137,6 +137,7 @@ Ein Generator gibt alles, was die App über ihn wissen muss, an seinem `Generato
 - `inputs`: Was der Generator vor dem Dialog braucht (3D-Modell, Auswahl).
 - `showIf` an einem Feld ist eine Regel (`{ eq: [key, value] }`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`), nie eine Funktion; `ruleHolds()` wertet sie aus.
 - `view(params)`: Werte im Dialog, die von den Parametern abhängen (`autoText`-Vorschläge für leere Textfelder).
+- `onChange(key, old, params)`: wird beim Übernehmen eines Feldes aufgerufen; liefert `patch` und/oder `ask` (Frage mit Optionen, Abbrechen stellt das Feld wieder her). `preview.center` zentriert die Vorschau; `resetOnNew` an einem Feld lässt neue Objekte mit dem Standardwert beginnen.
 - Meldungen haben einen festen `code`; Texte für Codes, die `generate()` wirft, kommen aus `texts`. Interne Funktionen werfen Codes, keinen Oberflächentext.
 
 Einen Generator mit `register()` in `src/generators/index.ts` anmelden. Seine `id` steht in Projekten und darf sich nie ändern.
