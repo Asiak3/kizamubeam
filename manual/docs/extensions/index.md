@@ -17,7 +17,7 @@ Extension packs (`.kzp` files) add **device presets, templates, material library
 After installing:
 
 - templates appear under **File → New from template … → From extensions**,
-- device presets appear in the device list, marked with the pack name,
+- device presets appear in the device list under their manufacturer (or under “From extensions”), marked with the pack name,
 - materials are copied into the material library,
 - motifs and design elements appear in the library.
 

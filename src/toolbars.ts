@@ -2,8 +2,7 @@
 // Auswahl und Reihenfolge der Nutzer festlegt (Fenster → Funktionsleisten anpassen … oder Rechtsklick auf
 // eine Leiste). Außerdem lassen sich alle Leisten (auch Eigenschaften, Palette, Statusleiste) ausblenden.
 // Gespeichert wird je Nutzer im localStorage („kizamubeam.toolbars“).
-import { ICONS } from './icons';
-import { $, h } from './dom';
+import { $, h, setIcon } from './dom';
 import { t } from './i18n';
 
 export interface Action {
@@ -34,7 +33,7 @@ export type BarKey = BarId | 'numbar' | 'textbar' | 'palette' | 'status';
 type IconSize = 's' | 'm' | 'l';
 
 interface Config {
-  /** Version der gespeicherten Belegung (2: Knopfgruppen, 3: Werkzeugkasten, 4: Generatoren/Verbindungen im Werkzeugkasten, 5: Beziehungen/Messen, 6: Vektorwerkzeuge, 7: Kamera-Overlay) */
+  /** Version der gespeicherten Belegung (2: Knopfgruppen, 3: Werkzeugkasten, 4: Generatoren/Verbindungen im Werkzeugkasten, 5: Beziehungen/Messen, 6: Vektorwerkzeuge, 7: Kamera-Overlay, 12: Bogenwerkzeug, Zeichengruppe) */
   v: number;
   bars: Record<BarId, string[]>;
   size: Record<BarId, IconSize>;
@@ -55,7 +54,7 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 11;
+const CONFIG_V = 13;
 /** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende).
  *  Buttons that later left the default again (v6 vectorfit/shape-builder/isolate, v9 laserpos) are no longer
  *  listed, so older bars do not pick them up on their way to v11. */
@@ -82,6 +81,10 @@ const REMOVED: { v: number; bar: BarId; seq: string[]; keep: string[]; tail?: st
   { v: 11, bar: 'tools', seq: ['tool:text', 'qr', 'apps'], keep: ['tool:text'], tail: [SEP, 'apps'] },
   { v: 11, bar: 'tools', seq: ['grp:bool', 'outline', 'offset', 'warp', 'grp:path', 'grp:array', 'nest'], keep: ['grp:bool', 'grp:contour', 'grp:path', 'grp:array'] },
   { v: 11, bar: 'tools', seq: ['tool:measure', 'laserpos'], keep: ['tool:measure'] },
+  // v12: select + lasso share one slot (grp:select) so the tools bar does not grow.
+  { v: 12, bar: 'tools', seq: ['tool:select'], keep: ['grp:select'] },
+  // v13: line, pencil and curvature share one slot (grp:draw, arc included) so the tools bar does not grow.
+  { v: 13, bar: 'tools', seq: ['tool:line', 'tool:pencil', 'tool:curvature'], keep: ['grp:draw'] },
 ];
 
 /** Gespeicherte Leiste auf die aktuelle Standardbelegung heben (raw: Version der gespeicherten Belegung) */
@@ -165,7 +168,7 @@ export function refreshBars() {
 
       if (a.dyn) {
         const d = a.dyn();
-        if (d.icon && b.dataset.icon !== d.icon) ((b.innerHTML = ICONS[d.icon]), (b.dataset.icon = d.icon));
+        if (d.icon && b.dataset.icon !== d.icon) (setIcon(b, d.icon), (b.dataset.icon = d.icon));
         if (d.label) b.title = d.label;
       }
       if (g.items) (el.lastElementChild as HTMLElement).title = t('Weitere: {name}', { name: g.label });
@@ -174,6 +177,12 @@ export function refreshBars() {
 
 /** Die Aktion, die eine Knopfgruppe gerade zeigt */
 function groupCurrent(g: Action): Action {
+  // Aktives Werkzeug bevorzugen: über Menü/Shortcut gewählt, kennt cfg.groups nur Knopf-Klicks.
+  // Ohne das zeigte die Gruppe die gespeicherte Wahl als ungedrückt, obwohl ihr Tool aktiv ist.
+  for (const id of g.items!) {
+    const a = actions.get(id);
+    if (!a?.small && a?.on?.()) return a;
+  }
   const id = cfg.groups[g.id];
   return actions.get(id && g.items!.includes(id) ? id : g.items!.find((x) => !actions.get(x)?.small)!)!;
 }
@@ -183,7 +192,7 @@ function paint(b: HTMLElement, a: Action) {
   b.className = `ib${a.icon ? '' : ' text'}${a.small ? ' small' : ''}`;
   b.title = a.label;
   if (a.icon) {
-    b.innerHTML = ICONS[a.icon];
+    setIcon(b, a.icon);
     b.dataset.icon = a.icon;
   } else {
     b.textContent = a.short ?? a.label;
@@ -330,7 +339,7 @@ function groupMenu(bar: BarId, g: Action, anchor: HTMLElement) {
       },
     },
       h('span', { class: 'check-mark' }, id === cur ? '✓' : ''),
-      h('span', { class: 'tb-icon', html: a.icon ? ICONS[a.icon] : '' }),
+      h('span', { class: 'tb-icon', icon: a.icon ?? '' }),
       ...menuLabel(a.dyn?.().label ?? a.label),
     );
     menu.append(b);
@@ -398,7 +407,7 @@ export function openToolbarDialog(start: BarId = 'main') {
     // Knopfgruppen zeigen das Symbol der Aktion, die sie gerade tragen
     const ic = a?.items ? groupCurrent(a) : a;
     return h('div', { class: 'tb-row', ...extra },
-      ic ? h('span', { class: `tb-icon${ic.icon ? '' : ' text'}`, html: ic.icon ? ICONS[ic.icon] : '' }, ic.icon ? null : ic.short ?? '') : h('span', { class: 'tb-icon' }),
+      ic ? h('span', { class: `tb-icon${ic.icon ? '' : ' text'}`, icon: ic.icon ?? '' }, ic.icon ? null : ic.short ?? '') : h('span', { class: 'tb-icon' }),
       h('span', {}, a ? a.label : t('— Trennlinie —')),
     );
   };

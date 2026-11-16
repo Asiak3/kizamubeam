@@ -112,6 +112,15 @@ export const CAM: Generator = {
   kind: 'part',
   name: t('Nocken'),
   icon: 'cam',
+  tile: {
+    group: 'mech',
+    text: (t) => ({
+      name: t('Nocken'),
+      desc: t('Nockenscheibe für Rolle oder Spitze mit Hub, Rast und Rückhub.'),
+      keys: t('Nocke Kurvenscheibe Hub Exzenter Automat|Suchwörter'),
+      action: t('Nocken erstellen (Hub, Rast, Rückhub; Parameter bleiben erhalten)'),
+    }),
+  },
   schema: [
     { key: 'baseRadius', type: 'length', label: t('Grundkreisradius'), min: 2, max: 1000, def: 20, title: t('Kleinster Radius des Nockens: Hier steht der Stößel ganz unten') },
     { key: 'lift', type: 'length', label: t('Hub'), min: 0.1, max: 1000, def: 8 },
@@ -123,7 +132,7 @@ export const CAM: Generator = {
       options: [['cycloid', t('Zykloide (ruckarm)')], ['poly5', t('Polynom 5. Grades')], ['harmonic', t('Harmonisch')]],
     },
     { key: 'follower', type: 'enum', label: t('Stößel'), def: 'roller', options: [['roller', t('Mit Rolle')], ['knife', t('Spitze')]] },
-    { key: 'rollerDia', type: 'length', label: t('Rollendurchmesser'), min: 0.5, max: 500, def: 10, showIf: (p) => p.follower === 'roller' },
+    { key: 'rollerDia', type: 'length', label: t('Rollendurchmesser'), min: 0.5, max: 500, def: 10, showIf: { eq: ['follower', 'roller'] } },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, damit der Nocken die Sollmaße hat. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
     ...boreSchema('', '', 'round', 6),
   ],

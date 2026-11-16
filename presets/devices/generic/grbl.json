@@ -1,0 +1,13 @@
+{
+  "id": "generic.grbl",
+  "name": {
+    "de": "GRBL-Laser (allgemein)",
+    "en": "GRBL laser (generic)",
+    "it": "Laser GRBL (generico)",
+    "es": "Láser GRBL (genérico)",
+    "pt-BR": "Laser GRBL (genérico)"
+  },
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 400
+}

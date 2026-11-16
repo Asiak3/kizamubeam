@@ -12,8 +12,6 @@ import { SCALE } from './clip';
 import { analyzeAssembly, AssemblyReport } from './view3d/assembly';
 import { genThickness } from './view3d/poses';
 
-/** Generatoren, deren Teile eine zusammenhängende Baugruppe bilden (Zahnradpaar nicht: Räder sitzen auf Achsen) */
-const ASSEMBLIES = new Set(['box', 'drawer', 'insert', 'shelf', 'discsphere', 'stack', 'ribs']);
 
 export interface AsmFinding {
   key: string;
@@ -105,7 +103,7 @@ export function checkAssemblies(objs: Obj[], all: Obj[], layerOf: (i: number) =>
     const m = mul(parent, o.m);
     if (mine) tops.set(o, top);
     if (o.shape.kind === 'group') o.shape.children.forEach((c) => walk(top, c, m, mine));
-    else if (o.shape.kind === 'gen' && o.shape.asm && ASSEMBLIES.has(o.shape.gen) && layerOf(o.layer).output) {
+    else if (o.shape.kind === 'gen' && o.shape.asm && getGenerator(o.shape.gen)?.assemblyCheck && layerOf(o.layer).output) {
       here.push(o);
       mats.set(o, m);
     }

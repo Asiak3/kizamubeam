@@ -12,6 +12,7 @@ import { dec, t } from '../i18n';
 import type { Editor } from '../editor';
 import { RULER, HANDLE_OFF, cachedWorldPath, SNAP_COLOR } from './shared';
 import { curvaturePreview } from './vector';
+import { arcSubPath } from './arc';
 import { GRID_MIN_PX, gridLevels, gridLines, LEVEL_ALPHA } from '../grid';
 
 function rectPath(w: number, h: number): Path2D {
@@ -276,12 +277,17 @@ export class EditorRender {
     ctx.setLineDash([]);
 
     // Linie im Entstehen (nur Geometrie im Welt-Transform; Anker-/Anfasser-Markierungen liegen in renderOverlay)
+    let preview: SubPath | null = null;
     if (this.draft && this.draft.nodes.length) {
       const closeHit = this.draftCloseHit();
-      const sp: SubPath = this.tool === 'curvature'
+      preview = this.tool === 'curvature'
         ? curvaturePreview(this.draft, this.drag ? null : this.cursor, closeHit)
         : { nodes: !this.drag && !closeHit ? [...this.draft.nodes, { x: this.cursor.x, y: this.cursor.y }] : [...this.draft.nodes], closed: closeHit };
-      const tmp: Obj = { id: 0, m: IDENT, layer: this.currentLayer, shape: { kind: 'path', subs: [sp] } };
+    } else if (this.tool === 'arc' && this.arcDraft) {
+      preview = arcSubPath(this.arcDraft, this.arcCw);
+    }
+    if (preview) {
+      const tmp: Obj = { id: 0, m: IDENT, layer: this.currentLayer, shape: { kind: 'path', subs: [preview] } };
       ctx.strokeStyle = this.layerDrawColor(this.currentLayer);
       ctx.lineWidth = 1.2 * px;
       ctx.stroke(worldPath(tmp.shape, IDENT));
@@ -580,9 +586,44 @@ export class EditorRender {
       ctx.setLineDash([]);
     }
     if(d?.type==='lasso') {
-      ctx.save();ctx.strokeStyle=T.sel;ctx.fillStyle=this.dark?'#5b93f520':'#3070ff20';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();
+      ctx.save();ctx.strokeStyle=d.touch?'#ff6020':T.sel;ctx.fillStyle=d.touch?'#ff602020':(this.dark?'#5b93f520':'#3070ff20');ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();
       d.points.forEach((p,i)=>{const q=this.toScreen(p);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y)});
       ctx.closePath();ctx.fill('evenodd');ctx.stroke();ctx.restore();
+    }
+    // Bogenwerkzeug: Mitte, Radiushilfe und gesetzte Punkte im Bildschirmraum (nicht doppelt transformiert)
+    const arcDraft = this.tool === 'arc' ? this.arcDraft : null;
+    if (arcDraft) {
+      ctx.save();
+      ctx.strokeStyle = T.sel;
+      ctx.fillStyle = T.handleFill;
+      ctx.lineWidth = 1.5;
+      if (arcDraft.mode === 'center') {
+        const c = this.toScreen(arcDraft.center);
+        ctx.beginPath();
+        ctx.moveTo(c.x - 7, c.y); ctx.lineTo(c.x + 7, c.y);
+        ctx.moveTo(c.x, c.y - 7); ctx.lineTo(c.x, c.y + 7);
+        ctx.stroke();
+        if (arcDraft.radius > 0) {
+          if (arcDraft.phase === 2) {
+            ctx.setLineDash([4, 3]);
+            ctx.beginPath(); ctx.arc(c.x, c.y, arcDraft.radius * this.view.zoom, 0, Math.PI * 2); ctx.stroke();
+            ctx.setLineDash([]);
+          }
+          const s = this.toScreen(arcDraft.start);
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(s.x, s.y); ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillRect(s.x - 3.5, s.y - 3.5, 7, 7);
+          ctx.strokeRect(s.x - 3 + 0.5, s.y - 3 + 0.5, 6, 6);
+        }
+      } else {
+        for (const pt of [arcDraft.start, arcDraft.mid, arcDraft.end].slice(0, arcDraft.phase)) {
+          const q = this.toScreen(pt);
+          ctx.fillRect(q.x - 3.5, q.y - 3.5, 7, 7);
+          ctx.strokeRect(q.x - 3 + 0.5, q.y - 3 + 0.5, 6, 6);
+        }
+      }
+      ctx.restore();
     }
     // Knoten
     for (const o of this.tool === 'node' || this.tool === 'freehand-edit' ? this.nodeTargets() : []) {

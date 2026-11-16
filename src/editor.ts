@@ -51,6 +51,7 @@ import { EditorSelection } from './editor/selection';
 import { DEFAULT_GRID, GridSettings } from './grid';
 import { EditorIsolation, IsolationState } from './editor/isolation';
 import { EditorVector, VectorPlan } from './editor/vector';
+import type { ArcDraft, ArcMode } from './editor/arc';
 
 import { EditorOutline, type OutlinePreview } from './editor/outline';
 import { EditorInteraction, BuilderSession } from './editor/interaction';
@@ -136,6 +137,11 @@ export class Editor {
   vectorPreview: VectorPlan[] | null = null;
   pencilTolerance = 0.2;
   pencilClosed = false;
+  /** Bogenwerkzeug: Konstruktionsart und Schnittrichtung (CCW = gegen den Uhrzeigersinn) */
+  arcMode: ArcMode = 'center';
+  arcCw = false;
+  /** Laufender Bogen über mehrere Klicks hinweg */
+  arcDraft: ArcDraft | null = null;
   builderSession: BuilderSession | null = null;
   suppressContextMenu = false;
   /** Drag with the right mouse button pans the view (opt-in, Edit → Settings → Mouse and keyboard) */
@@ -176,7 +182,7 @@ export class Editor {
   // Fangen an Raster, Objekten und Hilfslinien
   /** Ist der Werkzeug-Modus einer, bei dem der Mauszeiger schon ohne Ziehen fängt? */
   get drawTool() {
-    return this.tool === 'pencil' || this.tool === 'line' || this.tool === 'curvature' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
+    return this.tool === 'pencil' || this.tool === 'line' || this.tool === 'curvature' || this.tool === 'arc' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
   }
 
   finishDraft() {
@@ -539,6 +545,8 @@ export class Editor {
     if (t !== 'builder') this.builderSession = null;
     if (this.drag) this.cancelDrag();
     if (this.draft) this.finishDraft();
+    // Werkzeugwechsel verwirft einen laufenden Bogen (Esc bleibt die bewusste Abbruchtaste).
+    this.arcDraft = null;
     this.tool = t;
     this.nodeHover = this.segHover = null;
     this.jointPicks = [];

@@ -4,11 +4,13 @@ import { about, apply, clone, IDENT, inv, Mat, mul, newId, Node, Obj, Pt, rotate
 import { Box, boundsOf, leafIntersectsBox, segments, shapeSubs, textLayout } from '../geom';
 import { wrapWidth } from '../fonts';
 import { buildSnapSet, findSnap } from '../snap';
-import { t } from '../i18n';
+import { t, dec } from '../i18n';
 import type { Editor } from '../editor';
+import { lassoTouchMode } from '../lasso';
 import { MAX_VECTOR_SAMPLES } from '../vectorFit';
 import { genLeaves, isMarkGroup } from './generators';
-import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, RULER, SNAP_PX, TOOL_HINTS } from './shared';
+import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, LASSO_TOUCH_HINT, RULER, SNAP_PX, TOOL_HINTS } from './shared';
+import { ARC_MIN_RADIUS, arcPoint, arcSpec, arcSubPath, newArcDraft, snapAngle, type ArcDraft, type ArcMode } from './arc';
 import { OVERLAP_MOVE_PX } from '../overlapPicker';
 
 const RIGHT_PAN_KEY = 'kizamubeam.rightPan';
@@ -40,6 +42,13 @@ function frameText(o: Obj, m: Mat): { s: TextShape } | null {
 
 const JOINT_HINT_SECOND =
   t('Zweite Kante anklicken (Gegenstück bzw. Linie für die Schlitze) oder Enter für nur eine Kante. Erneuter Klick hebt die Wahl auf.');
+
+/** Zahl im Hinweisfeld: höchstens zwei Nachkommastellen, Dezimaltrennzeichen der Sprache. */
+const hintNum = (v: number) => dec(String(Math.round(v * 100) / 100));
+/** Winkel im Hinweisfeld in Maschinensicht (0° = rechts, gegen den Uhrzeigersinn), auf 0–360° normalisiert. */
+const hintDeg = (a: number) => hintNum(((((-a * 180) / Math.PI) % 360) + 360) % 360);
+/** Überstrichener Winkel im Hinweisfeld in Grad (Betrag, damit z. B. 90° und 270° unterscheidbar bleiben). */
+const hintSweep = (sweep: number) => hintNum((Math.abs(sweep) * 180) / Math.PI);
 
 export class EditorPointer {
   evPt(this: Editor, e: PointerEvent | MouseEvent) {
@@ -188,6 +197,26 @@ export class EditorPointer {
         this.redraw();
         return;
       }
+      case 'arc': {
+        const p = this.snapPt(wp, e, { toggle: false });
+        if (!this.arcDraft || this.arcDraft.mode !== this.arcMode) this.arcDraft = newArcDraft(this.arcMode, p);
+        const d = this.arcDraft;
+        if (d.phase === 1) {
+          // Erster Klick setzt Mitte bzw. Startpunkt; Ziehen soll diesen Punkt nicht verschieben.
+          if (d.mode === 'center') {
+            d.center = p; d.radius = 0; d.a0 = d.a1 = 0; d.start = p;
+          } else {
+            d.start = p;
+          }
+          d.mid = d.end = d.start;
+        } else {
+          this.arcTrack(d, p, e);
+        }
+        this.drag = { type: 'arc', pointerId: e.pointerId, start: p, moved: false, draft: d };
+        this.arcHint(d);
+        this.redraw();
+        return;
+      }
       case 'pencil':
         e.preventDefault();
         this.clearSnap();
@@ -320,8 +349,9 @@ export class EditorPointer {
   /** Right click: finish the line or sketch draft, or let the context menu open (see suppressContextMenu) */
   rightPress(this: Editor) {
     if (this.outlinePreview) { this.suppressContextMenu = true; return; }
-    this.suppressContextMenu = !!this.draft || this.tool === 'sketch' || this.tool === 'builder' || !!this.pickHandler || !!this.drag;
+    this.suppressContextMenu = !!this.draft || !!this.arcDraft || this.tool === 'sketch' || this.tool === 'builder' || !!this.pickHandler || !!this.drag;
     if (this.tool === 'builder') this.setTool('select');
+    if (this.arcDraft) this.cancelArc();
     if (this.draft) this.finishDraft();
     if (this.sketchEdit && this.sketchEdit.draft.length) {
       this.sketchEdit.draft = [];
@@ -374,6 +404,7 @@ export class EditorPointer {
       if (this.drawTool) {
         // Fangpunkt schon vor dem Klicken zeigen; die Linie im Entstehen folgt ihm
         this.cursor = this.snapPt(wp, e, { extra: this.draft?.nodes, toggle: this.tool === 'line' || this.tool === 'curvature' || this.tool === 'text' || this.tool === 'measure' });
+        if (this.tool === 'arc') this.arcHover(this.cursor, e);
         if (this.tool === 'measure') this.updateMeasureHover(sx, sy);
         this.canvas.style.cursor = this.space ? 'grab' : this.tool === 'text' ? 'text' : 'crosshair';
         return;
@@ -406,9 +437,17 @@ export class EditorPointer {
     }
     switch (d.type) {
       case 'freehand-edit': this.sampleFreehandEdit(wp,e.pointerId); return;
-      case 'lasso':
+      case 'lasso': {
         if(Math.hypot(wp.x-d.points.at(-1)!.x,wp.y-d.points.at(-1)!.y)*this.view.zoom>=2){if(d.points.length<4096)d.points.push(wp);else d.overflow=true;}
+        // Drehrichtung schaltet live zwischen Umschließen (CW) und Berühren (CCW) um.
+        // Schwelle ≥3 Punkte wie finishLasso: darunter ist keine Fläche definiert; die eps-Regel
+        // in lassoTouchMode dämpft zusätzlich das Flackern zu Gestenbeginn.
+        if(!d.components && d.points.length>=3){
+          const touchNow=lassoTouchMode(d.points);
+          if(touchNow!==d.touch){d.touch=touchNow;this.hint=touchNow?LASSO_TOUCH_HINT:TOOL_HINTS.lasso;this.emit('tool');}
+        }
         this.redraw();return;
+      }
       case 'builder':
         if (d.pointerId !== e.pointerId) return;
         this.builderStroke(d.last, wp); d.last = wp; return;
@@ -596,6 +635,16 @@ export class EditorPointer {
         this.redraw();
         return;
       }
+      case 'arc': {
+        if (d.pointerId !== e.pointerId) return;
+        const p = this.snapPt(wp, e, { toggle: false });
+        if (Math.hypot(p.x - d.start.x, p.y - d.start.y) * this.view.zoom > 3) d.moved = true;
+        // Der erste Klickpunkt bleibt stehen; die folgenden Schritte folgen dem Zeiger.
+        if (d.draft.phase > 1) this.arcTrack(d.draft, p, e);
+        this.arcHint(d.draft);
+        this.redraw();
+        return;
+      }
       case 'node': {
         const o = d.obj;
         if (!d.moved) {
@@ -778,6 +827,26 @@ export class EditorPointer {
         }
         return;
       }
+      case 'arc': {
+        const draft = d.draft;
+        if (draft.phase === 3) this.finishArc();
+        else if (draft.mode === 'center' && draft.phase === 2 && !(draft.radius >= ARC_MIN_RADIUS)) {
+          this.hint = t('Bogen: Radius muss größer als null sein.');
+          this.redraw();
+          this.emit('tool');
+        } else if (draft.mode === '3point' && draft.phase === 2
+          && Math.hypot(draft.mid.x - draft.start.x, draft.mid.y - draft.start.y) < 1e-9) {
+          this.hint = t('3-Punkt-Bogen: Durchgangspunkt muss sich vom Startpunkt unterscheiden.');
+          this.redraw();
+          this.emit('tool');
+        } else {
+          draft.phase = (draft.phase + 1) as 2 | 3;
+          this.arcHint(draft);
+          this.redraw();
+          this.emit('tool');
+        }
+        return;
+      }
       case 'pivot':
         return;
       case 'node':
@@ -874,6 +943,118 @@ export class EditorPointer {
     return b ? `${b.w.toFixed(2)} × ${b.h.toFixed(2)} mm` : '';
   }
 
+  // ---------- Bogenwerkzeug ----------
+
+  /** Vorschau ohne gedrückte Taste: nächster Schritt folgt dem Zeiger. */
+  arcHover(this: Editor, p: Pt, e: { shiftKey: boolean }) {
+    const d = this.arcDraft;
+    if (!d) return;
+    if (d.phase > 1) this.arcTrack(d, p, e);
+    this.arcHint(d);
+    this.redraw();
+  }
+
+  /** Schritt des laufenden Bogens mit dem Zeiger nachführen (Phase 2 und 3). */
+  arcTrack(this: Editor, d: ArcDraft, p: Pt, e: { shiftKey: boolean }) {
+    if (d.mode === 'center') {
+      if (d.phase === 1) return;
+      const angle = Math.atan2(p.y - d.center.y, p.x - d.center.x);
+      if (d.phase === 2) {
+        d.radius = Math.hypot(p.x - d.center.x, p.y - d.center.y);
+        d.a0 = e.shiftKey ? snapAngle(angle) : angle;
+        d.a1 = d.a0;
+      } else {
+        d.a1 = e.shiftKey ? snapAngle(angle) : angle;
+      }
+      d.start = arcPoint(d.center.x, d.center.y, d.radius, d.a0);
+      d.end = arcPoint(d.center.x, d.center.y, d.radius, d.a1);
+      return;
+    }
+    if (d.phase === 1) return;
+    if (d.phase === 2) {
+      d.mid = p;
+      // Noch kein dritter Punkt: Ende am Durchgangspunkt lassen, bis der Zeiger weiterläuft.
+      d.end = { x: p.x, y: p.y };
+    } else d.end = p;
+  }
+
+  /** Live-Anzeige von Radius und Winkeln im Hinweisfeld; kein eigenes Panel. */
+  arcHint(this: Editor, d: ArcDraft) {
+    const phase = d.mode === 'center'
+      ? d.phase === 1
+        ? t('Bogen: Mitte anklicken. Esc bricht ab.')
+        : d.phase === 2
+          ? t('Bogen: Radius und Startwinkel anklicken oder ziehen. Shift: 15°-Schritte, Esc verwirft den Bogen.')
+          : t('Bogen: Endwinkel anklicken. Shift: 15°-Schritte, Enter übernimmt, Esc verwirft den Bogen.')
+      : d.phase === 1
+        ? t('3-Punkt-Bogen: Startpunkt anklicken. Esc bricht ab.')
+        : d.phase === 2
+          ? t('3-Punkt-Bogen: Durchgangspunkt anklicken. Esc verwirft den Bogen.')
+          : t('3-Punkt-Bogen: Endpunkt anklicken. Enter übernimmt, Esc verwirft den Bogen.');
+    const spec = arcSpec(d, this.arcCw);
+    let read = '';
+    if (d.mode === 'center' && d.phase > 1 && d.radius > 0) {
+      read = d.phase === 3 && spec
+        ? t('R {r} mm · {a0}°–{a1}° · {sweep}°', { r: hintNum(d.radius), a0: hintDeg(d.a0), a1: hintDeg(d.a0 + spec.sweep), sweep: hintSweep(spec.sweep) })
+        : t('R {r} mm · {a0}°', { r: hintNum(d.radius), a0: hintDeg(d.a0) });
+    } else if (spec) {
+      read = t('R {r} mm · {a0}°–{a1}° · {sweep}°', { r: hintNum(spec.r), a0: hintDeg(spec.a0), a1: hintDeg(spec.a0 + spec.sweep), sweep: hintSweep(spec.sweep) });
+    }
+    this.hint = read ? `${read} · ${phase}` : phase;
+  }
+
+  /** Bogen verwerfen (Esc, Werkzeugwechsel, Moduswechsel); kein Undo-Schritt. */
+  cancelArc(this: Editor) {
+    this.arcDraft = null;
+    this.hint = TOOL_HINTS.arc;
+    this.redraw();
+    this.emit('tool');
+  }
+
+  /** Optionen der Optionsleiste; ein Moduswechsel beginnt einen neuen Bogen. */
+  setArcOptions(this: Editor, patch: { mode?: ArcMode; cw?: boolean }) {
+    if (patch.cw !== undefined) this.arcCw = patch.cw;
+    if (patch.mode && patch.mode !== this.arcMode) {
+      this.arcMode = patch.mode;
+      this.arcDraft = null;
+      this.hint = TOOL_HINTS.arc;
+    }
+    if (this.arcDraft) this.arcHint(this.arcDraft);
+    this.redraw();
+    this.emit('tool');
+  }
+
+  /** Bogen übernehmen: ein Objekt, ein Undo-Schritt, Knotenreihenfolge nach der Richtungswahl. */
+  finishArc(this: Editor): boolean {
+    const d = this.arcDraft;
+    if (!d || d.phase !== 3) {
+      if (d) this.arcHint(d);
+      return false;
+    }
+    const sub = arcSubPath(d, this.arcCw);
+    if (!sub) {
+      this.hint = d.mode === 'center'
+        ? t('Kein Bogen: Endwinkel und Radius müssen sich von null unterscheiden.')
+        : t('Kein Bogen: Die drei Punkte dürfen nicht zusammenfallen oder auf einer Geraden liegen.');
+      this.emit('tool');
+      return false;
+    }
+    const layer = this.layer(this.currentLayer);
+    if (layer.locked || !layer.show) {
+      this.hint = t('Eine sichtbare, entsperrte Ebene wählen.');
+      this.emit('tool');
+      return false;
+    }
+    this.arcDraft = null;
+    this.snapshot(t('Bogen zeichnen'));
+    const o: Obj = { id: newId(), m: IDENT, layer: this.currentLayer, shape: { kind: 'path', subs: [{ nodes: sub.nodes, closed: false }] } };
+    this.doc.objs.push(o);
+    this.emit('doc');
+    this.setTool('select');
+    this.setSel([o]);
+    return true;
+  }
+
   finishLine(this: Editor) {
     const d = this.draft;
     const cont = this.continuedFrom;
@@ -936,12 +1117,14 @@ export class EditorPointer {
         if (i >= 0) this.draft.nodes.splice(i, 1);
         if (!this.draft.nodes.length) { this.draft = null; this.continuedFrom = null; }
       }
+    } else if (d.type === 'arc') {
+      this.arcDraft = null;
     } else if (d.type === 'right') {
       // Cancelled (e.g. Esc): no context menu when the button comes up
       this.suppressContextMenu = !d.context;
       if (d.panning) this.canvas.style.cursor = this.tool === 'select' ? 'default' : 'crosshair';
     }
-    this.hint = '';
+    this.hint = d.type === 'arc' ? TOOL_HINTS.arc : '';
     this.clearSnap();
     this.emit('doc');
     this.emit('sel');

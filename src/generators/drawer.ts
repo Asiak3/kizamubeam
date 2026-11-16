@@ -7,6 +7,8 @@ import { t } from '../i18n';
 import { arrangeParts, flipY, PathBuilder, polySub } from './build';
 import { BoxParams, panelPolys } from './box';
 import type { Generator, Issue, Params } from './types';
+import { boxPoses } from './box';
+import { moved, neg, pose, X, Y, Z, type AsmPoses, type Pose, type V3 } from './pose';
 
 export interface DrawerParams {
   width: number;
@@ -84,27 +86,61 @@ const PART_NAMES: Record<string, () => string> = {
   front: () => t('Blende'),
 };
 
+function drawerPoses(p: DrawerParams): AsmPoses {
+  const th = p.thickness;
+  const { box, front } = drawerDims(p);
+  const out: Record<string, Pose> = {};
+  const boxOf = (W: number, D: number, H: number): BoxParams => ({
+    sizeMode: 'outer', width: W, depth: D, height: H, thickness: th, top: 'open', finger: p.finger, clearance: p.clearance, kerf: 0,
+  });
+  if (p.carcass) {
+    // Korpus = Box mit Breite × Höhe × Tiefe, gekippt: ihr Boden wird die Rückwand, ihre offene Oberseite zeigt nach vorne
+    const names: Record<string, string> = { bottom: 'back', front: 'bottom', back: 'top' };
+    const R: [V3, V3, V3] = [X, Z, neg(Y)];
+    for (const [k, ps] of Object.entries(boxPoses(boxOf(p.width, p.height, p.depth)))) out['c_' + (names[k] ?? k)] = moved(ps, R, [0, p.depth, 0]);
+  }
+  const c = p.carcass ? th : 0;
+  const inset = p.front === 'inset' ? th : 0;
+  // Schubkasten mit der Luft seitlich in der Öffnung, hinter einer eingelegten Blende
+  for (const [k, ps] of Object.entries(boxPoses(boxOf(box.W, box.D, box.H)))) out['d_' + k] = moved(ps, [X, Y, Z], [c + p.sidePlay, inset, c]);
+  if (front) out.front = pose([p.width / 2, p.front === 'overlay' ? -th : 0, p.height / 2], X, neg(Z), Y);
+  return { poses: out };
+}
+
 export const DRAWER: Generator = {
   id: 'drawer',
   version: 2,
   kind: 'assembly',
   name: t('Schublade'),
   icon: 'drawer',
+  poses: (p) => drawerPoses(p as unknown as DrawerParams),
+  fit: { kind: 'pair', play: 'clearance' },
+  assemblyCheck: true,
+  tile: {
+    group: 'box',
+    before: 'lidhinge',
+    text: (t) => ({
+      name: t('Schublade'),
+      desc: t('Korpus, Schubkasten und Blende mit Griff als Baugruppe.'),
+      keys: t('Schublade Schubfach Kommode Korpus|Suchwörter'),
+      action: t('Schublade erstellen (Korpus, Schubkasten und Blende als Baugruppe)'),
+    }),
+  },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'width', type: 'length', label: t('Breite'), min: 20, max: 3000, def: 160, title: t('Außenmaß des Korpus (ohne Korpus: Breite des Fachs)') },
     { key: 'height', type: 'length', label: t('Höhe'), min: 15, max: 3000, def: 80 },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 20, max: 3000, def: 150 },
     { key: 'thickness', type: 'length', label: t('Materialdicke'), min: 0.3, max: 50, def: 3 },
     { key: 'carcass', type: 'bool', label: t('Mit Korpus'), def: true },
     { key: 'front', type: 'enum', label: t('Blende'), def: 'overlay', options: [['overlay', t('Vorgesetzt (deckt den Korpus ab)')], ['inset', t('Eingelegt (in der Öffnung)')], ['none', t('Keine')]] },
-    { key: 'handle', type: 'enum', label: t('Griff'), def: 'slot', options: [['slot', t('Griffloch (Langloch)')], ['hole', t('Rundes Loch')], ['none', t('Keiner')]], showIf: (p) => p.front !== 'none' },
-    { key: 'handleWidth', type: 'length', label: t('Griffbreite'), min: 3, max: 1000, def: 50, showIf: (p) => p.front !== 'none' && p.handle !== 'none', title: t('Länge des Langlochs bzw. Durchmesser des runden Lochs') },
-    { key: 'handleHeight', type: 'length', label: t('Griffhöhe'), min: 3, max: 500, def: 18, showIf: (p) => p.front !== 'none' && p.handle === 'slot' },
+    { key: 'handle', type: 'enum', label: t('Griff'), def: 'slot', options: [['slot', t('Griffloch (Langloch)')], ['hole', t('Rundes Loch')], ['none', t('Keiner')]], showIf: { ne: ['front', 'none'] } },
+    { key: 'handleWidth', type: 'length', label: t('Griffbreite'), min: 3, max: 1000, def: 50, showIf: { and: [{ ne: ['front', 'none'] }, { ne: ['handle', 'none'] }] }, title: t('Länge des Langlochs bzw. Durchmesser des runden Lochs') },
+    { key: 'handleHeight', type: 'length', label: t('Griffhöhe'), min: 3, max: 500, def: 18, showIf: { and: [{ ne: ['front', 'none'] }, { eq: ['handle', 'slot'] }] } },
     { key: 'sidePlay', type: 'length', label: t('Luft seitlich'), min: 0, max: 20, def: 1, title: t('Abstand zwischen Schubkasten und Korpus auf jeder Seite') },
     { key: 'topPlay', type: 'length', label: t('Luft oben'), min: 0, max: 50, def: 2 },
     { key: 'backPlay', type: 'length', label: t('Luft hinten'), min: 0, max: 100, def: 2 },
-    { key: 'frontGap', type: 'length', label: t('Fuge um die Blende'), min: 0, max: 20, def: 1, showIf: (p) => p.front !== 'none', title: t('Die Blende wird ringsum um so viel kleiner') },
+    { key: 'frontGap', type: 'length', label: t('Fuge um die Blende'), min: 0, max: 20, def: 1, showIf: { ne: ['front', 'none'] }, title: t('Die Blende wird ringsum um so viel kleiner') },
     { key: 'finger', type: 'length', label: t('Zinkenbreite'), min: 0.5, max: 500, def: 10, advanced: true },
     { key: 'clearance', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0, advanced: true, title: t('Jede Zinke wird um so viel schmaler; negativ = Presspassung') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Löcher werden kleiner. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },

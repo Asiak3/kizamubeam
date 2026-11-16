@@ -4,6 +4,7 @@
 import { h } from '../dom';
 import { t } from '../i18n';
 import type { Params } from '../generators/types';
+import type { GenPanel } from '../generators/host';
 import { getMesh } from './store';
 import type { Mesh } from './mesh';
 import type { V3 } from './slice';
@@ -19,10 +20,7 @@ const VIEW_LABEL: Record<View, () => string> = {
   xy: () => t('von oben (X–Y)'),
 };
 
-export interface GenPanel {
-  el: HTMLElement;
-  refresh(np: Params): void;
-}
+export type { GenPanel } from '../generators/host';
 
 /** Bereich der Zeichenfläche (CSS-Pixel); die Leinwand wird für scharfe Linien größer angelegt */
 const CW = 560,

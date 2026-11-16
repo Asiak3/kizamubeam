@@ -198,6 +198,15 @@ export const GEAR: Generator = {
   kind: 'part',
   name: t('Zahnrad'),
   icon: 'gear',
+  tile: {
+    group: 'mech',
+    text: (t) => ({
+      name: t('Zahnrad'),
+      desc: t('Evolventen-Zahnrad mit Modul, Zähnezahl, Bohrung und Speichen; Parameter bleiben änderbar.'),
+      keys: t('Zahnrad Zähne Getriebe Evolvente Modul|Suchwörter'),
+      action: t('Zahnrad erstellen (Evolventenverzahnung, Parameter bleiben erhalten)'),
+    }),
+  },
   schema: [
     { key: 'teeth', type: 'int', label: t('Zähnezahl'), min: 5, max: 400, def: 24 },
     { key: 'module', type: 'length', label: t('Modul'), min: 0.3, max: 20, def: 2, title: t('Teilkreisdurchmesser geteilt durch Zähnezahl; Zahnräder, die ineinandergreifen, brauchen dasselbe Modul') },

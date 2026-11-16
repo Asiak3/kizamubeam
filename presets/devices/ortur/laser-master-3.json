@@ -1,0 +1,37 @@
+{
+  "id": "ortur.laser-master-3",
+  "vendor": "Ortur",
+  "name": "Ortur Laser Master 3",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 400,
+  "laser": {
+    "type": "diode"
+  },
+  "variants": [
+    {
+      "id": "lu2-10a",
+      "name": "LU2-10A",
+      "laser": {
+        "power": 10
+      }
+    },
+    {
+      "id": "lu3-20a",
+      "name": "LU3-20A",
+      "bedH": 380,
+      "laser": {
+        "power": 20
+      }
+    },
+    {
+      "id": "lu3-40a",
+      "name": "LU3-40A",
+      "bedH": 380
+    }
+  ],
+  "baud": 115200,
+  "source": "ortur.net: 400 × 400 mm with LU2-10A, 400 × 380 mm with LU3-20A/LU3-40A, OLF-V2.0 firmware (GRBL based), default 115200 baud",
+  "sourceUrl": "https://ortur.net/pages/support-olm3",
+  "checked": "2026-11-16"
+}

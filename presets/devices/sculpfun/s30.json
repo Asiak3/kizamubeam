@@ -1,0 +1,13 @@
+{
+  "id": "sculpfun.s30",
+  "vendor": "Sculpfun",
+  "name": "Sculpfun S30",
+  "fw": "grbl",
+  "bedW": 410,
+  "bedH": 400,
+  "laser": {
+    "type": "diode"
+  },
+  "source": "Manufacturer: 410 × 400 mm; users in the LightBurn forum measure about 374 × 362 mm",
+  "checked": "2026-10-19"
+}

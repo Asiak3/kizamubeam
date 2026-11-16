@@ -20,6 +20,7 @@ import type { Pt, SubPath } from '../model';
 import { t } from '../i18n';
 import { arrangeParts, PathBuilder } from './build';
 import type { Generator, Issue, Params } from './types';
+import { pose, type AsmPoses, type Pose } from './pose';
 
 export type V3 = [number, number, number];
 
@@ -399,14 +400,36 @@ export function discOutline(disc: Disc, r: number, kerf: number): SubPath[] {
 /** Größte Öffnung, die in eine Scheibe passt, ohne die Schlitze anzuschneiden */
 const maxHole = (disc: Disc, th: number) => 2 * Math.min(...disc.slots.map((s) => s.h - s.w / 2 - webMin(th)));
 
+/** Scheibenkugel: Mittelebene jeder Scheibe im Abstand d vom Mittelpunkt (Z = 0), Dicke zu beiden Seiten */
+function discSpherePoses(params: Params, th: number): AsmPoses | null {
+  const L = sphereLayout({ ...params, thickness: th });
+  if (!L) return null;
+  const out: Record<string, Pose> = {};
+  for (const d of L.discs) out[d.key] = pose([d.c[0] - (d.n[0] * th) / 2, d.c[1] - (d.n[1] * th) / 2, d.c[2] - (d.n[2] * th) / 2], d.U, d.V, d.n);
+  return { poses: out };
+}
+
 export const DISCSPHERE: Generator = {
   id: 'discsphere',
   version: 2,
   kind: 'assembly',
   name: t('Scheibenkugel'),
   icon: 'discsphere',
+  poses: (p, th) => discSpherePoses(p, th),
+  fit: { kind: 'slot', play: 'play' },
+  assemblyCheck: true,
+  tile: {
+    group: 'model3d',
+    since: '1.10.0',
+    text: (t) => ({
+      name: t('Scheibenkugel'),
+      desc: t('Kugel oder Lampe aus Kreisscheiben, die sich über schräge Schlitze gegenseitig halten.'),
+      keys: t('Lampe Kugel Scheiben Steckmodell Lampenschirm Polyeder Papier Karton|Suchwörter'),
+      action: t('Scheibenkugel erstellen (Lampe aus gesteckten Scheiben)'),
+    }),
+  },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'diameter', type: 'length', label: t('Durchmesser'), min: 40, max: 2000, def: 250, title: t('Außendurchmesser der fertigen Kugel') },
     {
       key: 'shape',

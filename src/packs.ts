@@ -1,8 +1,9 @@
 // Erweiterungen (Inhaltspakete, .kzp): Gerätevorlagen, Vorlagen, Materialien und Bibliotheks-Einträge, die sich ohne App-Update
-// nachladen lassen. Ein Paket enthält nur Daten, keinen Code; alles wird beim Lesen gegen das Format geprüft und
-// auf erlaubte Felder beschränkt. Gespeichert wird in der Desktop-App im Einstellungsordner (Rust: packs.rs),
+// nachladen lassen. Alles wird beim Lesen gegen das Format geprüft und auf erlaubte Felder beschränkt. Since format
+// version 2 a pack may also bring plugins (program code, issue #205); they run only in the sandbox of src/plugins. Gespeichert wird in der Desktop-App im Einstellungsordner (Rust: packs.rs),
 // im Browser im lokalen Speicher. Die Prüflogik wird mit `npm run test:packs` getestet.
-import { Device, Firmware, FIRMWARES, PRESETS } from './gcode';
+import { Device, Firmware, FIRMWARES, LASER_TYPES, LaserModule, LaserType } from './gcode';
+import { builtinPresetFiles } from './builtinPresets';
 import { library, MaterialEntry, sanitizeEntry } from './materials';
 import { loadDoc } from './model';
 import { normalizeTemplate, TemplateInfo } from './templates';
@@ -10,13 +11,16 @@ import type { ProjectParam } from './params';
 import { compareVersions } from './updates';
 import { AssetData, AssetError, parseAsset } from './assetFormat';
 import { localText, t, tn } from './i18n';
+import { ManifestError, parsePlugin, type PluginManifest } from './plugins/manifest';
 
 export { localText };
 import { version as APP_VERSION } from '../package.json';
 
 export const PACK_EXT = 'kzp';
 export const PACK_FORMAT = 'kizamubeam-pack';
-export const PACK_FORMAT_VERSION = 1;
+export const PACK_FORMAT_VERSION = 2;
+/** Packs with plugins need format version 2, so older apps refuse them with an update hint */
+export const PLUGIN_FORMAT_VERSION = 2;
 /** Größte Paketdatei (Vorlagen können Bilder enthalten) */
 export const PACK_MAX_BYTES = 20 * 1024 * 1024;
 
@@ -25,6 +29,41 @@ export type LocalText = string | Record<string, string>;
 
 /** Gerätevorlage aus einem Paket: nur Felder, die keine Befehle an die Maschine enthalten */
 export type PackDevice = Partial<Device> & { name: string; fw: Firmware };
+
+/** A checked device preset. id and vendor stay outside `preset`, so they never end up in a stored device. */
+export interface PresetEntry {
+  preset: PackDevice;
+  source?: string;
+  /** Stable id such as „ortur.laser-master-3“; a pack preset with the id of a built-in one replaces it */
+  id?: string;
+  /** Manufacturer; presets without one are generic */
+  vendor?: string;
+  /** Link to the source (https only) */
+  sourceUrl?: string;
+  /** Date the values were last checked against the source (YYYY-MM-DD) */
+  checked?: string;
+  /** true when the work area was measured on a real machine, not only taken from the manufacturer */
+  measured?: boolean;
+  /** Equipment of the machine, informational (see PRESET_FEATURES) */
+  features?: PresetFeature[];
+  /** Variants of one model (e.g. laser modules with different work areas); the list shows one entry per variant */
+  variants?: PresetVariant[];
+  /** Set on entries expanded from a variant: id of the file they come from */
+  base?: string;
+}
+
+/** Equipment a preset can list; shown next to the preset, never changes the generated G-code */
+export const PRESET_FEATURES = ['air-assist', 'autofocus', 'camera', 'enclosure', 'wifi', 'bluetooth', 'offline'] as const;
+export type PresetFeature = (typeof PRESET_FEATURES)[number];
+
+/** One variant of a preset: its own name suffix and the values that differ */
+export interface PresetVariant {
+  id: string;
+  name: string;
+  bedW?: number;
+  bedH?: number;
+  laser?: LaserModule;
+}
 
 export interface PackTemplate {
   info: TemplateInfo;
@@ -40,11 +79,13 @@ export interface Pack {
   description?: string;
   author?: string;
   homepage?: string;
-  devices: { preset: PackDevice; source?: string }[];
+  devices: PresetEntry[];
   templates: PackTemplate[];
   materials: MaterialEntry[];
   /** Einträge für die Bibliothek (Motive, Bilder, Designelemente); id = eigene Kennung im Paket */
   assets: (AssetData & { id: string })[];
+  /** Plugins (program code, run in the sandbox); only in format version 2 */
+  plugins: PluginManifest[];
 }
 
 export class PackError extends Error {}
@@ -52,15 +93,60 @@ export class PackError extends Error {}
 const ID_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/;
 const VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 
+const PRESET_ID_RE = /^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$/;
+
+/** Presets may only point at this computer (e.g. the KizamuBeam Virtual Machine), never at other hosts. */
+export function isLoopbackHost(v: unknown): v is string {
+  if (typeof v !== 'string') return false;
+  const host = v.trim().toLowerCase();
+  if (host === 'localhost') return true;
+  const m = /^127\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  return !!m && m.slice(1).every((n) => Number(n) <= 255);
+}
+
 const str = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const numIn = (v: unknown, min: number, max: number) => (typeof v === 'number' && isFinite(v) && v >= min && v <= max ? v : undefined);
 
+const VARIANT_ID_RE = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
+const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const MAX_VARIANTS = 12;
+
+/** Laser module: kind, optical power (W) and wavelength (nm); invalid parts are dropped, an empty module is undefined */
+export function sanitizeLaser(v: unknown): LaserModule | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const r = v as Record<string, unknown>;
+  const m: LaserModule = {};
+  if (LASER_TYPES.includes(r.type as LaserType)) m.type = r.type as LaserType;
+  const power = numIn(r.power, 0.1, 1000);
+  if (power !== undefined) m.power = power;
+  const wavelength = numIn(r.wavelength, 200, 11_000);
+  if (wavelength !== undefined) m.wavelength = Math.round(wavelength);
+  return Object.keys(m).length ? m : undefined;
+}
+
+function sanitizeVariant(v: unknown, where: string): PresetVariant {
+  const r = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
+  if (typeof r.id !== 'string' || !VARIANT_ID_RE.test(r.id)) throw new PackError(t('{where}: Variante ohne gültige Kennung', { where }));
+  const name = str(localText(r.name), 40);
+  if (!name) throw new PackError(t('{where}: Variante „{id}“ ohne Name', { where, id: r.id }));
+  const out: PresetVariant = { id: r.id, name };
+  const bedW = numIn(r.bedW, 10, 5000);
+  const bedH = numIn(r.bedH, 10, 5000);
+  if (bedW !== undefined) out.bedW = bedW;
+  if (bedH !== undefined) out.bedH = bedH;
+  const laser = sanitizeLaser(r.laser);
+  if (laser) out.laser = laser;
+  return out;
+}
+
 /**
- * Gerätevorlage prüfen. Erlaubt sind Name, Firmware, Arbeitsbereich und Werte für Verbindung und Zeitschätzung.
- * Start-/End-Skripte, Drehachse, Adressen und Grenzen für KI-Agenten fallen weg, weil sie Befehle oder
- * persönliche Einstellungen sind.
+ * Gerätevorlage prüfen. Erlaubt sind Name, Firmware, Arbeitsbereich und Werte für Verbindung und Zeitschätzung,
+ * plus laser module, Z axis, red-dot offset, receive buffer and metadata (source, equipment, variants).
+ * Start-/End-Skripte, Drehachse, Rahmen mit Laser, Adressen und Grenzen für KI-Agenten fallen weg, weil sie Befehle,
+ * Laserleistung oder persönliche Einstellungen sind. Only a loopback host (localhost, 127.x.x.x) is kept.
+ * Built-in presets (presets/devices) go through the same check.
  */
-export function sanitizeDevice(raw: unknown, where: string): { preset: PackDevice; source?: string } {
+export function sanitizeDevice(raw: unknown, where: string): PresetEntry {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const name = str(localText(r.name), 80);
   if (!name) throw new PackError(t('{where}: Name fehlt', { where }));
@@ -88,8 +174,45 @@ export function sanitizeDevice(raw: unknown, where: string): { preset: PackDevic
   if (r.airCmd === 'M7' || r.airCmd === 'M8') p.airCmd = r.airCmd;
   if (r.limitSwitches === 'yes' || r.limitSwitches === 'no' || r.limitSwitches === 'unknown') p.limitSwitches = r.limitSwitches;
   if (typeof r.homeOnConnect === 'boolean') p.homeOnConnect = r.homeOnConnect;
+  const frameSpeed = numIn(r.frameSpeed, 10, 200_000);
+  if (frameSpeed !== undefined) p.frameSpeed = frameSpeed;
+  if (isLoopbackHost(r.host)) p.host = r.host.trim();
+  const httpPort = numIn(r.httpPort, 1, 65535);
+  if (httpPort !== undefined) p.httpPort = Math.round(httpPort);
+  const rxBuffer = numIn(r.rxBuffer, 64, 16_384);
+  if (rxBuffer !== undefined) p.rxBuffer = Math.round(rxBuffer);
+  if (typeof r.zAxis === 'boolean') p.zAxis = r.zAxis;
+  if (typeof r.zFlip === 'boolean') p.zFlip = r.zFlip;
+  const po = r.pointerOffset as Record<string, unknown> | undefined;
+  if (po && typeof po === 'object') {
+    const x = numIn(po.x, -200, 200);
+    const y = numIn(po.y, -200, 200);
+    if (x !== undefined && y !== undefined) p.pointerOffset = { x, y, enabled: po.enabled === true };
+  }
+  const laser = sanitizeLaser(r.laser);
+  if (laser) p.laser = laser;
+  const entry: PresetEntry = { preset: p };
   const source = str(r.source, 300);
-  return source ? { preset: p, source } : { preset: p };
+  if (source) entry.source = source;
+  if (typeof r.id === 'string' && PRESET_ID_RE.test(r.id)) entry.id = r.id;
+  const vendor = str(localText(r.vendor), 60);
+  if (vendor) entry.vendor = vendor;
+  const url = str(r.sourceUrl, 300);
+  if (/^https:\/\/[^\s]+$/i.test(url)) entry.sourceUrl = url;
+  if (typeof r.checked === 'string' && DATE_RE.test(r.checked)) entry.checked = r.checked;
+  if (typeof r.measured === 'boolean') entry.measured = r.measured;
+  if (Array.isArray(r.features)) {
+    const f = PRESET_FEATURES.filter((x) => (r.features as unknown[]).includes(x));
+    if (f.length) entry.features = f;
+  }
+  if (r.variants !== undefined) {
+    if (!Array.isArray(r.variants) || !r.variants.length || r.variants.length > MAX_VARIANTS)
+      throw new PackError(t('{where}: „variants“ muss 1 bis {n} Einträge haben', { where, n: MAX_VARIANTS }));
+    const variants = r.variants.map((v) => sanitizeVariant(v, where));
+    if (new Set(variants.map((v) => v.id)).size !== variants.length) throw new PackError(t('{where}: Varianten mit doppelter Kennung', { where }));
+    entry.variants = variants;
+  }
+  return entry;
 }
 
 /** Vorlage prüfen: muss sich als Projekt laden lassen und Vorlagen-Angaben haben */
@@ -166,8 +289,18 @@ export function parsePack(text: string, appVersion: string = APP_VERSION): Pack 
     }
   });
   if (new Set(assets.map((a) => a.id)).size !== assets.length) throw new PackError(t('Bibliotheks-Einträge mit doppelter Kennung'));
-  if (!devices.length && !templates.length && !materials.length && !assets.length) throw new PackError(t('Die Erweiterung ist leer'));
-  const pack: Pack = { id, version, name, devices, templates, materials, assets };
+  const pluginList = list('plugins');
+  if (pluginList.length && fv < PLUGIN_FORMAT_VERSION) throw new PackError(t('Plugins brauchen „formatVersion“: {n}', { n: PLUGIN_FORMAT_VERSION }));
+  const plugins = pluginList.map((x, i) => {
+    try {
+      return parsePlugin(x, t('Plugin {n}', { n: i + 1 }));
+    } catch (e) {
+      throw new PackError(e instanceof ManifestError ? e.message : String(e));
+    }
+  });
+  if (new Set(plugins.map((x) => x.id)).size !== plugins.length) throw new PackError(t('Plugins mit doppelter Kennung'));
+  if (!devices.length && !templates.length && !materials.length && !assets.length && !plugins.length) throw new PackError(t('Die Erweiterung ist leer'));
+  const pack: Pack = { id, version, name, devices, templates, materials, assets, plugins };
   if (minApp) pack.minApp = minApp;
   const description = str(localText(raw.description), 1000);
   if (description) pack.description = description;
@@ -179,14 +312,15 @@ export function parsePack(text: string, appVersion: string = APP_VERSION): Pack 
 }
 
 /** Kurzbeschreibung des Inhalts, z. B. „3 Gerätevorlagen · 1 Vorlage“ */
-export const packSummary = (p: Pack) => countSummary(p.devices.length, p.templates.length, p.materials.length, p.assets.length);
+export const packSummary = (p: Pack) => countSummary(p.devices.length, p.templates.length, p.materials.length, p.assets.length, p.plugins.length);
 
-export function countSummary(devices: number, templates: number, materials: number, assets = 0): string {
+export function countSummary(devices: number, templates: number, materials: number, assets = 0, plugins = 0): string {
   const parts: string[] = [];
   if (devices) parts.push(tn('{n} Gerätevorlage', '{n} Gerätevorlagen', devices));
   if (templates) parts.push(tn('{n} Vorlage', '{n} Vorlagen', templates));
   if (materials) parts.push(tn('{n} Material', '{n} Materialien', materials));
   if (assets) parts.push(tn('{n} Bibliotheks-Eintrag', '{n} Bibliotheks-Einträge', assets));
+  if (plugins) parts.push(tn('{n} Plugin', '{n} Plugins', plugins));
   return parts.join(' · ');
 }
 
@@ -211,9 +345,79 @@ export const brokenPacks = () => broken;
 export const onPacksChanged = (f: () => void) => void listeners.add(f);
 export const packFileName = (id: string) => `${id}.${PACK_EXT}`;
 
-/** Gerätevorlagen: eingebaute zuerst, dann die aus Erweiterungen */
-export function presetList(): { preset: PackDevice; source?: string; pack?: string }[] {
-  return [...PRESETS.map((preset) => ({ preset })), ...installed.flatMap(({ pack }) => pack.devices.map((d) => ({ ...d, pack: pack.name })))];
+/** Built-in presets from presets/devices, checked like pack presets; a broken file is skipped (the tests catch it) */
+export function builtinPresets(): PresetEntry[] {
+  const out: PresetEntry[] = [];
+  for (const [file, raw] of Object.entries(builtinPresetFiles())) {
+    try {
+      out.push(sanitizeDevice(raw, file));
+    } catch (e) {
+      console.warn(e);
+    }
+  }
+  return out;
+}
+
+export type PresetListEntry = PresetEntry & { pack?: string };
+
+/**
+ * One list entry per variant: name „Model (variant)“, the variant's work area and laser module, id „base:variant“.
+ * A preset without variants stays as it is.
+ */
+export function expandVariants<T extends PresetEntry>(e: T): T[] {
+  if (!e.variants?.length) return [e];
+  return e.variants.map((v) => {
+    const { variants: _drop, ...rest } = e;
+    const preset: PackDevice = { ...e.preset, name: `${e.preset.name} (${v.name})` };
+    if (v.bedW !== undefined) preset.bedW = v.bedW;
+    if (v.bedH !== undefined) preset.bedH = v.bedH;
+    if (v.laser) preset.laser = { ...e.preset.laser, ...v.laser };
+    return { ...rest, preset, id: e.id ? `${e.id}:${v.id}` : undefined, base: e.id } as unknown as T;
+  });
+}
+
+/**
+ * Gerätevorlagen: eingebaute zuerst, dann die aus Erweiterungen, variants expanded into one entry each. A pack
+ * preset with the id of an earlier one replaces it (with all its variants) in place.
+ */
+export function presetList(): PresetListEntry[] {
+  const list: PresetListEntry[] = builtinPresets().flatMap((e) => expandVariants(e));
+  for (const { pack } of installed)
+    for (const d of pack.devices) {
+      const items = expandVariants({ ...d, pack: pack.name } as PresetListEntry);
+      const key = d.id;
+      const at = key ? list.findIndex((x) => (x.base ?? x.id) === key) : -1;
+      if (at >= 0) {
+        const n = list.filter((x) => (x.base ?? x.id) === key).length;
+        list.splice(at, n, ...items);
+      } else list.push(...items);
+    }
+  return list;
+}
+
+/** Group key for presets without a manufacturer */
+export const GENERIC_VENDOR = '';
+
+/**
+ * Presets grouped by manufacturer for the „New device from template“ selects: manufacturers alphabetically,
+ * models alphabetically within each, then generic presets, then extension presets without a manufacturer.
+ * `index` points into `list`.
+ */
+export function groupPresets(list: PresetListEntry[], lang?: string): { vendor: string; fromPack: boolean; items: { entry: PresetListEntry; index: number }[] }[] {
+  const cmp = (a: string, b: string) => a.localeCompare(b, lang, { sensitivity: 'base', numeric: true });
+  const groups = new Map<string, { vendor: string; fromPack: boolean; items: { entry: PresetListEntry; index: number }[] }>();
+  list.forEach((entry, index) => {
+    const vendor = entry.vendor ?? GENERIC_VENDOR;
+    const fromPack = !entry.vendor && !!entry.pack;
+    const key = entry.vendor ? `v:${entry.vendor.toLowerCase()}` : fromPack ? 'pack' : 'generic';
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = { vendor, fromPack, items: [] }));
+    g.items.push({ entry, index });
+  });
+  const rank = (g: { vendor: string; fromPack: boolean }) => (g.vendor ? 0 : g.fromPack ? 2 : 1);
+  const out = [...groups.values()].sort((a, b) => rank(a) - rank(b) || cmp(a.vendor, b.vendor));
+  for (const g of out) g.items.sort((a, b) => cmp(a.entry.preset.name, b.entry.preset.name));
+  return out;
 }
 
 /** Bibliotheks-Einträge aus Erweiterungen; key = „Paket-Kennung/Eintrag“ */

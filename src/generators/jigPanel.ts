@@ -1,32 +1,18 @@
 // Bereich „Werkstücke“ im Dialog des Jig-Generators: Werkstückformen aus der Auswahl (Vektorgrafik, Text, Formen),
 // aus einem Bild (Foto oder Scan, nachgezeichnet) oder aus dem Kamerabild holen; je Art Name, Anzahl und Drehung.
-import type { Editor } from '../editor';
-import { cameraViews } from '../cameraui';
 import { flattenSub, SCALE } from '../clip';
 import { h } from '../dom';
-import { shapeSubs, subsToPath2D } from '../geom';
+import { subsToPath2D } from '../geom';
 import { dec, t, tn } from '../i18n';
-import { IDENT, Obj, Pt, visibleLeaves } from '../model';
+import { IDENT } from '../model';
 import { DEFAULT_DETECT, detectPieces, Piece, RGBAImage } from '../workpieces';
 import { decodeShapes, encodeShapes, JigShape, outlineFromPolys } from './jig';
-import type { GenPanel } from '../model3d/ribsPanel';
+import type { GenHost, GenPanel, GenSelected } from './host';
 import type { Params } from './types';
 
-const polysOfObj = (o: Obj): Pt[][] => {
-  const out: Pt[][] = [];
-  for (const [leaf, world] of visibleLeaves([o]))
-    for (const sp of shapeSubs(leaf.shape)) if (sp.closed) out.push(flattenSub(sp, world).map((q) => ({ x: q.X / SCALE, y: q.Y / SCALE })));
-  return out;
-};
-
-const nameOf = (o: Obj) => o.name || (o.shape.kind === 'text' ? o.shape.text.slice(0, 20) : '');
-
 /** Je gewähltem Objekt (oberste Ebene) eine Werkstückart: Außenumriss aller geschlossenen Konturen */
-export function shapesFromSelection(ed: Editor): JigShape[] {
-  const sel = ed.doc.objs.filter((o) => ed.sel.includes(o));
-  return sel
-    .map((o, i) => ({ n: nameOf(o) || t('Werkstück {n}', { n: i + 1 }), c: 1, r: 0, s: outlineFromPolys(polysOfObj(o)) }))
-    .filter((s) => s.s.length);
+export function shapesFromSelection(sel: GenSelected[]): JigShape[] {
+  return sel.map((o, i) => ({ n: o.name || t('Werkstück {n}', { n: i + 1 }), c: 1, r: 0, s: outlineFromPolys(o.polys) })).filter((s) => s.s.length);
 }
 
 /** Außenkontur eines erkannten Teils (Pixel-Treppen werden beim Einpassen geglättet) */
@@ -49,7 +35,7 @@ function readImage(src: CanvasImageSource, w: number, h: number, maxPx = 1000): 
 
 const biggest = (ps: Piece[]) => ps.filter((p) => !p.cut).sort((a, b) => b.area - a.area)[0] ?? ps.sort((a, b) => b.area - a.area)[0];
 
-export function jigPanel(p: Params, set: (patch: Params) => void, ed?: Editor): GenPanel {
+export function jigPanel(p: Params, set: (patch: Params) => void, host?: GenHost): GenPanel {
   let shapes = decodeShapes(String(p.shapes ?? '[]'));
   const list = h('div', { class: 'jig-list' });
   const note = h('div', { class: 'note' });
@@ -105,8 +91,8 @@ export function jigPanel(p: Params, set: (patch: Params) => void, ed?: Editor): 
   // ----- Quellen -----
   const fromSel = h('button', { class: 'btn small', title: t('Gewählte Objekte als Werkstücke übernehmen (Vektorgrafik, Formen, Text); je Objekt eine Art, Löcher zählen nicht') }, t('Aus Auswahl')) as HTMLButtonElement;
   fromSel.addEventListener('click', () => {
-    if (!ed) return;
-    add(shapesFromSelection(ed), t('Erst auf der Arbeitsfläche die Werkstückform auswählen (z. B. eine importierte SVG-, DXF- oder PDF-Datei).'));
+    if (!host) return;
+    add(shapesFromSelection(host.selection()), t('Erst auf der Arbeitsfläche die Werkstückform auswählen (z. B. eine importierte SVG-, DXF- oder PDF-Datei).'));
   });
 
   const imgWidth = h('input', { type: 'number', min: '1', max: '1000', step: '0.1', value: '20', class: 'jig-count', title: t('Echte Breite des Werkstücks im Bild, damit die Form die richtige Größe bekommt') }) as HTMLInputElement;
@@ -131,14 +117,14 @@ export function jigPanel(p: Params, set: (patch: Params) => void, ed?: Editor): 
   const fromImg = h('button', { class: 'btn small', title: t('Foto oder Scan eines Werkstücks nachzeichnen; die Breite legt den Maßstab fest') }, t('Aus Bild …')) as HTMLButtonElement;
   fromImg.addEventListener('click', () => file.click());
 
-  const views = ed ? cameraViews(ed) : [];
+  const views = host ? host.cameraImages() : [];
   const fromCam = h('button', { class: 'btn small', title: t('Werkstücke auf dem Bett im Kamerabild erkennen; Maße kommen aus der Kalibrierung') }, t('Aus Kamera')) as HTMLButtonElement;
   fromCam.hidden = !views.length;
   fromCam.addEventListener('click', () => {
     const v = views[0];
     const src = v?.image;
-    if (!src || !ed) return void (note.textContent = t('Kein Kamerabild. Im Fenster „Kamera“ verbinden und das Bild aktualisieren.'));
-    const { w: bw, h: bh } = ed.doc.bed;
+    if (!src || !host) return void (note.textContent = t('Kein Kamerabild. Im Fenster „Kamera“ verbinden und das Bild aktualisieren.'));
+    const { w: bw, h: bh } = host.bed();
     const { img } = readImage(src, src.width, src.height, 1200);
     const ps = detectPieces(img, bw / img.width, bh / img.height, DEFAULT_DETECT, v.empty ? readImage(v.empty, v.empty.width, v.empty.height, 1200).img : null).filter((pc) => !pc.cut);
     if (!ps.length) return void (note.textContent = t('Kein Werkstück im Kamerabild erkannt.'));

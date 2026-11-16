@@ -74,7 +74,7 @@ UI texts are written in German in the code inside `t('…')` (placeholders in cu
 | `src/check.ts`, `src/checkPanel.ts`, `src/editor/check.ts` | Design check: the checks (core, no DOM), the Design Check window, selecting findings and applying fixes |
 | `src/hinges.ts`, `src/hingeDialog.ts` | Living hinges: patterns and dialog |
 | `src/pattern.ts`, `src/patternFormat.ts`, `src/patternLibrary.ts`, `src/patternDialog.ts`, `src/editor/pattern.ts` | Pattern fill: tile repeat, clipping and dedupe, recipe format, built-in patterns, dialog and editor commands |
-| `src/generators/` | Parametric parts: common interface (`types.ts`: parameter schema, validation, geometry), registry (`index.ts`), dialog built from the schema, Bézier helpers, spur gear (`gear.ts`), rack (`rack.ts`), timing pulley (`pulley.ts`), cam (`cam.ts`), gear pair (`gearpair.ts`), shared bores (`bore.ts`), finger-jointed box (`box.ts`), drawer (`drawer.ts`), insert (`insert.ts`), slot-together shelf (`shelf.ts`), disc sphere (`discsphere.ts`), layered model from a 3D model (`stack.ts`), rib model (`ribs.ts`) |
+| `src/generators/` | Parametric parts: common interface (`types.ts`: parameter schema, validation, geometry), registry (`index.ts`, `register()`), opening with declared inputs (`run.ts`), dialog built from the schema, Bézier helpers, spur gear (`gear.ts`), rack (`rack.ts`), timing pulley (`pulley.ts`), cam (`cam.ts`), gear pair (`gearpair.ts`), shared bores (`bore.ts`), finger-jointed box (`box.ts`), drawer (`drawer.ts`), insert (`insert.ts`), slot-together shelf (`shelf.ts`), disc sphere (`discsphere.ts`), layered model from a 3D model (`stack.ts`), rib model (`ribs.ts`) |
 | `src/model3d/` | 3D models: read STL/OBJ, weld and store compactly (`mesh.ts`), model store with autosave (`store.ts`), cross-sections, regions and deepest point (`slice.ts`) |
 | `src/view3d/` | 3D view: position of the assembly parts in space (`poses.ts`), plates and intersection check (`solids.ts`), assembling parts joined with the joint tool (`mates.ts`), engravings on the surfaces (`engrave.ts`), material looks and generated textures (`looks.ts`, picker `lookui.ts`), the window (`panel.ts`) and the drawing with three.js (MIT, `viewer.ts`, loaded only when the window opens) |
 | `src/joints.ts`, `src/jointDialog.ts` | Joints: finger joints, tab-and-slot, cross-lap, snap-fit, hook, wedge and T-slot joints, lid hinge with pin. Tests: `npm run test:joints` |
@@ -125,6 +125,30 @@ UI texts are written in German in the code inside `t('…')` (placeholders in cu
 | `src/native.ts` | Calls into the computation core from the UI |
 
 Internally the editor works in mm with y pointing down; the display uses machine coordinates (origin at the bottom left).
+
+## Generators
+
+A generator declares everything the app needs to know about it on its `Generator` object (`src/generators/types.ts`); the core never branches on generator ids (issue #341, checked by `npm run test:gen-decoupling`):
+
+- `tile`: toolbox group, position (`before`), texts for the tile and the toolbar action. The toolbox, the actions in `ui.ts` and the legacy generator toolbar group are built from the registry.
+- `fit`: kind of plug-in fit and the parameter holding the play (design check, material calibration).
+- `poses(params, thickness)`: position of every part in space (3D view, assembly check); helpers in `src/generators/pose.ts`.
+- `assemblyCheck`: the parts form one assembly for the assembly check.
+- `inputs`: what the generator needs before its dialog opens (a 3D model, the selection); `fromInputs()` turns them into parameters. Importing a 3D model offers every generator with a `model3d` input.
+- `panel(params, set, host)`: extra dialog area that reads the app only through `GenHost` (selection outlines, bed size, camera images; `src/generators/host.ts`) and writes only parameters.
+- `showIf` on a field is a rule (`{ eq: [key, value] }`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`), never a function; `ruleHolds()` evaluates it.
+- `view(params)`: values the dialog shows that depend on the parameters (`autoText` suggestions for empty text fields).
+- `onChange(key, old, params)`: called when a field is committed; returns a `patch` and/or an `ask` (question with options, cancelling restores the field). `preview.center` centres the dialog preview; `resetOnNew` on a field makes new objects start with its default.
+- Issues carry a stable `code`; texts for codes that `generate()` throws come from `texts`. Internals throw codes, not UI text.
+
+Register a generator with `register()` in `src/generators/index.ts`. Its `id` is stored in projects and must never change.
+## Security: CSP and markup
+
+The WebView runs under a strict Content Security Policy (`app.security.csp` in `src-tauri/tauri.conf.json`): scripts only from the app itself (plus WebAssembly), no `eval`, no inline scripts, no frames or objects. Network access from the WebView is limited to the update check (api.github.com), the extension catalog and the Google Fonts preview; everything else (machines, network cameras, settings sync, font downloads) goes through Rust. `devCsp` adds the Vite dev server. `style-src` keeps `'unsafe-inline'` because the UI sets inline styles; Tauri is told not to add nonces there (`dangerousDisableAssetCspModification`), since a nonce would switch `'unsafe-inline'` off.
+
+Markup is only inserted through `src/dom.ts`: `h(tag, { icon: 'name' })` and `setIcon()` for entries of `ICONS`, `h(tag, { svg })` and `setTrustedSvg()` for SVG the app builds itself (escape text with `escapeXml()`). Text from files, plugins, the catalog or the network is always inserted as text. `npm run check:html` (part of CI) fails on any other `innerHTML`, `insertAdjacentHTML`, `document.write`, `eval` or `new Function` in `src/`.
+
+Plugins never get their own Tauri capability set; `src-tauri/capabilities/default.json` stays minimal.
 
 ## Logo
 

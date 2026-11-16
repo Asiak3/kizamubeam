@@ -1,5 +1,5 @@
 import { t } from './i18n';
-import { ICONS } from './icons';
+import { setIcon } from './dom';
 import type { SlotRecipe } from './slotPlacement';
 
 export type SlotTreeSelection = { kind: 'group' | 'slot' | 'helper'; id: string } | { kind: 'source'; id: 'source' } | null;
@@ -227,7 +227,7 @@ export function createSlotFeatureTree(
         eye.title = hidden ? t('Einblenden') : t('Ausblenden');
         eye.setAttribute('aria-label', `${eye.title}: ${labels.get(key(value))}`);
         eye.setAttribute('aria-pressed', String(!hidden));
-        eye.innerHTML = hidden ? ICONS.eyeoff : ICONS.eye;
+        setIcon(eye, hidden ? 'eyeoff' : 'eye');
         eye.style.cssText = 'flex:none;width:28px;height:28px;padding:4px;border:0;background:transparent;color:inherit;cursor:pointer;';
         wrapper.append(row, eye);
         return wrapper;

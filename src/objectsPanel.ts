@@ -56,6 +56,11 @@ export function objLabel(o: Obj): string {
 const KIND_ICON: Record<Obj['shape']['kind'], string> = {
   rect: 'rect', ellipse: 'ellipse', polygon: 'polygon', path: 'path', text: 'text', image: 'image', barcode: 'qr', gen: 'gear', group: 'group',
 };
+const objIcon = (o: Obj) => {
+  const name = o.shape.kind === 'gen' ? (getGenerator(o.shape.gen)?.icon ?? 'gear') : o.shape.kind === 'barcode' && o.shape.type !== 'qr' ? 'barcode' : KIND_ICON[o.shape.kind];
+  return ICONS[name] ? name : 'gear';
+};
+
 
 interface Section {
   layer: number;
@@ -106,7 +111,7 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     h('button', {
       class: `ot-btn ${cls}${on ? ' on' : ''}`,
       title,
-      html: ICONS[icon],
+      icon,
       onclick: (e: Event) => (e.stopPropagation(), onclick()),
     });
 
@@ -162,7 +167,7 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
         title: t('Klick: auswählen (Shift/Ctrl: hinzufügen) · Doppelklick auf den Namen: umbenennen · Ziehen: Reihenfolge oder Layer ändern'),
       },
       chevron,
-      h('span', { class: 'ot-icon', html: ICONS[o.shape.kind === 'gen' ? (getGenerator(o.shape.gen)?.icon ?? 'gear') : o.shape.kind === 'barcode' && o.shape.type !== 'qr' ? 'barcode' : KIND_ICON[o.shape.kind]] ?? ICONS.gear }),
+      h('span', { class: 'ot-icon', icon: objIcon(o) }),
       swatch,
       label,
       o.showIf
@@ -275,7 +280,7 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
           render();
         },
       }, cur && !pageCollapsed ? '▾' : '▸'),
-      h('span', { class: 'ot-icon', html: ICONS.new }),
+      h('span', { class: 'ot-icon', icon: 'new' }),
       label,
       h('span', { class: 'muted ot-n' }, String(p.objs.length)),
       toggleBtn('ot-act', false, 'copy', t('Seite duplizieren'), () => ed.duplicatePage(i)),

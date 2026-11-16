@@ -1,0 +1,15 @@
+{
+  "id": "ortur.laser-master-3-le",
+  "vendor": "Ortur",
+  "name": "Ortur Laser Master 3 LE",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 400,
+  "laser": {
+    "type": "diode"
+  },
+  "baud": 115200,
+  "source": "ortur.net: 400 × 400 mm, OLF-V2.0 firmware (GRBL based), default 115200 baud, LaserGRBL/LightBurn",
+  "sourceUrl": "https://ortur.net/pages/support-olm3le",
+  "checked": "2026-11-16"
+}

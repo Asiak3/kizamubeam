@@ -15,6 +15,7 @@ Gli strumenti di disegno si trovano nella barra Strumenti a sinistra e nel menu 
 | Strumento | Scorciatoia | Come si usa |
 |---|---|---|
 | **Disegna linee** | Ctrl+L | Fai clic per gli angoli; fai clic e trascina per una curva di Bézier. Un clic sul punto iniziale chiude la forma; doppio clic, Invio o clic destro termina. |
+| **Arco** | | Imposta il centro, poi raggio e angolo iniziale, poi l'angolo finale — oppure fai clic su inizio, punto intermedio e fine (3 punti). Maiusc aggancia gli angoli a 15°, Invio conferma, Esc scarta l'arco. Modalità e direzione sono nelle opzioni dello strumento; in modalità centro la direzione sceglie l'arco complementare, con 3 punti inverte l'ordine dei nodi, quindi il taglio parte dall'ultimo punto impostato. |
 | **Mano libera / Matita** | | Trascina un tratto; al rilascio viene convertito in curve morbide e modificabili. Nelle opzioni dello strumento imposti la tolleranza e se il tratto va chiuso. |
 | **Rettangolo** | Ctrl+R | Trascina un rettangolo. Maiusc disegna un quadrato, Ctrl parte dal centro. Il raggio degli angoli si imposta nella barra delle modifiche numeriche. |
 | **Ellisse** | Ctrl+E | Trascina un’ellisse. Maiusc disegna un cerchio, Ctrl parte dal centro. |

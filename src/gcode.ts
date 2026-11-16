@@ -76,6 +76,17 @@ export const FIRMWARES: Record<Firmware, FirmwareInfo> = {
 /** Achse, auf der die Drehung ausgegeben wird: Y = Rotary steckt am Y-Anschluss, sonst eine eigene Achse */
 export type RotaryAxis = 'Y' | 'Z' | 'A' | 'B' | 'C';
 
+/** Kind of laser source; decides which material settings fit */
+export type LaserType = 'diode' | 'ir' | 'co2' | 'fiber';
+export const LASER_TYPES: LaserType[] = ['diode', 'ir', 'co2', 'fiber'];
+
+/** The laser module in a device: kind, optical output power in W and wavelength in nm (each optional) */
+export interface LaserModule {
+  type?: LaserType;
+  power?: number;
+  wavelength?: number;
+}
+
 /** Drehachse (Rotary): Die Y-Richtung des Entwurfs wird zur Umfangsrichtung des Objekts */
 export interface Rotary {
   enabled: boolean;
@@ -182,6 +193,8 @@ export interface Device {
    * (LightBurn-Verhalten, zugleich Kollisionsprüfung Kopf gegen Material/Spannpratzen).
    */
   frameView: 'pointer' | 'tool';
+  /** Laser module (from the preset or entered by hand); informational, not used for G-code */
+  laser?: LaserModule;
 }
 
 export const DEFAULT_DEVICE: Device = {
@@ -231,59 +244,7 @@ export const DEFAULT_DEVICE: Device = {
   frameView: 'pointer',
 };
 
-/**
- * Vorlagen für neue Geräte. Maße nach Herstellerseite oder Testbericht (Quelle je Zeile, Stand 2026-10-19);
- * Händler geben oft die Größe der Wabenplatte statt des Fahrwegs an. Vor dem ersten Job mit
- * „Von der Maschine lesen“ oder dem Assistenten „Laser einrichten“ prüfen.
- */
-export const PRESETS: (Partial<Device> & { name: string; fw: Firmware })[] = [
-  // Steuerung an Hanjos Gerät bestätigt; 365 × 305 laut notebookcheck.com und macitynet.it, Herstellerseite nicht lesbar
-  { name: 'Swiitol E6 Pro', fw: 'fluidnc', bedW: 365, bedH: 305 },
-  // 3dprintbeginner.com/ortur-laser-master-3-preview, clevercreations.org
-  { name: 'Ortur Laser Master 3', fw: 'grbl', bedW: 400, bedH: 400 },
-  // techradar.com/reviews/ortur-laser-master-2-pro
-  { name: 'Ortur Laser Master 2 Pro S2', fw: 'grbl', bedW: 400, bedH: 400 },
-  // atomstack.com/products/atomstack-a20-pro-130w
-  { name: 'Atomstack A20 Pro', fw: 'grbl', bedW: 400, bedH: 365 },
-  // Atomstack P1; area di lavoro 110 × 110 mm, moduli intercambiabili (diodo 5W / infrarossi 1.2W)
-  { 
-    name: 'Atomstack P1', 
-    fw: 'grbl', 
-    bedW: 110, 
-    bedH: 110, 
-    baud: 115200, 
-    rapid: 3000, 
-    accel: 1000, 
-    sMax: 1000, 
-    frameSpeed: 1500 
-  },
-  // Herstellerangabe 410 × 400; Nutzer messen im LightBurn-Forum etwa 374 × 362
-  { name: 'Sculpfun S30', fw: 'grbl', bedW: 410, bedH: 400 },
-  // crealityfalcon.com/blogs/product-reviews/sculpfun-s9-review
-  { name: 'Sculpfun S9', fw: 'grbl', bedW: 410, bedH: 420 },
-  // atomm.com/blog/2535-what-is-xtool-d1 (ca.); 230400 Baud laut LightBurn-Forum
-  { name: 'xTool D1', fw: 'grbl', bedW: 432, bedH: 406, baud: 230400 },
-  { name: 'xTool D1 Pro', fw: 'grbl', bedW: 430, bedH: 400, baud: 230400 },
-  // crealityfalcon.com/products/10w-cr-laser-falcon-engraver
-  { name: 'Creality CR-Laser Falcon 10W', fw: 'grbl', bedW: 400, bedH: 415 },
-  // filament2print.com
-  { name: 'Creality Falcon 2', fw: 'grbl', bedW: 400, bedH: 415 },
-  // techradar.com/reviews/two-trees-ts2-laser-engraver
-  { name: 'Two Trees TS2', fw: 'grbl', bedW: 450, bedH: 450 },
-  // longer.net, Ray5 5 W/10 W (20 W: 400 × 365, 40 W: 385 × 385); 115200 Baud
-  { name: 'Longer Ray5 5/10 W', fw: 'grbl', bedW: 400, bedH: 400 },
-  { name: 'Longer Ray5 20 W', fw: 'grbl', bedW: 400, bedH: 365 },
-  // Bedienungsanleitung COMGO Z1 V1.1; 115200 Baud
-  { name: 'Comgrow Z1', fw: 'grbl', bedW: 400, bedH: 400 },
-  { name: t('GRBL-Laser (allgemein)'), fw: 'grbl', bedW: 400, bedH: 400 },
-  { name: t('grblHAL-Laser (allgemein)'), fw: 'grblhal', bedW: 400, bedH: 400 },
-  { name: t('FluidNC-Laser (allgemein)'), fw: 'fluidnc', bedW: 400, bedH: 400 },
-  { name: t('Marlin mit Laser'), fw: 'marlin', bedW: 300, bedH: 300, baud: 250000 },
-  { name: t('Smoothieware-Laser'), fw: 'smoothie', bedW: 300, bedH: 200 },
-  // Virtuelle Maschine zum Testen ohne Hardware (vm/ im Repo, eigener Download); Ports wie dort voreingestellt
-  { name: 'KizamuBeam Virtual Machine', fw: 'fluidnc', bedW: 400, bedH: 400, conn: 'tcp', host: '127.0.0.1', tcpPort: 2323, wsPort: 8181, limitSwitches: 'yes' },
-];
-
+/** Built-in presets for new devices live in presets/devices (one JSON file per device), see packs.ts presetList */
 export function newDevice(preset: Partial<Device> & { fw: Firmware }): Device {
   const fw = FIRMWARES[preset.fw];
   return {
@@ -292,6 +253,8 @@ export function newDevice(preset: Partial<Device> & { fw: Firmware }): Device {
     sMax: fw.sMax,
     ...preset,
     rotary: { ...DEFAULT_ROTARY, ...preset.rotary },
+    pointerOffset: { ...DEFAULT_DEVICE.pointerOffset, ...preset.pointerOffset },
+    ...(preset.laser ? { laser: { ...preset.laser } } : {}),
     id: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
   };
 }

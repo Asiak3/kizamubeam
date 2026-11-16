@@ -58,6 +58,8 @@ export interface Node {
   cout?: Pt;
   /** Anfasser bleiben beim Ziehen gespiegelt */
   smooth?: boolean;
+  /** Inserted by the start point tool on an edge; removed again when the start moves while still unchanged (#333) */
+  split?: boolean;
 }
 
 export interface SubPath {
@@ -98,6 +100,8 @@ export interface GenShape {
   asm?: string;
   /** Felder, die aus Projekt-Parametern berechnet werden: Schlüssel → Formel (z. B. thickness: 'Dicke') */
   bind?: Record<string, string>;
+  /** Name of the extension whose plugin made the part; shown when the extension is missing */
+  ext?: string;
 }
 
 /** Bildanpassungen je Bild (wie „Adjust Image“ in LightBurn) */

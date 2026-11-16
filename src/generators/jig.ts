@@ -14,6 +14,7 @@ import { IDENT } from '../model';
 import { markSubs } from '../printcut';
 import { numberStrokes } from './stack';
 import type { Generator, GenPart, Issue, Params } from './types';
+import { jigPanel, shapesFromSelection } from './jigPanel';
 
 /** Eine Werkstückart: Name, Anzahl, Drehung im Jig (0/90°) und Außenumriss (Mitte im Ursprung) */
 export interface JigShape {
@@ -275,6 +276,20 @@ export const JIG: Generator = {
   kind: 'assembly',
   name: t('Jig'),
   icon: 'jig',
+  inputs: [{ kind: 'selection' }],
+  fromInputs: (inp) => (inp.selection?.length ? { shapes: encodeShapes(shapesFromSelection(inp.selection)) } : undefined),
+  panel: (p, set, host) => jigPanel(p, set, host),
+  tile: {
+    group: 'arrange',
+    before: 'jigfill',
+    since: '1.17.0',
+    text: (t) => ({
+      name: t('Jig'),
+      desc: t('Halteplatte mit passgenauen Aussparungen für Werkstücke aus Vektorgrafik, Bild oder Kamera, mit Nummern und Passermarken.'),
+      keys: t('Jig Halterung Vorrichtung Schablone Aussparung Serie Schlüsselanhänger Rohlinge Fächer|Suchwörter'),
+      action: t('Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken'),
+    }),
+  },
   schema: [
     { key: 'shapes', type: 'data', label: t('Werkstücke'), def: '[]' },
     {
@@ -282,20 +297,20 @@ export const JIG: Generator = {
       options: [['fit', t('Passend zu den Fächern')], ['size', t('Feste Größe')]],
       title: t('Passend: die Platte wächst mit der Zahl der Fächer. Feste Größe: so viele Fächer wie angegeben, soweit sie passen.'),
     },
-    { key: 'width', type: 'length', label: t('Breite'), min: 20, max: 2000, def: 200, showIf: (p) => p.plate === 'size' },
-    { key: 'height', type: 'length', label: t('Höhe'), min: 20, max: 2000, def: 150, showIf: (p) => p.plate === 'size' },
+    { key: 'width', type: 'length', label: t('Breite'), min: 20, max: 2000, def: 200, showIf: { eq: ['plate', 'size'] } },
+    { key: 'height', type: 'length', label: t('Höhe'), min: 20, max: 2000, def: 150, showIf: { eq: ['plate', 'size'] } },
     { key: 'gap', type: 'length', label: t('Abstand der Fächer'), min: 1, max: 100, def: 5, title: t('Steg zwischen zwei Aussparungen (ohne Griffmulden)') },
     { key: 'clearance', type: 'length', label: t('Spiel je Seite'), min: 0, max: 3, def: 0.15, title: t('So viel größer als das Werkstück wird die Aussparung auf jeder Seite.') },
     { key: 'notch', type: 'enum', label: t('Griffmulden'), def: 'one', options: [['none', t('Keine')], ['one', t('Eine Seite')], ['two', t('Beide Seiten')]], title: t('Halbrunde Ausschnitte am Rand der Aussparung, um das Werkstück herauszunehmen') },
-    { key: 'notchSize', type: 'length', label: t('Muldengröße'), min: 4, max: 40, def: 12, showIf: (p) => p.notch !== 'none' },
+    { key: 'notchSize', type: 'length', label: t('Muldengröße'), min: 4, max: 40, def: 12, showIf: { ne: ['notch', 'none'] } },
     { key: 'numbers', type: 'bool', label: t('Fächer nummerieren'), def: true, title: t('Fachnummer als feine Gravur unter jeder Aussparung; sie passt zur Zeile der Serien-Tabelle.') },
     { key: 'marks', type: 'bool', label: t('Passermarken gravieren'), def: true, title: t('Drei Marken in den Ecken, um den wieder eingelegten Jig mit Print and Cut einzumessen') },
     { key: 'margin', type: 'length', label: t('Rand'), min: 2, max: 100, def: 10, advanced: true },
     { key: 'radius', type: 'length', label: t('Eckenradius'), min: 0, max: 50, def: 3, advanced: true },
     { key: 'kerf', type: 'length', label: t('Schnittfuge'), min: 0, max: 1, def: 0.1, advanced: true, title: t('Breite des Schnitts; wird beim Spiel berücksichtigt') },
     { key: 'thickness', type: 'length', label: t('Materialdicke'), min: 0.5, max: 50, def: 3, advanced: true, title: t('Dicke der Jig-Platte (für die 3D-Ansicht)') },
-    { key: 'numberSize', type: 'length', label: t('Schrifthöhe'), min: 1.5, max: 20, def: 3, advanced: true, showIf: (p) => !!p.numbers },
-    { key: 'markSize', type: 'length', label: t('Markengröße'), min: 3, max: 20, def: 6, advanced: true, showIf: (p) => !!p.marks },
+    { key: 'numberSize', type: 'length', label: t('Schrifthöhe'), min: 1.5, max: 20, def: 3, advanced: true, showIf: { eq: ['numbers', true] } },
+    { key: 'markSize', type: 'length', label: t('Markengröße'), min: 3, max: 20, def: 6, advanced: true, showIf: { eq: ['marks', true] } },
   ],
   validate(raw: Params): Issue[] {
     const p = P(raw);

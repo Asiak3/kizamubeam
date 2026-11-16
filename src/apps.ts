@@ -2,9 +2,11 @@
 // kurzen Namen, Erklärsatz und welchen Suchwörtern. Was eine Kachel tut (Symbol, Aufruf, ob sie gerade
 // möglich ist), kommt von der gleichnamigen Aktion der Funktionsleisten (ui.ts, buildBars).
 // Neues Werkzeug: Aktion in buildBars anlegen und hier eintragen; npm run test:apps prüft beides.
+// Generators bring their own tile (Generator.tile) and are merged in by rows(); do not list them here.
 // Ohne DOM, damit die Tests in Node laufen.
 import en from './locales/en.json';
 import { t } from './i18n';
+import { GENERATORS } from './generators/index';
 
 export type AppGroup = 'mech' | 'box' | 'model3d' | 'join' | 'arrange' | 'text' | 'image' | 'laser' | 'cad';
 
@@ -50,22 +52,9 @@ export const appGroups = (): AppGroupInfo[] => [
  * Sprache der Oberfläche, mit der Identität die deutschen Quelltexte (für die Suche in beiden Sprachen);
  * npm run i18n:check findet die Texte so wie sonst auch.
  */
-const rows = (t: (s: string) => string): AppInfo[] => [
-  { id: 'gear', group: 'mech', name: t('Zahnrad'), desc: t('Evolventen-Zahnrad mit Modul, Zähnezahl, Bohrung und Speichen; Parameter bleiben änderbar.'), keys: t('Zahnrad Zähne Getriebe Evolvente Modul|Suchwörter') },
-  { id: 'rack', group: 'mech', name: t('Zahnstange'), desc: t('Gerade Zahnstange, die zum Zahnrad mit gleichem Modul passt.'), keys: t('Zahnstange Linearantrieb Zahnrad|Suchwörter') },
-  { id: 'pulley', group: 'mech', name: t('Riemenscheibe'), desc: t('Zahnriemenscheibe für GT2- oder HTD-Riemen, mit Bordscheiben.'), keys: t('Riemen Zahnriemen GT2 HTD Pulley|Suchwörter') },
-  { id: 'cam', group: 'mech', name: t('Nocken'), desc: t('Nockenscheibe für Rolle oder Spitze mit Hub, Rast und Rückhub.'), keys: t('Nocke Kurvenscheibe Hub Exzenter Automat|Suchwörter') },
-  { id: 'gearpair', group: 'mech', name: t('Zahnradpaar'), desc: t('Zwei passende Zahnräder mit Achsabstand und Grundplatte als Baugruppe.'), keys: t('Getriebe Übersetzung Zahnräder Achsabstand|Suchwörter') },
-  { id: 'box', group: 'box', name: t('Box mit Fingerzinken'), desc: t('Kiste aus Platten mit Fingerzinken, mit oder ohne Deckel, als Baugruppe.'), keys: t('Kiste Kasten Gehäuse Schachtel Fingerzinken Deckel|Suchwörter') },
-  { id: 'box-divided', group: 'box', name: t('Box mit Fingerzinken und Trennwänden'), desc: t('Box mit parametrischen Trennwänden.'), keys: t('Box Fächer Trennwände Fingerzinken|Suchwörter') },
-  { id: 'drawer', group: 'box', name: t('Schublade'), desc: t('Korpus, Schubkasten und Blende mit Griff als Baugruppe.'), keys: t('Schublade Schubfach Kommode Korpus|Suchwörter') },
-  { id: 'insert', group: 'box', name: t('Einsatz mit Fächern'), desc: t('Gesteckte Trennstege, die eine Box oder Schublade in Fächer teilen.'), keys: t('Einsatz Fächer Trennwand Sortierkasten Box|Suchwörter') },
-  { id: 'shelf', group: 'box', name: t('Steckregal'), desc: t('Regal aus Seiten und Böden, die ineinander gesteckt werden.'), keys: t('Regal Böden Stecksystem Möbel|Suchwörter') },
-  { id: 'stack', group: 'model3d', name: t('Schichtmodell'), desc: t('3D-Modell (STL, OBJ) in gestapelte Scheiben zerlegen, die verleimt wieder das Modell ergeben.'), keys: t('3D STL OBJ Scheiben Schichten stapeln Slicer Skulptur Relief Kopf|Suchwörter'), since: '1.10.0' },
-  { id: 'multilayer', group: 'model3d', name: t('Mehrlagenarbeit'), desc: t('Aus ausgewählten Formen oder Gruppen eine frei gestaltete, in der 3D-Ansicht gestapelte Arbeit machen.'), keys: t('Schichten Platten Stapeln Holz Relief Shadowbox 3D mehrlagig|Suchwörter'), since: '2.6.0' },
-  { id: 'ribs', group: 'model3d', name: t('Rippenmodell'), desc: t('3D-Modell (STL, OBJ) als Rippen, die mit Schlitzen auf einem Rückgrat stecken.'), keys: t('3D STL OBJ Rippen Spanten Rückgrat Steckmodell Tier Figur Waffel|Suchwörter'), since: '1.16.0' },
-  { id: 'discsphere', group: 'model3d', name: t('Scheibenkugel'), desc: t('Kugel oder Lampe aus Kreisscheiben, die sich über schräge Schlitze gegenseitig halten.'), keys: t('Lampe Kugel Scheiben Steckmodell Lampenschirm Polyeder Papier Karton|Suchwörter'), since: '1.10.0' },
+const coreRows = (t: (s: string) => string): AppInfo[] => [
   { id: 'lidhinge', group: 'box', name: t('Deckelscharnier'), desc: t('Scharnier zwischen Rückwand und Deckel einer Box: Knöchel, Schlitze und Stiftlöcher.'), keys: t('Scharnier Deckel Klappe Box Gelenk|Suchwörter') },
+  { id: 'multilayer', group: 'model3d', name: t('Mehrlagenarbeit'), desc: t('Aus ausgewählten Formen oder Gruppen eine frei gestaltete, in der 3D-Ansicht gestapelte Arbeit machen.'), keys: t('Schichten Platten Stapeln Holz Relief Shadowbox 3D mehrlagig|Suchwörter'), since: '2.6.0' },
   { id: 'sketch', group: 'cad', name: t('Neue Skizze'), desc: t('Linien, Kreise und Bögen mit Beziehungen und Bemaßungen zeichnen; Maße bleiben änderbar, auch über Projekt-Parameter.'), keys: t('Skizze CAD Bemaßung Beziehung Constraint parametrisch tangential parallel senkrecht Maß Solver|Suchwörter'), since: '2.1.0' },
   { id: 'sketchconv', group: 'cad', name: t('In Skizze umwandeln'), desc: t('Gewählte Formen in eine Skizze umwandeln, damit Beziehungen und Maße darauf gesetzt werden können.'), keys: t('Skizze umwandeln CAD Bemaßung Beziehung parametrisch|Suchwörter'), since: '2.1.0' },
   { id: 'tool:joint', group: 'join', name: t('Verbindungen'), desc: t('Fingerzinken, Zapfen, Überblattung, Schnapp-, Haken-, Keil- oder T-Slot-Verbindung auf gerade Kanten.'), keys: t('Zinken Zapfen Schlitz Überblattung T-Slot Keil Holzverbindung|Suchwörter') },
@@ -90,7 +79,6 @@ const rows = (t: (s: string) => string): AppInfo[] => [
   { id: 'materialtest', group: 'laser', name: t('Materialtest'), desc: t('Testraster mit gestuften Werten für Leistung und Geschwindigkeit lasern.'), keys: t('Test Leistung Geschwindigkeit Raster Material|Suchwörter') },
   { id: 'testphoto', group: 'laser', name: t('Materialtest auswerten'), desc: t('Foto des gelaserten Tests laden, beste Zelle anklicken, Werte übernehmen.'), keys: t('Foto Kamera Auswertung Material Test|Suchwörter'), since: '1.5.0' },
   { id: 'focustest', group: 'laser', name: t('Fokustest'), desc: t('Rampe auf schrägem Material oder Linienreihe mit Z-Versatz lasern und die schärfste Stelle anklicken.'), keys: t('Fokus Brennpunkt Brennweite Abstand Höhe Schärfe Rampe Z-Achse einstellen|Suchwörter'), since: '1.12.0' },
-  { id: 'jig', group: 'arrange', name: t('Jig'), desc: t('Halteplatte mit passgenauen Aussparungen für Werkstücke aus Vektorgrafik, Bild oder Kamera, mit Nummern und Passermarken.'), keys: t('Jig Halterung Vorrichtung Schablone Aussparung Serie Schlüsselanhänger Rohlinge Fächer|Suchwörter'), since: '1.17.0' },
   { id: 'jigfill', group: 'arrange', name: t('Auf Jig-Fächer legen'), desc: t('Design in jedes Fach eines Jigs kopieren, auf Wunsch mit Seriennummer oder CSV-Zeile je Fach.'), keys: t('Jig Fächer verteilen Serie Seriennummer Namen CSV Schlüsselanhänger kopieren|Suchwörter'), since: '1.17.0' },
   { id: 'printcut', group: 'laser', name: t('Print and Cut'), desc: t('Gedrucktes Blatt an Passermarken mit Laserpunkt oder Kamera einmessen und passgenau ausschneiden.'), keys: t('Print Cut Drucken Ausschneiden Passermarken Registrierung Aufkleber Sticker Etikett ausrichten|Suchwörter'), since: '1.17.0' },
   { id: 'calibrate', group: 'laser', name: t('Passung kalibrieren'), desc: t('Testteile lasern, nachmessen und Schnittfuge und Steckspiel übernehmen.'), keys: t('Kerf Fuge Schnittbreite Passung Spiel kalibrieren|Suchwörter') },
@@ -98,6 +86,26 @@ const rows = (t: (s: string) => string): AppInfo[] => [
   { id: 'setup', group: 'laser', name: t('Laser einrichten'), desc: t('Schritt für Schritt von der Verbindung bis zum ersten Testauftrag.'), keys: t('Einrichten Assistent Verbinden erste Schritte Gerät|Suchwörter') },
   { id: 'rotary', group: 'laser', name: t('Drehachse'), desc: t('Rotary einstellen: Walzen oder Futter, Anschluss, Durchmesser, Testdrehung.'), keys: t('Rotary Drehachse Walze Futter Becher Glas zylindrisch|Suchwörter') },
 ];
+
+/** Core tiles plus the tiles of all registered generators (Generator.tile), each placed in its group */
+function rows(t: (s: string) => string): AppInfo[] {
+  const out = coreRows(t);
+  for (const g of GENERATORS) {
+    if (!g.tile) continue;
+    const { name, desc, keys } = g.tile.text(t);
+    const row: AppInfo = { id: g.id, group: g.tile.group as AppGroup, name, desc, keys, ...(g.tile.since ? { since: g.tile.since } : {}) };
+    let at = g.tile.before ? out.findIndex((a) => a.id === g.tile!.before) : -1;
+    if (at < 0) {
+      // End of its group; a group without core tiles goes ahead of the first tile of a later group
+      const last = out.map((a) => a.group).lastIndexOf(row.group);
+      const order = appGroups().map((x) => x.id);
+      const later = out.findIndex((a) => order.indexOf(a.group) > order.indexOf(row.group));
+      at = last >= 0 ? last + 1 : later >= 0 ? later : out.length;
+    }
+    out.splice(at, 0, row);
+  }
+  return out;
+}
 
 /** Alle Kacheln in der Sprache der Oberfläche */
 export const appList = (): AppInfo[] => rows(t);

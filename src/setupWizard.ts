@@ -6,7 +6,7 @@ import type { Editor } from './editor';
 import { h, numInput } from './dom';
 import { Device, FIRMWARES, newDevice, rotaryOn, StartFrom } from './gcode';
 import { presetList } from './packs';
-import { presetOption } from './packsDialog';
+import { presetPicker } from './packsDialog';
 import { isTauri, machine, PortInfo } from './machine';
 import { addDevice, deviceList, device, frameJob, JobSource, openDeviceDialog, openPreview, onDeviceChange, patchDevice, runBlocker, selectDevice, startJob } from './laser';
 import { defaultImageLayer } from './model';
@@ -147,7 +147,7 @@ export function openSetupWizard(ed: Editor) {
       ...devices.map((d) => h('option', { value: d.id, selected: d === device }, `${d.name} (${FIRMWARES[d.fw].label})`)),
     ) as HTMLSelectElement;
     const presets = presetList();
-    const presetSel = h('select', {}, ...presets.map((p, i) => presetOption(p, i))) as HTMLSelectElement;
+    const { select: presetSel, details: presetInfo } = presetPicker(presets);
     const addBtn = h('button', {
       class: 'btn', onclick: () => {
         addDevice(ed, newDevice(presets[Number(presetSel.value)].preset));
@@ -221,6 +221,7 @@ export function openSetupWizard(ed: Editor) {
       h('div', { class: 'form setup-form' },
         h('label', {}, t('Gerät')), h('div', { class: 'conn-row' }, devSel),
         h('label', {}, t('oder neu')), h('div', { class: 'conn-row' }, presetSel, addBtn),
+        h('span', {}), presetInfo,
         ...rows,
       ),
       h('div', { class: 'conn-row' }, connectBtn),

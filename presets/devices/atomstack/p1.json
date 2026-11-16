@@ -1,0 +1,35 @@
+{
+  "id": "atomstack.p1",
+  "vendor": "Atomstack",
+  "name": "Atomstack P1",
+  "fw": "grbl",
+  "bedW": 110,
+  "bedH": 110,
+  "laser": {
+    "type": "diode"
+  },
+  "variants": [
+    {
+      "id": "diode-5w",
+      "name": "5 W",
+      "laser": {
+        "power": 5
+      }
+    },
+    {
+      "id": "ir-1-2w",
+      "name": "1.2 W IR",
+      "laser": {
+        "type": "ir",
+        "power": 1.2
+      }
+    }
+  ],
+  "baud": 115200,
+  "rapid": 3000,
+  "accel": 1000,
+  "sMax": 1000,
+  "frameSpeed": 1500,
+  "source": "Work area 110 × 110 mm, interchangeable modules (5 W diode / 1.2 W infrared)",
+  "checked": "2026-10-19"
+}

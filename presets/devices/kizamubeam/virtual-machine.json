@@ -1,0 +1,15 @@
+{
+  "id": "kizamubeam.virtual-machine",
+  "vendor": "KizamuBeam",
+  "name": "KizamuBeam Virtual Machine",
+  "fw": "fluidnc",
+  "bedW": 400,
+  "bedH": 400,
+  "conn": "tcp",
+  "host": "127.0.0.1",
+  "tcpPort": 2323,
+  "wsPort": 8181,
+  "limitSwitches": "yes",
+  "source": "Virtual machine for testing without hardware (vm/ in this repository); ports as preset there",
+  "checked": "2026-11-16"
+}

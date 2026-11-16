@@ -86,6 +86,15 @@ export const RACK: Generator = {
   kind: 'part',
   name: t('Zahnstange'),
   icon: 'rack',
+  tile: {
+    group: 'mech',
+    text: (t) => ({
+      name: t('Zahnstange'),
+      desc: t('Gerade Zahnstange, die zum Zahnrad mit gleichem Modul passt.'),
+      keys: t('Zahnstange Linearantrieb Zahnrad|Suchwörter'),
+      action: t('Zahnstange erstellen (passend zum Zahnrad, Parameter bleiben erhalten)'),
+    }),
+  },
   schema: [
     { key: 'teeth', type: 'int', label: t('Zähnezahl'), min: 1, max: 1000, def: 20 },
     { key: 'module', type: 'length', label: t('Modul'), min: 0.3, max: 20, def: 2, title: t('Muss zum Modul des Zahnrads passen') },

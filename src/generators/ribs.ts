@@ -20,7 +20,7 @@ import type { Pt, SubPath } from '../model';
 import { t, tn } from '../i18n';
 import { fitPolyline } from '../fit';
 import { arrangeParts } from './build';
-import type { Generator, GenPart, Issue, Params, PlanSheet } from './types';
+import type { Generator, GenPart, Issue, Params, PlanSheet, Rule } from './types';
 import { getMesh } from '../model3d/store';
 import type { Mesh } from '../model3d/mesh';
 import {
@@ -28,6 +28,7 @@ import {
   regionIslands, sliceAt, sliceRegion, subtractRegions, unionRegions, V3,
 } from '../model3d/slice';
 import { numberStrokes, numberWidth, placeNumber, worldOf } from './stack';
+import { ribsPanel } from '../model3d/ribsPanel';
 
 export interface RibsParams {
   model: string;
@@ -867,7 +868,8 @@ function center(polys: Pt[][]): Pt {
 
 // ---------- Generator ----------
 
-const simple = (p: Params) => !parseSections(String(p.sections ?? ''))?.length;
+/** Without own sections (the ribs panel writes '' when none are left) */
+const SIMPLE: Rule = { eq: ['sections', ''] };
 
 export const RIBS: Generator = {
   id: 'ribs',
@@ -875,8 +877,27 @@ export const RIBS: Generator = {
   kind: 'assembly',
   name: t('Rippenmodell'),
   icon: 'ribs',
+  poses: (p) => {
+    const poses = ribsPoses(p);
+    return poses ? { poses } : null;
+  },
+  fit: { kind: 'slot', play: 'play' },
+  assemblyCheck: true,
+  inputs: [{ kind: 'model3d' }],
+  fromInputs: (inp) => (inp.model ? { model: inp.model.id, name: inp.model.name } : undefined),
+  panel: (p, set) => ribsPanel(p, set),
+  tile: {
+    group: 'model3d',
+    since: '1.16.0',
+    text: (t) => ({
+      name: t('Rippenmodell'),
+      desc: t('3D-Modell (STL, OBJ) als Rippen, die mit Schlitzen auf einem Rückgrat stecken.'),
+      keys: t('3D STL OBJ Rippen Spanten Rückgrat Steckmodell Tier Figur Waffel|Suchwörter'),
+      action: t('Rippenmodell aus einem 3D-Modell (STL, OBJ) erstellen'),
+    }),
+  },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'model', type: 'data', label: t('Modell'), def: '' },
     { key: 'name', type: 'data', label: t('Dateiname'), def: '' },
     { key: 'sections', type: 'data', label: t('Abschnitte'), def: '' },
@@ -889,13 +910,13 @@ export const RIBS: Generator = {
       key: 'axis', type: 'enum', label: t('Achse'), def: 'x',
       options: [['x', t('von links nach rechts')], ['y', t('von vorne nach hinten')], ['z', t('von unten nach oben')]],
       title: t('Die Rippen stehen quer zu dieser Richtung. Bei Tieren, Fischen und Autos meist die Länge.'),
-      showIf: simple,
+      showIf: SIMPLE,
     },
     {
       key: 'spineDir', type: 'enum', label: t('Rückgrat steht'), def: 'z',
       options: [['z', t('senkrecht (nach oben)')], ['y', t('nach vorne')], ['x', t('zur Seite')]],
       title: t('Ebene des Rückgrats: Es enthält die Achse und diese Richtung. Die Rippen werden in dieser Richtung aufgesteckt.'),
-      showIf: simple,
+      showIf: SIMPLE,
     },
     { key: 'size', type: 'length', label: t('Größe (längste Seite)'), min: 10, max: 3000, def: 200 },
     { key: 'thickness', type: 'length', label: t('Materialdicke'), min: 0.3, max: 30, def: 3 },
@@ -908,10 +929,10 @@ export const RIBS: Generator = {
       key: 'spineInset', type: 'length', label: t('Rückgrat nach innen versetzt'), min: 0, max: 100, def: 2,
       title: t('Das Rückgrat wird um so viel kleiner als der Umriss, damit es zwischen den Rippen nicht heraussteht. 0 = voller Umriss.'),
     },
-    { key: 'spineOffset', type: 'length', label: t('Rückgrat verschieben'), min: -1000, max: 1000, def: 0, advanced: true, title: t('Lage des Rückgrats aus der Mitte heraus, quer zu seiner Ebene.'), showIf: simple },
+    { key: 'spineOffset', type: 'length', label: t('Rückgrat verschieben'), min: -1000, max: 1000, def: 0, advanced: true, title: t('Lage des Rückgrats aus der Mitte heraus, quer zu seiner Ebene.'), showIf: SIMPLE },
     { key: 'play', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0.1, title: t('Die Schlitze werden um so viel breiter als die Materialdicke; negativ = Presspassung') },
     { key: 'numbers', type: 'bool', label: t('Nummern gravieren'), def: true, title: t('Jede Rippe bekommt ihre Nummer, das Rückgrat neben jedem Schlitz die Nummer der passenden Rippe.') },
-    { key: 'numberSize', type: 'length', label: t('Größte Schrifthöhe'), min: 1.5, max: 30, def: 6, advanced: true, showIf: (p) => !!p.numbers },
+    { key: 'numberSize', type: 'length', label: t('Größte Schrifthöhe'), min: 1.5, max: 30, def: 6, advanced: true, showIf: { eq: ['numbers', true] } },
     { key: 'minArea', type: 'number', label: t('Kleinste Fläche (mm²)'), min: 0, max: 10000, def: 4, advanced: true, title: t('Inseln und Löcher, die kleiner sind, werden weggelassen bzw. gefüllt.') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.1, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Schlitze werden schmaler. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
     { key: 'maxPlate', type: 'length', label: t('Platten teilen ab'), min: 0, max: 3000, def: 0, advanced: true, title: t('Rückgrat-Platten, die länger sind (z. B. als das Bett), werden mit einem Schwalbenschwanz geteilt. 0 = nie teilen.') },

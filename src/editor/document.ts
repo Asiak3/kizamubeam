@@ -235,6 +235,8 @@ export class EditorDocument {
     this.vectorPreview = null;
     if (this.drag) this.cancelDrag();
     if (this.draft) this.finishDraft();
+    // Ein laufender Bogen gehört zur alten Seite und wird nicht mitgenommen.
+    this.arcDraft = null;
     this.sel = [];
     this.pivot = null;
     this.rotateMode = false;

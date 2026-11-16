@@ -43,7 +43,7 @@ Unter **Werkzeuge → Pfad**:
 - **Ausgewählte Formen verbinden** (Alt+J) fügt offene Pfade, deren Enden sich treffen (innerhalb 0,05 mm), zu einem Pfad zusammen.
 - **Zerlegen** (Alt+B) teilt Pfade, Formen und Texte in ihre einzelnen Linien und Kurven.
 - **Formen trimmen** (Ctrl+K): Fährst du über eine Kurve, färbt sich das Stück bis zu den nächsten Schnittpunkten rot und wird mit einem Klick entfernt. Die übrigen Stücke werden an den Schnittpunkten verbunden, zwei überlappende Kreise werden so nach zwei Klicks zu einer Kontur. Ctrl+Klick verbindet nicht, Shift+Klick behält das entfernte Stück.
-- **Startpunkt setzen**: Einen Knoten anklicken, damit der Schnitt dort beginnt, oder eine Kante anklicken, um dort einen neuen Startknoten einzufügen. Shift+Klick kehrt die Richtung um. Solange das Werkzeug aktiv ist, zeigt die Arbeitsfläche alle Startpunkte, Richtungen, An- und Ausschnitte genau so, wie der Job sie schneidet.
+- **Startpunkt setzen**: Einen Knoten anklicken, damit der Schnitt dort beginnt, oder eine Kante anklicken, um dort einen neuen Startknoten einzufügen. Dieser Knoten verschwindet wieder, wenn man den Startpunkt verlegt oder freigibt, sofern man ihn nicht bearbeitet hat. Shift+Klick kehrt die Richtung um. Solange das Werkzeug aktiv ist, zeigt die Arbeitsfläche alle Startpunkte, Richtungen, An- und Ausschnitte genau so, wie der Job sie schneidet.
 - **Richtung umkehren** dreht die Schnittrichtung um.
 - **Mittelpunkte markieren** setzt ein kleines Kreuz in die Mitte jedes Kreises und Bogens, zum Ankörnen oder Bohren.
 

@@ -7,6 +7,7 @@ import { flipY, layoutParts, PathBuilder } from './build';
 import { boreIssues, boreSchema } from './bore';
 import { GEAR, gearGeometry, GearParams } from './gear';
 import type { GenPart, Generator, Issue, Params } from './types';
+import { flatPose, rotatePose, type AsmPoses, type Pose } from './pose';
 
 export interface GearPairParams {
   teeth1: number;
@@ -71,14 +72,41 @@ function plateOutline(p: GearPairParams, w: number, h: number, x1: number, x2: n
   return out;
 }
 
+function gearPairPoses(raw: Params, th: number): AsmPoses {
+  const p = raw as unknown as GearPairParams;
+  const g1 = gearGeometry(pairGear(raw, 1) as unknown as GearParams);
+  const g2 = gearGeometry(pairGear(raw, 2) as unknown as GearParams);
+  const a = centerDistance(p);
+  // Achsen wie in der Grundplatte; ohne Platte liegen die Räder auf Z = 0
+  const c0 = (g2.ra - g1.ra) / 2;
+  const z = p.plate ? th : 0;
+  // Der erste Zahn zeigt nach oben (+Y). Rad 1: Zahn zu Rad 2 (+X); Rad 2: Lücke zu Rad 1 (−X)
+  const out: Record<string, Pose> = {
+    gear1: rotatePose(flatPose(-a / 2 - c0, 0, z), -Math.PI / 2),
+    gear2: rotatePose(flatPose(a / 2 - c0, 0, z), Math.PI / 2 + Math.PI / p.teeth2),
+  };
+  if (p.plate) out.plate = flatPose();
+  return { poses: out, spin: { gear1: 1, gear2: -p.teeth1 / p.teeth2 } };
+}
+
 export const GEARPAIR: Generator = {
   id: 'gearpair',
   version: 2,
   kind: 'assembly',
   name: t('Zahnradpaar'),
   icon: 'gearpair',
+  poses: (p, th) => gearPairPoses(p, th),
+  tile: {
+    group: 'mech',
+    text: (t) => ({
+      name: t('Zahnradpaar'),
+      desc: t('Zwei passende Zahnräder mit Achsabstand und Grundplatte als Baugruppe.'),
+      keys: t('Getriebe Übersetzung Zahnräder Achsabstand|Suchwörter'),
+      action: t('Zahnradpaar erstellen (Baugruppe mit Achsabstand und Grundplatte)'),
+    }),
+  },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'teeth1', type: 'int', label: t('Zähnezahl Rad 1'), min: 5, max: 400, def: 18 },
     { key: 'teeth2', type: 'int', label: t('Zähnezahl Rad 2'), min: 5, max: 400, def: 36 },
     { key: 'module', type: 'length', label: t('Modul'), min: 0.3, max: 20, def: 2, title: t('Teilkreisdurchmesser geteilt durch Zähnezahl') },
@@ -88,8 +116,8 @@ export const GEARPAIR: Generator = {
     ...boreSchema('1', t('Rad 1')),
     ...boreSchema('2', t('Rad 2')),
     { key: 'plate', type: 'bool', label: t('Grundplatte mit Achslöchern'), def: false },
-    { key: 'axleDia', type: 'length', label: t('Achslochdurchmesser'), min: 0.5, max: 500, def: 6, showIf: (p) => !!p.plate },
-    { key: 'margin', type: 'length', label: t('Rand der Grundplatte'), min: 0, max: 500, def: 8, showIf: (p) => !!p.plate, title: t('Überstand der Platte über die Kopfkreise') },
+    { key: 'axleDia', type: 'length', label: t('Achslochdurchmesser'), min: 0.5, max: 500, def: 6, showIf: { eq: ['plate', true] } },
+    { key: 'margin', type: 'length', label: t('Rand der Grundplatte'), min: 0, max: 500, def: 8, showIf: { eq: ['plate', true] }, title: t('Überstand der Platte über die Kopfkreise') },
     { key: 'profileShift', type: 'number', label: t('Profilverschiebung Rad 1'), min: -0.8, max: 1, def: 0, advanced: true, title: t('Rad 2 bekommt die negative Verschiebung, der Achsabstand bleibt. Positiv vermeidet Unterschnitt am kleinen Rad.') },
     { key: 'rootFillet', type: 'number', label: t('Fußrundung (× Modul)'), min: 0, max: 0.45, def: 0.38, advanced: true, title: t('Radius der Werkzeugkopfrundung, Norm: 0,38') },
     { key: 'clearance', type: 'number', label: t('Kopfspiel (× Modul)'), min: 0.1, max: 0.5, def: 0.25, advanced: true, title: t('Abstand zwischen Zahnkopf und Fußkreis des Gegenrads, Norm: 0,25') },

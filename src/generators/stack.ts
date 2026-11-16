@@ -202,8 +202,26 @@ export const STACK: Generator = {
   kind: 'assembly',
   name: t('Schichtmodell'),
   icon: 'stack',
+  poses: (p) => {
+    const poses = stackPoses(p);
+    return poses ? { poses } : null;
+  },
+  assemblyCheck: true,
+  inputs: [{ kind: 'model3d' }],
+  fromInputs: (inp) => (inp.model ? { model: inp.model.id, name: inp.model.name } : undefined),
+  tile: {
+    group: 'model3d',
+    before: 'multilayer',
+    since: '1.10.0',
+    text: (t) => ({
+      name: t('Schichtmodell'),
+      desc: t('3D-Modell (STL, OBJ) in gestapelte Scheiben zerlegen, die verleimt wieder das Modell ergeben.'),
+      keys: t('3D STL OBJ Scheiben Schichten stapeln Slicer Skulptur Relief Kopf|Suchwörter'),
+      action: t('Schichtmodell aus einem 3D-Modell (STL, OBJ) erstellen'),
+    }),
+  },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'model', type: 'data', label: t('Modell'), def: '' },
     { key: 'name', type: 'data', label: t('Dateiname'), def: '' },
     {
@@ -224,7 +242,7 @@ export const STACK: Generator = {
       title: t('Mitte: Querschnitt in halber Schichthöhe. Außen: nichts vom Modell fehlt, Stufen stehen über und lassen sich abschleifen. Innen: keine Schicht steht über das Modell hinaus.'),
     },
     { key: 'numbers', type: 'bool', label: t('Nummern gravieren'), def: true, title: t('Jede Scheibe bekommt ihre Nummer (von unten gezählt) als feine Gravur auf einem eigenen Layer.') },
-    { key: 'numberSize', type: 'length', label: t('Größte Schrifthöhe'), min: 1.5, max: 30, def: 6, advanced: true, showIf: (p) => !!p.numbers },
+    { key: 'numberSize', type: 'length', label: t('Größte Schrifthöhe'), min: 1.5, max: 30, def: 6, advanced: true, showIf: { eq: ['numbers', true] } },
     { key: 'minArea', type: 'number', label: t('Kleinste Fläche (mm²)'), min: 0, max: 10000, def: 4, advanced: true, title: t('Inseln und Löcher, die kleiner sind, werden weggelassen bzw. gefüllt.') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.1, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],

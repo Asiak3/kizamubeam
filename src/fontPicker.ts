@@ -63,7 +63,7 @@ export function createFontPicker(
     'aria-haspopup': 'listbox', 'aria-expanded': 'false',
   }) as HTMLButtonElement;
   const label = h('span', { class: 'fontpick-label' });
-  const chev = h('span', { class: 'fontpick-chev', html: '▾' });
+  const chev = h('span', { class: 'fontpick-chev' }, '▾');
   btn.append(label, chev);
 
   let pop: HTMLElement | null = null;

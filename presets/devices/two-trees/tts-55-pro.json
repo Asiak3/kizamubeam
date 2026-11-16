@@ -1,0 +1,15 @@
+{
+  "id": "two-trees.tts-55-pro",
+  "vendor": "Two Trees",
+  "name": "Two Trees TTS-55 Pro",
+  "fw": "grbl",
+  "bedW": 300,
+  "bedH": 300,
+  "laser": {
+    "type": "diode"
+  },
+  "baud": 115200,
+  "source": "TTS Pro user manual: 300 × 300 mm, GRBL, 115200 baud",
+  "sourceUrl": "https://st.robu.in/wp-content/uploads/2023/08/TTS-Pro-Mamual-A3.pdf",
+  "checked": "2026-11-16"
+}

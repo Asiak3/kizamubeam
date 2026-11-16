@@ -1,0 +1,16 @@
+{
+  "id": "swiitol.e6-pro",
+  "vendor": "Swiitol",
+  "name": "Swiitol E6 Pro",
+  "fw": "fluidnc",
+  "bedW": 365,
+  "bedH": 305,
+  "laser": {
+    "type": "diode"
+  },
+  "features": [
+    "wifi"
+  ],
+  "source": "365 × 305 mm per notebookcheck.com and macitynet.it (manufacturer page not readable); controller confirmed on a real machine",
+  "checked": "2026-10-19"
+}

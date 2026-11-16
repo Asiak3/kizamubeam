@@ -1,0 +1,13 @@
+{
+  "id": "creality.falcon-2",
+  "vendor": "Creality",
+  "name": "Creality Falcon 2",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 415,
+  "laser": {
+    "type": "diode"
+  },
+  "source": "filament2print.com",
+  "checked": "2026-10-19"
+}

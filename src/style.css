@@ -324,6 +324,10 @@ select:focus {
 #textbar select {
   max-width: 220px;
 }
+/* Bogen-Optionen: Zielgröße 24 px für die nativen Auswahlfelder */
+#arcbar select {
+  height: 24px;
+}
 .group-disabled {
   opacity: 0.4;
   pointer-events: none;

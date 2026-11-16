@@ -10,6 +10,7 @@ import type { Pt, SubPath } from '../model';
 import { t } from '../i18n';
 import type { Generator, GenPart, Issue, Params } from './types';
 import { layoutParts } from './build';
+import { neg, pose, X, Y, Z, type Pose } from './pose';
 
 export interface BoxParams {
   sizeMode: 'outer' | 'inner';
@@ -268,14 +269,42 @@ const PART_NAMES: Record<string, () => string> = {
   right: () => t('Seitenwand rechts'),
 };
 
+/** Box: Boden auf Z = 0, Vorderwand bei Y = 0, linke Wand bei X = 0 */
+export function boxPoses(p: BoxParams): Record<string, Pose> {
+  const { W, D, H } = boxOuter(p);
+  const th = p.thickness;
+  const down = neg(Z);
+  return {
+    bottom: pose([W / 2, D / 2, 0], X, Y, Z),
+    top: pose([W / 2, D / 2, H - th], X, Y, Z),
+    front: pose([W / 2, 0, H / 2], X, down, Y),
+    back: pose([W / 2, D - th, H / 2], X, down, Y),
+    left: pose([0, D / 2, H / 2], Y, down, X),
+    right: pose([W - th, D / 2, H / 2], Y, down, X),
+  };
+}
+
 export const BOX: Generator = {
   id: 'box',
   version: 2,
   kind: 'assembly',
   name: t('Box'),
   icon: 'box',
+  poses: (p) => ({ poses: boxPoses({ ...(p as unknown as BoxParams), kerf: 0 }) }),
+  fit: { kind: 'pair', play: 'clearance' },
+  assemblyCheck: true,
+  tile: {
+    group: 'box',
+    before: 'lidhinge',
+    text: (t) => ({
+      name: t('Box mit Fingerzinken'),
+      desc: t('Kiste aus Platten mit Fingerzinken, mit oder ohne Deckel, als Baugruppe.'),
+      keys: t('Kiste Kasten Gehäuse Schachtel Fingerzinken Deckel|Suchwörter'),
+      action: t('Box mit Fingerzinken erstellen (Baugruppe, Parameter bleiben erhalten)'),
+    }),
+  },
   schema: [
-    { key: 'partLayout', type: 'data', label: '', def: 'nest' },
+    { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
     { key: 'sizeMode', type: 'enum', label: t('Maße'), def: 'outer', options: [['outer', t('Außenmaß')], ['inner', t('Innenmaß')]] },
     { key: 'width', type: 'length', label: t('Breite'), min: 5, max: 3000, def: 100 },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 5, max: 3000, def: 80 },

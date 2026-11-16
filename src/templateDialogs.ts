@@ -1,7 +1,7 @@
 // Dialoge für Vorlagen: „Als Vorlage speichern …“ (Titel, Beschreibung, gefragte Parameter), „Neu aus
 // Vorlage …“ (Vorlagen-Ordner) und das Ausfüllen mit Vorschau.
 import type { Editor } from './editor';
-import { h, showDialog } from './dom';
+import { h, setTrustedSvg, showDialog } from './dom';
 import { t, tn } from './i18n';
 import { buildSvg, openText, saveText } from './files';
 import { loadDoc } from './model';
@@ -309,7 +309,7 @@ export function openFillDialog(
   let queued = false;
   const render = () => {
     queued = false;
-    preview.innerHTML = buildSvg(ed, { preview: true });
+    setTrustedSvg(preview, buildSvg(ed, { preview: true }));
     refreshers.forEach((f) => f());
     problems.replaceChildren(
       ...ed.paramProblems

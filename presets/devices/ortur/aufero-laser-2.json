@@ -1,0 +1,15 @@
+{
+  "id": "ortur.aufero-laser-2",
+  "vendor": "Ortur",
+  "name": "Ortur Aufero Laser 2 (AL2)",
+  "fw": "grbl",
+  "bedW": 390,
+  "bedH": 390,
+  "laser": {
+    "type": "diode"
+  },
+  "baud": 115200,
+  "source": "ortur.net: 390 × 390 mm, OLF-V180 firmware (GRBL based), default 115200 baud, LaserGRBL/LightBurn",
+  "sourceUrl": "https://ortur.net/pages/support-al2",
+  "checked": "2026-11-16"
+}

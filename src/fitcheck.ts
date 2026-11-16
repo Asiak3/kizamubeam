@@ -15,15 +15,8 @@ import { getGenerator } from './generators/index';
  */
 export type FitKind = 'pair' | 'slot';
 
-/** Generatoren mit Steckverbindungen: Art und Parameter für das Spiel */
-export const GEN_FITS: Record<string, { kind: FitKind; play: string }> = {
-  box: { kind: 'pair', play: 'clearance' },
-  drawer: { kind: 'pair', play: 'clearance' },
-  insert: { kind: 'slot', play: 'play' },
-  shelf: { kind: 'slot', play: 'play' },
-  discsphere: { kind: 'slot', play: 'play' },
-  ribs: { kind: 'slot', play: 'play' },
-};
+/** Plug-in joints of a generator (Generator.fit): kind of fit and the parameter that holds the play */
+export const genFit = (gen: string): { kind: FitKind; play: string } | undefined => getGenerator(gen)?.fit;
 
 /** Verbindungsarten des Verbindungs-Werkzeugs: Zinken und Haken sind Teil-in-Teil, die übrigen stecken in Schlitzen */
 export const jointFitKind = (kind: string): FitKind => (kind === 'finger' || kind === 'snap' || kind === 'hook' ? 'pair' : 'slot');
@@ -73,7 +66,7 @@ export function suggestFit(kind: FitKind, e: MaterialEntry, kerfNow: number, lay
 
 /** Generator-Parameter für die Kalibrierung des Materials (nur Felder, die der Generator hat) */
 export function genFitPatch(gen: string, e: MaterialEntry, p: Params, layerKerf: number): Partial<Params> | null {
-  const spec = GEN_FITS[gen];
+  const spec = genFit(gen);
   if (!spec) return null;
   const s = suggestFit(spec.kind, e, Number(p.kerf ?? 0), layerKerf);
   if (!s) return null;
@@ -132,14 +125,14 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
   for (const o of objs) walk(o, o, IDENT);
   for (const [o] of world.values()) {
     const s = o.shape;
-    if (s.kind !== 'gen' || !GEN_FITS[s.gen] || !layerOf(o.layer).output) continue;
+    if (s.kind !== 'gen' || !genFit(s.gen) || !layerOf(o.layer).output) continue;
     const k = s.asm ?? `obj${o.id}`;
     (asms.get(k) ?? asms.set(k, []).get(k)!).push(o);
   }
   for (const [k, parts] of asms) {
     const o = parts[0];
     const s = o.shape as Extract<Obj['shape'], { kind: 'gen' }>;
-    const spec = GEN_FITS[s.gen];
+    const spec = genFit(s.gen)!;
     const p = s.params as Params;
     const allTops = [...new Set(parts.map((x) => tops.get(x)!))];
     cases.push({
@@ -214,9 +207,9 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
     if (!msg) continue;
     const f: FitFinding = { key: `${c.key}:fit`, kind: 'fit', level, msg: msg + detail, objs: c.objs, lines: c.lines, calibrated: false };
     // Ohne Kalibrierung: Spiel so setzen, dass nach dem Lasern nichts übrig bleibt (satt)
-    if (c.gen && !c.gen.bound.has(GEN_FITS[c.gen.gen].play)) {
+    if (c.gen && !c.gen.bound.has(genFit(c.gen.gen)!.play)) {
       const target = c.kind === 'pair' ? c.kerf + 2 * kl - beam : c.kerf + 2 * kl - beam + (thMat ?? c.th) - c.th;
-      f.gen = { obj: c.gen.obj, patch: { [GEN_FITS[c.gen.gen].play]: Math.round(target * 100) / 100 } };
+      f.gen = { obj: c.gen.obj, patch: { [genFit(c.gen.gen)!.play]: Math.round(target * 100) / 100 } };
     }
     out.push(f);
   }

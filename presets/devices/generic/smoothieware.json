@@ -1,0 +1,13 @@
+{
+  "id": "generic.smoothieware",
+  "name": {
+    "de": "Smoothieware-Laser",
+    "en": "Smoothieware laser",
+    "it": "Laser Smoothieware",
+    "es": "Láser Smoothieware",
+    "pt-BR": "Laser Smoothieware"
+  },
+  "fw": "smoothie",
+  "bedW": 300,
+  "bedH": 200
+}

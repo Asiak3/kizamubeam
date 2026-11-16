@@ -1,0 +1,39 @@
+{
+  "id": "acmer.p1-s-pro",
+  "vendor": "ACMER",
+  "name": "ACMER P1 S Pro",
+  "fw": "grbl",
+  "bedW": 380,
+  "bedH": 370,
+  "laser": {
+    "type": "diode"
+  },
+  "variants": [
+    {
+      "id": "6w",
+      "name": "6 W",
+      "laser": {
+        "power": 6
+      }
+    },
+    {
+      "id": "10w",
+      "name": "10 W",
+      "laser": {
+        "power": 10
+      }
+    },
+    {
+      "id": "20w",
+      "name": "20 W",
+      "bedW": 380,
+      "bedH": 350,
+      "laser": {
+        "power": 20
+      }
+    }
+  ],
+  "source": "acmerlaser.com: 380 × 370 mm with 6 W/10 W, 380 × 350 mm with 20 W; LightBurn/LaserGRBL",
+  "sourceUrl": "https://acmerlaser.com/products/acmer-p1-s-pro-laser-engraving-machine",
+  "checked": "2026-11-16"
+}

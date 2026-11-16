@@ -7,7 +7,7 @@ import { bezierPt, Box, segments, shapeSubs, textOutline } from '../geom';
 import { dec, t, tn } from '../i18n';
 import {
   breakApart, breakAtNode, CLOSE_TOL, copySub, CloseStats, closeSubs, cutParams, extract, JOIN_TOL, joinSubs, nearestParam, pointAt,
-  reverseSub, setStart, splitAt, trimSpan, trimSub,
+  reverseSub, setStart, splitAt, trimSpan, trimSub, unsplit,
 } from '../pathtools';
 import { cornerSub, CornerMode, isCorner } from '../corners';
 import { shapeCenters, shownMark } from '../arcs';
@@ -411,7 +411,15 @@ export class EditorPaths {
     this.snapshot(t('Startpunkt setzen'));
     this.convertObjToPath(o);
     const sp = (o.shape as { subs: SubPath[] }).subs[sub];
+    const count = sp.nodes.length;
     if (onEdge) idx = splitAt(sp, u);
+    const keep = mode === 'reset' ? undefined : sp.nodes[idx];
+    if (onEdge && keep && sp.nodes.length > count) keep.split = true;
+    // nodes the start point tool inserted earlier go away again unless the user has changed them (#333)
+    for (const n of sp.nodes.filter((n) => n.split && n !== keep)) {
+      if (!unsplit(sp, sp.nodes.indexOf(n))) delete n.split;
+    }
+    if (keep) idx = sp.nodes.indexOf(keep);
     if (mode === 'reset') {
       delete sp.start;
       this.hint = t('Startpunkt und Richtung wählt wieder die Optimierung.');

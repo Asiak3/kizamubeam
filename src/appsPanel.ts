@@ -7,12 +7,13 @@
 import type { Editor } from './editor';
 import { h } from './dom';
 import { t, tn } from './i18n';
-import { ICONS } from './icons';
 import { dockWindow, isNewWindow, showWindow } from './dock';
 import { getAction } from './toolbars';
 import { AppGroup, appGroups, appList, fold, isNewIn, pushRecent, searchApps } from './apps';
 import { ensurePacks, onPacksChanged, packTemplates } from './packs';
 import { startFromTemplate } from './templateDialogs';
+import { pluginGenerators } from './plugins/registry';
+import { openGenerator } from './generators/run';
 import { version as APP_VERSION } from '../package.json';
 
 const KEY = 'kizamubeam.apps';
@@ -119,6 +120,12 @@ export function buildAppsPanel(ed: Editor) {
     });
   const manage = getAction('packs');
   const packTiles = (): Tile[] => [
+    // Generators from extension plugins
+    ...pluginGenerators().map((g): Tile => ({
+      key: g.id, group: 'pack', name: g.name, desc: g.desc ? `${g.desc} (${g.pack.name})` : g.pack.name, icon: g.icon, isNew: false,
+      text: fold(`${g.name} ${g.desc} ${g.keys} ${g.pack.name}`),
+      run: () => openGenerator(ed, g),
+    })),
     ...packTemplates().map((p): Tile => ({
       key: `pack:${p.key}`, group: 'pack', name: p.info.title, desc: p.info.description ? `${p.info.description} (${p.pack})` : p.pack,
       img: p.info.preview, icon: 'template', isNew: false, text: fold(`${p.info.title} ${p.info.description ?? ''} ${p.pack}`),
@@ -138,7 +145,7 @@ export function buildAppsPanel(ed: Editor) {
   searchBox = search;
   const chips = h('div', { class: 'apps-chips' });
   const list = h('div', { class: 'apps-list' });
-  body.append(h('div', { class: 'apps-top' }, h('label', { class: 'apps-searchbox' }, h('span', { class: 'apps-sicon', html: ICONS.search }), search), chips), list);
+  body.append(h('div', { class: 'apps-top' }, h('label', { class: 'apps-searchbox' }, h('span', { class: 'apps-sicon', icon: 'search' }), search), chips), list);
 
   const use = (tile: Tile) => {
     if (tile.run() === false) return;
@@ -182,9 +189,9 @@ export function buildAppsPanel(ed: Editor) {
       },
     },
       h('span', { class: `app-art${tile.img ? ' img' : ''}` },
-        tile.img ? h('img', { src: svgUrl(tile.img), alt: '' }) : h('span', { class: 'app-icon', html: ICONS[tile.icon ?? ''] ?? '' }),
+        tile.img ? h('img', { src: svgUrl(tile.img), alt: '' }) : h('span', { class: 'app-icon', icon: tile.icon ?? '' }),
         isNew ? h('span', { class: 'app-new' }, t('NEU')) : null,
-        fav ? h('span', { class: 'app-fav', html: ICONS.star }) : null,
+        fav ? h('span', { class: 'app-fav', icon: 'star' }) : null,
       ),
       h('span', { class: 'app-name' }, tile.name),
     );
@@ -215,10 +222,10 @@ export function buildAppsPanel(ed: Editor) {
         render();
       },
     },
-      h('span', { class: 'apps-gicon', 'data-g': id, html: ICONS[icon] }),
+      h('span', { class: 'apps-gicon', 'data-g': id, icon }),
       h('span', { class: 'apps-gname' }, label),
       h('span', { class: 'apps-count' }, String(items.length)),
-      collapsible ? h('span', { class: 'apps-chev', html: closed ? ICONS.chevdown : ICONS.chevup }) : null,
+      collapsible ? h('span', { class: 'apps-chev', icon: closed ? 'chevdown' : 'chevup' }) : null,
     );
     return h('section', { class: 'apps-sec' }, head, closed ? null : h('div', { class: 'apps-grid' }, ...items.map(tileEl)));
   };

@@ -126,6 +126,30 @@ Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klam
 
 Intern rechnet der Editor in mm mit y nach unten; angezeigt wird in Maschinenkoordinaten (Ursprung unten links).
 
+## Generatoren
+
+Ein Generator gibt alles, was die App über ihn wissen muss, an seinem `Generator`-Objekt an (`src/generators/types.ts`); der Kern verzweigt nie nach Generator-Kennungen (Issue #341, geprüft mit `npm run test:gen-decoupling`):
+
+- `tile`: Gruppe im Werkzeugkasten, Position (`before`), Texte für Kachel und Aktion. Werkzeugkasten, Aktionen in `ui.ts` und die alte Generatoren-Gruppe der Leiste entstehen aus dem Verzeichnis.
+- `fit`: Art der Steckpassung und der Parameter mit dem Spiel (Konstruktion prüfen, Material-Kalibrierung).
+- `poses(params, thickness)`: Lage jedes Teils im Raum (3D-Ansicht, Baugruppen-Prüfung); Hilfen in `src/generators/pose.ts`.
+- `assemblyCheck`: Die Teile bilden eine Baugruppe für die Baugruppen-Prüfung.
+- `inputs`: Was der Generator vor dem Dialog braucht (3D-Modell, Auswahl); `fromInputs()` macht daraus Parameter. Der Import eines 3D-Modells bietet jeden Generator mit `model3d`-Eingabe an.
+- `panel(params, set, host)`: zusätzlicher Dialogbereich, der die App nur über `GenHost` liest (Umrisse der Auswahl, Bettgröße, Kamerabilder; `src/generators/host.ts`) und nur Parameter schreibt.
+- `showIf` an einem Feld ist eine Regel (`{ eq: [key, value] }`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`), nie eine Funktion; `ruleHolds()` wertet sie aus.
+- `view(params)`: Werte im Dialog, die von den Parametern abhängen (`autoText`-Vorschläge für leere Textfelder).
+- `onChange(key, old, params)`: wird beim Übernehmen eines Feldes aufgerufen; liefert `patch` und/oder `ask` (Frage mit Optionen, Abbrechen stellt das Feld wieder her). `preview.center` zentriert die Vorschau; `resetOnNew` an einem Feld lässt neue Objekte mit dem Standardwert beginnen.
+- Meldungen haben einen festen `code`; Texte für Codes, die `generate()` wirft, kommen aus `texts`. Interne Funktionen werfen Codes, keinen Oberflächentext.
+
+Einen Generator mit `register()` in `src/generators/index.ts` anmelden. Seine `id` steht in Projekten und darf sich nie ändern.
+## Sicherheit: CSP und Markup
+
+Die WebView läuft mit einer strengen Content Security Policy (`app.security.csp` in `src-tauri/tauri.conf.json`): Skripte nur aus der App selbst (plus WebAssembly), kein `eval`, keine Inline-Skripte, keine Frames oder Objekte. Netzzugriff aus der WebView gibt es nur für die Update-Prüfung (api.github.com), den Erweiterungskatalog und die Google-Fonts-Vorschau; alles andere (Maschinen, Netzwerk-Kameras, Einstellungen-Sync, Schrift-Downloads) läuft über Rust. `devCsp` erlaubt zusätzlich den Vite-Entwicklungsserver. `style-src` behält `'unsafe-inline'`, weil die Oberfläche Inline-Styles setzt; Tauri fügt dort keine Nonces ein (`dangerousDisableAssetCspModification`), da eine Nonce `'unsafe-inline'` abschalten würde.
+
+Markup wird nur über `src/dom.ts` eingefügt: `h(tag, { icon: 'name' })` und `setIcon()` für Einträge aus `ICONS`, `h(tag, { svg })` und `setTrustedSvg()` für SVG, das die App selbst baut (Text mit `escapeXml()` maskieren). Text aus Dateien, Plugins, dem Katalog oder dem Netz wird immer als Text eingefügt. `npm run check:html` (Teil der CI) schlägt bei jedem anderen `innerHTML`, `insertAdjacentHTML`, `document.write`, `eval` oder `new Function` in `src/` fehl.
+
+Plugins bekommen nie eigene Tauri-Capabilities; `src-tauri/capabilities/default.json` bleibt minimal.
+
 ## Logo
 
 Die Logo-Dateien liegen in [`docs/brand/`](brand/): Logo mit Symbol, Wortmarke, Symbol farbig und einfarbig, Symbol über der Wortmarke, jeweils auch als `-dark` für dunkle Hintergründe, dazu das App-Icon (`kizamubeam-app-icon.png`, Vorlage für `npx tauri icon`).

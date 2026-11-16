@@ -22,7 +22,7 @@ import { buildDxfText, buildPdfBytes, buildSvg, bytesToBase64, importBytesOrThro
 import { t } from './i18n';
 import { library, layerPatch } from './materials';
 import { isTauri } from './machine';
-import { buildGen, checkInput, GENERATORS, getGenerator, normalizeParams, resolveBinds } from './generators';
+import { buildGenAsync, checkInput, GENERATORS, getGenerator, normalizeParams, resolveBinds } from './generators';
 import type { Generator, Params } from './generators';
 import { coerce, ParamType, ProjectParam } from './params';
 import { genLeaves } from './editor/generators';
@@ -237,11 +237,11 @@ function bindArg(g: Generator, a: Args): Record<string, string> {
 }
 
 /** Formeln auswerten und Teile erzeugen; Fehler in Formeln sind Fehler des Aufrufs */
-function buildBound(g: Generator, params: Params, bind: Record<string, string>) {
+async function buildBound(g: Generator, params: Params, bind: Record<string, string>) {
   const rb = resolveBinds(g, params, bind);
   const bad = rb.issues.filter((i) => i.level === 'error');
   if (bad.length) throw new ToolError(bad.map((i) => i.msg).join('; '));
-  const r = buildGen(g, rb.params);
+  const r = await buildGenAsync(g, rb.params);
   r.issues.unshift(...rb.issues);
   if (Object.keys(bind).length) for (const p of r.parts) p.shape.bind = { ...bind };
   return r;
@@ -425,14 +425,14 @@ export const EDIT_TOOLS: ToolDef[] = [
       bind: BIND,
       x: { type: 'number' }, y: { type: 'number' }, layer: LAYER, rotation: ROT,
     }, ['generator', 'x', 'y']),
-    run: (ed, a) => {
+    run: async (ed, a) => {
       const g = getGenerator(String(a.generator));
       if (!g) throw new ToolError(`Unbekannter Generator „${a.generator}“ (${GENERATORS.map((x) => x.id).join(', ')})`);
       const raw = paramArg(a);
       const bad = checkInput(g, raw);
       if (bad.length) throw new ToolError(bad.map((i) => i.msg).join('; '));
       const bind = Object.fromEntries(Object.entries(bindArg(g, a)).filter(([, v]) => v));
-      const r = buildBound(g, normalizeParams(g, raw), bind);
+      const r = await buildBound(g, normalizeParams(g, raw), bind);
       if (!r.parts.length) throw new ToolError(r.issues.map((i) => i.msg).join('; '));
       const p = W(ed, num(a, 'x'), num(a, 'y'));
       const layer = layerOf(ed, a);
@@ -453,7 +453,7 @@ export const EDIT_TOOLS: ToolDef[] = [
     tier: Tier.Edit,
     inputSchema: obj({
       path: { type: 'string' },
-      kind: { type: 'string', enum: ['stack', 'ribs'] },
+      kind: { type: 'string', enum: GENERATORS.filter((g) => g.inputs?.some((i) => i.kind === 'model3d')).map((g) => g.id) },
       suggest: { type: 'boolean' },
       params: { type: 'object' },
       x: { type: 'number' }, y: { type: 'number' }, layer: LAYER,
@@ -477,9 +477,10 @@ export const EDIT_TOOLS: ToolDef[] = [
       } catch (e) {
         throw new ToolError(`${file}: ${(e as Error).message}`);
       }
-      const kind = a.kind === 'stack' ? 'stack' : 'ribs';
-      const g = getGenerator(kind)!;
-      const raw = { ...paramArg(a), model: addMesh(mesh), name: file.replace(/\.[^.]*$/, '') };
+      const g = getGenerator(String(a.kind ?? ''));
+      if (!g?.inputs?.some((i) => i.kind === 'model3d')) throw new ToolError(`kind: ${String(a.kind)}`);
+      const kind = g.id;
+      const raw = { ...paramArg(a), ...g.fromInputs?.({ model: { id: addMesh(mesh), name: file.replace(/\.[^.]*$/, '') } }) };
       const bad = checkInput(g, raw);
       if (bad.length) throw new ToolError(bad.map((i) => i.msg).join('; '));
       let params = normalizeParams(g, raw);
@@ -490,7 +491,7 @@ export const EDIT_TOOLS: ToolDef[] = [
         found = sg.found;
         if (sg.sections.length) params = normalizeParams(g, { ...params, sections: JSON.stringify(sg.sections) });
       }
-      const r = buildGen(g, params);
+      const r = await buildGenAsync(g, params);
       if (!r.parts.length) throw new ToolError(r.issues.map((i) => i.msg).join('; '));
       const p = W(ed, num(a, 'x', { def: ed.doc.bed.w / 2 }), num(a, 'y', { def: ed.doc.bed.h / 2 }));
       const objs = ed.addGen(r, layerOf(ed, a), p);
@@ -507,7 +508,7 @@ export const EDIT_TOOLS: ToolDef[] = [
       'Ändert Parameter eines parametrischen Bauteils (aus generate_part). Nur die angegebenen Parameter ändern sich, die übrigen bleiben. Ein fester Wert in params löst eine Formel dieses Feldes; bind setzt Formeln mit Projekt-Parametern (leer = wieder fest). Lage und Drehung bleiben erhalten, die Kontur wird neu berechnet. Bei einem Teil einer Baugruppe gilt die Änderung für alle Teile; entfallende Teile werden entfernt, neue neben das Teil gelegt.',
     tier: Tier.Edit,
     inputSchema: obj({ id: { type: 'integer' }, params: { type: 'object' }, bind: BIND }, ['id']),
-    run: (ed, a) => {
+    run: async (ed, a) => {
       const hit = findObj(ed.doc.objs, num(a, 'id', { int: true }));
       if (!hit) throw new ToolError(`Kein Objekt mit id ${a.id}`);
       const [o, parent] = hit;
@@ -524,7 +525,7 @@ export const EDIT_TOOLS: ToolDef[] = [
         if (v) bind[k] = v;
         else delete bind[k];
       }
-      const r = buildBound(g, normalizeParams(g, raw, normalizeParams(g, o.shape.params)), bind);
+      const r = await buildBound(g, normalizeParams(g, raw, normalizeParams(g, o.shape.params)), bind);
       if (!r.parts.length) throw new ToolError(r.issues.map((i) => i.msg).join('; '));
       const asm = o.shape.asm;
       // Ohne Formeln: auch eine alte Formel an den übrigen Teilen der Baugruppe entfernen

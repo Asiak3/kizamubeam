@@ -1,0 +1,40 @@
+{
+  "id": "longer.b1",
+  "vendor": "Longer",
+  "name": "Longer B1",
+  "fw": "grbl",
+  "bedW": 450,
+  "bedH": 440,
+  "laser": {
+    "type": "diode"
+  },
+  "variants": [
+    {
+      "id": "20w",
+      "name": "20 W",
+      "laser": {
+        "power": 20
+      }
+    },
+    {
+      "id": "30w",
+      "name": "30 W",
+      "laser": {
+        "power": 30
+      }
+    },
+    {
+      "id": "40w",
+      "name": "40 W",
+      "laser": {
+        "power": 40
+      }
+    }
+  ],
+  "features": [
+    "air-assist"
+  ],
+  "source": "longer3d.com (B1 20 W, 30 W, 40 W pages): 450 × 440 mm, air pump switched from LightBurn, LaserGRBL/LightBurn",
+  "sourceUrl": "https://longer3d.com/products/longer-laser-b1-30w-laser-engraver",
+  "checked": "2026-11-16"
+}

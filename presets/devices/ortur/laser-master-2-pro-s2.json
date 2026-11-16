@@ -1,0 +1,14 @@
+{
+  "id": "ortur.laser-master-2-pro-s2",
+  "vendor": "Ortur",
+  "name": "Ortur Laser Master 2 Pro S2",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 400,
+  "laser": {
+    "type": "diode"
+  },
+  "source": "techradar.com/reviews/ortur-laser-master-2-pro",
+  "sourceUrl": "https://www.techradar.com/reviews/ortur-laser-master-2-pro",
+  "checked": "2026-10-19"
+}
