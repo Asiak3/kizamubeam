@@ -27,7 +27,7 @@ export const HANDLE_OFF = 9; // Abstand der Griffe vom Auswahlrahmen in px
 
 export type Drag =
   | import('./freehand').FreehandStroke
-  | {type:'lasso';points:Pt[];pointerId:number;components:boolean;overflow:boolean;doc:import('../model').Doc;base:Obj[];nodeBase:Map<Obj,Set<string>>;handleBase:Map<Obj,Set<string>>;mode:'set'|'add'|'remove'|'toggle'}
+  | {type:'lasso';points:Pt[];pointerId:number;components:boolean;touch:boolean;overflow:boolean;doc:import('../model').Doc;base:Obj[];nodeBase:Map<Obj,Set<string>>;handleBase:Map<Obj,Set<string>>;mode:'set'|'add'|'remove'|'toggle'}
   | { type: 'pan'; sx: number; sy: number; ox: number; oy: number }
   /** Right button held with right-drag panning on: a click until it moves OVERLAP_MOVE_PX, then a pan.
    * context: the browser already sent contextmenu while held (WebKit does on press) */
@@ -103,7 +103,7 @@ export const HINGE_HINT_SECOND = t('Scharnier: jetzt die Hinterkante des Deckels
 
 export const TOOL_HINTS: Record<Tool, string> = {
   'freehand-edit': t('Freihand: am Endknoten fortsetzen oder zwischen vorhandenen Knoten neu zeichnen. Esc bricht ab.'),
-  lasso:t('Lasso: Objekte vollständig umschließen. Shift ergänzt, Ctrl schaltet um, Shift+Ctrl entfernt. Esc bricht ab.'),
+  lasso:t('Lasso: im Uhrzeigersinn umschließen, gegen den Uhrzeigersinn genügt Berühren. Shift ergänzt, Ctrl schaltet um, Shift+Ctrl entfernt. Esc bricht ab.'),
   select: t('Drehen: knapp außerhalb einer Ecke ziehen oder Auswahl nochmals anklicken. Rahmen nach rechts: umschließend, nach links: kreuzend.'),
   node: t('Klick/Rahmen wählt Knoten, Shift ergänzt. Entf löschen, L Gerade, C Kurve, E Ecke, S glatt, I einfügen (oder Doppelklick auf Kante), B aufbrechen, T trimmen.'),
   line: t('Klicken für Ecken, Ziehen für Kurven. Drücken auf den Startpunkt schließt beim Loslassen, Ziehen formt die Schlusstangente, Doppelklick/Enter/Rechtsklick beendet.'),
@@ -121,4 +121,7 @@ export const TOOL_HINTS: Record<Tool, string> = {
   sketch: '',
   measure: t('Messen: Anfang und Ende anklicken (mit Fang). Über einem Kreis erscheinen Radius und Durchmesser. Esc löscht die Messung.'),
 };
+
+/** Hinweis, solange das Objekt-Lasso per Drehrichtung (CCW) als Berührungs-Lasso läuft. */
+export const LASSO_TOUCH_HINT = t('Lasso (Berührung, gegen den Uhrzeigersinn): Berühren genügt zum Auswählen. Im Uhrzeigersinn kehrt zum Umschließen zurück. Shift ergänzt, Ctrl schaltet um, Shift+Ctrl entfernt. Esc bricht ab.');
 

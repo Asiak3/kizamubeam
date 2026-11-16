@@ -55,7 +55,7 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 11;
+const CONFIG_V = 12;
 /** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende).
  *  Buttons that later left the default again (v6 vectorfit/shape-builder/isolate, v9 laserpos) are no longer
  *  listed, so older bars do not pick them up on their way to v11. */
@@ -82,6 +82,8 @@ const REMOVED: { v: number; bar: BarId; seq: string[]; keep: string[]; tail?: st
   { v: 11, bar: 'tools', seq: ['tool:text', 'qr', 'apps'], keep: ['tool:text'], tail: [SEP, 'apps'] },
   { v: 11, bar: 'tools', seq: ['grp:bool', 'outline', 'offset', 'warp', 'grp:path', 'grp:array', 'nest'], keep: ['grp:bool', 'grp:contour', 'grp:path', 'grp:array'] },
   { v: 11, bar: 'tools', seq: ['tool:measure', 'laserpos'], keep: ['tool:measure'] },
+  // v12: select + lasso share one slot (grp:select) so the tools bar does not grow.
+  { v: 12, bar: 'tools', seq: ['tool:select'], keep: ['grp:select'] },
 ];
 
 /** Gespeicherte Leiste auf die aktuelle Standardbelegung heben (raw: Version der gespeicherten Belegung) */
@@ -174,6 +176,12 @@ export function refreshBars() {
 
 /** Die Aktion, die eine Knopfgruppe gerade zeigt */
 function groupCurrent(g: Action): Action {
+  // Aktives Werkzeug bevorzugen: über Menü/Shortcut gewählt, kennt cfg.groups nur Knopf-Klicks.
+  // Ohne das zeigte die Gruppe die gespeicherte Wahl als ungedrückt, obwohl ihr Tool aktiv ist.
+  for (const id of g.items!) {
+    const a = actions.get(id);
+    if (!a?.small && a?.on?.()) return a;
+  }
   const id = cfg.groups[g.id];
   return actions.get(id && g.items!.includes(id) ? id : g.items!.find((x) => !actions.get(x)?.small)!)!;
 }

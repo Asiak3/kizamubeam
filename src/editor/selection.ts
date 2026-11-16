@@ -1,7 +1,8 @@
 import type { Editor } from '../editor';
 import { apply, Obj, Pt } from '../model';
 import { boundsOf, shapeSubs } from '../geom';
-import { insideLasso } from '../lasso';
+import { insideLasso, lassoTouchMode, touchHit } from '../lasso';
+import { TOOL_HINTS } from './shared';
 import { t } from '../i18n';
 
 export interface HandleSelection {obj:Obj;sub:number;idx:number;which:'cin'|'cout'}
@@ -17,7 +18,8 @@ export class EditorSelection {
     }));
   }
   beginLasso(this:Editor,point:Pt,event:PointerEvent,components:boolean) {
-    this.drag={type:'lasso',points:[point],pointerId:event.pointerId,components,overflow:false,doc:this.doc,
+    // Der Modus kommt aus der Drehrichtung (finishLasso/onMove); Start ist immer Einschluss.
+    this.drag={type:'lasso',points:[point],pointerId:event.pointerId,components,touch:false,overflow:false,doc:this.doc,
       base:[...this.sel],nodeBase:new Map(this.nodeTargets().map(o=>[o,new Set(this.nodeSelection(o))])),
       handleBase:new Map(this.nodeTargets().map(o=>[o,new Set(this.handleSelection(o))])),
       mode:event.shiftKey && (event.ctrlKey||event.metaKey)?'remove':event.ctrlKey||event.metaKey?'toggle':event.shiftKey?'add':'set'};
@@ -43,16 +45,21 @@ export class EditorSelection {
       }
       this.emit('sel');
     }else{
+      // onUp hängt noch einen Punkt an: Modus final aus der Drehrichtung bestimmen (CW=Einschluss, CCW=Berührung).
+      d.touch=lassoTouchMode(d.points);
       const selected=this.doc.objs.filter(o=>{
         if(!this.selectable(o))return false;
         // Object lasso is deliberately fully enclosing, never bbox intersection.
         const b=boundsOf([o]);
-        const hit=!!b && [{x:b.x,y:b.y},{x:b.x+b.w,y:b.y},{x:b.x+b.w,y:b.y+b.h},{x:b.x,y:b.y+b.h}].every(contains) &&
+        const enclosed=!!b && [{x:b.x,y:b.y},{x:b.x+b.w,y:b.y},{x:b.x+b.w,y:b.y+b.h},{x:b.x,y:b.y+b.h}].every(contains) &&
           // Concave lassos may cut through a box despite enclosing all corners.
           !d.points.some(p=>p.x>b.x && p.x<b.x+b.w && p.y>b.y && p.y<b.y+b.h);
+        // Touch lasso (CCW): crossing an outline also hits; modes still apply via combine().
+        const hit=enclosed || (d.touch && touchHit(d.points,o));
         return combine(d.base.includes(o),hit);
       });
       this.setSel(selected);
+      if(d.touch){this.hint=TOOL_HINTS.lasso;this.emit('tool');}
     }
   }
 }

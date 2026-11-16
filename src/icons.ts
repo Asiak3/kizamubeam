@@ -9,6 +9,7 @@ export const ICONS: Record<string, string> = {
   cameraOverlayOff: svg('<rect x="3" y="7" width="18" height="13" rx="2" opacity=".4"/><path d="m7 7 2-3h6l2 3" opacity=".4"/><circle cx="14" cy="12" r="3" opacity=".4"/><path d="M3 21 21 3"/>'),
   cameraOverlay: svg('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="m7 7 2-3h6l2 3M5 17l3-3 3 3"/><circle cx="14" cy="12" r="3"/><path d="M14 9v6M11 12h6" opacity=".5"/>'),
   select: svg('<path d="M5 3l13 8-6 1.5L9 19z" fill="currentColor" fill-opacity=".15"/>'),
+  lasso: svg('<path d="M7 20C5 13 8 6 14 5c4.5-.9 7.5 2.5 6.5 6-.8 2.8-4 3.8-6.3 2.6" stroke-dasharray="2.5 2"/><circle cx="7" cy="20" r="1.4" fill="currentColor"/>'),
   node: svg('<path d="M4 18C8 4 16 4 20 18"/><rect x="2.5" y="16.5" width="3" height="3"/><rect x="18.5" y="16.5" width="3" height="3"/><circle cx="12" cy="7.5" r="1.6" fill="currentColor"/><path d="M7 7.5h10" stroke-dasharray="1.5 1.5"/>'),
   line: svg('<path d="M4 20l5-12 6 7 5-11"/><circle cx="4" cy="20" r="1.3" fill="currentColor"/><circle cx="20" cy="4" r="1.3" fill="currentColor"/>'),
   curve: svg('<path d="M4 20C9 20 6 4 20 4"/><circle cx="4" cy="20" r="1.3" fill="currentColor"/><circle cx="20" cy="4" r="1.3" fill="currentColor"/>'),

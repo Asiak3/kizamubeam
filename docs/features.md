@@ -42,8 +42,10 @@ Offline regressions: `npm run test:camera`. No hardware is acquired by the tests
   **Node lasso** in the node toolbar selects nodes and handles with a freehand
   lasso instead of a box; with Alt it also starts directly over a component.
 - **Tools → Path → Lasso selection** selects objects by drawing around them: only
-  fully enclosed objects are selected. Shift adds, Ctrl toggles, Shift+Ctrl
-  removes, Esc cancels.
+  fully enclosed objects are selected. Drawing counter-clockwise switches to
+  touch mode, where crossing an outline also selects; the direction can change
+  while drawing. Shift adds, Ctrl toggles, Shift+Ctrl removes, Esc cancels.
+  In the tools toolbar it shares one slot with Select.
 - **Tools → Freehand / Pencil** fits a dragged stroke to editable cubic paths.
   Tool options set tolerance and explicit closure. Release commits one Undo step;
   Escape, taps and excessive strokes do not create partial paths.

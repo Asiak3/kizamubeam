@@ -91,27 +91,27 @@ test('Gespeicherte Leisten: Generatoren und Verbindungen wandern in den Werkzeug
   // v11 keeps only tool:pencil from the v6 vector tools; QR code and laser positioning leave the bar,
   // and the Toolbox button moves to its own section at the end
   const v3 = ['tool:select', 'tool:text', 'qr', 'grp:gen', 'apps', '|', 'grp:bool', 'nest', 'tool:joint', 'lidhinge', 'hinge'];
-  assert.deepEqual(upgradeBar('tools', v3, 3), ['tool:select', 'tool:text', '|', 'grp:bool', 'nest', 'grp:relate', 'tool:measure', 'tool:pencil', 'tool:curvature', '|', 'apps']);
+  assert.deepEqual(upgradeBar('tools', v3, 3), ['grp:select', 'tool:text', '|', 'grp:bool', 'nest', 'grp:relate', 'tool:measure', 'tool:pencil', 'tool:curvature', '|', 'apps']);
   // v2 (ohne Werkzeugkasten-Knopf): erst einfügen, dann die Generatoren-Gruppe entfernen
   assert.deepEqual(upgradeBar('tools', ['qr', 'grp:gen', '|', 'tool:joint', 'lidhinge', 'hinge'], 2), ['qr', 'apps', '|', 'grp:relate', 'tool:measure', 'tool:pencil', 'tool:curvature']);
   // v4 nahm die Geräteeinstellungen heraus, v10 setzt sie vor „Prüfen“ wieder ein (#235)
   assert.deepEqual(upgradeBar('main', ['check', 'preview', 'devsettings', '|', 'group'], 3), ['devsettings', 'check', 'preview', '|', 'group', 'camera-overlays', 'isolate']);
   // selbst umgestellt: bleibt
   const own = ['grp:gen', 'tool:select', 'apps', 'hinge', 'tool:joint'];
-  assert.deepEqual(upgradeBar('tools', own, 3), [...own, 'grp:relate', 'tool:measure', 'tool:pencil', 'tool:curvature']);
+  assert.deepEqual(upgradeBar('tools', own, 3), ['grp:gen', 'grp:select', 'apps', 'hinge', 'tool:joint', 'grp:relate', 'tool:measure', 'tool:pencil', 'tool:curvature']);
   assert.deepEqual(upgradeBar('main', ['devsettings', 'check'], 3), ['devsettings', 'check', 'camera-overlays', 'isolate']);
-  // schon aktuell: nichts ändern
+  // schon aktuell (v11): v12 ersetzt nur tool:select durch grp:select, sonst kommt nichts dazu
   assert.deepEqual(upgradeBar('tools', ['grp:gen', 'apps'], 11), ['grp:gen', 'apps']);
   // v4 → v5: Beziehungen und Messen kommen hinter Verschachteln dazu
-  assert.deepEqual(upgradeBar('tools', ['tool:select', 'nest', 'apps'], 4), ['tool:select', 'nest', 'grp:relate', 'tool:measure', 'apps', 'tool:pencil', 'tool:curvature']);
+  assert.deepEqual(upgradeBar('tools', ['tool:select', 'nest', 'apps'], 4), ['grp:select', 'nest', 'grp:relate', 'tool:measure', 'apps', 'tool:pencil', 'tool:curvature']);
 });
 
 test('Vektorwerkzeuge: Bleistift kommt dazu, ohne Verlust der Benutzerreihenfolge', () => {
   const before = ['tool:select', 'tool:node', '|', 'tool:line', 'custom-action', 'apps'];
   const after = upgradeBar('tools', before, 5);
   assert.deepEqual(before, ['tool:select', 'tool:node', '|', 'tool:line', 'custom-action', 'apps']);
-  assert.deepEqual(after, ['tool:select', 'tool:node', '|', 'tool:line', 'tool:pencil', 'tool:curvature', 'custom-action', 'apps']);
-  assert.deepEqual(after.filter(id => before.includes(id)), before);
+  assert.deepEqual(after, ['grp:select', 'tool:node', '|', 'tool:line', 'tool:pencil', 'tool:curvature', 'custom-action', 'apps']);
+  assert.deepEqual(after.filter((id) => before.includes(id) || id === 'grp:select'), ['grp:select', 'tool:node', '|', 'tool:line', 'custom-action', 'apps']);
   assert.deepEqual(upgradeBar('tools', after, 5), after, 'keine doppelten Knöpfe');
   const removed = after.filter(id => id !== 'tool:pencil');
   assert.deepEqual(upgradeBar('tools', removed, 6), removed, 'bewusst entfernte v6-Aktion bleibt entfernt');
@@ -134,7 +134,7 @@ test('v11: schlanke Werkzeugleiste aus der v10-Standardbelegung', () => {
   assert.ok(bar('main').includes('isolate'));
   // customized sequences stay as they are
   const own = ['tool:select', 'qr', 'tool:text', 'nest', 'laserpos', 'tool:curvature'];
-  assert.deepEqual(upgradeBar('tools', own, 10), own);
+  assert.deepEqual(upgradeBar('tools', own, 10), ['grp:select', 'qr', 'tool:text', 'nest', 'laserpos', 'tool:curvature']);
   // the removed buttons are still reachable: Toolbox tiles, button groups or the Laser window
   const tiles = new Set(apps.map((a) => a.id));
   for (const id of ['qr', 'nest', 'warp']) assert.ok(tiles.has(id), id);
@@ -150,13 +150,14 @@ test('v11: schlanke Werkzeugleiste aus der v10-Standardbelegung', () => {
 
 test('Vektorwerkzeuge: eigene Symbole und sichtbare Standardbelegung', () => {
   const defaults = /initToolbars\(\s*list,\s*\{([\s\S]*?)\n\s*\},/.exec(ui)![1];
-  for (const [id, icon] of [['tool:node', 'node'], ['tool:pencil', 'pencil'], ['vectorfit', 'vectorfit'], ['shape-builder', 'shapeBuilder'], ['isolate', 'isolate']]) {
+  for (const [id, icon] of [['tool:node', 'node'], ['tool:lasso', 'lasso'], ['tool:pencil', 'pencil'], ['vectorfit', 'vectorfit'], ['shape-builder', 'shapeBuilder'], ['isolate', 'isolate']]) {
     assert.equal(actionIcons.get(id), icon);
     assert.ok(ICONS[icon]?.includes('viewBox="0 0 24 24"'), icon);
     assert.ok(defaults.includes(`'${id}'`) || new RegExp(`items: \\[[^\\]]*'${id}'`).test(ui), id);
   }
   assert.equal(new Set(['node', 'pencil', 'vectorfit', 'shapeBuilder', 'isolate', 'isolateExit'].map(icon => ICONS[icon])).size, 6);
   assert.notEqual(ICONS.pencil, ICONS.line);
+  assert.notEqual(ICONS.lasso, ICONS.select);
   assert.notEqual(ICONS.isolate, ICONS.select);
 });
 

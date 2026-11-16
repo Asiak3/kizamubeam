@@ -46,8 +46,10 @@ Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
   und Anfasser mit einem freien Lasso statt mit dem Rahmen; mit Alt beginnt es auch
   direkt über einer Komponente.
 - **Werkzeuge → Pfad → Lasso-Auswahl** wählt Objekte, indem man sie umfährt:
-  Ausgewählt werden nur vollständig umschlossene Objekte. Shift ergänzt, Ctrl
-  schaltet um, Shift+Ctrl entfernt, Esc bricht ab.
+  Ausgewählt werden nur vollständig umschlossene Objekte. Gegen den
+  Uhrzeigersinn genügt Berühren einer Kontur zum Auswählen; die Richtung kann
+  beim Zeichnen wechseln. Shift ergänzt, Ctrl schaltet um, Shift+Ctrl entfernt,
+  Esc bricht ab. In der Werkzeugleiste teilt sich das Lasso einen Platz mit Auswählen.
 - **Werkzeuge → Freihand / Bleistift** passt gezogene Striche an editierbare
   Bézierpfade an. Toleranz und explizites Schließen stehen in den Werkzeugoptionen.
   Loslassen erzeugt einen Undo-Schritt; Esc, Klicks ohne Strich und überlange

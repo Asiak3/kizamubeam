@@ -46,8 +46,10 @@ Test offline: `npm run test:camera`. I test non usano alcun hardware.
   nella barra dei nodi seleziona nodi e maniglie con un lazo libero invece del
   riquadro; con Alt si può iniziare anche sopra un componente.
 - **Strumenti → Percorso → Selezione a lazo** seleziona gli oggetti disegnandoci
-  intorno: vengono selezionati solo quelli racchiusi completamente. Shift aggiunge,
-  Ctrl inverte, Shift+Ctrl rimuove, Esc annulla.
+  intorno: vengono selezionati solo quelli racchiusi completamente. Disegnando in
+  senso antiorario basta toccare un contorno per selezionare; la direzione può
+  cambiare durante il disegno. Shift aggiunge, Ctrl inverte, Shift+Ctrl rimuove,
+  Esc annulla. Nella barra degli strumenti condivide un posto con Seleziona.
 - **Strumenti → Mano libera / Matita** adatta un tratto trascinato a percorsi di
   Bézier modificabili. Le opzioni dello strumento regolano tolleranza e chiusura
   esplicita. Il rilascio è un solo passo di annullamento; Esc, clic senza tratto e

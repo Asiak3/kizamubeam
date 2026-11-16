@@ -580,7 +580,7 @@ export class EditorRender {
       ctx.setLineDash([]);
     }
     if(d?.type==='lasso') {
-      ctx.save();ctx.strokeStyle=T.sel;ctx.fillStyle=this.dark?'#5b93f520':'#3070ff20';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();
+      ctx.save();ctx.strokeStyle=d.touch?'#ff6020':T.sel;ctx.fillStyle=d.touch?'#ff602020':(this.dark?'#5b93f520':'#3070ff20');ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();
       d.points.forEach((p,i)=>{const q=this.toScreen(p);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y)});
       ctx.closePath();ctx.fill('evenodd');ctx.stroke();ctx.restore();
     }

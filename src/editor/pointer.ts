@@ -6,9 +6,10 @@ import { wrapWidth } from '../fonts';
 import { buildSnapSet, findSnap } from '../snap';
 import { t } from '../i18n';
 import type { Editor } from '../editor';
+import { lassoTouchMode } from '../lasso';
 import { MAX_VECTOR_SAMPLES } from '../vectorFit';
 import { genLeaves, isMarkGroup } from './generators';
-import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, RULER, SNAP_PX, TOOL_HINTS } from './shared';
+import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, LASSO_TOUCH_HINT, RULER, SNAP_PX, TOOL_HINTS } from './shared';
 import { OVERLAP_MOVE_PX } from '../overlapPicker';
 
 const RIGHT_PAN_KEY = 'kizamubeam.rightPan';
@@ -406,9 +407,17 @@ export class EditorPointer {
     }
     switch (d.type) {
       case 'freehand-edit': this.sampleFreehandEdit(wp,e.pointerId); return;
-      case 'lasso':
+      case 'lasso': {
         if(Math.hypot(wp.x-d.points.at(-1)!.x,wp.y-d.points.at(-1)!.y)*this.view.zoom>=2){if(d.points.length<4096)d.points.push(wp);else d.overflow=true;}
+        // Drehrichtung schaltet live zwischen Umschließen (CW) und Berühren (CCW) um.
+        // Schwelle ≥3 Punkte wie finishLasso: darunter ist keine Fläche definiert; die eps-Regel
+        // in lassoTouchMode dämpft zusätzlich das Flackern zu Gestenbeginn.
+        if(!d.components && d.points.length>=3){
+          const touchNow=lassoTouchMode(d.points);
+          if(touchNow!==d.touch){d.touch=touchNow;this.hint=touchNow?LASSO_TOUCH_HINT:TOOL_HINTS.lasso;this.emit('tool');}
+        }
         this.redraw();return;
+      }
       case 'builder':
         if (d.pointerId !== e.pointerId) return;
         this.builderStroke(d.last, wp); d.last = wp; return;
