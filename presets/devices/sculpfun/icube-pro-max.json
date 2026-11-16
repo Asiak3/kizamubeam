@@ -1,0 +1,9 @@
+{
+  "id": "sculpfun.icube-pro-max",
+  "vendor": "Sculpfun",
+  "name": "Sculpfun iCube Pro Max",
+  "fw": "grbl",
+  "bedW": 120,
+  "bedH": 120,
+  "source": "sculpfun.com/products/sculpfun-icube-portable-laser-engraving-machine: 120 × 120 mm, LightBurn/LaserGRBL"
+}

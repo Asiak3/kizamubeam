@@ -1,0 +1,9 @@
+{
+  "id": "acmer.p1-s-pro",
+  "vendor": "ACMER",
+  "name": "ACMER P1 S Pro (6/10 W)",
+  "fw": "grbl",
+  "bedW": 380,
+  "bedH": 370,
+  "source": "acmerlaser.com/products/acmer-p1-s-pro-laser-engraving-machine: 380 × 370 mm (6 W/10 W), LightBurn/LaserGRBL"
+}

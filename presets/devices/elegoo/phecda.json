@@ -1,0 +1,9 @@
+{
+  "id": "elegoo.phecda",
+  "vendor": "Elegoo",
+  "name": "Elegoo Phecda",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 400,
+  "source": "PHECDA user manual 2023-10-20 (download.elegoo.com): 400 × 400 mm, LaserGRBL/LightBurn"
+}

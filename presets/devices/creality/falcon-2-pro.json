@@ -1,0 +1,9 @@
+{
+  "id": "creality.falcon-2-pro",
+  "vendor": "Creality",
+  "name": "Creality Falcon2 Pro",
+  "fw": "grbl",
+  "bedW": 400,
+  "bedH": 415,
+  "source": "cnx-software.com/2024/03/07/creality-falcon2-pro-enclosed-laser-engraver-cutter: 400 × 415 mm (22 W and 40 W), LaserGRBL/LightBurn"
+}

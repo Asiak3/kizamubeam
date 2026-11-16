@@ -1,0 +1,9 @@
+{
+  "id": "ortur.h20-40w",
+  "vendor": "Ortur",
+  "name": "Ortur H20 (40 W module)",
+  "fw": "grbl",
+  "bedW": 410,
+  "bedH": 275,
+  "source": "ortur.net/products/ortur-h20-laser-engraver-cutter-machine: 410 × 275 mm with 40 W module (IR 2 W: 420 × 275); LightBurn and LaserGRBL listed"
+}

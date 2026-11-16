@@ -1,0 +1,11 @@
+{
+  "id": "sculpfun.s10",
+  "vendor": "Sculpfun",
+  "name": "Sculpfun S10",
+  "fw": "grbl",
+  "bedW": 410,
+  "bedH": 400,
+  "baud": 115200,
+  "airCmd": "M7",
+  "source": "sculpfun.com/blogs/blog/sculpfun-s10: 410 × 400 mm (about 385 × 390 with limit switches), air assist on M7; user manual: GRBL, 115200 baud (manual says 410 × 420)"
+}

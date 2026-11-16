@@ -1,0 +1,9 @@
+{
+  "id": "longer.ray5-mini",
+  "vendor": "Longer",
+  "name": "Longer Ray5 Mini",
+  "fw": "grbl",
+  "bedW": 130,
+  "bedH": 140,
+  "source": "longer3d.com/blogs/laser-engraver-academy-1/longer-research-ray5-mini-laser-engraver-overview-compact-yet-powerful: 130 × 140 mm, LightBurn/LaserGRBL"
+}

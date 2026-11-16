@@ -1,0 +1,11 @@
+{
+  "id": "sculpfun.s30-pro-max",
+  "vendor": "Sculpfun",
+  "name": "Sculpfun S30 Pro Max",
+  "fw": "grbl",
+  "bedW": 370,
+  "bedH": 363,
+  "airCmd": "M8",
+  "limitSwitches": "yes",
+  "source": "geekbuying.com/item/SCULPFUN-S30-Pro-Max-20W-Laser-Engraver-Cutter-517193.html: 410 × 400 mm nominal, 370 × 363 mm with limit switches; LightBurn with air assist M8, LaserGRBL"
+}

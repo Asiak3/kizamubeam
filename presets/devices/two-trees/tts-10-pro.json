@@ -1,0 +1,10 @@
+{
+  "id": "two-trees.tts-10-pro",
+  "vendor": "Two Trees",
+  "name": "Two Trees TTS-10 Pro",
+  "fw": "grbl",
+  "bedW": 300,
+  "bedH": 300,
+  "baud": 115200,
+  "source": "TTS Pro user manual (st.robu.in/wp-content/uploads/2023/08/TTS-Pro-Mamual-A3.pdf) and twotrees3d.com: 300 × 300 mm, GRBL, 115200 baud"
+}
