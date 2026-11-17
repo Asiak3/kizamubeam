@@ -193,6 +193,16 @@ await test('host functions slice and region: a 3D model the plugin got as a reso
   assert.equal(await code(q.call('generate', { id })), 'host-not-allowed');
 });
 
+await test('host function nest: the same tidy arrangement as the generators\' nested part layout', async () => {
+  const { nestParts } = await import('../src/generators/build');
+  const sq = (s: number) => ({ closed: true, nodes: [{ x: -s / 2, y: -s / 2 }, { x: s / 2, y: -s / 2 }, { x: s / 2, y: s / 2 }, { x: -s / 2, y: s / 2 }] });
+  const parts = [10, 30, 10, 20, 10].map((s, i) => ({ key: `p${i}`, subs: [sq(s)] }));
+  const p = inProcess('js', `globalThis.plugin = { generate: (x) => host.nest(x) };`, ['nest']);
+  const at = (await p.call('generate', { parts, gap: 3 })) as [number, number][];
+  assert.deepEqual(at, nestParts(parts, 3).map((q) => [q.at.x, q.at.y]));
+  assert.equal(await code(p.call('generate', { parts: [{ subs: 'x' }], gap: 3 })), 'host-bad-input');
+});
+
 // A Rust module (no_std) whose kzb_call hands its input to host "fit" and returns the answer envelope
 const hostWasm = Uint8Array.from(atob('AGFzbQEAAAABEgNgBH9/f38BfmABfwF/YAABfwIRAQNremIJaG9zdF9jYWxsAAADBAMBAgAFAwEAEgYJAX8BQYCAwAALBysEBm1lbW9yeQIACWt6Yl9hbGxvYwABB2t6Yl9hcGkAAghremJfY2FsbAADCk8DMwEBf0EAQQBBACgChIDEgAAiASABIABqQYCABEsbIgEgAGo2AoSAxIAAIAFBhIDAgABqCwQAQQELFABBgIDAgABBAyACIAMQgICAgAALCwwBAEGAgMAACwNmaXQAbwRuYW1lAAcGdC53YXNtAT8EAB5fUk52Q3NlNG1wNlhMTWg5UV8xdDlob3N0X2NhbGwBCWt6Yl9hbGxvYwIHa3piX2FwaQMIa3piX2NhbGwHEgEAD19fc3RhY2tfcG9pbnRlcgkKAQAHLnJvZGF0YQA9CXByb2R1Y2VycwEMcHJvY2Vzc2VkLWJ5AQVydXN0Yx0xLjk3LjAgKDJkODE0NGI3OCAyMDI2LTA3LTA3KQCUAQ90YXJnZXRfZmVhdHVyZXMIKwtidWxrLW1lbW9yeSsPYnVsay1tZW1vcnktb3B0KxZjYWxsLWluZGlyZWN0LW92ZXJsb25nKwptdWx0aXZhbHVlKw9tdXRhYmxlLWdsb2JhbHMrE25vbnRyYXBwaW5nLWZwdG9pbnQrD3JlZmVyZW5jZS10eXBlcysIc2lnbi1leHQ='), (c) => c.charCodeAt(0));
 

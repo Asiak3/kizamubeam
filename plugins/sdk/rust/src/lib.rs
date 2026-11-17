@@ -204,9 +204,10 @@ pub fn mesh(data: &str) -> Option<(Vec<f32>, Vec<u32>)> {
 
 /// Call a host function of the app (#211): `"boolean"` (`{ "op": "union" | "difference" | "intersection" | "xor",
 /// "a": [sub-paths], "b": [sub-paths] }`), `"offset"` (`{ "subs", "delta", "join"? }`), `"fit"` (`{ "pts": [[x, y], …],
-/// "closed"?, "tolerance"? }`) or `"trace"` (`{ "width", "height", "data": gray bytes as base64, "threshold"?,
+/// "closed"?, "tolerance"? }`), `"trace"` (`{ "width", "height", "data": gray bytes as base64, "threshold"?,
 /// "smooth"?, "ignoreLess"?, "scale"? }`), `"slice"` (`{ "model": resource id, "up"?, "size"?, "frame"?, "heights",
-/// "gap"? }`: cross-sections of a 3D model) or `"region"` (`{ "op", … }`: operations on areas). See docs/plugins.md
+/// "gap"? }`: cross-sections of a 3D model), `"region"` (`{ "op", … }`: operations on areas) or `"nest"` (`{ "parts": [{ "subs" }], "gap" }`: positions of a
+/// compact arrangement). See docs/plugins.md
 /// for the details. The manifest must list it under `"host"`. `Err(code)` on failure, e.g.
 /// `host-not-allowed` or `host-bad-input`.
 pub fn host(name: &str, input: &Value) -> Result<Value, String> {

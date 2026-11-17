@@ -216,6 +216,8 @@ export interface Host {
   region(input: { op: 'clean'; a: Region; minArea?: number }): { polys: number[][]; islands: number };
   region(input: { op: 'islands'; a: Region; minArea?: number }): number[][][];
   region(input: { op: 'deepest'; polys: number[][] }): { p: [number, number]; r: number } | null;
+  /** Where each part goes in a compact arrangement without rotation (outlines around each part's origin) */
+  nest(input: { parts: { key?: string; subs: SubPath[] }[]; gap: number }): [number, number][];
   /** Report progress 0 … 1 of a long computation, optionally with a short text */
   progress(done: number, text?: string): void;
 }

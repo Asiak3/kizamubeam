@@ -1,5 +1,6 @@
 // Werkzeuge zum Aufbau von Generator-Konturen: glatte Kurven als kubische Béziers einpassen, Kreisbögen, Linien.
-import { IDENT, type Node, type Pt, type SubPath } from '../model';
+import type { Node, Pt, SubPath } from '../model';
+import { IDENT } from '../mat';
 import { bezierPt } from '../curves';
 import ClipperLib from 'clipper-lib';
 import { flattenSub, SCALE } from '../clip';

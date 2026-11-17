@@ -19,9 +19,10 @@ import {
 } from '../model3d/slice';
 import { worldOf } from '../model3d/world';
 import { deepestPoint } from '../model3d/polys';
+import { nestParts } from '../generators/build';
 
 /** Host functions a manifest may ask for */
-export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region'] as const;
+export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest'] as const;
 export type HostFn = (typeof HOST_FNS)[number];
 
 /** A host function got input it cannot use; the plugin call fails with this code unless the plugin catches it */
@@ -106,6 +107,18 @@ function trace(input: unknown): SubPath[] {
   if (k === 1) return out;
   const s = (q: Pt) => ({ x: q.x * k, y: q.y * k });
   return out.map((sp) => ({ ...sp, nodes: sp.nodes.map((n) => ({ ...n, ...s(n), ...(n.cin ? { cin: s(n.cin) } : {}), ...(n.cout ? { cout: s(n.cout) } : {}) })) }));
+}
+
+/**
+ * { parts: [{ key, subs }], gap (mm) } → [[x, y], …]: where each part goes in a compact, tidy arrangement without
+ * rotation (the generators' "nested" part layout), in the order given. Each part's outlines lie around its own
+ * origin; the positions move them so the arrangement is centred on the origin. Same parts give the same result.
+ */
+function nest(input: unknown): [number, number][] {
+  if (!isObj(input) || !Array.isArray(input.parts) || input.parts.length > 5000) return bad('nest');
+  const gap = num(input.gap, 'gap', 0, 1000);
+  const parts = input.parts.map((p, i) => (isObj(p) ? { key: typeof p.key === 'string' ? p.key : String(i), subs: subsOf(p.subs, 'parts.subs') } : bad('parts')));
+  return nestParts(parts, gap).map((p) => [p.at.x, p.at.y]);
 }
 
 // ---------- Slicing 3D models and areas (the 3D-model generators: stack, ribs) ----------
@@ -244,7 +257,7 @@ function takeResource(st: SliceState, json: string) {
 export function hostCaller(allowed: readonly string[], onProgress?: (done: number, text?: string) => void) {
   const ok = new Set(allowed.filter((x): x is HostFn => (HOST_FNS as readonly string[]).includes(x)));
   const st: SliceState = { meshes: new Map(), prepared: new Map() };
-  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn };
+  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest };
   const call = (name: string, json: string): string => {
     try {
       if (name === 'progress') {

@@ -21,6 +21,8 @@ const dicts = Object.fromEntries(LANGS.filter((l) => l !== 'de').map((l) => [l, 
 
 const SLICE_HOST = "export * from './plugins/core/slice-host';";
 const FIT_HOST = "export * from './plugins/core/fit-host';";
+// Every generator: the nested part layout through the app (host function nest)
+const BUILD_HOST = "export * from './plugins/core/build-host';";
 
 /**
  * Generators built as plugins. label: text for the Objects window with placeholders mapped to parameters
@@ -120,16 +122,19 @@ async function bundle(entry, format, platform, stub) {
     mainFields: ['module', 'main'], plugins: [i18nShim, stubs(stub)], logLevel: 'error', legalComments: 'none',
   });
   const files = Object.keys(r.metafile.inputs).filter((x) => !x.includes('node_modules') && !x.startsWith('plugins/core') && x.endsWith('.ts'));
-  return { js: r.outputFiles[0].text, files };
+  return { js: r.outputFiles[0].text, files, nests: 'plugins/core/build-host.ts' in r.metafile.inputs };
 }
 
 /** One plugin entry for the pack */
 export async function corePlugin(id) {
   const c = CORE[id];
   if (!c) throw new Error(`unknown core generator ${id}`);
-  const code = (await bundle(`import { ${c.name} } from './${c.file}'; import { wrap } from './plugins/core/wrap'; wrap(${c.name});`, 'iife', 'neutral', c.stub)).js;
+  const stub = { build: BUILD_HOST, ...c.stub };
+  const main = await bundle(`import { ${c.name} } from './${c.file}'; import { wrap } from './plugins/core/wrap'; wrap(${c.name});`, 'iife', 'neutral', stub);
+  const code = main.js;
+  const host = [...(c.host ?? []), ...(main.nests ? ['nest'] : [])];
   // Read the generator definition in Node through the same shim: labels arrive as German source texts
-  const node = await bundle(`export { ${c.name} as default } from './${c.file}';`, 'esm', 'node', c.stub);
+  const node = await bundle(`export { ${c.name} as default } from './${c.file}';`, 'esm', 'node', stub);
   const dir = mkdtempSync(join(tmpdir(), 'kzb-core-'));
   let g;
   try {
@@ -226,7 +231,7 @@ export async function corePlugin(id) {
   const sha256 = createHash('sha256').update(code).digest('hex');
   return {
     id: g.id, type: 'generator', api: 1, version: g.version, kind: g.kind, runtime: 'js', code, sha256,
-    icon: g.icon, ...(c.host ? { host: c.host } : {}),
+    icon: g.icon, ...(host.length ? { host } : {}),
     dialog: lists || actions || surface ? { version: v3 ? 3 : 2, ...(lists ? { lists } : {}), ...(actions ? { actions } : {}), ...(surface ? { surface } : {}) } : { version: 1 },
     ...(g.preview?.center ? { preview: { center: true } } : {}), ...(inputs ? { inputs } : {}), params, texts,
   };
