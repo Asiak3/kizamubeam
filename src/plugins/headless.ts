@@ -212,6 +212,21 @@ const SAMPLE_SELECTION: GenSelected[] = [{
   ],
 }];
 
+/**
+ * The sample image of the catalogue check: 160 × 100 pixels, white with a dark disc, a red bar and a grey square
+ * (a small logo with four colours)
+ */
+function sampleImage() {
+  const w = 160, h = 100;
+  const px = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const c = Math.hypot(x - 50, y - 50) < 30 ? [30, 30, 40] : x > 95 && x < 145 && y > 15 && y < 40 ? [200, 30, 40] : x > 100 && x < 140 && y > 55 && y < 85 ? [140, 140, 140] : [255, 255, 255];
+      px.set([...c, 255], (y * w + x) * 4);
+    }
+  return { name: 'sample', width: w, height: h, data: toBase64(px) };
+}
+
 /** An image of a script step: { width, height, data } with RGBA pixels as base64, like a plugin gets it */
 function scriptImage(v: unknown, i: number): GenImage {
   const o = v as { width?: unknown; height?: unknown; data?: unknown };
@@ -307,10 +322,16 @@ async function checkGenerator(m: PluginManifest, errors: string[], note: (states
     start = [...start, { $action: fill.id, $selection: SAMPLE_SELECTION }];
     first = await runDialog(m, start);
   }
+  // A plugin that keeps an image (#211 stage 6) is opened once with a sample image
+  const keep = m.actions?.find((a) => a.store);
+  if (!first[first.length - 1].parts.length && keep) {
+    start = [...start, { $action: keep.id, $image: sampleImage() }];
+    first = await runDialog(m, start);
+  }
   note(first, 'defaults');
   const d = first[first.length - 1];
   if (d.issues.some((i) => i.level === 'error')) errors.push(`defaults: ${d.issues.filter((i) => i.level === 'error').map((i) => i.code ?? i.msg).join(', ')}`);
-  if (!d.parts.length) errors.push(fill ? `defaults: no parts, even after action "${fill.id}" with a sample selection` : 'defaults: no parts');
+  if (!d.parts.length) errors.push(fill || keep ? `defaults: no parts, even after action "${(fill ?? keep)!.id}" with a sample ${fill ? 'selection' : 'image'}` : 'defaults: no parts');
   const again = (await runDialog(m, start)).pop()!;
   if (again.geometry !== d.geometry || JSON.stringify(again.info) !== JSON.stringify(d.info)) errors.push('defaults: two runs give different results (use a seed parameter instead of randomness or time)');
   // Every choice once, starting from the defaults

@@ -55,6 +55,17 @@ export interface GenResult {
   label?: Text;
   /** Names of the parts of an assembly by part key */
   labels?: Record<string, Text>;
+  /**
+   * Where each part sits in space for the 3D view, by part key: a point (x, y) of the outline at height s lies at
+   * o + x·u + y·v + s·n (mm; X right, Y back, Z up)
+   */
+  poses?: { poses: Record<string, Pose>; spin?: Record<string, number> };
+}
+export interface Pose {
+  o: V3;
+  u: V3;
+  v: V3;
+  n: V3;
 }
 /** Answer of onChange: parameters to change as well, or a question (up to three options, each with a patch) */
 export interface Change {

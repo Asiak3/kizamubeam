@@ -201,6 +201,51 @@ await test('stencil bridges (#311): counters and nested islands get bridges, the
   tool.dispose();
 });
 
+await test('layered art (#159): levels from an image, nested plates with a frame, marks, poses, reorder and join', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  execFileSync('node', ['scripts/plugin-pack.mjs', '--build', 'plugins/layered-art'], { stdio: 'ignore' });
+  const m = parsePack(buildPluginPack('plugins/layered-art')).plugins[0];
+  const check = await checkPlugin(m);
+  assert.deepEqual(check.errors, [], 'catalogue check');
+  assert.deepEqual(check.warnings, [], 'catalogue check warnings');
+  // A logo: white background, a dark disc, a red bar and a grey square
+  const w = 160, h = 100, px = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const c = Math.hypot(x - 50, y - 50) < 30 ? [30, 30, 40] : x > 95 && x < 145 && y > 15 && y < 40 ? [200, 30, 40] : x > 100 && x < 140 && y > 55 && y < 85 ? [140, 140, 140] : [255, 255, 255];
+      px.set([...c, 255], (y * w + x) * 4);
+    }
+  const image = { name: 'logo', width: w, height: h, data: Buffer.from(px).toString('base64') };
+  const s = await runDialog(m, [{ plates: 4, frame: 6, width: 200 }, { $action: 'pick', $image: image }, { $move: { list: 'levels', from: 0, to: 2 } }, { $action: 'join', $row: 0 }, { marks: false }]);
+  assert.deepEqual(s[1].issues.map((i) => i.code), ['noImage']);
+  const a = s[2];
+  assert.equal(a.message, '4 levels found.');
+  assert.match(String(a.params.photo), /^[0-9a-f]{16}$/, 'the image is kept');
+  const levels = JSON.parse(String(a.params.levels)) as { c: string }[];
+  assert.equal(levels.length, 4);
+  assert.equal(levels[3].c, '#ffffff', 'the background is the back plate');
+  assert.deepEqual(a.info.slice(0, 3), [['Size', '200 × 125 mm'], ['Plates', '4'], ['Total height', '12 mm']]);
+  assert.equal(a.rows.levels[3], 'back plate (1) · 68 %');
+  // Every plate is the full panel; the back plate has no holes, higher plates have more
+  assert.deepEqual(a.parts.map((p) => p.key), ['plate1', 'plate2', 'plate3', 'plate4']);
+  for (const p of a.parts) assert.ok(Math.abs(p.box.maxX - p.box.minX - 200) < 0.01 && Math.abs(p.box.maxY - p.box.minY - 125) < 0.01, p.key);
+  assert.equal(a.parts[0].subs, 1);
+  assert.ok(a.parts.slice(1).every((p) => p.subs > 1));
+  // Reordering changes the depths, joining merges two levels into one plate
+  const moved = JSON.parse(String(s[3].params.levels)) as { c: string }[];
+  assert.deepEqual(moved.map((x) => x.c), [levels[1].c, levels[2].c, levels[0].c, levels[3].c]);
+  assert.notEqual(s[3].geometry, a.geometry);
+  assert.equal(s[4].parts.length, 3);
+  assert.notEqual(s[5].geometry, s[4].geometry, 'without glue marks');
+  // Plates stack in 3D; marks show where the next plate goes
+  const g = pluginGenerator(m, { id: 'la', name: 'la' }, { resource: (kind) => (kind === 'image' ? `rgba1:${w},${h},${image.data}` : null) });
+  const r = await G.buildGenAsync(g, G.normalizeParams(g, { ...a.params }));
+  assert.deepEqual(r.issues, []);
+  assert.deepEqual(g.poses!(G.normalizeParams(g, { ...a.params }))?.poses.plate3.o, [0, 0, 6]);
+  assert.ok(r.parts[0].marks?.length, 'the back plate shows where plate 2 goes');
+  g.dispose();
+});
+
 if (failed) {
   console.log(`${failed} failed`);
   process.exit(1);
