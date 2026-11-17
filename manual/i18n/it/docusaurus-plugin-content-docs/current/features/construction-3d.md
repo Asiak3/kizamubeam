@@ -87,7 +87,7 @@ Ruota la vista con il mouse o usa le viste predefinite (3D, dall’alto, frontal
 
 Ogni livello di taglio può avere un aspetto proprio nella finestra del livello, in **Aspetto in 3D**: 21 preimpostazioni come compensato di pioppo e di betulla, faggio, rovere, noce, bambù, MDF, cartone, sughero, cuoio, ardesia, granito, acrilico trasparente, colorato e opaco, vetro, alluminio anodizzato e acciaio inox, ognuna con un colore proprio facoltativo. Le incisioni appaiono diverse a seconda del materiale: bruciatura scura sul legno, grigio chiaro sull’ardesia, bianco satinato su acrilico e vetro. I livelli senza aspetto proprio lo prendono dal nome della loro voce nella [libreria dei materiali](materials-tests.md#material-library).
 
-Per mostrare un pezzo piano senza taglio (un sottobicchiere in ardesia, per esempio), disegna il suo contorno su un livello con l’uscita disattivata: diventa la lastra.
+Per mostrare un pezzo piano senza taglio (un sottobicchiere in ardesia, per esempio), disegna il suo contorno su un livello con l’uscita disattivata: diventa la lastra. Lo stesso vale per il materiale grezzo: disegna un rettangolo della misura della lastra su un livello così, e le incisioni e i pezzi tagliati sopra compaiono sulla lastra. I pezzi che stanno dentro la lastra restano pezzi e la lastra ha dei fori al loro posto. La casella «Lastra» nella finestra 3D nasconde le lastre quando vuoi vedere solo i pezzi.
 
 ### Mockup per i clienti
 

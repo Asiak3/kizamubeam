@@ -3897,6 +3897,8 @@
   "Überschneidungen": "Solapamientos",
   "Füllungen, gravierte Linien und Bilder auf den Teilen zeigen": "Muestra rellenos, líneas grabadas e imágenes sobre las piezas",
   "Gravuren": "Grabados",
+  "Rohplatte": "Plancha",
+  "Rohplatten zeigen: geschlossene Konturen auf einem Schnitt-Layer ohne Ausgabe. Teile darauf bleiben Teile, die Platte bekommt Löcher an ihrer Stelle.": "Mostrar las planchas de material: contornos cerrados en un layer de corte con la salida desactivada. Las piezas sobre ellas siguen siendo piezas y la plancha tiene agujeros en su lugar.",
   "Für Teile ohne eigene Materialdicke (z. B. Zahnräder und gezeichnete Formen)": "Para piezas sin grosor de material propio (p. ej. engranajes y formas dibujadas)",
   "Aussehen für Layer ohne eigenes Material. Eigenes Aussehen je Schnitt-Layer im Layer-Dialog (Doppelklick auf den Layer).": "Aspecto para capas sin material propio. El aspecto propio de cada capa de corte se define en el diálogo de capa (doble clic en la capa).",
   "Ohne Raster, mit weichen Schatten und eigenem Hintergrund, z. B. für Bilder für Kunden": "Sin cuadrícula, con sombras suaves y fondo propio, p. ej. para imágenes para clientes",

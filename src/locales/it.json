@@ -2947,6 +2947,8 @@
   "Favoriten": "Preferiti",
   "Zuletzt benutzt": "Utilizzati di recente",
   "Gravuren": "Incisioni",
+  "Rohplatte": "Lastra",
+  "Rohplatten zeigen: geschlossene Konturen auf einem Schnitt-Layer ohne Ausgabe. Teile darauf bleiben Teile, die Platte bekommt Löcher an ihrer Stelle.": "Mostra le lastre di materiale: contorni chiusi su un layer di taglio con l'uscita disattivata. I pezzi sopra restano pezzi e la lastra ha dei fori al loro posto.",
   "Füllungen, gravierte Linien und Bilder auf den Teilen zeigen": "Mostra riempimenti, linee incise e immagini sulle parti",
   "Automatisch ({name})": "Automatico ({name})",
   "Automatisch (Standard der 3D-Ansicht)": "Automatico (predefinito vista 3D)",
