@@ -1,0 +1,409 @@
+{
+ "format": "kizamubeam-pack",
+ "formatVersion": 2,
+ "id": "org.kizamubeam.street-map",
+ "version": "1.0.0",
+ "name": {
+  "en": "Street map",
+  "de": "Stadtplan",
+  "it": "Mappa stradale"
+ },
+ "description": {
+  "en": "Engravable map of a place from OpenStreetMap: roads, water, railways, parks and buildings on a cut plate.",
+  "de": "Gravierbarer Plan eines Ortes aus OpenStreetMap: Straßen, Wasser, Bahnen, Parks und Gebäude auf einer geschnittenen Platte.",
+  "it": "Mappa incidibile di un luogo da OpenStreetMap: strade, acqua, ferrovie, parchi ed edifici su una lastra tagliata."
+ },
+ "author": "KizamuBeam",
+ "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/street-map",
+ "plugins": [
+  {
+   "id": "org.kizamubeam.street-map",
+   "type": "generator",
+   "api": 1,
+   "version": 1,
+   "kind": "part",
+   "runtime": "js",
+   "code": "\"use strict\";(()=>{var v=globalThis.host;function _(e){globalThis.plugin=e}var Z=.5522847498307935,ee=e=>({closed:!0,nodes:e.map(([t,n])=>({x:t,y:n}))});function B(e,t){let n=e/2,o=t/2;return ee([[-n,-o],[n,-o],[n,o],[-n,o]])}function D(e,t,n){let o=n*Z,r=(m,a,s,l,b,P)=>({x:m,y:a,cin:{x:s,y:l},cout:{x:b,y:P}});return{closed:!0,nodes:[r(e+n,t,e+n,t-o,e+n,t+o),r(e,t+n,e+o,t+n,e-o,t+n),r(e-n,t,e-n,t+o,e-n,t-o),r(e,t-n,e-o,t-n,e+o,t-n)]}}var F=1500,V=[300,600,1e3,1500,2e3,3e3,4e3];function Q(e){let t=/^\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*,\\s*(-?[0-9]+(?:\\.[0-9]+)?)\\s*$/.exec(e.center);if(!t)return null;let n=Number(t[1]),o=Number(t[2]);return Math.abs(n)<=85&&Math.abs(o)<=180?[n,o]:null}var G=e=>e.shape===\"circle\"?[e.width,e.width]:[e.width,e.height];function ne(e,t){let[n,o]=G(e),r=e.span*Math.max(1,o/n)*1.05,m=V.find(b=>b>=r)??V[V.length-1],a=m/2/110574,s=m/2/(111320*Math.cos(t[0]*Math.PI/180)),l=b=>Math.round(b*1e6)/1e6;return[l(t[0]-a),l(t[1]-s),l(t[0]+a),l(t[1]+s)]}var te=(e,t)=>`[out:json][timeout:25][bbox:${e.join(\",\")}];(${t});out geom qt;`,re='way[\"highway\"];way[\"railway\"~\"^(rail|light_rail|tram|narrow_gauge)$\"];way[\"natural\"=\"water\"];relation[\"natural\"=\"water\"];way[\"waterway\"~\"^(river|canal|stream|riverbank)$\"];way[\"landuse\"~\"^(reservoir|basin|forest|grass|meadow)$\"];way[\"leisure\"~\"^(park|garden)$\"];',oe='way[\"building\"];';function W(e,t){let n=v.fetch({host:\"overpass\",path:\"/interpreter\",method:\"POST\",body:`data=${encodeURIComponent(te(e,t))}`});if(n.error)throw new Error(n.status===429||n.status===503||n.status===504?\"serverBusy\":n.error);return JSON.parse(n.text??\"{}\").elements??[]}function N(e,t){let n=e.length/2;if(n<3)return e;let o=new Uint8Array(n);o[0]=o[n-1]=1;let r=[[0,n-1]];for(;r.length;){let[a,s]=r.pop(),l=e[a*2],b=e[a*2+1],P=e[s*2],w=e[s*2+1],f=P-l,h=w-b,T=Math.hypot(f,h)||1e-12,S=-1,d=-1;for(let y=a+1;y<s;y++){let p=Math.abs((e[y*2]-l)*h-(e[y*2+1]-b)*f)/T;p>S&&(S=p,d=y)}S>t&&(o[d]=1,r.push([a,d],[d,s]))}let m=[];for(let a=0;a<n;a++)o[a]&&m.push(e[a*2],e[a*2+1]);return m}function se(e){let t=0;for(let n=0,o=e.length;n<o;n+=2){let r=(n+2)%o;t+=e[n]*e[r+1]-e[r]*e[n+1]}return t/2}var H=e=>se(e)<0?Y(e):e;function Y(e){let t=[];for(let n=e.length-2;n>=0;n-=2)t.push(e[n],e[n+1]);return t}function z(e){let t=[],n=e.filter(r=>r.length>=4).map(r=>r.slice()),o=(r,m,a,s)=>Math.abs(r[m]-a[s])<1e-6&&Math.abs(r[m+1]-a[s+1])<1e-6;for(;n.length;){let r=n.shift();for(let m=!0;m&&!o(r,0,r,r.length-2);){m=!1;for(let a=0;a<n.length;a++){let s=n[a],l=r.length-2;if(o(r,l,s,0))r=r.concat(s.slice(2));else if(o(r,l,s,s.length-2))r=r.concat(Y(s).slice(2));else continue;n.splice(a,1),m=!0;break}}r.length>=8&&o(r,0,r,r.length-2)&&t.push(r.slice(0,-2))}return t}function J(e,t){let n=[],o=null,r=t.length/2,m=t.reduce((s,l,b)=>b%2?s:s+l,0)/r,a=t.reduce((s,l,b)=>b%2?s+l:s,0)/r;for(let s=0;s+3<e.length;s+=2){let l=e[s],b=e[s+1],P=e[s+2],w=e[s+3],f=0,h=1;for(let p=0;p<r&&f<=h;p++){let k=t[p*2],x=t[p*2+1],E=t[(p+1)%r*2],M=-(t[(p+1)%r*2+1]-x),A=E-k;M*(m-k)+A*(a-x)<0&&(M=-M,A=-A);let O=M*(P-l)+A*(w-b),U=M*(l-k)+A*(b-x);if(Math.abs(O)<1e-15){U<0&&(f=2);continue}let j=-U/O;O>0?f=Math.max(f,j):h=Math.min(h,j)}if(f>h){o=null;continue}let T=l+(P-l)*f,S=b+(w-b)*f,d=l+(P-l)*h,y=b+(w-b)*h;o&&f===0?o.push(d,y):(o=[T,S,d,y],n.push(o)),h<1&&(o=null)}return n.filter(s=>s.length>=4&&Math.hypot(s[s.length-2]-s[0],s[s.length-1]-s[1])>1e-6)}function ae(e,t){let n=(e.highway??\"\").replace(/_link$/,\"\");if(e.tunnel&&e.tunnel!==\"no\"||e.area===\"yes\")return 0;let o=[\"motorway\",\"trunk\",\"primary\",\"secondary\"].includes(n),r=[\"tertiary\",\"residential\",\"unclassified\",\"living_street\",\"pedestrian\",\"road\"].includes(n),m=n===\"service\",a=[\"footway\",\"path\",\"cycleway\",\"track\",\"steps\",\"bridleway\"].includes(n);return o?t===\"none\"?0:1:r?t===\"streets\"||t===\"all\"?.65:0:m?t===\"all\"?.45:0:a&&t===\"all\"?.3:0}var C=(e,t)=>t.water&&(e.natural===\"water\"||e.waterway===\"riverbank\"||e.landuse===\"reservoir\"||e.landuse===\"basin\")?\"water\":t.parks&&(e.leisure===\"park\"||e.leisure===\"garden\"||e.landuse===\"forest\"||e.landuse===\"grass\"||e.landuse===\"meadow\")?\"parks\":null;function ie(e){let[t,n]=G(e);if(e.shape===\"circle\"){let o=[];for(let r=0;r<180;r++)o.push(Math.cos(r/180*2*Math.PI)*t/2,Math.sin(r/180*2*Math.PI)*t/2);return o}return[-t/2,-n/2,t/2,-n/2,t/2,n/2,-t/2,n/2]}var K=(e,t)=>{let n=[];for(let o=0;o<e.length;o+=2)n.push({x:Math.round(e[o]*1e3)/1e3,y:Math.round(e[o+1]*1e3)/1e3});return{nodes:n,closed:t}};function ue(e){let t=[];return Q(e)||t.push({key:\"query\",level:\"error\",code:\"noPlace\"}),e.buildings&&e.span>F&&t.push({key:\"buildings\",level:\"warn\",code:\"buildingsLarge\",values:{max:F}}),e.roadStyle===\"lines\"&&e.invert&&t.push({key:\"invert\",level:\"warn\",code:\"invertLines\"}),t}_({validate:ue,onEvent:({action:e,params:t})=>{if(e!==\"find\")return null;let n=t.query.trim();if(!n)return{message:{code:\"enterPlace\"}};if(/^-?[0-9.]+\\s*,\\s*-?[0-9.]+$/.test(n))return{patch:{center:n.replace(/\\s+/g,\"\"),placeName:n},message:{code:\"found\",values:{name:n}}};let o=v.fetch({host:\"nominatim\",path:\"/search\",query:{q:n,format:\"jsonv2\",limit:1}});if(o.error)throw new Error(o.error);let r=JSON.parse(o.text??\"[]\")[0];if(!r)return{message:{code:\"notFound\",values:{q:n}}};let m=r.display_name.split(\",\").slice(0,3).join(\",\").trim();return{patch:{center:`${Number(r.lat).toFixed(6)},${Number(r.lon).toFixed(6)}`,placeName:m},message:{code:\"found\",values:{name:m}}}},generate:e=>{let t=Q(e);if(!t)throw new Error(\"noPlace\");let n=ne(e,t),o=[],r=null;try{o=W(n,re)}catch(i){if(i.message!==\"net-pending\")throw i;r=i}let m=e.buildings&&e.span<=F;if(m)try{o=o.concat(W(n,oe))}catch(i){if(i.message!==\"net-pending\")throw i;r=i}if(r)throw r;let[a,s]=G(e),l=a/e.span,b=111320*Math.cos(t[0]*Math.PI/180)*l,P=110574*l,w=i=>{let c=[];for(let u of i)c.push((u.lon-t[1])*b,-(u.lat-t[0])*P);return c},f=ie(e),h=.03,T=e.roadWidth/2,S=[],d=[],y=[],p={roads:0,buildings:0,water:0},k=Math.max(a,s)*.75,x=i=>{let c=1/0,u=1/0,R=-1/0,g=-1/0;for(let I=0;I<i.length;I+=2)c=Math.min(c,i[I]),R=Math.max(R,i[I]),u=Math.min(u,i[I+1]),g=Math.max(g,i[I+1]);return c<k&&R>-k&&u<k&&g>-k},E=(i,c)=>{if(!(c<=0||i.length<4||!x(i)))for(let u of v.region({op:\"band\",line:N(i,h),radius:c}))S.push(u)};for(let i of o){let c=i.tags??{};if(i.type===\"way\"&&i.geometry&&i.geometry.length>=2){let u=w(i.geometry),R=u.length>=8&&Math.abs(u[0]-u[u.length-2])<1e-9&&Math.abs(u[1]-u[u.length-1])<1e-9;if(c.highway){let g=ae(c,e.roads);if(!g)continue;p.roads++,e.roadStyle===\"lines\"?x(u)&&y.push(...J(N(u,h),f)):E(u,T*g)}else c.railway?e.rail&&!(c.tunnel&&c.tunnel!==\"no\")&&(e.roadStyle===\"lines\"?x(u)&&y.push(...J(N(u,h),f)):E(u,T*.35)):c.building?m&&R&&x(u)&&(d.push(H(N(u.slice(0,-2),h))),p.buildings++):c.waterway&&c.waterway!==\"riverbank\"?e.water&&E(u,T*(c.waterway===\"river\"?.9:c.waterway===\"canal\"?.7:.3)):R&&C(c,e)&&x(u)&&(d.push(H(N(u.slice(0,-2),h))),C(c,e)===\"water\"&&p.water++)}else if(i.type===\"relation\"&&i.members&&C(c,e)){let u=z(i.members.filter(g=>g.role!==\"inner\"&&g.geometry).map(g=>w(g.geometry))),R=z(i.members.filter(g=>g.role===\"inner\"&&g.geometry).map(g=>w(g.geometry)));if(!u.some(x))continue;for(let g of v.region({op:\"loops\",loops:[...u,...R].map(I=>N(I,h))}))d.push(g);p.water++}}let L=v.region({op:\"union\",a:[...d,...S]}),M=v.region({op:\"intersection\",a:L,b:[f]}),A=e.invert&&e.roadStyle!==\"lines\"?v.region({op:\"difference\",a:[f],b:M}):M,U=[...v.region({op:\"clean\",a:A,minArea:e.minArea}).polys.map(i=>K(i,!0)),...y.map(i=>K(i,!1))],j=e.shape===\"circle\"?D(0,0,a/2):B(a,s),$=e.span*1e3/a,q=$>=1e3?100:10,X=Math.round($/q)*q;return{parts:[{key:\"map\",subs:[j],at:{x:0,y:0},...U.length?{marks:U}:{}}],info:[[\"info.place\",e.placeName||e.center],[\"info.scale\",{code:\"scale\",values:{n:X}}],[\"info.roads\",String(p.roads)],...m?[[\"info.buildings\",String(p.buildings)]]:[]],label:{code:\"label\",values:{name:e.placeName.split(\",\")[0]||e.center}}}}});})();\n",
+   "icon": "target",
+   "host": [
+    "fetch",
+    "region"
+   ],
+   "preview": {
+    "center": true
+   },
+   "network": [
+    {
+     "id": "nominatim",
+     "base": "https://nominatim.openstreetmap.org",
+     "methods": [
+      "GET"
+     ],
+     "types": [
+      "json"
+     ],
+     "rate": 1,
+     "purpose": "net.nominatim",
+     "attribution": "© OpenStreetMap contributors"
+    },
+    {
+     "id": "overpass",
+     "base": "https://overpass-api.de/api",
+     "methods": [
+      "POST"
+     ],
+     "types": [
+      "json"
+     ],
+     "rate": 1,
+     "purpose": "net.overpass",
+     "attribution": "© OpenStreetMap contributors"
+    }
+   ],
+   "params": [
+    {
+     "key": "query",
+     "type": "text",
+     "def": ""
+    },
+    {
+     "key": "center",
+     "type": "data",
+     "def": "52.516275,13.377704"
+    },
+    {
+     "key": "placeName",
+     "type": "data",
+     "def": "Brandenburger Tor, Berlin"
+    },
+    {
+     "key": "shape",
+     "type": "enum",
+     "options": [
+      [
+       "rect",
+       "shape.rect"
+      ],
+      [
+       "circle",
+       "shape.circle"
+      ]
+     ],
+     "def": "rect"
+    },
+    {
+     "key": "width",
+     "type": "length",
+     "min": 30,
+     "max": 600,
+     "def": 150
+    },
+    {
+     "key": "height",
+     "type": "length",
+     "min": 30,
+     "max": 600,
+     "def": 150,
+     "showIf": {
+      "eq": [
+       "shape",
+       "rect"
+      ]
+     }
+    },
+    {
+     "key": "span",
+     "type": "number",
+     "min": 200,
+     "max": 4000,
+     "def": 800
+    },
+    {
+     "key": "roads",
+     "type": "enum",
+     "options": [
+      [
+       "none",
+       "roads.none"
+      ],
+      [
+       "major",
+       "roads.major"
+      ],
+      [
+       "streets",
+       "roads.streets"
+      ],
+      [
+       "all",
+       "roads.all"
+      ]
+     ],
+     "def": "streets"
+    },
+    {
+     "key": "roadStyle",
+     "type": "enum",
+     "options": [
+      [
+       "bands",
+       "roadStyle.bands"
+      ],
+      [
+       "lines",
+       "roadStyle.lines"
+      ]
+     ],
+     "def": "bands"
+    },
+    {
+     "key": "roadWidth",
+     "type": "length",
+     "min": 0.2,
+     "max": 6,
+     "def": 1.6,
+     "showIf": {
+      "eq": [
+       "roadStyle",
+       "bands"
+      ]
+     }
+    },
+    {
+     "key": "water",
+     "type": "bool",
+     "def": true
+    },
+    {
+     "key": "rail",
+     "type": "bool",
+     "def": true
+    },
+    {
+     "key": "parks",
+     "type": "bool",
+     "def": false
+    },
+    {
+     "key": "buildings",
+     "type": "bool",
+     "def": false
+    },
+    {
+     "key": "invert",
+     "type": "bool",
+     "def": false,
+     "showIf": {
+      "eq": [
+       "roadStyle",
+       "bands"
+      ]
+     }
+    },
+    {
+     "key": "minArea",
+     "type": "number",
+     "min": 0,
+     "max": 20,
+     "def": 0.3,
+     "advanced": true
+    }
+   ],
+   "dialog": {
+    "version": 5,
+    "actions": [
+     {
+      "id": "find",
+      "label": "find",
+      "title": "find.title"
+     }
+    ],
+    "steps": [
+     {
+      "id": "place",
+      "label": "step.place",
+      "items": [
+       "query",
+       "find"
+      ]
+     },
+     {
+      "id": "size",
+      "label": "step.size",
+      "items": [
+       "shape",
+       "width",
+       "height",
+       "span"
+      ]
+     },
+     {
+      "id": "content",
+      "label": "step.content",
+      "items": [
+       "roads",
+       "roadStyle",
+       "roadWidth",
+       "water",
+       "rail",
+       "parks",
+       "buildings",
+       "invert",
+       "minArea"
+      ]
+     }
+    ]
+   },
+   "texts": {
+    "en": {
+     "name": "Street map",
+     "desc": "Engravable map of a place from OpenStreetMap: roads, water, railways, parks and buildings on a cut plate.",
+     "keys": "map city street map openstreetmap osm place location roads",
+     "label": "Map: {name}",
+     "step.place": "Place",
+     "step.size": "Size",
+     "step.content": "Content",
+     "query": "Place or address",
+     "find": "Find place",
+     "find.title": "Search OpenStreetMap (Nominatim) for the place; coordinates such as 52.5163, 13.3777 work too",
+     "center": "Centre",
+     "placeName": "Place name",
+     "span": "Map width in metres",
+     "shape": "Shape",
+     "shape.rect": "Rectangle",
+     "shape.circle": "Circle",
+     "width": "Width",
+     "height": "Height",
+     "roads": "Roads",
+     "roads.none": "None",
+     "roads.major": "Main roads",
+     "roads.streets": "Streets",
+     "roads.all": "All, with paths",
+     "roadStyle": "Roads as",
+     "roadStyle.bands": "Areas (fill)",
+     "roadStyle.lines": "Lines (score)",
+     "roadWidth": "Main road width",
+     "water": "Water",
+     "rail": "Railways",
+     "parks": "Parks and woods",
+     "buildings": "Buildings",
+     "invert": "Invert (engrave the background)",
+     "minArea": "Smallest area (mm²)",
+     "noPlace": "Find a place first.",
+     "buildingsLarge": "Buildings are only loaded for maps up to {max} m wide.",
+     "invertLines": "Invert works with roads as areas only.",
+     "enterPlace": "Enter a place or address.",
+     "found": "Found: {name}",
+     "notFound": "Nothing found for “{q}”.",
+     "serverBusy": "The map server is busy. Try again in a minute.",
+     "info.place": "Place",
+     "info.scale": "Scale",
+     "scale": "1 : {n}",
+     "info.roads": "Roads",
+     "info.buildings": "Buildings",
+     "net.nominatim": "Finds the place you search for (only when you press “Find place”)",
+     "net.overpass": "Loads the roads, water and buildings around the place"
+    },
+    "de": {
+     "name": "Stadtplan",
+     "desc": "Gravierbarer Plan eines Ortes aus OpenStreetMap: Straßen, Wasser, Bahnen, Parks und Gebäude auf einer geschnittenen Platte.",
+     "keys": "karte stadtplan straßenkarte openstreetmap osm ort straßen",
+     "label": "Stadtplan: {name}",
+     "step.place": "Ort",
+     "step.size": "Größe",
+     "step.content": "Inhalt",
+     "query": "Ort oder Adresse",
+     "find": "Ort suchen",
+     "find.title": "Sucht den Ort in OpenStreetMap (Nominatim); Koordinaten wie 52.5163, 13.3777 gehen auch",
+     "center": "Mitte",
+     "placeName": "Ortsname",
+     "span": "Kartenbreite in Metern",
+     "shape": "Form",
+     "shape.rect": "Rechteck",
+     "shape.circle": "Kreis",
+     "width": "Breite",
+     "height": "Höhe",
+     "roads": "Straßen",
+     "roads.none": "Keine",
+     "roads.major": "Hauptstraßen",
+     "roads.streets": "Straßen",
+     "roads.all": "Alle, mit Wegen",
+     "roadStyle": "Straßen als",
+     "roadStyle.bands": "Flächen (Füllen)",
+     "roadStyle.lines": "Linien (Ritzen)",
+     "roadWidth": "Breite Hauptstraße",
+     "water": "Wasser",
+     "rail": "Bahnstrecken",
+     "parks": "Parks und Wald",
+     "buildings": "Gebäude",
+     "invert": "Umkehren (Hintergrund gravieren)",
+     "minArea": "Kleinste Fläche (mm²)",
+     "noPlace": "Erst einen Ort suchen.",
+     "buildingsLarge": "Gebäude werden nur für Karten bis {max} m Breite geladen.",
+     "invertLines": "Umkehren geht nur mit Straßen als Flächen.",
+     "enterPlace": "Ort oder Adresse eingeben.",
+     "found": "Gefunden: {name}",
+     "notFound": "Nichts gefunden für „{q}“.",
+     "serverBusy": "Der Kartenserver ist ausgelastet. Versuche es in einer Minute noch einmal.",
+     "info.place": "Ort",
+     "info.scale": "Maßstab",
+     "scale": "1 : {n}",
+     "info.roads": "Straßen",
+     "info.buildings": "Gebäude",
+     "net.nominatim": "Findet den gesuchten Ort (nur bei „Ort suchen“)",
+     "net.overpass": "Lädt Straßen, Wasser und Gebäude rund um den Ort"
+    },
+    "it": {
+     "name": "Mappa stradale",
+     "desc": "Mappa incidibile di un luogo da OpenStreetMap: strade, acqua, ferrovie, parchi ed edifici su una lastra tagliata.",
+     "keys": "mappa città stradale openstreetmap osm luogo strade",
+     "label": "Mappa: {name}",
+     "step.place": "Luogo",
+     "step.size": "Dimensioni",
+     "step.content": "Contenuto",
+     "query": "Luogo o indirizzo",
+     "find": "Cerca luogo",
+     "find.title": "Cerca il luogo in OpenStreetMap (Nominatim); funzionano anche coordinate come 52.5163, 13.3777",
+     "center": "Centro",
+     "placeName": "Nome del luogo",
+     "span": "Larghezza della mappa in metri",
+     "shape": "Forma",
+     "shape.rect": "Rettangolo",
+     "shape.circle": "Cerchio",
+     "width": "Larghezza",
+     "height": "Altezza",
+     "roads": "Strade",
+     "roads.none": "Nessuna",
+     "roads.major": "Strade principali",
+     "roads.streets": "Strade",
+     "roads.all": "Tutte, con sentieri",
+     "roadStyle": "Strade come",
+     "roadStyle.bands": "Aree (riempimento)",
+     "roadStyle.lines": "Linee (incisione)",
+     "roadWidth": "Larghezza strada principale",
+     "water": "Acqua",
+     "rail": "Ferrovie",
+     "parks": "Parchi e boschi",
+     "buildings": "Edifici",
+     "invert": "Inverti (incidi lo sfondo)",
+     "minArea": "Area minima (mm²)",
+     "noPlace": "Cerca prima un luogo.",
+     "buildingsLarge": "Gli edifici vengono caricati solo per mappe larghe fino a {max} m.",
+     "invertLines": "Inverti funziona solo con strade come aree.",
+     "enterPlace": "Inserisci un luogo o un indirizzo.",
+     "found": "Trovato: {name}",
+     "notFound": "Nessun risultato per «{q}».",
+     "serverBusy": "Il server delle mappe è occupato. Riprova tra un minuto.",
+     "info.place": "Luogo",
+     "info.scale": "Scala",
+     "scale": "1 : {n}",
+     "info.roads": "Strade",
+     "info.buildings": "Edifici",
+     "net.nominatim": "Trova il luogo cercato (solo con «Cerca luogo»)",
+     "net.overpass": "Carica strade, acqua ed edifici intorno al luogo"
+    }
+   },
+   "sha256": "43cb4549853c6224e5837355d751efb1136930335c3d3f5088ff48cb0a23a068"
+  }
+ ]
+}

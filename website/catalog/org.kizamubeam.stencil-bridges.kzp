@@ -1,0 +1,259 @@
+{
+ "format": "kizamubeam-pack",
+ "formatVersion": 2,
+ "id": "org.kizamubeam.stencil-bridges",
+ "version": "1.0.0",
+ "name": {
+  "en": "Stencil bridges",
+  "de": "Schablonenstege",
+  "it": "Ponti per stencil",
+  "es": "Puentes para plantillas",
+  "pt-BR": "Pontes para estêncil"
+ },
+ "description": {
+  "en": "Bridges for the inner parts of letters and shapes, so they do not fall out of a stencil.",
+  "de": "Stege für die Innenteile von Buchstaben und Formen, damit sie nicht aus der Schablone fallen.",
+  "it": "Ponti per le parti interne di lettere e forme, così non cadono dallo stencil.",
+  "es": "Puentes para las partes interiores de letras y formas, para que no se caigan de la plantilla.",
+  "pt-BR": "Pontes para as partes internas de letras e formas, para que não caiam do estêncil."
+ },
+ "author": "KizamuBeam",
+ "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/stencil-bridges",
+ "plugins": [
+  {
+   "id": "org.kizamubeam.stencil-bridges",
+   "type": "pathtool",
+   "api": 1,
+   "version": 1,
+   "runtime": "js",
+   "code": "\"use strict\";(()=>{var I=globalThis.host;function k(e){globalThis.plugin=e}var M={vertical:!0,sign:-1},A={vertical:!0,sign:1},D={vertical:!1,sign:-1},N={vertical:!1,sign:1},F=e=>({vertical:e.vertical,sign:e.sign===1?-1:1});function G(e){let r=[],t=e.nodes.length;for(let o=0;o<t;o++){let n=e.nodes[o],s=e.nodes[(o+1)%t];if(r.push({x:n.x,y:n.y}),o===t-1&&!e.closed)break;if(!n.cout&&!s.cin)continue;let u=n.cout??n,m=s.cin??s;for(let b=1;b<16;b++){let a=b/16,i=1-a;r.push({x:i*i*i*n.x+3*i*i*a*u.x+3*i*a*a*m.x+a*a*a*s.x,y:i*i*i*n.y+3*i*i*a*u.y+3*i*a*a*m.y+a*a*a*s.y})}}return r}var O=e=>{let r=0;for(let t=0,o=e.length-1;t<e.length;o=t++)r+=e[o].x*e[t].y-e[t].x*e[o].y;return Math.abs(r/2)};function j(e,r){let t=!1;for(let o=0,n=e.length-1;o<e.length;n=o++){let s=e[n],u=e[o];s.y>r.y!=u.y>r.y&&r.x<s.x+(r.y-s.y)*(u.x-s.x)/(u.y-s.y)&&(t=!t)}return t}var E=e=>{let r=1/0,t=1/0,o=-1/0,n=-1/0;for(let s of e)r=Math.min(r,s.x),t=Math.min(t,s.y),o=Math.max(o,s.x),n=Math.max(n,s.y);return{x0:r,y0:t,x1:o,y1:n}};function V(e,r,t){let o=[];for(let n of e)for(let s=0,u=n.length-1;s<n.length;u=s++){let m=n[u],b=n[s],[a,i,p,h]=r?[m.x,m.y,b.x,b.y]:[m.y,m.x,b.y,b.x];a>t!=p>t&&o.push(i+(t-a)*(h-i)/(p-a))}return o.sort((n,s)=>n-s)}var U=.1;function C(e,r,t,o){let n=E(r),s=t.vertical?(n.x0+n.x1)/2:(n.y0+n.y1)/2,u=1/0,m=-1/0,b=0;for(let a=-4;a<=4;a++){let i=s+a/4*(o/2)*.98,p=V([r],t.vertical,i);if(p.length<2){if(a===0)return null;continue}let h=t.sign<0?p[0]:p[p.length-1],d=h+t.sign*1e-4,x=V(e,t.vertical,i),f=null;for(let c=0;c+1<x.length;c+=2)x[c]<=d&&d<=x[c+1]&&(f=[x[c],x[c+1]]);if(!f){if(a===0)return null;continue}b++;let[P,l]=t.sign<0?[f[0],h]:[h,f[1]];u=Math.min(u,P),m=Math.max(m,l)}return b?{lo:u-U,hi:m+U,c:s,len:m-u}:null}var z=(e,r,t)=>{let[o,n]=[r.c-t/2,r.c+t/2];return{closed:!0,nodes:e.vertical?[{x:o,y:r.lo},{x:n,y:r.lo},{x:n,y:r.hi},{x:o,y:r.hi}]:[{x:r.lo,y:o},{x:r.hi,y:o},{x:r.hi,y:n},{x:r.lo,y:n}]}},L={vertical:[M,A],horizontal:[D,N],shortest:[M,A,D,N]};k({apply({params:e,objects:r}){let t=[],o=[],n=0,s=0,u=0,m=0,b=0;for(let i of r){let p=i.subs.filter(l=>l.closed&&l.nodes.length>=3),h=i.subs.filter(l=>!l.closed||l.nodes.length<3),d=p.map(G),x=d.map((l,c)=>({poly:l,depth:d.filter((v,R)=>R!==c&&j(v,l[0])).length})).filter(l=>l.depth%2===1&&O(l.poly)>=e.minArea),f=[];for(let l of x){if(l.depth>1&&!e.nested){u++;continue}n++;let c=E(l.poly),v=Math.max(c.x1-c.x0,c.y1-c.y0),R=e.count===\"2\"||e.count===\"auto\"&&v>=e.autoSize,T=L[e.direction].map(g=>({d:g,r:C(d,l.poly,g,e.width)})).filter(g=>!!g.r).sort((g,y)=>g.r.len-y.r.len);if(!T.length){b++;continue}let w=T[0],S=[w];if(R){let g=F(w.d),y=C(d,l.poly,g,e.width);y&&S.push({d:g,r:y})}for(let g of S)(g.d.vertical?c.x1-c.x0:c.y1-c.y0)<e.width&&m++,f.push(z(g.d,g.r,e.width)),s++}if(!f.length){o.push({from:i.id,subs:i.subs});continue}let P=I.boolean({op:\"difference\",a:p,b:f});o.push({from:i.id,subs:[...P,...h]})}r.some(i=>i.subs.some(p=>p.closed))?!n&&!u&&t.push({level:\"warn\",code:\"no-islands\"}):t.push({level:\"error\",code:\"no-closed\"}),u&&t.push({key:\"nested\",level:\"warn\",code:\"nested-left\",values:{n:u}}),m&&t.push({key:\"width\",level:\"warn\",code:\"narrow\",values:{n:m}}),b&&t.push({level:\"warn\",code:\"failed\",values:{n:b}});let a=[[{code:\"info.islands\"},String(n)],[{code:\"info.bridges\"},String(s)]];return{objects:t.some(i=>i.level===\"error\")?void 0:o,issues:t,info:a}}});})();\n",
+   "icon": "text",
+   "host": [
+    "boolean"
+   ],
+   "dialog": {
+    "version": 1
+   },
+   "params": [
+    {
+     "key": "width",
+     "type": "length",
+     "min": 0.2,
+     "max": 20,
+     "def": 2,
+     "title": "width.title"
+    },
+    {
+     "key": "count",
+     "type": "enum",
+     "options": [
+      [
+       "1",
+       "count.1"
+      ],
+      [
+       "2",
+       "count.2"
+      ],
+      [
+       "auto",
+       "count.auto"
+      ]
+     ],
+     "def": "auto"
+    },
+    {
+     "key": "autoSize",
+     "type": "length",
+     "min": 1,
+     "max": 1000,
+     "def": 25,
+     "title": "autoSize.title",
+     "showIf": {
+      "eq": [
+       "count",
+       "auto"
+      ]
+     }
+    },
+    {
+     "key": "direction",
+     "type": "enum",
+     "options": [
+      [
+       "vertical",
+       "direction.vertical"
+      ],
+      [
+       "horizontal",
+       "direction.horizontal"
+      ],
+      [
+       "shortest",
+       "direction.shortest"
+      ]
+     ],
+     "def": "vertical"
+    },
+    {
+     "key": "nested",
+     "type": "bool",
+     "def": true,
+     "title": "nested.title"
+    },
+    {
+     "key": "minArea",
+     "type": "number",
+     "min": 0,
+     "max": 10000,
+     "def": 0.5,
+     "title": "minArea.title",
+     "advanced": true
+    }
+   ],
+   "texts": {
+    "en": {
+     "name": "Stencil bridges",
+     "desc": "Bridges for the inner parts of letters and shapes, so they do not fall out of a stencil.",
+     "keys": "stencil bridge counter letters text island template",
+     "width": "Bridge width",
+     "width.title": "Width of each bridge. About 1.5 × the material thickness holds well.",
+     "count": "Bridges per island",
+     "count.1": "1",
+     "count.2": "2 (opposite)",
+     "count.auto": "Automatic by size",
+     "autoSize": "Two bridges from",
+     "autoSize.title": "Islands at least this long or wide get two bridges.",
+     "direction": "Direction",
+     "direction.vertical": "Vertical",
+     "direction.horizontal": "Horizontal",
+     "direction.shortest": "Shortest connection",
+     "nested": "Bridge nested islands too",
+     "nested.title": "An island inside an island (a ring in a ring) is connected in a chain to the outer one.",
+     "minArea": "Smallest island",
+     "minArea.title": "Smaller inner parts are ignored (mm²).",
+     "no-closed": "Select closed shapes or text.",
+     "no-islands": "Nothing would fall out: the selection has no inner parts.",
+     "nested-left": "{n} nested islands stay without a bridge.",
+     "narrow": "{n} bridges are wider than their island.",
+     "failed": "{n} islands found no place for a bridge.",
+     "info.islands": "Islands",
+     "info.bridges": "Bridges"
+    },
+    "de": {
+     "name": "Schablonenstege",
+     "desc": "Stege für die Innenteile von Buchstaben und Formen, damit sie nicht aus der Schablone fallen.",
+     "keys": "Schablone Steg Stege Buchstaben Text Innenteil Insel Stencil",
+     "width": "Stegbreite",
+     "width.title": "Breite jedes Stegs. Etwa 1,5 × Materialdicke hält gut.",
+     "count": "Stege pro Insel",
+     "count.1": "1",
+     "count.2": "2 (gegenüber)",
+     "count.auto": "Automatisch nach Größe",
+     "autoSize": "Zwei Stege ab",
+     "autoSize.title": "Inseln, die mindestens so lang oder breit sind, bekommen zwei Stege.",
+     "direction": "Richtung",
+     "direction.vertical": "Senkrecht",
+     "direction.horizontal": "Waagerecht",
+     "direction.shortest": "Kürzeste Verbindung",
+     "nested": "Verschachtelte Inseln auch verbinden",
+     "nested.title": "Eine Insel in einer Insel (Ring im Ring) wird in einer Kette mit der äußeren verbunden.",
+     "minArea": "Kleinste Insel",
+     "minArea.title": "Kleinere Innenteile werden übergangen (mm²).",
+     "no-closed": "Geschlossene Formen oder Text auswählen.",
+     "no-islands": "Hier fällt nichts heraus: Die Auswahl hat keine Innenteile.",
+     "nested-left": "{n} verschachtelte Inseln bleiben ohne Steg.",
+     "narrow": "{n} Stege sind breiter als ihre Insel.",
+     "failed": "{n} Inseln fanden keinen Platz für einen Steg.",
+     "info.islands": "Inseln",
+     "info.bridges": "Stege"
+    },
+    "it": {
+     "name": "Ponti per stencil",
+     "desc": "Ponti per le parti interne di lettere e forme, così non cadono dallo stencil.",
+     "keys": "stencil ponte ponti lettere testo isola mascherina",
+     "width": "Larghezza ponte",
+     "width.title": "Larghezza di ogni ponte. Circa 1,5 × lo spessore del materiale tiene bene.",
+     "count": "Ponti per isola",
+     "count.1": "1",
+     "count.2": "2 (opposti)",
+     "count.auto": "Automatico secondo la dimensione",
+     "autoSize": "Due ponti da",
+     "autoSize.title": "Le isole lunghe o larghe almeno così ricevono due ponti.",
+     "direction": "Direzione",
+     "direction.vertical": "Verticale",
+     "direction.horizontal": "Orizzontale",
+     "direction.shortest": "Collegamento più corto",
+     "nested": "Collega anche le isole annidate",
+     "nested.title": "Un’isola dentro un’isola (anello nell’anello) viene collegata a catena a quella esterna.",
+     "minArea": "Isola più piccola",
+     "minArea.title": "Le parti interne più piccole vengono ignorate (mm²).",
+     "no-closed": "Seleziona forme chiuse o testo.",
+     "no-islands": "Non cade nulla: la selezione non ha parti interne.",
+     "nested-left": "{n} isole annidate restano senza ponte.",
+     "narrow": "{n} ponti sono più larghi della loro isola.",
+     "failed": "{n} isole non hanno trovato posto per un ponte.",
+     "info.islands": "Isole",
+     "info.bridges": "Ponti"
+    },
+    "es": {
+     "name": "Puentes para plantillas",
+     "desc": "Puentes para las partes interiores de letras y formas, para que no se caigan de la plantilla.",
+     "keys": "plantilla puente puentes letras texto isla stencil",
+     "width": "Ancho del puente",
+     "width.title": "Ancho de cada puente. Unas 1,5 × el grosor del material sujeta bien.",
+     "count": "Puentes por isla",
+     "count.1": "1",
+     "count.2": "2 (opuestos)",
+     "count.auto": "Automático según el tamaño",
+     "autoSize": "Dos puentes desde",
+     "autoSize.title": "Las islas al menos así de largas o anchas reciben dos puentes.",
+     "direction": "Dirección",
+     "direction.vertical": "Vertical",
+     "direction.horizontal": "Horizontal",
+     "direction.shortest": "Conexión más corta",
+     "nested": "Unir también las islas anidadas",
+     "nested.title": "Una isla dentro de una isla (anillo en anillo) se une en cadena con la exterior.",
+     "minArea": "Isla más pequeña",
+     "minArea.title": "Las partes interiores más pequeñas se ignoran (mm²).",
+     "no-closed": "Selecciona formas cerradas o texto.",
+     "no-islands": "No se cae nada: la selección no tiene partes interiores.",
+     "nested-left": "{n} islas anidadas se quedan sin puente.",
+     "narrow": "{n} puentes son más anchos que su isla.",
+     "failed": "{n} islas no encontraron sitio para un puente.",
+     "info.islands": "Islas",
+     "info.bridges": "Puentes"
+    },
+    "pt-BR": {
+     "name": "Pontes para estêncil",
+     "desc": "Pontes para as partes internas de letras e formas, para que não caiam do estêncil.",
+     "keys": "estêncil ponte pontes letras texto ilha molde stencil",
+     "width": "Largura da ponte",
+     "width.title": "Largura de cada ponte. Cerca de 1,5 × a espessura do material segura bem.",
+     "count": "Pontes por ilha",
+     "count.1": "1",
+     "count.2": "2 (opostas)",
+     "count.auto": "Automático pelo tamanho",
+     "autoSize": "Duas pontes a partir de",
+     "autoSize.title": "Ilhas pelo menos tão longas ou largas recebem duas pontes.",
+     "direction": "Direção",
+     "direction.vertical": "Vertical",
+     "direction.horizontal": "Horizontal",
+     "direction.shortest": "Ligação mais curta",
+     "nested": "Ligar também ilhas aninhadas",
+     "nested.title": "Uma ilha dentro de uma ilha (anel no anel) é ligada em cadeia à externa.",
+     "minArea": "Menor ilha",
+     "minArea.title": "Partes internas menores são ignoradas (mm²).",
+     "no-closed": "Selecione formas fechadas ou texto.",
+     "no-islands": "Nada cairia: a seleção não tem partes internas.",
+     "nested-left": "{n} ilhas aninhadas ficam sem ponte.",
+     "narrow": "{n} pontes são mais largas que sua ilha.",
+     "failed": "{n} ilhas não encontraram lugar para uma ponte.",
+     "info.islands": "Ilhas",
+     "info.bridges": "Pontes"
+    }
+   },
+   "sha256": "dfe01d1c1cebaeaa64de6c4c922c4056bfccb551b7b284a44f0b709f4519773a"
+  }
+ ]
+}

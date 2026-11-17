@@ -1,7 +1,7 @@
 {
  "format": "kizamubeam-catalog",
  "version": 1,
- "generated": "2026-11-16T20:24:29.541Z",
+ "generated": "2026-11-17T14:11:42.832Z",
  "packs": [
   {
    "id": "org.kizamubeam.example",
@@ -21,9 +21,234 @@
    "templates": 1,
    "materials": 2,
    "assets": 3,
+   "plugins": 0,
    "file": "org.kizamubeam.example.kzp",
    "sha256": "3dfb647e2fb6c1070e9933994c5119a228204f9199e8b2f960f06661b999e900",
    "size": 5031
+  },
+  {
+   "id": "org.kizamubeam.game-board",
+   "version": "1.0.0",
+   "name": {
+    "en": "Chessboard and game boards",
+    "de": "Schachbrett und Spielbretter",
+    "it": "Scacchiera e tavolieri",
+    "es": "Tablero de ajedrez y juegos",
+    "pt-BR": "Tabuleiro de xadrez e jogos"
+   },
+   "description": {
+    "en": "Chessboards, draughts boards and any n × m board: dark squares filled, hatched, crossed or as a small checkerboard, with coordinates on the border.",
+    "de": "Schachbretter, Damebretter und beliebige n × m Bretter: dunkle Felder gefüllt, schraffiert, gekreuzt oder als kleines Schachbrett, mit Koordinaten am Rand.",
+    "it": "Scacchiere, damiere e qualsiasi tavoliere n × m: caselle scure piene, tratteggiate, incrociate o come piccola scacchiera, con coordinate sul bordo."
+   },
+   "author": "KizamuBeam",
+   "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/game-board",
+   "devices": 0,
+   "templates": 0,
+   "materials": 0,
+   "assets": 0,
+   "plugins": 1,
+   "runtimes": [
+    "js"
+   ],
+   "pluginApi": 1,
+   "codeSize": 5644,
+   "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/game-board",
+   "file": "org.kizamubeam.game-board.kzp",
+   "sha256": "dd9109ba25d0d560e94f06da79916a845c06f6cc83715a023685fc2e7238ada4",
+   "size": 14490
+  },
+  {
+   "id": "org.kizamubeam.hole-plate",
+   "version": "1.0.0",
+   "name": {
+    "en": "Hole plate (example plugin)",
+    "de": "Lochplatte (Beispiel-Plugin)",
+    "it": "Piastra forata (plugin di esempio)"
+   },
+   "description": {
+    "en": "Example of a generator plugin in Rust/WebAssembly: a plate with a square or hexagonal pattern of holes.",
+    "de": "Beispiel für ein Generator-Plugin in Rust/WebAssembly: eine Platte mit quadratischem oder sechseckigem Lochmuster.",
+    "it": "Esempio di plugin generatore in Rust/WebAssembly: una piastra con uno schema di fori quadrato o esagonale."
+   },
+   "author": "KizamuBeam",
+   "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/hole-plate",
+   "devices": 0,
+   "templates": 0,
+   "materials": 0,
+   "assets": 0,
+   "plugins": 1,
+   "runtimes": [
+    "wasm"
+   ],
+   "pluginApi": 1,
+   "codeSize": 150127,
+   "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/hole-plate",
+   "file": "org.kizamubeam.hole-plate.kzp",
+   "sha256": "c1cc32eee3cdbacc53ca5e9c68d4f390a0a8ef402c10b4f7fafa08a86665d2ea",
+   "size": 205751
+  },
+  {
+   "id": "org.kizamubeam.jigsaw",
+   "version": "1.0.0",
+   "name": {
+    "en": "Jigsaw puzzle",
+    "de": "Puzzle",
+    "it": "Puzzle",
+    "es": "Rompecabezas",
+    "pt-BR": "Quebra-cabeça"
+   },
+   "description": {
+    "en": "Jigsaw puzzle generator: interlocking pieces from a seed, each edge cut once, optional frame and piece numbers.",
+    "de": "Puzzle-Generator: ineinandergreifende Teile aus einem Startwert, jede Kante wird nur einmal geschnitten, auf Wunsch mit Rahmen und Teilenummern.",
+    "it": "Generatore di puzzle: pezzi a incastro da un seme, ogni bordo tagliato una sola volta, cornice e numeri dei pezzi a scelta."
+   },
+   "author": "KizamuBeam",
+   "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/jigsaw",
+   "devices": 0,
+   "templates": 0,
+   "materials": 0,
+   "assets": 0,
+   "plugins": 1,
+   "runtimes": [
+    "js"
+   ],
+   "pluginApi": 1,
+   "codeSize": 6149,
+   "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/jigsaw",
+   "file": "org.kizamubeam.jigsaw.kzp",
+   "sha256": "9b8e26598c3471d4b6cb5ae94006a7bb469a4d2283ea974df704f2a039c919bb",
+   "size": 14060
+  },
+  {
+   "id": "org.kizamubeam.layered-art",
+   "version": "1.0.0",
+   "name": {
+    "en": "Layered art",
+    "de": "Schichtbild",
+    "it": "Arte a strati"
+   },
+   "description": {
+    "en": "Turns a logo, drawing or photo into stacked plates that are cut and glued on top of each other for depth.",
+    "de": "Macht aus einem Logo, einer Zeichnung oder einem Foto gestapelte Platten, die geschnitten und für Tiefe übereinander geklebt werden.",
+    "it": "Trasforma un logo, un disegno o una foto in pannelli sovrapposti, tagliati e incollati uno sull'altro per dare profondità."
+   },
+   "author": "KizamuBeam",
+   "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/layered-art",
+   "devices": 0,
+   "templates": 0,
+   "materials": 0,
+   "assets": 0,
+   "plugins": 1,
+   "runtimes": [
+    "js"
+   ],
+   "pluginApi": 1,
+   "codeSize": 12700,
+   "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/layered-art",
+   "file": "org.kizamubeam.layered-art.kzp",
+   "sha256": "b28881e9757a5a98e538d8680f88d8cd4f143ae818943a853850c3735747c532",
+   "size": 25812
+  },
+  {
+   "id": "org.kizamubeam.ruler",
+   "version": "1.0.0",
+   "name": {
+    "en": "Rulers and scales",
+    "de": "Lineale und Skalen",
+    "it": "Righelli e scale",
+    "es": "Reglas y escalas",
+    "pt-BR": "Réguas e escalas"
+   },
+   "description": {
+    "en": "Straight rulers (metric or inch), protractors and scale dials with engraved ticks and numbers at their exact positions.",
+    "de": "Gerade Lineale (metrisch oder Zoll), Winkelmesser und Skalenscheiben mit gravierten Strichen und Zahlen an den genauen Positionen.",
+    "it": "Righelli dritti (metrici o in pollici), goniometri e quadranti con tacche e numeri incisi nelle posizioni esatte."
+   },
+   "author": "KizamuBeam",
+   "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/ruler",
+   "devices": 0,
+   "templates": 0,
+   "materials": 0,
+   "assets": 0,
+   "plugins": 1,
+   "runtimes": [
+    "js"
+   ],
+   "pluginApi": 1,
+   "codeSize": 7441,
+   "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/ruler",
+   "file": "org.kizamubeam.ruler.kzp",
+   "sha256": "7e223eac19fc35cfad402b02a51d2669533c4c8b89c4f41e40d51eedf0351d5a",
+   "size": 21288
+  },
+  {
+   "id": "org.kizamubeam.stencil-bridges",
+   "version": "1.0.0",
+   "name": {
+    "en": "Stencil bridges",
+    "de": "Schablonenstege",
+    "it": "Ponti per stencil",
+    "es": "Puentes para plantillas",
+    "pt-BR": "Pontes para estêncil"
+   },
+   "description": {
+    "en": "Bridges for the inner parts of letters and shapes, so they do not fall out of a stencil.",
+    "de": "Stege für die Innenteile von Buchstaben und Formen, damit sie nicht aus der Schablone fallen.",
+    "it": "Ponti per le parti interne di lettere e forme, così non cadono dallo stencil.",
+    "es": "Puentes para las partes interiores de letras y formas, para que no se caigan de la plantilla.",
+    "pt-BR": "Pontes para as partes internas de letras e formas, para que não caiam do estêncil."
+   },
+   "author": "KizamuBeam",
+   "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/stencil-bridges",
+   "devices": 0,
+   "templates": 0,
+   "materials": 0,
+   "assets": 0,
+   "plugins": 1,
+   "runtimes": [
+    "js"
+   ],
+   "pluginApi": 1,
+   "codeSize": 3350,
+   "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/stencil-bridges",
+   "file": "org.kizamubeam.stencil-bridges.kzp",
+   "sha256": "5cf311a3c066fa90931c8f4fe223ddf9c9fede69d85163b1740aca78a6611483",
+   "size": 12980
+  },
+  {
+   "id": "org.kizamubeam.street-map",
+   "version": "1.0.0",
+   "name": {
+    "en": "Street map",
+    "de": "Stadtplan",
+    "it": "Mappa stradale"
+   },
+   "description": {
+    "en": "Engravable map of a place from OpenStreetMap: roads, water, railways, parks and buildings on a cut plate.",
+    "de": "Gravierbarer Plan eines Ortes aus OpenStreetMap: Straßen, Wasser, Bahnen, Parks und Gebäude auf einer geschnittenen Platte.",
+    "it": "Mappa incidibile di un luogo da OpenStreetMap: strade, acqua, ferrovie, parchi ed edifici su una lastra tagliata."
+   },
+   "author": "KizamuBeam",
+   "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/street-map",
+   "devices": 0,
+   "templates": 0,
+   "materials": 0,
+   "assets": 0,
+   "plugins": 1,
+   "runtimes": [
+    "js"
+   ],
+   "pluginApi": 1,
+   "codeSize": 7824,
+   "network": [
+    "nominatim.openstreetmap.org",
+    "overpass-api.de"
+   ],
+   "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/street-map",
+   "file": "org.kizamubeam.street-map.kzp",
+   "sha256": "0b8b278e736334a233e8bc391bbbab169a7a035e2ccf6b963ba674adbbdd50f7",
+   "size": 18614
   }
  ]
 }

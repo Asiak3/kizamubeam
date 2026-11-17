@@ -1,0 +1,300 @@
+{
+ "format": "kizamubeam-pack",
+ "formatVersion": 2,
+ "id": "org.kizamubeam.game-board",
+ "version": "1.0.0",
+ "name": {
+  "en": "Chessboard and game boards",
+  "de": "Schachbrett und Spielbretter",
+  "it": "Scacchiera e tavolieri",
+  "es": "Tablero de ajedrez y juegos",
+  "pt-BR": "Tabuleiro de xadrez e jogos"
+ },
+ "description": {
+  "en": "Chessboards, draughts boards and any n × m board: dark squares filled, hatched, crossed or as a small checkerboard, with coordinates on the border.",
+  "de": "Schachbretter, Damebretter und beliebige n × m Bretter: dunkle Felder gefüllt, schraffiert, gekreuzt oder als kleines Schachbrett, mit Koordinaten am Rand.",
+  "it": "Scacchiere, damiere e qualsiasi tavoliere n × m: caselle scure piene, tratteggiate, incrociate o come piccola scacchiera, con coordinate sul bordo."
+ },
+ "author": "KizamuBeam",
+ "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/game-board",
+ "plugins": [
+  {
+   "id": "org.kizamubeam.game-board",
+   "type": "generator",
+   "api": 1,
+   "version": 1,
+   "kind": "part",
+   "runtime": "js",
+   "code": "\"use strict\";(()=>{var I={0:\"1,0 3,0 4,1 4,5 3,6 1,6 0,5 0,1 1,0\",1:\"1,1 2,0 2,6|1,6 3,6\",2:\"0,1 1,0 3,0 4,1 4,2 0,6 4,6\",3:\"0,0 4,0 2,2.5 3,2.5 4,3.5 4,5 3,6 1,6 0,5\",4:\"3,6 3,0 0,4 4,4\",5:\"4,0 0,0 0,2.5 3,2.5 4,3.5 4,5 3,6 0,6\",6:\"3,0 1,0 0,1 0,5 1,6 3,6 4,5 4,3.5 3,2.5 0,2.5\",7:\"0,0 4,0 1.5,6\",8:\"3,3 1,3 0,4 0,5 1,6 3,6 4,5 4,4 3,3 4,2 4,1 3,0 1,0 0,1 0,2 1,3\",9:\"4,3.5 1,3.5 0,2.5 0,1 1,0 3,0 4,1 4,5 3,6 1,6\",A:\"0,6 0,2 2,0 4,2 4,6|0,3.5 4,3.5\",B:\"0,3 3,3 4,4 4,5 3,6 0,6 0,0 3,0 4,1 4,2 3,3\",C:\"4,1 3,0 1,0 0,1 0,5 1,6 3,6 4,5\",D:\"0,0 0,6 2.5,6 4,4.5 4,1.5 2.5,0 0,0\",E:\"4,0 0,0 0,6 4,6|0,3 3,3\",F:\"4,0 0,0 0,6|0,3 3,3\",G:\"4,1 3,0 1,0 0,1 0,5 1,6 3,6 4,5 4,3.5 2,3.5\",H:\"0,0 0,6|4,0 4,6|0,3 4,3\",I:\"1,0 3,0|2,0 2,6|1,6 3,6\",J:\"4,0 4,5 3,6 1,6 0,5\",K:\"0,0 0,6|4,0 0,3.5|1.3,2.7 4,6\",L:\"0,0 0,6 4,6\",M:\"0,6 0,0 2,3 4,0 4,6\",N:\"0,6 0,0 4,6 4,0\",O:\"1,0 3,0 4,1 4,5 3,6 1,6 0,5 0,1 1,0\",P:\"0,6 0,0 3,0 4,1 4,2 3,3 0,3\",Q:\"1,0 3,0 4,1 4,5 3,6 1,6 0,5 0,1 1,0|2.5,4.5 4,6\",R:\"0,6 0,0 3,0 4,1 4,2 3,3 0,3|2,3 4,6\",S:\"4,1 3,0 1,0 0,1 0,2 1,3 3,3 4,4 4,5 3,6 1,6 0,5\",T:\"0,0 4,0|2,0 2,6\",U:\"0,0 0,5 1,6 3,6 4,5 4,0\",V:\"0,0 2,6 4,0\",W:\"0,0 1,6 2,3 3,6 4,0\",X:\"0,0 4,6|4,0 0,6\",Y:\"0,0 2,3 4,0|2,3 2,6\",Z:\"0,0 4,0 0,6 4,6\",\"-\":\"1,3 3,3\",\"+\":\"2,1.5 2,4.5|0.5,3 3.5,3\",\".\":\"1.6,5.4 2.4,5.4 2.4,6 1.6,6 1.6,5.4\",\",\":\"2.2,5.2 2.2,6 1.5,7\",\":\":\"1.6,1.6 2.4,1.6 2.4,2.2 1.6,2.2 1.6,1.6|1.6,5.4 2.4,5.4 2.4,6 1.6,6 1.6,5.4\",\"/\":\"0,6 4,0\",\"\\xB0\":\"1,0 2.5,0 2.5,1.5 1,1.5 1,0\",'\"':\"1.5,0 1.5,1.5|2.5,0 2.5,1.5\",\"'\":\"2,0 2,1.5\",\"=\":\"0.5,2 3.5,2|0.5,4 3.5,4\",\"(\":\"3,0 2,1 1.5,3 2,5 3,6\",\")\":\"1,0 2,1 2.5,3 2,5 1,6\",\"%\":\"0,6 4,0|0,0 1,0 1,1 0,1 0,0|3,5 4,5 4,6 3,6 3,5\"},M=new Map;function A(e){let r=M.get(e);if(!r){let n=I[e]??I[e.toUpperCase()];r=n?n.split(\"|\").map(t=>t.split(\" \").map(s=>s.split(\",\").map(Number))):[],M.set(e,r)}return r}var U=5.5,O=new Set([\".\",\",\",\":\",\"'\",\"1\",\"I\"]),w=e=>e===\" \"?4:O.has(e)?4.5:U;function R(e,r){let n=r/6,t=0;for(let s of e)t+=w(s);return Math.max(0,t-1.5)*n}function P(e,r,n={}){let t=r/6,s=1/0,o=-1/0,i=0;for(let h of e){for(let x of A(h))for(let[f]of x)s=Math.min(s,i+f),o=Math.max(o,i+f);i+=w(h)}s>o&&(s=o=0);let u=(n.align===\"center\"?-(s+o)/2:n.align===\"right\"?-o:-s)*t,b=n.valign===\"top\"?0:n.valign===\"middle\"?-r/2:-r,c=(n.angle??0)*Math.PI/180,d=Math.cos(c),a=Math.sin(c),g=n.x??0,l=n.y??0,m=[],p=0;for(let h of e){for(let x of A(h))m.push({closed:!1,nodes:x.map(([f,N])=>{let T=u+p+f*t,k=b+N*t;return{x:g+T*d-k*a,y:l+T*a+k*d}})});p+=w(h)*t}return m}var H=globalThis.host;function z(e){globalThis.plugin=e}var F=.5522847498307935,G=e=>({closed:!0,nodes:e.map(([r,n])=>({x:r,y:n}))});function E(e,r){let n=e/2,t=r/2;return G([[-n,-t],[n,-t],[n,t],[-n,t]])}function V(e,r,n){if(n=Math.max(0,Math.min(n,e/2,r/2)),n<=0)return E(e,r);let t=-e/2,s=-r/2,o=e/2,i=r/2,u=n*F,b=(c,d,a,g,l,m)=>({x:c,y:d,cin:{x:a,y:g},cout:{x:l,y:m}});return{closed:!0,nodes:[b(t+n,s,t+n-u,s,t+n,s),b(o-n,s,o-n,s,o-n+u,s),b(o,s+n,o,s+n-u,o,s+n),b(o,i-n,o,i-n,o,i-n+u),b(o-n,i,o-n+u,i,o-n,i),b(t+n,i,t+n,i,t+n-u,i),b(t,i-n,t,i-n+u,t,i-n),b(t,s+n,t,s+n,t,s+n-u)]}}var S=e=>String(Math.round(e*1e3)/1e3);var y=(e,r,n,t)=>({closed:!1,nodes:[{x:e,y:r},{x:n,y:t}]}),C=(e,r,n)=>({closed:!0,nodes:[{x:e,y:r},{x:e+n,y:r},{x:e+n,y:r+n},{x:e,y:r+n}]});function v(e,r,n,t,s){let o=[],i=t*Math.SQRT2,u=Math.floor(n/i);for(let b=-u;b<=u;b++){let c=b*i;if(Math.abs(c)>=n-1e-9)continue;let d={u:Math.max(0,c),v:Math.max(0,-c)},a={u:Math.min(n,n+c),v:Math.min(n,n-c)};s===1?o.push(y(e+d.u,r+d.v,e+a.u,r+a.v)):o.push(y(e+d.u,r+n-d.v,e+a.u,r+n-a.v))}return o}var j=(e,r)=>r<=26?String.fromCharCode(65+e):String(e+1);z({validate(e){let r=[],n=e.sizeIncludesBorder?e.size-2*e.border:e.size,t=n/e.cols;return(n<=0||t<3)&&r.push({key:\"size\",level:\"error\",code:\"squares-too-small\",values:{min:3}}),e.coords&&e.coordSize>e.border-1&&r.push({key:\"coordSize\",level:\"warn\",code:\"coords-too-large\",values:{max:Math.max(0,e.border-1)}}),e.style!==\"fill\"&&e.style!==\"none\"&&e.spacing>t/3&&r.push({key:\"spacing\",level:\"warn\",code:\"spacing-wide\"}),e.corner>e.border+1e-9&&e.border>0&&r.push({key:\"corner\",level:\"warn\",code:\"corner-into-board\"}),r},generate(e){let n=(e.sizeIncludesBorder?e.size-2*e.border:e.size)/e.cols,t=n*e.cols,s=n*e.rows,o=-t/2,i=-s/2,u=[];if(u.push({closed:!0,nodes:[{x:o,y:i},{x:o+t,y:i},{x:o+t,y:i+s},{x:o,y:i+s}]}),e.gridLines){for(let a=1;a<e.cols;a++)u.push(y(o+a*n,i,o+a*n,i+s));for(let a=1;a<e.rows;a++)u.push(y(o,i+a*n,o+t,i+a*n))}let b=0;for(let a=0;a<e.rows;a++)for(let g=0;g<e.cols;g++){if((e.rows-1-a+g)%2!==0)continue;b++;let l=o+g*n,m=i+a*n;if(e.style===\"fill\")u.push(C(l,m,n));else if(e.style===\"hatch\")u.push(...v(l,m,n,e.spacing,1));else if(e.style===\"crosshatch\")u.push(...v(l,m,n,e.spacing,1),...v(l,m,n,e.spacing,-1));else if(e.style===\"cross\")u.push(y(l,m,l+n,m+n),y(l+n,m,l,m+n));else if(e.style===\"mini\"){let h=n/4;for(let x=0;x<4;x++)for(let f=0;f<4;f++)(x+f)%2===1&&u.push(C(l+f*h,m+x*h,h))}}if(e.coords&&e.border>0){let a=Math.min(e.coordSize,e.border*.8,n*.6),g=e.border/2;for(let l=0;l<e.cols;l++){let m=o+(l+.5)*n,p=j(l,e.cols);u.push(...P(p,a,{x:m,y:i+s+g,align:\"center\",valign:\"middle\"})),e.bothSides&&u.push(...P(p,a,{x:m,y:i-g,align:\"center\",valign:\"middle\",angle:180}))}for(let l=0;l<e.rows;l++){let m=i+(l+.5)*n,p=String(e.rows-l);R(p,a)<=e.border*.9&&(u.push(...P(p,a,{x:o-g,y:m,align:\"center\",valign:\"middle\"})),e.bothSides&&u.push(...P(p,a,{x:o+t+g,y:m,align:\"center\",valign:\"middle\",angle:180})))}}let c=t+2*e.border,d=s+2*e.border;return{parts:[{key:\"board\",subs:[V(c,d,e.corner)],marks:u,at:{x:0,y:0}}],info:[[\"square\",`${S(n)} mm`],[\"board-size\",`${S(c)} \\xD7 ${S(d)} mm`],[\"dark-squares\",String(b)]]}}});})();\n",
+   "icon": "grid",
+   "dialog": {
+    "version": 1
+   },
+   "preview": {
+    "center": true
+   },
+   "params": [
+    {
+     "key": "cols",
+     "type": "int",
+     "min": 2,
+     "max": 30,
+     "def": 8
+    },
+    {
+     "key": "rows",
+     "type": "int",
+     "min": 2,
+     "max": 30,
+     "def": 8
+    },
+    {
+     "key": "size",
+     "type": "length",
+     "min": 40,
+     "max": 1500,
+     "def": 320
+    },
+    {
+     "key": "sizeIncludesBorder",
+     "type": "bool",
+     "def": false
+    },
+    {
+     "key": "style",
+     "type": "enum",
+     "options": [
+      [
+       "fill",
+       "style.fill"
+      ],
+      [
+       "hatch",
+       "style.hatch"
+      ],
+      [
+       "crosshatch",
+       "style.crosshatch"
+      ],
+      [
+       "cross",
+       "style.cross"
+      ],
+      [
+       "mini",
+       "style.mini"
+      ],
+      [
+       "none",
+       "style.none"
+      ]
+     ],
+     "def": "fill"
+    },
+    {
+     "key": "spacing",
+     "type": "length",
+     "min": 0.2,
+     "max": 20,
+     "def": 2,
+     "showIf": {
+      "in": [
+       "style",
+       [
+        "hatch",
+        "crosshatch"
+       ]
+      ]
+     }
+    },
+    {
+     "key": "gridLines",
+     "type": "bool",
+     "def": true
+    },
+    {
+     "key": "border",
+     "type": "length",
+     "min": 0,
+     "max": 100,
+     "def": 15,
+     "section": "section.border"
+    },
+    {
+     "key": "coords",
+     "type": "bool",
+     "def": true,
+     "section": "section.border",
+     "showIf": {
+      "gt": [
+       "border",
+       0
+      ]
+     }
+    },
+    {
+     "key": "coordSize",
+     "type": "length",
+     "min": 1.5,
+     "max": 40,
+     "def": 7,
+     "section": "section.border",
+     "showIf": {
+      "and": [
+       {
+        "eq": [
+         "coords",
+         true
+        ]
+       },
+       {
+        "gt": [
+         "border",
+         0
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": "bothSides",
+     "type": "bool",
+     "def": false,
+     "section": "section.border",
+     "showIf": {
+      "and": [
+       {
+        "eq": [
+         "coords",
+         true
+        ]
+       },
+       {
+        "gt": [
+         "border",
+         0
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": "corner",
+     "type": "length",
+     "min": 0,
+     "max": 100,
+     "def": 5,
+     "section": "section.border"
+    }
+   ],
+   "texts": {
+    "en": {
+     "name": "Chessboard and game boards",
+     "desc": "Chessboard or any n × m game board with filled, hatched or patterned dark squares and coordinates.",
+     "keys": "chess chessboard draughts checkers game board squares",
+     "label": "Board {cols} × {rows}",
+     "part.board": "board",
+     "cols": "Columns",
+     "rows": "Rows",
+     "size": "Width of the squares area",
+     "size.title": "Width of all squares together, or of the whole board when the border is included.",
+     "sizeIncludesBorder": "Width includes the border",
+     "style": "Dark squares",
+     "style.fill": "Outline (fill layer)",
+     "style.hatch": "Hatch",
+     "style.crosshatch": "Cross hatch",
+     "style.cross": "Single cross",
+     "style.mini": "Small checkerboard",
+     "style.none": "Not marked",
+     "style.title": "Outlines are closed shapes: put them on a fill layer to engrave the dark squares solid.",
+     "spacing": "Hatch spacing",
+     "gridLines": "Lines between squares",
+     "section.border": "Border",
+     "border": "Border width",
+     "coords": "Coordinates (A–H, 1–8)",
+     "coordSize": "Coordinate height",
+     "bothSides": "On all four sides",
+     "corner": "Corner radius",
+     "squares-too-small": "The squares are too small: at least {min} mm.",
+     "coords-too-large": "The coordinates do not fit the border: at most {max} mm.",
+     "spacing-wide": "The hatch spacing is wide for the squares.",
+     "corner-into-board": "The corner radius is larger than the border and cuts into the squares.",
+     "square": "Square",
+     "board-size": "Board size",
+     "dark-squares": "Dark squares"
+    },
+    "de": {
+     "name": "Schachbrett und Spielbretter",
+     "desc": "Schachbrett oder beliebiges n × m Spielbrett mit gefüllten, schraffierten oder gemusterten dunklen Feldern und Koordinaten.",
+     "keys": "Schach Schachbrett Dame Spielbrett Felder",
+     "label": "Brett {cols} × {rows}",
+     "part.board": "Brett",
+     "cols": "Spalten",
+     "rows": "Reihen",
+     "size": "Breite der Spielfläche",
+     "size.title": "Breite aller Felder zusammen, oder des ganzen Bretts, wenn der Rand dazugehört.",
+     "sizeIncludesBorder": "Breite mit Rand",
+     "style": "Dunkle Felder",
+     "style.fill": "Umriss (Füll-Layer)",
+     "style.hatch": "Schraffur",
+     "style.crosshatch": "Kreuzschraffur",
+     "style.cross": "Einfaches Kreuz",
+     "style.mini": "Kleines Schachbrett",
+     "style.none": "Nicht markiert",
+     "style.title": "Umrisse sind geschlossene Formen: Auf einem Füll-Layer werden die dunklen Felder voll graviert.",
+     "spacing": "Schraffurabstand",
+     "gridLines": "Linien zwischen den Feldern",
+     "section.border": "Rand",
+     "border": "Randbreite",
+     "coords": "Koordinaten (A–H, 1–8)",
+     "coordSize": "Höhe der Koordinaten",
+     "bothSides": "Auf allen vier Seiten",
+     "corner": "Eckenradius",
+     "squares-too-small": "Die Felder sind zu klein: mindestens {min} mm.",
+     "coords-too-large": "Die Koordinaten passen nicht in den Rand: höchstens {max} mm.",
+     "spacing-wide": "Der Schraffurabstand ist groß für die Felder.",
+     "corner-into-board": "Der Eckenradius ist größer als der Rand und schneidet in die Felder.",
+     "square": "Feld",
+     "board-size": "Brettgröße",
+     "dark-squares": "Dunkle Felder"
+    },
+    "it": {
+     "name": "Scacchiera e tavolieri",
+     "desc": "Scacchiera o qualsiasi tavoliere n × m con caselle scure piene, tratteggiate o a motivo e coordinate.",
+     "keys": "scacchi scacchiera dama tavoliere caselle",
+     "label": "Tavoliere {cols} × {rows}",
+     "part.board": "tavoliere",
+     "cols": "Colonne",
+     "rows": "Righe",
+     "size": "Larghezza dell’area di gioco",
+     "size.title": "Larghezza di tutte le caselle insieme, o dell’intero tavoliere se il bordo è incluso.",
+     "sizeIncludesBorder": "Larghezza con bordo",
+     "style": "Caselle scure",
+     "style.fill": "Contorno (layer di riempimento)",
+     "style.hatch": "Tratteggio",
+     "style.crosshatch": "Tratteggio incrociato",
+     "style.cross": "Croce singola",
+     "style.mini": "Piccola scacchiera",
+     "style.none": "Non segnate",
+     "style.title": "I contorni sono forme chiuse: su un layer di riempimento le caselle scure vengono incise piene.",
+     "spacing": "Passo del tratteggio",
+     "gridLines": "Linee tra le caselle",
+     "section.border": "Bordo",
+     "border": "Larghezza del bordo",
+     "coords": "Coordinate (A–H, 1–8)",
+     "coordSize": "Altezza delle coordinate",
+     "bothSides": "Su tutti e quattro i lati",
+     "corner": "Raggio degli angoli",
+     "squares-too-small": "Le caselle sono troppo piccole: almeno {min} mm.",
+     "coords-too-large": "Le coordinate non entrano nel bordo: al massimo {max} mm.",
+     "spacing-wide": "Il passo del tratteggio è ampio per le caselle.",
+     "corner-into-board": "Il raggio degli angoli è più grande del bordo e taglia le caselle.",
+     "square": "Casella",
+     "board-size": "Dimensioni del tavoliere",
+     "dark-squares": "Caselle scure"
+    }
+   },
+   "sha256": "7d6ea1300a0fcd1b21726925833ebc74f8e6bda303a6a6b179ae3ce2896bbb78"
+  }
+ ]
+}
