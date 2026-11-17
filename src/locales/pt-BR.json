@@ -4954,6 +4954,7 @@
   "„{name}“ darf Daten laden von: {hosts}": "“{name}” pode carregar dados de: {hosts}",
   "„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:": "“{name}” carrega dados da internet. O KizamuBeam pergunta antes da primeira solicitação e as faz por conta própria, apenas para estes servidores:",
   "ungültige Angabe „{key}“": "“{key}” inválido",
+  "Das Teil ({w} × {h} mm) passt nicht auf die Arbeitsfläche ({aw} × {ah} mm).": "A peça ({w} × {h} mm) não cabe na área de trabalho ({aw} × {ah} mm).",
   "{where}: „action“ muss eine Aktion mit der Eingabe „selection“ sein": "{where}: “action” deve ser uma ação com a entrada “selection”",
   "unbekannter Kontext in „context“ (erlaubt: {list})": "contexto desconhecido em “context” (permitidos: {list})",
   "„context“ fehlt für die Host-Funktion „context“": "falta “context” para a função de host “context”",

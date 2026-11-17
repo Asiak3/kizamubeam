@@ -267,6 +267,22 @@ export interface Host {
    */
   fetch(input: { host: string; path: string; query?: Record<string, string | number>; method?: 'GET' | 'POST'; body?: string }): NetResponse;
   /**
+   * The geometric part of "Check design" on the plugin's cut lines (#388): lines cut twice, open outlines, webs
+   * thinner than minWeb, cut-outs lost to the kerf, parts larger than the work area (turned too). Each part is
+   * checked on its own unless placed is true (then they lie where they will be cut, moved by at). Pass the findings
+   * on as issues of validate with their code and values: the app writes the texts.
+   */
+  check(input: {
+    parts: { key: string; subs: SubPath[]; at?: [number, number] }[];
+    placed?: boolean;
+    minWeb?: number;
+    beam?: number;
+    kerf?: number;
+    tol?: number;
+    closeGap?: number;
+    workArea?: { width: number; height: number };
+  }): CheckFinding[];
+  /**
    * Context the manifest declares under "context" (#386): the material of the layer the part goes on, or the
    * machine's work area. null when the app does not know it (a layer without material): report an issue then.
    * Another material or work area computes the part again.
@@ -297,6 +313,15 @@ export interface NetResponse {
   text?: string;
   data?: string;
   error?: string;
+}
+/** A finding of host.check: code check-double, check-double-whole, check-unjoined, check-open, check-open-fill,
+ * check-hole-lost, check-hole-small, check-web, check-web-cut or check-too-big; the parts it concerns by key */
+export interface CheckFinding {
+  code: string;
+  level: 'error' | 'warn' | 'info';
+  parts: string[];
+  values?: Record<string, number>;
+  at?: [number, number];
 }
 export type V3 = [number, number, number];
 /** An area: closed polygons, each [x0, y0, x1, y1, …] in mm */

@@ -225,7 +225,8 @@ pub fn mesh(data: &str) -> Option<(Vec<f32>, Vec<u32>)> {
 /// manifest declares; `Err("net-pending")` the first time, which the plugin returns so the app fetches the data and
 /// calls again), `"context"` (`"material"` or `"workArea"`: what the manifest declares under `"context"`, #386;
 /// `{ "name", "thickness", "kerf", "pairPlay", "slotPlay" }` or `{ "width", "height" }` in mm, `null` when the app
-/// does not know it). See docs/plugins.md
+/// does not know it) or `"check"` (`{ "parts": [{ "key", "subs", "at"? }], "placed"?, "minWeb"?, "kerf"?,
+/// "workArea"? }`: findings of the design check as `check-*` codes with values, to pass on as issues). See docs/plugins.md
 /// for the details. The manifest must list it under `"host"`. `Err(code)` on failure, e.g.
 /// `host-not-allowed` or `host-bad-input`.
 pub fn host(name: &str, input: &Value) -> Result<Value, String> {

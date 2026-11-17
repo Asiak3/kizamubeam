@@ -4,6 +4,7 @@ import type { Issue, ParamSpec } from '../generators/types';
 import type { PluginIssue, PluginText } from './contract';
 import { pluginText, type PluginManifest } from './manifest';
 import { lang, t } from '../i18n';
+import { checkCodeText } from '../checkText';
 
 /** Issue code while a plugin is still computing these parameters */
 export const PENDING = 'plugin-pending';
@@ -73,14 +74,16 @@ export function pluginWords(m: PluginManifest) {
     appCodeText(code, name) ?? text(code, values) ?? t('Fehler in der Erweiterung „{name}“: {code}', { name, code });
   const values = (v?: Record<string, PluginText | number>) => v && Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'number' ? localNumber(x) : render(x)]));
   /** A plugin text in the interface language */
-  const render = (x: PluginText): string => (typeof x === 'string' ? localNumbers(x) : Array.isArray(x) ? x.map(render).join('') : codeText(x.code, values(x.values)));
+  const render = (x: PluginText): string => (typeof x === 'string' ? localNumbers(x) : Array.isArray(x) ? x.map(render).join('') : coded(x.code, x.values));
+  /** A code with its values: findings of host.check (#388) have their text in the app and take the raw numbers */
+  const coded = (code: string, v?: Record<string, PluginText | number>) => checkCodeText(code, v) ?? codeText(code, values(v));
   /** A plain text that names a code (info labels of older plugins) is shown as that text */
   const label = (x: PluginText) => (typeof x === 'string' ? (text(x) ?? x) : render(x));
   const issue = (i: PluginIssue): Issue => ({
     ...(i.key ? { key: i.key } : {}),
     level: i.level,
     code: i.code,
-    msg: i.code === 'plugin-text' && i.values?.text !== undefined && typeof i.values.text !== 'number' ? render(i.values.text) : codeText(i.code, values(i.values)),
+    msg: i.code === 'plugin-text' && i.values?.text !== undefined && typeof i.values.text !== 'number' ? render(i.values.text) : coded(i.code, i.values),
   });
   /** Parameters with labels, tooltips, sections and option labels in the interface language */
   const schema: ParamSpec[] = m.schema.map((s) => {

@@ -1,7 +1,8 @@
 // Host functions (#211 stage 5): building blocks of the app a plugin may call while it computes, instead of
 // bundling its own: boolean operations and offsets of outlines (Clipper), fitting Bézier curves through points and
 // tracing a grayscale image, slicing a 3D model and area operations on slices. Pure computation on the data the
-// plugin hands over (and the 3D models the app gave it as resources); no editor or files. fetch (#280) answers only
+// plugin hands over (and the 3D models the app gave it as resources); no editor or files. check (#388) runs the
+// geometric part of the design check on the plugin's parts. fetch (#280) answers only
 // with data the app fetched for the plugin from a server its manifest declares; the Worker itself has no network.
 // A plugin names the ones it uses in its manifest (`host`); `progress` is always there.
 // Runs inside the plugin Worker (and in Node tests); each call counts toward the time limit of the plugin call.
@@ -21,9 +22,10 @@ import {
 import { worldOf } from '../model3d/world';
 import { deepestPoint } from '../model3d/polys';
 import { nestParts } from '../generators/build';
+import { checkFn } from './hostCheck';
 
 /** Host functions a manifest may ask for */
-export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest', 'fetch', 'context'] as const;
+export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest', 'fetch', 'context', 'check'] as const;
 export type HostFn = (typeof HOST_FNS)[number];
 
 /** A host function got input it cannot use; the plugin call fails with this code unless the plugin catches it */
@@ -340,7 +342,7 @@ export function hostCaller(allowed: readonly string[], onProgress?: (done: numbe
   const st: SliceState = { meshes: new Map(), prepared: new Map() };
   const net = new Map<string, NetResponse>();
   const ctx = new Map<string, unknown>();
-  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest, fetch: (x) => fetchFn(net, x, onWant), context: (x) => contextFn(ctx, x) };
+  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest, fetch: (x) => fetchFn(net, x, onWant), context: (x) => contextFn(ctx, x), check: (x) => checkFn(x, subsOf, num, bad) };
   const call = (name: string, json: string): string => {
     try {
       if (name === 'progress') {
