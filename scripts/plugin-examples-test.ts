@@ -83,6 +83,33 @@ await test('jigsaw (#307): one path per grid line, seed decides the tabs, frame 
   g.dispose();
 });
 
+await test('ruler (#308): ticks at exact positions, inch divisions, protractor, dial with own labels', async () => {
+  const g = await load('plugins/ruler');
+  const r = await run(g);
+  assert.equal(r.issues.length, 0);
+  const part = r.parts[0];
+  // Ticks are the two-node marks that start on the top edge; 150 mm in 1 mm steps
+  const top = -15;
+  const xs = part.marks!.filter((s) => s.nodes.length === 2 && Math.abs(s.nodes[0].y - top) < 1e-9 && s.nodes[0].x === s.nodes[1].x).map((s) => s.nodes[0].x);
+  assert.equal(xs.length, 151);
+  for (let i = 1; i < xs.length; i++) assert.ok(Math.abs(xs[i] - xs[i - 1] - 1) < 1e-9, 'exactly 1 mm apart');
+  assert.deepEqual(r.info.find(([k]) => k === 'Ticks'), ['Ticks', '151']);
+  const inch = await run(g, { units: 'inch', inches: 6, sub: '16' });
+  assert.deepEqual(inch.info.find(([k]) => k === 'Ticks'), ['Ticks', '97']);
+  assert.deepEqual(inch.info[0], ['Scale length', '152.4 mm']);
+  const pro = await run(g, { type: 'protractor' });
+  assert.deepEqual(pro.info.find(([k]) => k === 'Ticks'), ['Ticks', '181']);
+  assert.ok(pro.info.some(([k]) => k === 'Number height (fitted)'), 'numbers shrink so neighbours do not touch');
+  const odd = await run(g, { type: 'protractor', sweep: 175 });
+  assert.ok(odd.issues.some((i) => i.code === 'sweep-tens'));
+  const dial = await run(g, { type: 'dial', sweep: 360, divisions: 12, minorPer: 5 });
+  assert.deepEqual(dial.info.find(([k]) => k === 'Ticks'), ['Ticks', '60'], 'a full dial has no doubled tick at 360°');
+  const own = await run(g, { type: 'dial', sweep: 270, labels: 'MIN,,MAX', divisions: 2, minorPer: 1 });
+  const plain = await run(g, { type: 'dial', sweep: 270, labels: '', divisions: 2, minorPer: 1, numbers: false });
+  assert.ok(own.parts[0].marks!.length > plain.parts[0].marks!.length + 4, 'own labels drawn');
+  g.dispose();
+});
+
 if (failed) {
   console.log(`${failed} failed`);
   process.exit(1);

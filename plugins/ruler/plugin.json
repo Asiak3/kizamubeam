@@ -1,0 +1,581 @@
+{
+  "format": "kizamubeam-pack",
+  "formatVersion": 2,
+  "id": "org.kizamubeam.ruler",
+  "version": "1.0.0",
+  "name": {
+    "en": "Rulers and scales",
+    "de": "Lineale und Skalen",
+    "it": "Righelli e scale",
+    "es": "Reglas y escalas",
+    "pt-BR": "Réguas e escalas"
+  },
+  "description": {
+    "en": "Straight rulers (metric or inch), protractors and scale dials with engraved ticks and numbers at their exact positions.",
+    "de": "Gerade Lineale (metrisch oder Zoll), Winkelmesser und Skalenscheiben mit gravierten Strichen und Zahlen an den genauen Positionen.",
+    "it": "Righelli dritti (metrici o in pollici), goniometri e quadranti con tacche e numeri incisi nelle posizioni esatte."
+  },
+  "author": "KizamuBeam",
+  "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/ruler",
+  "build": [
+    {
+      "esbuild": "src/index.ts",
+      "out": "dist/ruler.js"
+    }
+  ],
+  "plugins": [
+    {
+      "id": "org.kizamubeam.ruler",
+      "type": "generator",
+      "api": 1,
+      "version": 1,
+      "kind": "part",
+      "runtime": "js",
+      "code": "@dist/ruler.js",
+      "icon": "measure",
+      "dialog": {
+        "version": 1
+      },
+      "preview": {
+        "center": true
+      },
+      "params": [
+        {
+          "key": "type",
+          "type": "enum",
+          "options": [
+            [
+              "straight",
+              "type.straight"
+            ],
+            [
+              "protractor",
+              "type.protractor"
+            ],
+            [
+              "dial",
+              "type.dial"
+            ]
+          ],
+          "def": "straight"
+        },
+        {
+          "key": "units",
+          "type": "enum",
+          "options": [
+            [
+              "metric",
+              "units.metric"
+            ],
+            [
+              "inch",
+              "units.inch"
+            ]
+          ],
+          "def": "metric",
+          "showIf": {
+            "eq": [
+              "type",
+              "straight"
+            ]
+          }
+        },
+        {
+          "key": "length",
+          "type": "length",
+          "min": 20,
+          "max": 2000,
+          "def": 150,
+          "showIf": {
+            "and": [
+              {
+                "eq": [
+                  "type",
+                  "straight"
+                ]
+              },
+              {
+                "eq": [
+                  "units",
+                  "metric"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "key": "inches",
+          "type": "int",
+          "min": 1,
+          "max": 72,
+          "def": 6,
+          "showIf": {
+            "and": [
+              {
+                "eq": [
+                  "type",
+                  "straight"
+                ]
+              },
+              {
+                "eq": [
+                  "units",
+                  "inch"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "key": "sub",
+          "type": "enum",
+          "options": [
+            [
+              "2",
+              "sub.2"
+            ],
+            [
+              "4",
+              "sub.4"
+            ],
+            [
+              "8",
+              "sub.8"
+            ],
+            [
+              "16",
+              "sub.16"
+            ]
+          ],
+          "def": "16",
+          "showIf": {
+            "and": [
+              {
+                "eq": [
+                  "type",
+                  "straight"
+                ]
+              },
+              {
+                "eq": [
+                  "units",
+                  "inch"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "key": "width",
+          "type": "length",
+          "min": 8,
+          "max": 200,
+          "def": 30,
+          "showIf": {
+            "eq": [
+              "type",
+              "straight"
+            ]
+          }
+        },
+        {
+          "key": "radius",
+          "type": "length",
+          "min": 15,
+          "max": 500,
+          "def": 60,
+          "showIf": {
+            "ne": [
+              "type",
+              "straight"
+            ]
+          }
+        },
+        {
+          "key": "sweep",
+          "type": "angle",
+          "min": 10,
+          "max": 360,
+          "def": 180,
+          "showIf": {
+            "ne": [
+              "type",
+              "straight"
+            ]
+          }
+        },
+        {
+          "key": "divisions",
+          "type": "int",
+          "min": 1,
+          "max": 100,
+          "def": 10,
+          "showIf": {
+            "eq": [
+              "type",
+              "dial"
+            ]
+          }
+        },
+        {
+          "key": "minorPer",
+          "type": "int",
+          "min": 1,
+          "max": 20,
+          "def": 5,
+          "showIf": {
+            "eq": [
+              "type",
+              "dial"
+            ]
+          }
+        },
+        {
+          "key": "startValue",
+          "type": "number",
+          "min": -10000,
+          "max": 10000,
+          "def": 0,
+          "showIf": {
+            "ne": [
+              "type",
+              "protractor"
+            ]
+          }
+        },
+        {
+          "key": "step",
+          "type": "number",
+          "min": -1000,
+          "max": 1000,
+          "def": 1,
+          "showIf": {
+            "ne": [
+              "type",
+              "protractor"
+            ]
+          }
+        },
+        {
+          "key": "major",
+          "type": "length",
+          "min": 1,
+          "max": 60,
+          "def": 8,
+          "section": "section.ticks"
+        },
+        {
+          "key": "half",
+          "type": "length",
+          "min": 0.5,
+          "max": 60,
+          "def": 6,
+          "section": "section.ticks"
+        },
+        {
+          "key": "minor",
+          "type": "length",
+          "min": 0.5,
+          "max": 60,
+          "def": 4,
+          "section": "section.ticks"
+        },
+        {
+          "key": "numbers",
+          "type": "bool",
+          "def": true,
+          "section": "section.numbers"
+        },
+        {
+          "key": "numberSize",
+          "type": "length",
+          "min": 1.5,
+          "max": 40,
+          "def": 4,
+          "section": "section.numbers",
+          "showIf": {
+            "eq": [
+              "numbers",
+              true
+            ]
+          }
+        },
+        {
+          "key": "numberEvery",
+          "type": "int",
+          "min": 1,
+          "max": 20,
+          "def": 1,
+          "section": "section.numbers",
+          "showIf": {
+            "eq": [
+              "numbers",
+              true
+            ]
+          }
+        },
+        {
+          "key": "rotate",
+          "type": "bool",
+          "def": true,
+          "section": "section.numbers",
+          "showIf": {
+            "and": [
+              {
+                "eq": [
+                  "numbers",
+                  true
+                ]
+              },
+              {
+                "ne": [
+                  "type",
+                  "straight"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "key": "labels",
+          "type": "text",
+          "def": "",
+          "section": "section.numbers",
+          "showIf": {
+            "eq": [
+              "numbers",
+              true
+            ]
+          }
+        },
+        {
+          "key": "unitText",
+          "type": "bool",
+          "def": true,
+          "section": "section.numbers",
+          "showIf": {
+            "eq": [
+              "type",
+              "straight"
+            ]
+          }
+        },
+        {
+          "key": "margin",
+          "type": "length",
+          "min": 2,
+          "max": 50,
+          "def": 5,
+          "section": "section.body"
+        },
+        {
+          "key": "corner",
+          "type": "length",
+          "min": 0,
+          "max": 50,
+          "def": 3,
+          "section": "section.body",
+          "showIf": {
+            "eq": [
+              "type",
+              "straight"
+            ]
+          }
+        },
+        {
+          "key": "hole",
+          "type": "bool",
+          "def": true,
+          "section": "section.body"
+        },
+        {
+          "key": "holeDia",
+          "type": "length",
+          "min": 1,
+          "max": 100,
+          "def": 6,
+          "section": "section.body",
+          "showIf": {
+            "eq": [
+              "hole",
+              true
+            ]
+          }
+        }
+      ],
+      "texts": {
+        "en": {
+          "name": "Rulers and scales",
+          "desc": "Ruler, protractor or scale dial with engraved ticks and numbers at their exact positions.",
+          "keys": "ruler protractor scale dial gauge measure inch",
+          "label": "Scale",
+          "part.straight": "ruler",
+          "part.protractor": "protractor",
+          "part.dial": "dial",
+          "type": "Type",
+          "type.straight": "Straight ruler",
+          "type.protractor": "Protractor",
+          "type.dial": "Dial",
+          "units": "Units",
+          "units.metric": "Metric (mm, cm)",
+          "units.inch": "Inch",
+          "length": "Scale length",
+          "inches": "Length in inches",
+          "sub": "Finest division",
+          "sub.2": "1/2 inch",
+          "sub.4": "1/4 inch",
+          "sub.8": "1/8 inch",
+          "sub.16": "1/16 inch",
+          "width": "Ruler width",
+          "radius": "Scale radius",
+          "sweep": "Angle range",
+          "sweep.title": "180° = half circle, 360° = full dial. The scale is centred at the top.",
+          "divisions": "Main divisions",
+          "minorPer": "Steps per division",
+          "startValue": "First number",
+          "step": "Smallest step",
+          "section.ticks": "Ticks",
+          "major": "Main tick length",
+          "half": "Half tick length",
+          "minor": "Small tick length",
+          "section.numbers": "Numbers",
+          "numbers": "Numbers",
+          "numberSize": "Number height",
+          "numberEvery": "Number every n-th main tick",
+          "rotate": "Turn numbers with the scale",
+          "labels": "Own labels",
+          "labels.title": "Comma-separated, one per numbered tick (e.g. MIN,1,2,3,MAX). Empty = numbers.",
+          "unitText": "Unit (CM / IN)",
+          "section.body": "Body",
+          "margin": "Margin",
+          "corner": "Corner radius",
+          "hole": "Hole",
+          "holeDia": "Hole diameter",
+          "ticks-too-long": "The ticks are too long for the ruler or scale.",
+          "hole-too-large": "The hole is too large: at most {max} mm.",
+          "ticks-dense": "The small ticks are very close together and may burn into each other.",
+          "tick-order": "Half ticks should not be longer than main ticks, small ticks not longer than half ticks.",
+          "sweep-tens": "A protractor needs an angle range in steps of 10°.",
+          "scale-length": "Scale length",
+          "size": "Size",
+          "ticks": "Ticks",
+          "number-height": "Number height (fitted)"
+        },
+        "de": {
+          "name": "Lineale und Skalen",
+          "desc": "Lineal, Winkelmesser oder Skalenscheibe mit gravierten Strichen und Zahlen an den genauen Positionen.",
+          "keys": "Lineal Winkelmesser Skala Skalenscheibe Maßstab Zoll messen",
+          "label": "Skala",
+          "part.straight": "Lineal",
+          "part.protractor": "Winkelmesser",
+          "part.dial": "Skalenscheibe",
+          "type": "Art",
+          "type.straight": "Gerades Lineal",
+          "type.protractor": "Winkelmesser",
+          "type.dial": "Skalenscheibe",
+          "units": "Einheit",
+          "units.metric": "Metrisch (mm, cm)",
+          "units.inch": "Zoll",
+          "length": "Skalenlänge",
+          "inches": "Länge in Zoll",
+          "sub": "Feinste Teilung",
+          "sub.2": "1/2 Zoll",
+          "sub.4": "1/4 Zoll",
+          "sub.8": "1/8 Zoll",
+          "sub.16": "1/16 Zoll",
+          "width": "Linealbreite",
+          "radius": "Skalenradius",
+          "sweep": "Winkelbereich",
+          "sweep.title": "180° = Halbkreis, 360° = volle Scheibe. Die Skala liegt mittig oben.",
+          "divisions": "Hauptteilungen",
+          "minorPer": "Schritte je Teilung",
+          "startValue": "Erste Zahl",
+          "step": "Kleinster Schritt",
+          "section.ticks": "Striche",
+          "major": "Länge Hauptstrich",
+          "half": "Länge Halbstrich",
+          "minor": "Länge kleiner Strich",
+          "section.numbers": "Zahlen",
+          "numbers": "Zahlen",
+          "numberSize": "Ziffernhöhe",
+          "numberEvery": "Zahl an jedem n-ten Hauptstrich",
+          "rotate": "Zahlen mit der Skala drehen",
+          "labels": "Eigene Beschriftung",
+          "labels.title": "Durch Kommas getrennt, eine je beschriftetem Strich (z. B. MIN,1,2,3,MAX). Leer = Zahlen.",
+          "unitText": "Einheit (CM / IN)",
+          "section.body": "Körper",
+          "margin": "Rand",
+          "corner": "Eckenradius",
+          "hole": "Loch",
+          "holeDia": "Lochdurchmesser",
+          "ticks-too-long": "Die Striche sind zu lang für das Lineal oder die Skala.",
+          "hole-too-large": "Das Loch ist zu groß: höchstens {max} mm.",
+          "ticks-dense": "Die kleinen Striche liegen sehr dicht und können ineinander brennen.",
+          "tick-order": "Halbstriche sollten nicht länger als Hauptstriche sein, kleine Striche nicht länger als Halbstriche.",
+          "sweep-tens": "Ein Winkelmesser braucht einen Winkelbereich in 10°-Schritten.",
+          "scale-length": "Skalenlänge",
+          "size": "Größe",
+          "ticks": "Striche",
+          "number-height": "Ziffernhöhe (angepasst)"
+        },
+        "it": {
+          "name": "Righelli e scale",
+          "desc": "Righello, goniometro o quadrante con tacche e numeri incisi nelle posizioni esatte.",
+          "keys": "righello goniometro scala quadrante misura pollici",
+          "label": "Scala",
+          "part.straight": "righello",
+          "part.protractor": "goniometro",
+          "part.dial": "quadrante",
+          "type": "Tipo",
+          "type.straight": "Righello dritto",
+          "type.protractor": "Goniometro",
+          "type.dial": "Quadrante",
+          "units": "Unità",
+          "units.metric": "Metrico (mm, cm)",
+          "units.inch": "Pollici",
+          "length": "Lunghezza della scala",
+          "inches": "Lunghezza in pollici",
+          "sub": "Divisione più fine",
+          "sub.2": "1/2 pollice",
+          "sub.4": "1/4 pollice",
+          "sub.8": "1/8 pollice",
+          "sub.16": "1/16 pollice",
+          "width": "Larghezza del righello",
+          "radius": "Raggio della scala",
+          "sweep": "Ampiezza dell’angolo",
+          "sweep.title": "180° = semicerchio, 360° = quadrante completo. La scala è centrata in alto.",
+          "divisions": "Divisioni principali",
+          "minorPer": "Passi per divisione",
+          "startValue": "Primo numero",
+          "step": "Passo minimo",
+          "section.ticks": "Tacche",
+          "major": "Lunghezza tacca principale",
+          "half": "Lunghezza mezza tacca",
+          "minor": "Lunghezza tacca piccola",
+          "section.numbers": "Numeri",
+          "numbers": "Numeri",
+          "numberSize": "Altezza delle cifre",
+          "numberEvery": "Numero ogni n-esima tacca principale",
+          "rotate": "Ruota i numeri con la scala",
+          "labels": "Etichette proprie",
+          "labels.title": "Separate da virgole, una per tacca numerata (es. MIN,1,2,3,MAX). Vuoto = numeri.",
+          "unitText": "Unità (CM / IN)",
+          "section.body": "Corpo",
+          "margin": "Margine",
+          "corner": "Raggio degli angoli",
+          "hole": "Foro",
+          "holeDia": "Diametro del foro",
+          "ticks-too-long": "Le tacche sono troppo lunghe per il righello o la scala.",
+          "hole-too-large": "Il foro è troppo grande: al massimo {max} mm.",
+          "ticks-dense": "Le tacche piccole sono molto vicine e possono bruciarsi a vicenda.",
+          "tick-order": "Le mezze tacche non dovrebbero essere più lunghe di quelle principali, le piccole non più delle mezze.",
+          "sweep-tens": "Un goniometro richiede un’ampiezza in passi di 10°.",
+          "scale-length": "Lunghezza della scala",
+          "size": "Dimensioni",
+          "ticks": "Tacche",
+          "number-height": "Altezza cifre (adattata)"
+        }
+      }
+    }
+  ]
+}
