@@ -15,6 +15,7 @@ export const ICONS: Record<string, string> = {
   curve: svg('<path d="M4 20C9 20 6 4 20 4"/><circle cx="4" cy="20" r="1.3" fill="currentColor"/><circle cx="20" cy="4" r="1.3" fill="currentColor"/>'),
   arc: svg('<path d="M4 20V4M4 20h16" stroke-dasharray="1.5 1.5" opacity=".45"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="4" cy="20" r="1.5" fill="currentColor"/><circle cx="4" cy="4" r="1.2" fill="currentColor"/><circle cx="20" cy="20" r="1.2" fill="currentColor"/>'),
   pencil: svg('<path d="M4 15 15.5 3.5l5 5L9 20l-6 1zM13.5 5.5l5 5M4 15l5 5M3 21l3-1"/><path d="M12 21c2-5 5 2 9-3"/>'),
+  shaper: svg('<rect x="3.5" y="7" width="13" height="11" rx="5.5" stroke-dasharray="3 2" opacity=".7"/><rect x="9" y="9.5" width="9" height="7"/><path d="M17.5 3.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="currentColor" stroke="none"/>'),
   shapeBuilder: svg('<path d="M3 4h11v6h7v11H10v-6H3z" fill="currentColor" fill-opacity=".15"/><path d="M10 10h4v5h-4z" fill="currentColor" fill-opacity=".35" stroke-dasharray="1 2"/><path d="M17 3v5M14.5 5.5h5"/>'),
   rect: svg('<rect x="4" y="6" width="16" height="12" rx="1"/>'),
   ellipse: svg('<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>'),

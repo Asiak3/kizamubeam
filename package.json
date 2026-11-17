@@ -98,6 +98,7 @@
     "test:nodes": "node scripts/vector-offline-test.mjs scripts/multi-object-nodes-test.ts",
     "test:refit": "node scripts/run-ts.mjs scripts/vector-fit-test.ts && node scripts/vector-offline-test.mjs scripts/path-refit-editor-test.ts",
     "test:pencil": "node scripts/vector-offline-test.mjs scripts/pencil-test.ts",
+    "test:shaper": "node scripts/vector-offline-test.mjs scripts/shaper-test.ts",
     "test:pointer": "node scripts/run-ts.mjs scripts/pointer-offset-test.ts"
   },
   "license": "GPL-3.0-or-later",

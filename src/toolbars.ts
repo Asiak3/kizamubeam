@@ -33,7 +33,7 @@ export type BarKey = BarId | 'numbar' | 'textbar' | 'palette' | 'status';
 type IconSize = 's' | 'm' | 'l';
 
 interface Config {
-  /** Version der gespeicherten Belegung (2: Knopfgruppen, 3: Werkzeugkasten, 4: Generatoren/Verbindungen im Werkzeugkasten, 5: Beziehungen/Messen, 6: Vektorwerkzeuge, 7: Kamera-Overlay, 12: Bogenwerkzeug, Zeichengruppe) */
+  /** Version der gespeicherten Belegung (2: Knopfgruppen, 3: Werkzeugkasten, 4: Generatoren/Verbindungen im Werkzeugkasten, 5: Beziehungen/Messen, 6: Vektorwerkzeuge, 7: Kamera-Overlay, 12: Auswahl-Gruppe, 13: Zeichengruppe, 14: Shaper) */
   v: number;
   bars: Record<BarId, string[]>;
   size: Record<BarId, IconSize>;
@@ -54,7 +54,7 @@ let cfg: Config;
 /** Ersatz alter Einzelknopf-Folgen durch Knopfgruppen in gespeicherten Leisten (Version 1 → 2) */
 let migrations: [string[], string][] = [];
 
-const CONFIG_V = 13;
+const CONFIG_V = 14;
 /** Neue Standardknöpfe: ab Version v der Belegung, hinter after (sonst ans Ende).
  *  Buttons that later left the default again (v6 vectorfit/shape-builder/isolate, v9 laserpos) are no longer
  *  listed, so older bars do not pick them up on their way to v11. */
@@ -65,6 +65,9 @@ const ADDED: { v: number; bar: BarId; id: string; after: string }[] = [
   { v: 7, bar: 'main', id: 'camera-overlays', after: 'view3d' },
   { v: 6, bar: 'tools', id: 'tool:pencil', after: 'tool:line' },
   { v: 11, bar: 'tools', id: 'tool:curvature', after: 'tool:pencil' },
+  // v14: Shaper hinter der Krümmung einhängen, damit die v13-Folge [line, pencil, curvature]
+  // für die Zeichengruppen-Faltung zusammenhängend bleibt (fällt sonst ersatzlos ans Ende).
+  { v: 14, bar: 'tools', id: 'tool:shaper', after: 'tool:curvature' },
   { v: 11, bar: 'main', id: 'isolate', after: 'ungroup' },
 ];
 /** Aus der Standardbelegung entfernte Knöpfe (seit v4 im Werkzeugkasten bzw. Laser-Fenster): eine gespeicherte
