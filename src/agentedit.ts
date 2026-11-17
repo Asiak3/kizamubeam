@@ -752,7 +752,7 @@ export const EDIT_TOOLS: ToolDef[] = [
         if (file.startsWith('builtin:') && !b) throw new Error(`Keine mitgelieferte Vorlage „${file}“`);
         const pk = file.startsWith('pack:') ? packTemplates().find((x) => `pack:${x.key}` === file) : undefined;
         if (file.startsWith('pack:') && !pk) throw new Error(`Keine Vorlage „${file}“ in den installierten Erweiterungen`);
-        json = b ? b.json() : pk ? pk.json : await readTemplate(file);
+        json = b ? await b.json() : pk ? pk.json : await readTemplate(file);
       } catch (e) {
         throw new ToolError(e instanceof Error ? e.message : String(e));
       }

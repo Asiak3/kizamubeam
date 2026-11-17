@@ -2,8 +2,7 @@
 // Code erzeugt (immer passend zur aktuellen Version); Lage und Maße kommen aus Formeln mit den Parametern,
 // die Geometrie hier ist nur der Ausgangspunkt, den applyParams beim Öffnen nachrechnet.
 import { newAsmId, newDoc, newId, Obj, OBJ_BIND_KEYS, ObjBinds, Shape, TextShape, translate } from './model';
-import { buildGen, defaultParams } from './generators';
-import { BOX } from './generators/box';
+import { buildGenAsync, defaultParams, getGenerator } from './generators';
 import { renameInExpr, renameInTemplate } from './params';
 import type { ProjectParam } from './params';
 import type { TemplateInfo } from './templates';
@@ -12,8 +11,8 @@ import { t } from './i18n';
 export interface BuiltinTemplate {
   id: string;
   info: TemplateInfo;
-  /** Inhalt wie eine .kzt-Datei */
-  json: () => string;
+  /** Inhalt wie eine .kzt-Datei (async: the box of the label box template may be a plugin computing in its Worker) */
+  json: () => Promise<string>;
 }
 
 const BED_H = 400;
@@ -106,7 +105,7 @@ export function builtinTemplates(): BuiltinTemplate[] {
     {
       id: 'keyfob',
       info: KEYFOB(),
-      json: () =>
+      json: async () =>
         docJson(
           [
             { name: 'Name', type: 'text', value: 'Anna' },
@@ -127,7 +126,7 @@ export function builtinTemplates(): BuiltinTemplate[] {
     {
       id: 'nametag',
       info: NAMETAG(),
-      json: () =>
+      json: async () =>
         docJson(
           [
             { name: 'Name', type: 'text', value: 'Anna Muster' },
@@ -153,7 +152,7 @@ export function builtinTemplates(): BuiltinTemplate[] {
     {
       id: 'labelbox',
       info: LABELBOX(),
-      json: () => {
+      json: async () => {
         const params: ProjectParam[] = [
           { name: 'Beschriftung', type: 'text', value: t('Schrauben') },
           num('Breite', 100, 30, 300),
@@ -161,8 +160,9 @@ export function builtinTemplates(): BuiltinTemplate[] {
           num('Höhe', 50, 20, 200),
           num('Dicke', 3, 1, 10, 0.5, t('Materialdicke; die Zinken passen sich an')),
         ];
-        const gp = { ...defaultParams(BOX), sizeMode: 'outer', width: 100, depth: 80, height: 50, thickness: 3, top: 'open' };
-        const r = buildGen(BOX, gp);
+        const box = getGenerator('box')!;
+        const gp = { ...defaultParams(box), sizeMode: 'outer', width: 100, depth: 80, height: 50, thickness: 3, top: 'open' };
+        const r = await buildGenAsync(box, gp);
         const asm = newAsmId();
         const bind = { width: 'Breite', depth: 'Tiefe', height: 'Höhe', thickness: 'Dicke' };
         // Anordnung über Formeln, damit die Platten beim Ändern der Maße nicht ineinanderlaufen:

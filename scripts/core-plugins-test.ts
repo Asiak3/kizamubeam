@@ -308,6 +308,32 @@ await test('ribs as a plugin: same parts and sections; the drawing surface answe
   }
 });
 
+await test('app callers wait for a plugin in place of a built-in generator: 3D solids, assembly check, label box template', async () => {
+  const { register, getGenerator } = G;
+  const builtIn = getGenerator('box')!;
+  const m = pack.plugins.find((x) => x.id === 'box')!;
+  const g = pluginGenerator(m, { id: pack.id, name: 'core' });
+  register(g);
+  try {
+    const { asmSolids } = await import('../src/view3d/solids');
+    const { assemblyReport } = await import('../src/asmcheck');
+    const p = G.normalizeParams(g, { ...G.defaultParams(g), width: 120 });
+    const keys = new Set(['front', 'back', 'left', 'right', 'bottom']);
+    assert.equal(asmSolids('box', p, 3, keys), 'pending', 'the plugin computes first');
+    assert.equal(assemblyReport('box', p, keys), null, 'no report while computing');
+    await g.prepare(G.normalizeParams(g, { ...p, kerf: 0, partLayout: 'rows' }));
+    const solids = asmSolids('box', p, 3, keys);
+    assert.ok(Array.isArray(solids) && solids.length === 5, 'solids once computed');
+    assert.ok(assemblyReport('box', p, keys), 'the check reports once computed (not the cached null)');
+    const { builtinTemplates } = await import('../src/builtinTemplates');
+    const json = await builtinTemplates().find((b) => b.id === 'labelbox')!.json();
+    assert.ok((json.match(/"gen":"box"/g) ?? []).length >= 5, 'the template waits for the plugin box');
+  } finally {
+    g.dispose();
+    register(builtIn);
+  }
+});
+
 await test('all pass the catalogue check', async () => {
   for (const m of pack.plugins) {
     const r = await checkPlugin(m);

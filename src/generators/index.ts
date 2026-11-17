@@ -141,6 +141,11 @@ export interface BuildResult {
  * Like buildGen, but first waits for generators that compute elsewhere (plugins, Generator.prepare). Use it where
  * the caller can wait (MCP tools); interactive code calls buildGen and listens to onPluginResult.
  */
+/** Code of the issue a generator reports while its result is computed elsewhere (a plugin in its Worker; PENDING in plugins/words.ts) */
+export const GEN_PENDING = 'plugin-pending';
+/** Whether a result is still being computed: callers that cannot wait ask again when it is there (onPluginResult) */
+export const isPending = (r: BuildResult) => r.issues.some((i) => i.code === GEN_PENDING);
+
 export async function buildGenAsync(g: Generator, params: Params): Promise<BuildResult> {
   await g.prepare?.(params);
   return buildGen(g, params);

@@ -5,7 +5,7 @@ import { CheckIssue, checkDesign, loadCheckSettings, removeSpans } from '../chec
 import type { Editor } from '../editor';
 import { t } from '../i18n';
 import { genLeaves } from './generators';
-import { buildGen, getGenerator, normalizeParams } from '../generators/index';
+import { buildGenAsync, getGenerator, normalizeParams } from '../generators/index';
 import type { Params } from '../generators/types';
 
 export class EditorCheck {
@@ -109,7 +109,10 @@ export class EditorCheck {
         if (o.shape.kind !== 'gen' || !this.doc.objs.some((x) => contains(x, o))) return false;
         const g = getGenerator(o.shape.gen);
         if (!g) return false;
-        const r = buildGen(g, { ...normalizeParams(g, o.shape.params), ...f.patch } as Params);
+        const params = { ...normalizeParams(g, o.shape.params), ...f.patch } as Params;
+        // A plugin generator computes in its Worker: wait for its result
+        const r = await buildGenAsync(g, params);
+        if (!this.doc.objs.some((x) => contains(x, o))) return false;
         const err = r.issues.find((i) => i.level === 'error');
         if (err || !r.parts.length) {
           this.hint = err?.msg ?? t('Bauteil ließ sich mit diesen Werten nicht erzeugen.');

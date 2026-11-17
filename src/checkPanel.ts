@@ -7,6 +7,7 @@ import { dec, t, tn } from './i18n';
 import { dockWindow, isShown, onWindowShow, setBadge, showWindow } from './dock';
 import { CheckIssue, CheckKind, CheckSettings, fixLabel, loadCheckSettings, saveCheckSettings } from './check';
 import { objLabel } from './objectsPanel';
+import { onPluginResult } from './plugins/generator';
 import { isCutLayer, layerLabel, PALETTE } from './model';
 
 const KIND_NAMES = (): Record<CheckKind, string> => ({
@@ -167,6 +168,10 @@ export function buildCheckPanel(ed: Editor) {
       ed.checkActive = null;
       setBadge('check', '');
     }
+  });
+  // Generators that are plugins compute in their Worker: check again when a result arrives
+  onPluginResult(() => {
+    if (isShown('check')) run();
   });
   onWindowShow('check', () => {
     ed.checkMarks = true;

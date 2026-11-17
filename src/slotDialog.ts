@@ -6,7 +6,7 @@ import { numField } from './arrayDialogs';
 import { h } from './dom';
 import { Mat, Obj, visibleLeaves } from './model';
 import { findSlots, resizeSlots, Slot, slotWidths } from './slots';
-import { buildGen, getGenerator, normalizeParams } from './generators/index';
+import { buildGenAsync, getGenerator, normalizeParams, type BuildResult } from './generators/index';
 import type { Params } from './generators/types';
 import { library } from './materials';
 import { dec, t, tn } from './i18n';
@@ -46,13 +46,22 @@ export interface SlotResizeResult {
  * Schlitze der Breite th (± tol) für die Dicke thNew anpassen: jede Schlitzbreite ändert sich um thNew − th,
  * das Spiel bleibt also erhalten. Ein Undo-Schritt für alles.
  */
-export function applySlotResize(ed: Editor, th: number, tol: number, thNew: number): SlotResizeResult {
+export async function applySlotResize(ed: Editor, th: number, tol: number, thNew: number): Promise<SlotResizeResult> {
   const items = scope(ed);
   const delta = thNew - th;
   const slots = findSlots(items, { width: th, tol });
   const gens = genTargets(items, th, tol);
   const res: SlotResizeResult = { slots: 0, gens: 0, skipped: 0 };
   if ((!slots.length && !gens.length) || Math.abs(delta) < 1e-6) return res;
+  // Generator parts with the new thickness first: plugin generators compute in their Worker
+  const built = new Map<Obj, BuildResult>();
+  for (const o of gens) {
+    if (o.shape.kind !== 'gen') continue;
+    const g = getGenerator(o.shape.gen);
+    if (!g) continue;
+    const p = normalizeParams(g, o.shape.params);
+    built.set(o, await buildGenAsync(g, { ...p, thickness: Math.round((Number(p.thickness) + delta) * 1000) / 1000 } as Params));
+  }
   ed.snapshot(t('Schlitze anpassen'));
   const ok = slots.filter((s) => s.width + delta > 0.05);
   res.skipped = slots.length - ok.length;
@@ -63,11 +72,8 @@ export function applySlotResize(ed: Editor, th: number, tol: number, thNew: numb
   }
   res.slots = ok.length;
   for (const o of gens) {
-    if (o.shape.kind !== 'gen') continue;
-    const g = getGenerator(o.shape.gen);
-    if (!g) continue;
-    const p = normalizeParams(g, o.shape.params);
-    const r = buildGen(g, { ...p, thickness: Math.round((Number(p.thickness) + delta) * 1000) / 1000 } as Params);
+    const r = built.get(o);
+    if (!r) continue;
     if (r.issues.some((i) => i.level === 'error') || !r.parts.length) {
       res.skipped++;
       continue;
@@ -166,12 +172,13 @@ export function openSlotDialog(ed: Editor) {
       } catch {
         /* Speicher nicht verfügbar */
       }
-      const r = applySlotResize(ed, st.th, st.tol, st.thNew);
+      void applySlotResize(ed, st.th, st.tol, st.thNew).then((r) => {
       ed.hint = r.slots || r.gens
         ? [r.slots ? tn('{n} Schlitz angepasst', '{n} Schlitze angepasst', r.slots) : '', r.gens ? tn('{n} Generator-Bauteil angepasst', '{n} Generator-Bauteile angepasst', r.gens) : '']
           .filter(Boolean).join(', ') + (r.skipped ? tn(', {n} übersprungen.|one', ', {n} übersprungen.', r.skipped) : '.')
         : t('Nichts angepasst.');
       ed.emit('tool');
+      });
     }
     dlg.remove();
   });
