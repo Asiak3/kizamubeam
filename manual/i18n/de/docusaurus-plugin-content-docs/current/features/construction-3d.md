@@ -81,7 +81,7 @@ Drehe die Ansicht mit der Maus oder nutze die festen Ansichten (3D, oben, vorn).
 
 **Kollisionen**: Wo sich zwei Teile durchdringen (etwa bei einer Presspassung oder einem zu schmalen Schlitz), färbt sich die Stelle rot, und die Statuszeile nennt die Teile und das Volumen.
 
-**Gravuren**: Mit dem Kästchen **Gravuren** erscheinen Füllungen, gravierte Linien, Text und bearbeitete Bilder auf der Seite, die beim Lasern oben lag, mit leichter Tiefe.
+**Gravuren**: Mit dem Kästchen **Gravuren** erscheinen Füllungen, gravierte Linien, Text und bearbeitete Bilder auf der Seite, die beim Lasern oben lag, mit leichter Tiefe. Gravuren, die auf keinem Teil liegen, werden nicht gezeichnet und würden beim Lasern die Arbeitsfläche treffen. Die Statuszeile zählt sie („1 Gravur ohne Teil“); ein Klick auf die Zahl wählt sie auf der Arbeitsfläche aus.
 
 ### Materialaussehen {#material-look}
 
@@ -105,6 +105,7 @@ Gefunden werden unter anderem:
 - Stege zwischen zwei Schnitten, die schmaler als der Mindeststeg sind (Standard 1 mm, Schnittbreite eingerechnet),
 - Ausschnitte, die für die Schnittbreite zu klein sind,
 - Objekte außerhalb des Arbeitsbereichs,
+- Gravuren, die auf keinem Schnittteil liegen (sie fehlen in der 3D-Ansicht und würden die Arbeitsfläche treffen; gibt es auf der Seite gar kein Schnittteil, wird nichts gemeldet, weil dann alles auf einem fertigen Gegenstand liegt),
 - Elemente, die ein SVG- oder DXF-Import überspringen musste,
 - die **Passung** von Steckverbindungen aus den Generatoren und dem Werkzeug Verbindung gegenüber Materialdicke und Kerf (zu eng, sehr eng, sehr locker).
 

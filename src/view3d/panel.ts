@@ -11,7 +11,7 @@ import { region } from '../ops';
 import ClipperLib from 'clipper-lib';
 import { Path, Paths, SCALE } from '../clip';
 import { h } from '../dom';
-import { t } from '../i18n';
+import { t, tn } from '../i18n';
 import { dockWindow, isShown, onWindowShow } from '../dock';
 import { objLabel } from '../objectsPanel';
 import { genLabel } from '../generators';
@@ -21,7 +21,7 @@ import { flatPose, genThickness } from './poses';
 import { assembleMates, MatePart } from './mates';
 import { Placement, spreadApart } from './spread';
 import { collectCutters, cutPlate, pathBox } from './cuts';
-import { BURN, CanvasPlace, engravings, memberPlace } from './engrave';
+import { BURN, CanvasPlace, engravings, looseMarks, memberPlace } from './engrave';
 import { cleanLook, DEFAULT_LOOK, layerLook, LookPreset, MaterialLook, resolveLook } from './looks';
 import { lookEditor } from './lookui';
 import { library } from '../materials';
@@ -134,7 +134,7 @@ function cutPlates(ed: Editor, targets: ViewSolid[], places: Map<string, CanvasP
 }
 
 /** Teile für die Ansicht sammeln; liefert auch einen Schlüssel, der sich nur ändert, wenn andere Objekte gezeigt werden */
-export function collectScene(ed: Editor, th: number, marks = true, fallback: MaterialLook = DEFAULT_LOOK): { scene: Scene3D; key: string; asms: number } {
+export function collectScene(ed: Editor, th: number, marks = true, fallback: MaterialLook = DEFAULT_LOOK): { scene: Scene3D; key: string; asms: number; loose: Obj[] } {
   const roots = ed.sel.length ? ed.sel : ed.doc.objs.filter((o) => !o.hidden);
   const solids: ViewSolid[] = [];
   const ids: (number | string)[] = [];
@@ -163,7 +163,8 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
   /** Lose Formen: erst nach den Baugruppen entscheiden, ob sie Platten schneiden (Loch, Kerbe) oder eigene Platten sind */
   const looseShapes: { o: Obj; m: Obj['m']; thick: number }[] = [];
   // Eine Auswahl zeigt auch ausgeblendete Objekte, die ganze Seite nur sichtbare
-  const all = [...(ed.sel.length ? leaves(roots) : visibleLeaves(roots))].filter(([o]) => !multi.used.has(o.id));
+  const shown = [...(ed.sel.length ? leaves(roots) : visibleLeaves(roots))];
+  const all = shown.filter(([o]) => !multi.used.has(o.id));
   const mated = collectMates(ed, all, th, places);
   for (const g of mated.groups) {
     solids.push(...g);
@@ -246,8 +247,10 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     const eng = engravings(ed, solids, places, (s) => (s as ViewSolid).look?.engrave ?? BURN);
     for (const s of solids) s.engraving = eng.get(s.key);
   }
+  // Gravuren ohne Platte fehlen in der Ansicht: nur die gezeigten Objekte prüfen (eine Auswahl, sonst die sichtbaren der Seite)
+  const bare = looseMarks(ed, solids, places, new Set(shown.map(([o]) => o)));
   const overlaps = findOverlaps(solids);
-  return { scene: { solids, overlaps }, key: `${th}|${ids.join(',')}`, asms };
+  return { scene: { solids, overlaps }, key: `${th}|${ids.join(',')}`, asms, loose: bare };
 }
 
 /** Darf ein Objekt als Platte (bzw. als Loch darin) erscheinen? Nur geschlossene Konturen auf Schnitt-Layern. */
@@ -406,6 +409,19 @@ export function buildView3dPanel(ed: Editor) {
   };
   const host = h('div', { class: 'v3d-canvas' });
   const status = h('div', { class: 'v3d-status' });
+  const statusText = h('span', {});
+  /** Gravuren ohne Teil (Issue #326): Klick wählt sie auf der Arbeitsfläche aus */
+  let loose: Obj[] = [];
+  const looseBtn = h('button', {
+    class: 'v3d-loose',
+    hidden: true,
+    title: t('Diese Gravuren auf der Arbeitsfläche auswählen. Sie liegen auf keinem Teil: In der Ansicht fehlen sie, und beim Lasern träfen sie die Arbeitsfläche.'),
+    onclick: () => {
+      ed.setSel(loose.filter((o) => ed.doc.objs.includes(o) && ed.selectable(o)));
+      ed.redraw();
+    },
+  });
+  status.append(statusText, looseBtn);
   const hint = h('div', { class: 'v3d-empty' }, t('Wähle eine Baugruppe (z. B. eine Box) oder Teile aus. Ohne Auswahl zeigt die Ansicht alle Schnitte der Seite.'));
   const explode = h('input', { type: 'range', min: '0', max: '1.5', step: '0.01', value: '0', title: t('Teile auseinanderziehen') }) as HTMLInputElement;
   const spinBox = h('input', { type: 'checkbox' }) as HTMLInputElement;
@@ -469,7 +485,8 @@ export function buildView3dPanel(ed: Editor) {
       queued = window.setTimeout(update, 150);
       return;
     }
-    const { scene, key, asms } = collectScene(ed, set.th, set.marks, set.look);
+    const { scene, key, asms, loose: lone } = collectScene(ed, set.th, set.marks, set.look);
+    loose = lone;
     hint.hidden = scene.solids.length > 0;
     viewer.setScene(scene, key !== lastKey);
     lastKey = key;
@@ -482,7 +499,9 @@ export function buildView3dPanel(ed: Editor) {
       ? t('Teile: {n}', { n: scene.solids.length }) + (asms ? ` (${t('Baugruppen: {n}', { n: asms })})` : '')
       : '';
     info = parts ? `${parts} · ${set.overlaps ? overlapText(scene.overlaps, scene.solids) : ''}` : '';
-    status.textContent = info;
+    statusText.textContent = info;
+    looseBtn.hidden = !loose.length;
+    looseBtn.textContent = (info ? ' · ' : '') + tn('{n} Gravur ohne Teil', '{n} Gravuren ohne Teil', loose.length);
     status.classList.toggle('v3d-bad', set.overlaps && scene.overlaps.length > 0);
   };
   const schedule = () => {
@@ -500,7 +519,7 @@ export function buildView3dPanel(ed: Editor) {
             hint.textContent = t('3D-Darstellung nicht möglich: {msg}', { msg: e instanceof Error ? e.message : String(e) });
             return;
           }
-          viewer.onHover = (label) => (status.textContent = label ?? info);
+          viewer.onHover = (label) => (statusText.textContent = label ?? info);
           viewer.isVisible = () => isShown('view3d');
           viewer.setExplode(Number(explode.value));
           viewer.setShowOverlaps(set.overlaps);

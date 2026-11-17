@@ -22,6 +22,7 @@ const KIND_NAMES = (): Record<CheckKind, string> => ({
   thickness: t('Materialdicke'),
   loose: t('Zusammenhalt'),
   insert: t('Stecken'),
+  engrave: t('Gravur'),
 });
 
 let openPanel: (() => void) | null = null;
