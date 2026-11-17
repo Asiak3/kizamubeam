@@ -28,6 +28,9 @@ on:
       - 'src/catalog.ts'
       - 'scripts/build-catalog.ts'
       - 'scripts/sign-catalog.mjs'
+      - 'plugins/**'
+      - 'src/plugins/**'
+      - 'scripts/plugin-pack.mjs'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -66,6 +69,11 @@ jobs:
             git --no-pager diff --stat -- website
             exit 1
           fi
+
+      # Plugin packs in the catalogue are built here from their source in plugins/ (#205)
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
       - name: Build and sign the extension catalogue
         env:

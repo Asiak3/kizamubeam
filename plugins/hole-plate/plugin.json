@@ -10,6 +10,8 @@
     "it": "Esempio di plugin generatore in Rust/WebAssembly: una piastra con uno schema di fori quadrato o esagonale."
   },
   "author": "KizamuBeam",
+  "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/hole-plate",
+  "build": [{ "rust": ".", "out": "dist/hole-plate.wasm" }],
   "plugins": [
     {
       "id": "org.kizamubeam.hole-plate",

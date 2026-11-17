@@ -240,7 +240,7 @@ export async function openPacksDialog() {
       catList.append(h('div', { class: 'pack-card' },
         h('div', { class: 'pack-text' },
           h('div', {}, h('b', {}, localText(e.name)), ` ${e.version}`, e.author ? h('span', { class: 'muted' }, ` · ${e.author}`) : null),
-          h('div', { class: 'muted' }, countSummary(e.devices, e.templates, e.materials, e.assets)),
+          h('div', { class: 'muted' }, countSummary(e.devices, e.templates, e.materials, e.assets, e.plugins)),
           desc ? h('div', {}, desc) : null,
         ),
         btn,
