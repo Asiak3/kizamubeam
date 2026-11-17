@@ -117,6 +117,37 @@ await test('headless runs give a sample context; the check also runs without con
   assert.match((await checkPlugin(careless)).errors.join(' '), /without context/);
 });
 
+// "From material": onChange copies the thickness of the layer's material into the field
+const COPY = `globalThis.plugin = {
+  validate: () => [],
+  generate: (p) => ({ parts: [{ key: 'p', at: { x: 0, y: 0 }, subs: [{ closed: true, nodes: [{x:0,y:0},{x:10,y:0},{x:0,y:10}] }] }], info: [['t', String(p.thickness)]] }),
+  onChange: ({ key, params }) => {
+    if (key !== 'fromMaterial' || !params.fromMaterial) return null;
+    const m = host.context('material');
+    return m && m.thickness ? { patch: { thickness: m.thickness } } : null;
+  },
+};`;
+
+await test('onChange sees the current context, not the one of the last computation', async () => {
+  const m = manifest(COPY, {
+    context: ['material'],
+    params: [{ key: 'thickness', type: 'length', min: 0.5, max: 20, def: 3 }, { key: 'fromMaterial', type: 'bool', def: false }],
+    texts: { en: { name: 'Plate', desc: 'A plate', thickness: 'Thickness', fromMaterial: 'From material' } },
+  });
+  let ctx: Record<string, unknown> = { material: { name: 'Plywood', thickness: 3, kerf: null, pairPlay: null, slotPlay: null } };
+  const g = pluginGenerator(m, { id: 'p', name: 'p' }, { context: (w) => ctx[w] ?? null });
+  try {
+    const p = normalizeParams(g, defaultParams(g));
+    await buildGenAsync(g, p);
+    // The layer's material changes, nothing is computed in between
+    ctx = { material: { name: 'Acrylic', thickness: 4, kerf: null, pairPlay: null, slotPlay: null } };
+    const r = await g.onChange!('fromMaterial', false, { ...p, fromMaterial: true });
+    assert.deepEqual(r && r.patch, { thickness: 4 });
+  } finally {
+    g.dispose();
+  }
+});
+
 // Opened with the selection: the action that takes it fills the parameters
 const LIST = `globalThis.plugin = {
   validate: (p) => (p.items ? [] : [{ level: 'error', code: 'empty' }]),

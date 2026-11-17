@@ -361,6 +361,9 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       : {}),
     async onChange(key, old, p): Promise<GenChange | void> {
       if (missing.has('onChange')) return;
+      // The current context, as before validate and generate: a switch such as "From material" sees the layer's
+      // material now, not the one of the last computation (#327)
+      sendResources(p);
       const r = await call('onChange', { key, old, params: { ...p } }, checkChange);
       if (!('ok' in r)) return;
       const { patch, ask } = r.ok;
