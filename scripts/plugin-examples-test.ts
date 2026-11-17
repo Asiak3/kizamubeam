@@ -110,6 +110,36 @@ await test('ruler (#308): ticks at exact positions, inch divisions, protractor, 
   g.dispose();
 });
 
+await test('game board (#309): dark squares like a chessboard, styles, coordinates, size with border', async () => {
+  const g = await load('plugins/game-board');
+  const r = await run(g);
+  assert.equal(r.issues.length, 0);
+  assert.deepEqual(r.info, [['Square', '40 mm'], ['Board size', '350 × 350 mm'], ['Dark squares', '32']]);
+  const marks = r.parts[0].marks!;
+  // Fill style: 32 closed squares of 40 mm plus the frame; a1 (bottom left) is dark, h1 (bottom right) is light
+  const squares = marks.filter((s) => s.closed && s.nodes.length === 4 && Math.abs(s.nodes[1].x - s.nodes[0].x - 40) < 1e-9);
+  assert.equal(squares.length, 32);
+  assert.ok(squares.some((s) => s.nodes[0].x === -160 && s.nodes[0].y === 120), 'a1 dark');
+  assert.ok(!squares.some((s) => s.nodes[0].x === 120 && s.nodes[0].y === 120), 'h1 light');
+  const hatch = await run(g, { style: 'hatch', coords: false });
+  const diagonals = hatch.parts[0].marks!.filter((s) => !s.closed && s.nodes.length === 2 && s.nodes[0].x !== s.nodes[1].x && s.nodes[0].y !== s.nodes[1].y);
+  assert.ok(diagonals.length > 100);
+  assert.ok(diagonals.every((s) => s.nodes.every((n) => Math.abs(n.x) <= 160 + 1e-9 && Math.abs(n.y) <= 160 + 1e-9)), 'hatch stays inside the squares');
+  const cross = await run(g, { style: 'crosshatch', coords: false });
+  assert.ok(cross.parts[0].marks!.length > hatch.parts[0].marks!.length);
+  const outer = await run(g, { sizeIncludesBorder: true, size: 350 });
+  assert.deepEqual(outer.info[1], ['Board size', '350 × 350 mm']);
+  assert.deepEqual(outer.info[0], ['Square', '40 mm']);
+  const bare = await run(g, { coords: false });
+  const coords = await run(g, { bothSides: true });
+  assert.ok(coords.parts[0].marks!.length > r.parts[0].marks!.length && r.parts[0].marks!.length > bare.parts[0].marks!.length);
+  const draughts = await run(g, { cols: 10, rows: 10 });
+  assert.deepEqual(draughts.info[2], ['Dark squares', '50']);
+  const tiny = await run(g, { cols: 30, rows: 30, size: 60 });
+  assert.ok(tiny.issues.some((i) => i.code === 'squares-too-small'));
+  g.dispose();
+});
+
 if (failed) {
   console.log(`${failed} failed`);
   process.exit(1);
