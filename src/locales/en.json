@@ -4852,5 +4852,7 @@
   "„kind“ muss part oder assembly sein": "“kind” must be part or assembly",
   "„params“ muss eine Liste mit höchstens {n} Einträgen sein": "“params” must be a list of at most {n} entries",
   "„runtime“ muss js oder wasm sein": "“runtime” must be js or wasm",
-  "„{id}“ (Erweiterung „{name}“ fehlt)": "“{id}” (extension “{name}” missing)"
+  "„{id}“ (Erweiterung „{name}“ fehlt)": "“{id}” (extension “{name}” missing)",
+  "{where}: ungültiger Abschnitt": "{where}: invalid section",
+  "ungültige Angabe „dialog“": "invalid “dialog”"
 }

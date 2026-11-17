@@ -207,11 +207,20 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   }
   const main: HTMLElement[] = [],
     adv: HTMLElement[] = [];
+  const sections = new Map<string, HTMLElement[]>();
   for (const s of g.schema) {
     const els = field(s);
     rows.set(s.key, els);
-    (s.advanced ? adv : main).push(...els);
+    if (s.advanced) adv.push(...els);
+    else if (s.section) {
+      if (!sections.has(s.section)) sections.set(s.section, []);
+      sections.get(s.section)!.push(...els);
+    } else main.push(...els);
   }
+
+  // A section whose fields are all hidden (showIf) is hidden as well
+  const sectionEls = [...sections].map(([label, els]) => h('details', { open: true, class: 'gen-section' }, h('summary', {}, label), h('div', { class: 'form' }, ...els)));
+  const sectionKeys = [...sections.keys()].map((label) => g.schema.filter((s) => !s.advanced && s.section === label));
 
   const canvas = h('canvas', { class: 'gen-preview', width: 240, height: 240 }) as HTMLCanvasElement;
   const issuesEl = h('div', { class: 'gen-issues' });
@@ -233,6 +242,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       if (control) control.value = autoText(g, s.key, np);
     }
     for (const s of g.schema) rows.get(s.key)!.forEach((el) => (el.hidden = !fieldActive(s, np)));
+    sectionEls.forEach((el, i) => (el.hidden = !sectionKeys[i].some((s) => fieldActive(s, np))));
     const r = buildGen(g, np);
     r.issues.unshift(...rb.issues);
     if (rb.issues.some((i) => i.level === 'error')) r.parts = [];
@@ -397,6 +407,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     h('div', { class: 'qr-layout' },
       h('div', {},
         h('div', { class: 'form' }, ...main),
+        ...sectionEls,
         adv.length ? h('details', {}, h('summary', {}, t('Erweitert')), h('div', { class: 'form' }, ...adv)) : null,
       ),
       h('div', {}, canvas, infoEl),

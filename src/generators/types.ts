@@ -31,6 +31,11 @@ interface SpecBase {
   title?: string;
   /** Abschnitt im Dialog: Hauptfelder oder eingeklappt unter „Erweitert“ */
   advanced?: boolean;
+  /**
+   * Named section of the dialog (its heading, already translated); fields with the same section are shown
+   * together below the main fields, in the order of their first field. advanced wins over section.
+   */
+  section?: string;
   /** New objects always start with def instead of the last-used value (layout choices of saved objects) */
   resetOnNew?: boolean;
   /** Feld nur zeigen (und beachten), wenn diese Bedingung gilt */

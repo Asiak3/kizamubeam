@@ -5,7 +5,7 @@
 // a result (the dialog, formula recomputation) listens to onPluginResult and asks again.
 import type { GenResult, Generator, Issue, Params, ParamSpec } from '../generators/types';
 import type { AsmPoses } from '../generators/pose';
-import { checkGenResult, checkIssues, type PluginGenResult, type PluginIssue } from './contract';
+import { checkGenResult, checkIssues, ContractError, type PluginGenResult, type PluginIssue } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
 import { pluginText, type PluginManifest } from './manifest';
@@ -107,7 +107,13 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     r = (async () => {
       const entry: Entry = { validate: await call('validate', input, checkIssues) };
       const v = entry.validate;
-      if ('ok' in v && !v.ok.some((i) => i.level === 'error')) entry.generate = await call('generate', input, checkGenResult);
+      // A part generator makes exactly one part (assemblies any number)
+      const check = (x: unknown) => {
+        const r = checkGenResult(x);
+        if (m.kind === 'part' && r.parts.length !== 1) throw new ContractError('plugin-bad-output', 'a part generator must return exactly one part');
+        return r;
+      };
+      if ('ok' in v && !v.ok.some((i) => i.level === 'error')) entry.generate = await call('generate', input, check);
       remember(k, entry);
     })().finally(() => {
       running.delete(k);
@@ -128,6 +134,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     const label = text(s.key) ?? s.key;
     const title = text(`${s.key}.title`);
     const out = { ...s, label, ...(title ? { title } : {}) } as ParamSpec;
+    if (out.section) out.section = text(out.section) ?? out.section;
     if (out.type === 'enum') out.options = out.options.map(([v, k]) => [v, text(k) ?? v]);
     return out;
   });

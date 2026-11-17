@@ -1,6 +1,6 @@
 # Plugins (developer notes)
 
-Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205): runtime, plugins in extension packs (format version 2) and generator plugins in the toolbox. The richer dialog schema of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335) (sections, `view`, `onChange`, lists, surfaces) follows.
+Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205) and of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335): runtime, plugins in extension packs (format version 2), generator plugins in the toolbox, dialog schema version 1 and the headless runner. Dynamic dialogs (`view`, `onChange`, lists, surfaces) follow in the next stages of #335.
 
 A plugin computes geometry from parameters. It gets JSON in and gives JSON out. It cannot reach files, the network, the DOM, Tauri or the editor. Every plugin runs in its own Web Worker, and the app checks every answer before anything reaches the drawing.
 
@@ -27,6 +27,7 @@ A plugin is an entry of `plugins` in an extension pack ([docs/packs.md](packs.md
   "sha256": "9f2c…",                // SHA-256 of the code bytes (hex), checked on every load
   "icon": "pattern",                // optional, a name from src/icons.ts
   "preview": { "center": true },    // optional, centre the dialog preview on the parts
+  "dialog": { "version": 1 },       // optional, dialog schema the plugin needs (see below)
   "params": [
     { "key": "width", "type": "length", "min": 10, "max": 2000, "def": 120 },
     { "key": "pattern", "type": "enum", "options": ["hex", "square"], "def": "hex" },
@@ -41,6 +42,19 @@ A plugin is an entry of `plugins` in an extension pack ([docs/packs.md](packs.md
 ```
 
 Parameter types are the same as for built-in generators: `length` (mm), `angle` (degrees), `int`, `number`, `enum`, `bool`, `text` and `data` (hidden text). `showIf` uses the rule language of the app (`eq`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`); no plugin code runs for visibility. `advanced` puts a field under “Advanced”, `resetOnNew` starts new parts with `def`.
+
+## Dialog (schema version 1)
+
+Plugins describe what the dialog contains; the app draws it, with its own controls, units, formula fields, OK/Cancel and keyboard handling. Plugins never ship HTML, styles or scripts for the dialog. Version 1 has:
+
+- **Fields** from `params`, in their order: number fields with unit, choice lists, switches, text fields; `data` fields are hidden.
+- **Layout**: the main area, named sections (`"section": "<text key>"` on each field; a section appears below the main fields in the order of its first field, and disappears when all its fields are hidden) and the collapsed “Advanced” section (`"advanced": true`, which wins over `section`).
+- **Rules**: `showIf` per field, evaluated by the app.
+- **Preview** of the generated parts (centred with `"preview": { "center": true }`), the **info table** from `generate` and the **issue list** from `validate`; errors disable OK.
+
+`"dialog": { "version": N }` names the schema a plugin needs. A plugin that needs a newer one than the app knows is refused at install with an update hint. Without `dialog`, version 1 is assumed.
+
+All state is in the parameters, so saving, undo, formulas with project parameters, reopening and MCP work the same as for built-in generators.
 
 **Texts** are plain text, looked up in the interface language, then English (`en` is required). Keys:
 
@@ -70,7 +84,7 @@ A missing text falls back to its key. The app checks everything before it regist
 | `validate` | parameters (object) | list of issues `{ key?, level: "error" \| "warn", code, values? }` |
 | `generate` | parameters (object) | `{ parts, info, poses?, plan? }` |
 
-A part is `{ key, subs, at, marks? }`. `subs` uses the same sub-path format as the editor (`{ nodes: [{ x, y, … }], closed }`). `info` is a list of `[code, value]` rows for the dialog. Issue and info codes are translated through the plugin's texts (part of the manifest in the next step), so a plugin never builds user-facing sentences.
+A part is `{ key, subs, at, marks? }`; a plugin with `"kind": "part"` returns exactly one, an assembly any number. `subs` uses the same sub-path format as the editor (`{ nodes: [{ x, y, … }], closed }`). `info` is a list of `[code, value]` rows for the dialog. Issue and info codes are translated through the plugin's texts (part of the manifest in the next step), so a plugin never builds user-facing sentences.
 
 A failure is reported as a code, for example `holes-touch`. Codes the app itself uses start with `plugin-`:
 
@@ -120,6 +134,17 @@ The module has no imports and exports:
 
 The example [`plugins/hole-plate`](../plugins/hole-plate) (plate with a pattern of holes) implements this in Rust; `src/abi.rs` can be copied into other plugins.
 
+## Headless runner and check
+
+`src/plugins/headless.ts` runs a plugin's dialog without the app: `runDialog(manifest, steps)` starts with the default parameters, applies each step (a set of field changes, checked against the schema like user input) and returns after each one what the dialog would show: parameters, visible fields, issues with codes, info rows, the parts (key, position, size) and a SHA-256 of the geometry. Use it in plugin tests.
+
+`npm run plugin:check <folder | file.kzp>` checks every plugin of a pack the way the catalogue will:
+
+- the default parameters generate parts without errors,
+- every option of every choice and both values of every switch run without a crash, timeout or broken output,
+- two runs give the same geometry (no randomness or clock; use a seed parameter),
+- issue codes, parameter labels and `desc` have English texts (warnings).
+
 ## Tests
 
-`npm run test:plugins` runs both runtimes in Node: the hole plate, a JavaScript plugin, the time and memory limits, and refused output.
+`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output), plugins in packs (`scripts/plugin-packs-test.ts`) and the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`).

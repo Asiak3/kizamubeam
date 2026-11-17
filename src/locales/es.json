@@ -4852,5 +4852,7 @@
   "„kind“ muss part oder assembly sein": "«kind» debe ser part o assembly",
   "„params“ muss eine Liste mit höchstens {n} Einträgen sein": "«params» debe ser una lista de como máximo {n} entradas",
   "„runtime“ muss js oder wasm sein": "«runtime» debe ser js o wasm",
-  "„{id}“ (Erweiterung „{name}“ fehlt)": "«{id}» (falta la extensión «{name}»)"
+  "„{id}“ (Erweiterung „{name}“ fehlt)": "«{id}» (falta la extensión «{name}»)",
+  "{where}: ungültiger Abschnitt": "{where}: sección no válida",
+  "ungültige Angabe „dialog“": "«dialog» no válido"
 }

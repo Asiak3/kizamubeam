@@ -36,6 +36,13 @@ export interface PluginManifest {
 
 export class ManifestError extends Error {}
 
+/**
+ * Version of the dialog schema (#335). Version 1: fields with labels, tooltips, options, the main area, named
+ * sections and „Advanced“, showIf rules, preview, info table and issue list. A plugin that needs a newer schema
+ * is refused with an update hint instead of being shown half-broken.
+ */
+export const DIALOG_VERSION = 1;
+
 const ID_RE = /^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$/;
 const KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/;
 const TEXT_KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,80}$/;
@@ -83,7 +90,14 @@ function param(v: unknown, i: number): ParamSpec {
   if (!isObj(v) || typeof v.key !== 'string' || !KEY_RE.test(v.key)) throw new ManifestError(t('{where}: Kennung fehlt oder ist ungültig', { where }));
   const key = v.key;
   const at = `${where} (${key})`;
-  const base = { key, label: key, ...(v.advanced === true ? { advanced: true } : {}), ...(v.resetOnNew === true ? { resetOnNew: true } : {}) };
+  if (v.section !== undefined && (typeof v.section !== 'string' || !TEXT_KEY_RE.test(v.section))) throw new ManifestError(t('{where}: ungültiger Abschnitt', { where: `${where} (${key})` }));
+  const base = {
+    key, label: key,
+    ...(v.advanced === true ? { advanced: true } : {}),
+    ...(v.resetOnNew === true ? { resetOnNew: true } : {}),
+    // Text key of the section heading; the generator replaces it with the text
+    ...(typeof v.section === 'string' ? { section: v.section } : {}),
+  };
   const type = v.type;
   if ((NUMERIC as readonly unknown[]).includes(type)) {
     const { min, max, def } = v;
@@ -148,6 +162,11 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
     const api = raw.api;
     if (!isNum(api) || !Number.isInteger(api) || api < 1) fail(t('Angabe „api“ fehlt'));
     if ((api as number) > PLUGIN_API) fail(t('braucht eine neuere Version von KizamuBeam'));
+    if (raw.dialog !== undefined) {
+      const dv = isObj(raw.dialog) ? raw.dialog.version : undefined;
+      if (!isNum(dv) || !Number.isInteger(dv) || dv < 1) fail(t('ungültige Angabe „dialog“'));
+      if ((dv as number) > DIALOG_VERSION) fail(t('braucht eine neuere Version von KizamuBeam'));
+    }
     const version = raw.version ?? 1;
     if (!isNum(version) || !Number.isInteger(version) || version < 1) fail(t('ungültige Version'));
     const kind = raw.kind ?? 'part';

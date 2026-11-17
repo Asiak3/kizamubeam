@@ -156,6 +156,12 @@ await test('plugin generator: crashes, timeouts and broken output become issues'
   const r2 = await G.buildGenAsync(g2, G.defaultParams(g2));
   assert.match(r2.issues.at(-1)!.msg, /ungültige Geometrie/);
   g2.dispose();
+  const two = `globalThis.plugin = { validate: () => [], generate: () => ({ parts: [], info: [] }) };`;
+  const m4 = P.parsePack(jsPack(two)).plugins[0];
+  const g4 = pluginGenerator({ ...m4, kind: 'part' }, { id: 'x', name: 'None' });
+  const r4 = await G.buildGenAsync(g4, G.defaultParams(g4));
+  assert.match(r4.issues.at(-1)!.msg, /ungültige Geometrie/, 'a part generator must return exactly one part');
+  g4.dispose();
   const own = `globalThis.plugin = { validate: () => [], generate: () => { throw new Error('big'); } };`;
   const g3 = pluginGenerator(P.parsePack(jsPack(own)).plugins[0], { id: 'x', name: 'Own' });
   const r3 = await G.buildGenAsync(g3, G.defaultParams(g3));
