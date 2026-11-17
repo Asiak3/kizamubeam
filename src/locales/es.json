@@ -4908,5 +4908,9 @@
   "{where}: ungültige Spalten": "{where}: columnas no válidas",
   "{where}: unbekannte Eingabe": "{where}: entrada desconocida",
   "Listen und Aktionen brauchen „dialog“ Version 2": "Las listas y acciones necesitan «dialog» versión 2",
-  "{where}: „field“ muss ein Zahlen-Parameter sein": "{where}: «field» debe ser un parámetro numérico"
+  "{where}: „field“ muss ein Zahlen-Parameter sein": "{where}: «field» debe ser un parámetro numérico",
+  "ungültige Angabe „inputs“": "«inputs» no válido",
+  "{where}: unbekannte Ressource „{kind}“": "{where}: recurso desconocido «{kind}»",
+  "{where}: „name“ muss ein Text-Parameter sein": "{where}: «name» debe ser un parámetro de texto",
+  "{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein": "{where}: «param» debe ser un parámetro data con «resource»: «model3d»"
 }

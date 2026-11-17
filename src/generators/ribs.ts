@@ -898,7 +898,7 @@ export const RIBS: Generator = {
   },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
-    { key: 'model', type: 'data', label: t('Modell'), def: '' },
+    { key: 'model', type: 'data', label: t('Modell'), def: '', resource: 'model3d' },
     { key: 'name', type: 'data', label: t('Dateiname'), def: '' },
     { key: 'sections', type: 'data', label: t('Abschnitte'), def: '' },
     {

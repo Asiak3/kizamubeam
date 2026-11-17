@@ -354,7 +354,8 @@ export function deepestPoint(polys: Pt[][]): { p: Pt; r: number } | null {
         const q = { x: cx - hw + (2 * hw * i) / n, y: cy - hh + (2 * hh * j) / n };
         if (!inside(polys, q)) continue;
         const r = edgeDist(polys, q);
-        if (!best || r > best.r) best = { p: q, r };
+        // Near-ties keep the first point, so engines that differ in the last bit pick the same one (plugins)
+        if (!best || r > best.r + 1e-9) best = { p: q, r };
       }
     if (!best) return null;
     cx = best.p.x;

@@ -7,8 +7,47 @@ import type { WorkerReply, WorkerRequest } from './worker';
 export interface PluginProcess {
   /** Call a plugin function; rejects with EngineError (code: plugin-timeout, plugin-crash, or the plugin's own code) */
   call(fn: PluginFn, input: unknown): Promise<unknown>;
+  /**
+   * Data a parameter refers to (a 3D model): handed to the plugin's `resource` function before the next call, and
+   * again after the plugin was restarted. The newest few are kept.
+   */
+  setResource(r: PluginResource): void;
   dispose(): void;
 }
+
+export interface PluginResource {
+  kind: string;
+  id: string;
+  data: string;
+}
+
+/** Resources a process keeps for restarts; older ones are handed again only when set again */
+const KEEP_RESOURCES = 4;
+
+/** The resources of one process and which of them the running engine already has */
+function resourceSet() {
+  const all = new Map<string, PluginResource>();
+  let sent = new Set<string>();
+  return {
+    set(r: PluginResource) {
+      const k = `${r.kind}:${r.id}`;
+      all.delete(k);
+      all.set(k, r);
+      while (all.size > KEEP_RESOURCES) all.delete(all.keys().next().value!);
+    },
+    /** Resources the engine does not have yet; marked as sent */
+    pending(): PluginResource[] {
+      const out = [...all].filter(([k]) => !sent.has(k));
+      for (const [k] of out) sent.add(k);
+      return out.map(([, r]) => r);
+    },
+    /** A new engine has none */
+    reset: () => void (sent = new Set()),
+  };
+}
+
+/** A plugin without a resource function simply does not use resources */
+const noResourceFn = (e: unknown) => e instanceof EngineError && e.code === 'plugin-no-function';
 
 type Pending = { req: WorkerRequest; resolve: (r: WorkerReply) => void };
 
@@ -25,8 +64,10 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array): Plug
   let seq = 0;
   const pending = new Map<number, Pending>();
   let chain: Promise<unknown> = Promise.resolve();
+  const resources = resourceSet();
 
   const start = () => {
+    resources.reset();
     worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (ev: MessageEvent<WorkerReply>) => {
       const p = pending.get(ev.data.seq);
@@ -58,11 +99,11 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array): Plug
   return {
     call(fn, input) {
       // One call at a time per plugin; a timed-out call restarts the Worker for the next one
-      const run = async () => {
+      const one = async (f: PluginFn, inp: unknown) => {
         if (!worker) start();
         await loaded;
-        const ms = LIMITS.callMs[fn];
-        const r = await send({ seq: ++seq, op: 'call', fn, input: JSON.stringify(input), timeoutMs: ms }, ms + 500);
+        const ms = LIMITS.callMs[f];
+        const r = await send({ seq: ++seq, op: 'call', fn: f, input: JSON.stringify(inp), timeoutMs: ms }, ms + 500);
         if (r.error) {
           const err = replyError(r.error);
           // A Worker whose engine ran out of memory or crashed is not trusted for the next call
@@ -71,10 +112,16 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array): Plug
         }
         return unwrap(r.out ?? '');
       };
+      const run = async () => {
+        if (!worker) start();
+        for (const res of resources.pending()) await one('resource', res).catch((e) => { if (!noResourceFn(e)) throw e; });
+        return one(fn, input);
+      };
       const p = chain.then(run, run);
       chain = p.catch(() => undefined);
       return p;
     },
+    setResource: (r) => resources.set(r),
     dispose: () => kill('plugin-disposed'),
   };
 }
@@ -82,16 +129,26 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array): Plug
 /** Run a plugin in the current thread (Node tests, headless runner); same answers, no hard time limit for WebAssembly */
 export function inProcess(runtime: Runtime, code: string | Uint8Array): PluginProcess {
   let engine: Promise<Engine> | null = null;
+  const resources = resourceSet();
   return {
     async call(fn, input) {
+      if (!engine) resources.reset();
       const e = await (engine ??= createEngine(runtime, code));
       try {
+        for (const res of resources.pending()) {
+          try {
+            unwrap(e.call('resource', JSON.stringify(res), LIMITS.callMs.resource));
+          } catch (x) {
+            if (!noResourceFn(x)) throw x;
+          }
+        }
         return unwrap(e.call(fn, JSON.stringify(input), LIMITS.callMs[fn]));
       } catch (x) {
         if (x instanceof EngineError && (x.code === 'plugin-memory' || x.code === 'plugin-crash')) engine = null;
         throw x;
       }
     },
+    setResource: (r) => resources.set(r),
     dispose() {
       engine?.then((e) => e.dispose());
       engine = null;

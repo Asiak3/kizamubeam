@@ -185,6 +185,22 @@ pub fn pixels(image: &Value) -> Option<Vec<u8>> {
     Some(out)
 }
 
+/// A 3D model handed to `resource` (`kzm1:` + base64): positions (x, y, z per vertex, mm) and triangles
+pub fn mesh(data: &str) -> Option<(Vec<f32>, Vec<u32>)> {
+    let b = pixels(&serde_json::json!({ "data": data.strip_prefix("kzm1:")? }))?;
+    let u32_at = |o: usize| u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]);
+    if b.len() < 8 {
+        return None;
+    }
+    let (nv, nt) = (u32_at(0) as usize, u32_at(4) as usize);
+    if 8 + nv * 12 + nt * 12 != b.len() {
+        return None;
+    }
+    let pos = (0..nv * 3).map(|i| f32::from_bits(u32_at(8 + i * 4))).collect();
+    let tri = (0..nt * 3).map(|i| u32_at(8 + nv * 12 + i * 4)).collect();
+    Some((pos, tri))
+}
+
 /// A generator plugin. `validate` runs first; `generate` only when it reported no error.
 pub trait Plugin {
     type Params: serde::de::DeserializeOwned;
@@ -209,6 +225,12 @@ pub trait Plugin {
     fn on_event(_action: &str, _inputs: &Value, _p: &Self::Params) -> Option<Value> {
         None
     }
+    /// Optional: data a parameter with `"resource"` names (`kind` "model3d": a 3D model, see [`mesh`]). Called
+    /// once before the first call that needs it and again after a restart; keep it by `id` (e.g. in a
+    /// `thread_local!`). Return `false` for data the plugin cannot read. The default means no resources.
+    fn resource(_kind: &str, _id: &str, _data: &str) -> Option<bool> {
+        None
+    }
 }
 
 /// Call a plugin function by name with JSON input (used by `export_plugin!`, also handy in tests)
@@ -225,6 +247,14 @@ pub fn dispatch<P: Plugin>(name: &str, input: Value) -> Result<Value, String> {
             let old = input.get("old").cloned().unwrap_or(Value::Null);
             let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
             P::on_change(&key, &old, &p).ok_or_else(missing)
+        }
+        "resource" => {
+            let get = |k: &str| input.get(k).and_then(Value::as_str).ok_or("bad-input");
+            match P::resource(get("kind")?, get("id")?, get("data")?) {
+                None => Err(missing()),
+                Some(true) => Ok(Value::Null),
+                Some(false) => Err("bad-resource".into()),
+            }
         }
         "onEvent" => {
             let action = input.get("action").and_then(Value::as_str).ok_or("bad-input")?.to_string();
@@ -263,5 +293,25 @@ mod pixel_tests {
             assert_eq!(super::pixels(&serde_json::json!({ "data": b64 })), Some(bytes));
         }
         assert_eq!(super::pixels(&serde_json::json!({ "data": "A*" })), None);
+    }
+
+    #[test]
+    fn decodes_meshes() {
+        // One vertex (1, 2, 3), one triangle (0, 0, 0)
+        let mut b = vec![1u8, 0, 0, 0, 1, 0, 0, 0];
+        for v in [1.0f32, 2.0, 3.0] {
+            b.extend(v.to_le_bytes());
+        }
+        b.extend([0u8; 12]);
+        let abc = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut s = String::from("kzm1:");
+        for c in b.chunks(3) {
+            let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+            for k in 0..4 {
+                s.push(if k <= c.len() { abc[(n >> (18 - 6 * k) & 63) as usize] as char } else { '=' });
+            }
+        }
+        assert_eq!(super::mesh(&s), Some((vec![1.0, 2.0, 3.0], vec![0, 0, 0])));
+        assert_eq!(super::mesh("stl"), None);
     }
 }

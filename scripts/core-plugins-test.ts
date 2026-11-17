@@ -225,6 +225,38 @@ await test('jig as a plugin: same dialog, geometry and rows; adding from the sel
   }
 });
 
+await test('stack as a plugin: the 3D model goes to the plugin as a resource; same layers, issues and poses', async () => {
+  const { weld } = await import('../src/model3d/mesh');
+  const { addMesh, meshData } = await import('../src/model3d/store');
+  const { setResourceSource } = await import('../src/plugins/generator');
+  setResourceSource((kind, id) => (kind === 'model3d' ? meshData(id) : null));
+  /** Surface (u, v) → point as a welded grid */
+  const grid = (nu: number, nv: number, f: (u: number, v: number) => number[], closeV: boolean) => {
+    const soup: number[] = [];
+    const P = (i: number, j: number) => f((i % nu) / nu, closeV ? (j % nv) / nv : j / nv);
+    for (let i = 0; i < nu; i++)
+      for (let j = 0; j < nv; j++) soup.push(...P(i, j), ...P(i + 1, j), ...P(i + 1, j + 1), ...P(i, j), ...P(i + 1, j + 1), ...P(i, j + 1));
+    return weld(Float32Array.from(soup));
+  };
+  const sphere = addMesh(grid(32, 16, (u, v) => [40 * Math.sin(v * Math.PI) * Math.cos(u * 2 * Math.PI), 40 * Math.sin(v * Math.PI) * Math.sin(u * 2 * Math.PI), 40 * Math.cos(v * Math.PI)], false));
+  const torus = addMesh(grid(32, 12, (u, v) => [(30 + 8 * Math.cos(v * 2 * Math.PI)) * Math.cos(u * 2 * Math.PI), (30 + 8 * Math.cos(v * 2 * Math.PI)) * Math.sin(u * 2 * Math.PI), 8 * Math.sin(v * 2 * Math.PI)], true));
+  await same('stack', [
+    { model: '' },
+    { model: 'unknown' },
+    ...sweep('stack').map((c) => ({ model: sphere, name: 'ball', ...c })),
+    { model: torus, name: 'ring', up: 'y', axis: 'y', thickness: 2 },
+    { model: torus, name: 'ring', axis: 'x', sample: 'inner', numbers: false },
+  ]);
+  const core = G.getGenerator('stack')!;
+  const plug = pluginGenerator(pack.plugins.find((x) => x.id === 'stack')!, { id: pack.id, name: 'core' });
+  try {
+    assert.deepEqual(plug.inputs, [{ kind: 'model3d' }]);
+    assert.deepEqual(plug.fromInputs!({ model: { id: torus, name: 'ring' } }), core.fromInputs!({ model: { id: torus, name: 'ring' } }));
+  } finally {
+    plug.dispose();
+  }
+});
+
 await test('all pass the catalogue check', async () => {
   for (const m of pack.plugins) {
     const r = await checkPlugin(m);

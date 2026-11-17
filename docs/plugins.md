@@ -43,6 +43,8 @@ A plugin is an entry of `plugins` in an extension pack ([docs/packs.md](packs.md
 
 Parameter types are the same as for built-in generators: `length` (mm), `angle` (degrees), `int`, `number`, `enum`, `bool`, `text` and `data` (hidden text). `showIf` uses the rule language of the app (`eq`, `ne`, `lt`, `le`, `gt`, `ge`, `in`, `and`, `or`, `not`); no plugin code runs for visibility. `advanced` puts a field under “Advanced”, `resetOnNew` starts new parts with `def`.
 
+**3D models** (#211 stage 5). A `data` parameter with `"resource": "model3d"` holds the id of a 3D model the app keeps (models are not stored in the parameters, they can be megabytes). Before the plugin computes with such an id, the app calls its `resource` function once with `{ kind: "model3d", id, data }`, and again after the plugin was restarted (a timeout or crash); the plugin keeps the data by id. `data` is `kzm1:` followed by base64 of: vertex count and triangle count (uint32), the positions (float32, x y z in mm) and the triangle indices (uint32), little endian; `mesh()` in both SDKs decodes it. While a model is not loaded (an old project whose model is still being restored), the plugin is not told and reports the missing model itself; the result is computed again once the model is there. `"inputs": [{ "kind": "model3d", "param": "model", "name": "name" }]` offers the plugin when the user imports a 3D model: the model id goes into `param`, the file name into `name` (optional, a `data` or `text` parameter).
+
 ## Dialog (schema version 1)
 
 Plugins describe what the dialog contains; the app draws it, with its own controls, units, formula fields, OK/Cancel and keyboard handling. Plugins never ship HTML, styles or scripts for the dialog. Version 1 has:
@@ -97,6 +99,7 @@ A missing text falls back to its key. The app checks everything before it regist
 | `generate` | parameters (object) | `{ parts, info, label?, labels?, poses?, plan? }` |
 | `view` (optional) | parameters | `{ autoText?, rows? }`: suggestions for empty text fields and a text per list row, by key (texts) |
 | `onChange` (optional) | `{ key, old, params }` | `null`, `{ patch }` or `{ ask: { question, options: [{ label, patch }] } }` |
+| `resource` (optional) | `{ kind, id, data }` | `null` (see 3D models above) |
 | `onEvent` (optional) | `{ action, params, inputs }` | `null` or `{ patch?, message? }` (an action button of dialog version 2) |
 
 A part is `{ key, subs, at, marks? }`; a plugin with `"kind": "part"` returns exactly one, an assembly any number. `subs` uses the same sub-path format as the editor (`{ nodes: [{ x, y, cin?, cout?, smooth? }], closed }`). `info` is a list of `[label, value]` rows for the dialog. Issue and info codes are translated through the plugin's texts, so a plugin never builds user-facing sentences.
@@ -121,7 +124,7 @@ A failure is reported as a code, for example `holes-touch`. Codes the app itself
 | `plugin-no-function` | The plugin does not provide the called function |
 | `plugin-bad-output` | The answer breaks the contract (wrong types, NaN, too many parts or nodes, coordinates out of range, duplicate keys) |
 
-Limits (`LIMITS` in `contract.ts`): `validate` 10 s, `generate` 30 s, `view` and `onChange` 2 s, `onEvent` 10 s, 512 MB memory, 8 MB code, 32 MB answer, 2000 parts, 500 000 nodes, coordinates within ±100 m.
+Limits (`LIMITS` in `contract.ts`): `validate` 10 s, `generate` 30 s, `view` and `onChange` 2 s, `onEvent` 10 s, `resource` 20 s, 512 MB memory, 8 MB code, 32 MB answer, 2000 parts, 500 000 nodes, coordinates within ±100 m.
 
 ## JavaScript
 
@@ -173,11 +176,11 @@ Install the `.kzp` in the app under Extensions to try it. `build` in `plugin.jso
 
 ## Headless runner and check
 
-`src/plugins/headless.ts` runs a plugin's dialog without the app: `runDialog(manifest, steps)` starts with the default parameters, applies each step (a set of field changes, checked against the schema like user input) and returns after each one what the dialog would show: parameters, visible fields, issues with codes, info rows, the parts (key, position, size) and a SHA-256 of the geometry. A step may also press a button: `{ "$action": "<id>", "$selection": [{ name, polys }], "$image": { name, width, height, data }, "$camera": { width, height, data, bed, empty? } }` (images as a plugin gets them); the state then has the `message`, and every state has the `rows` from `view`. Use it in plugin tests.
+`src/plugins/headless.ts` runs a plugin's dialog without the app: `runDialog(manifest, steps)` starts with the default parameters, applies each step (a set of field changes, checked against the schema like user input) and returns after each one what the dialog would show: parameters, visible fields, issues with codes, info rows, the parts (key, position, size) and a SHA-256 of the geometry. A step may also press a button: `{ "$action": "<id>", "$selection": [{ name, polys }], "$image": { name, width, height, data }, "$camera": { width, height, data, bed, empty? } }` (images as a plugin gets them), and `{ "$model": { name, data } }` opens a 3D model (`kzm1:` data) like an import; the state then has the `message`, and every state has the `rows` from `view`. Use it in plugin tests.
 
 `npm run plugin:check <folder | file.kzp>` checks every plugin of a pack the way the catalogue will:
 
-- the default parameters generate parts without errors (a dialog that starts with an empty list is first filled by its first action with the selection as input, with a sample selection: a 40 × 30 mm rectangle with a hole),
+- the default parameters generate parts without errors (a plugin that is opened with a 3D model first gets a sample model, an octahedron 60 mm across; a dialog that starts with an empty list is first filled by its first action with the selection as input, with a sample selection: a 40 × 30 mm rectangle with a hole),
 - every option of every choice and both values of every switch run without a crash, timeout or broken output,
 - two runs give the same geometry (no randomness or clock; use a seed parameter),
 - issue codes, parameter labels and `desc` have English texts (warnings).
@@ -192,7 +195,7 @@ The built-in generators move to the plugin system (#205, #327). `npm run plugin:
 
 - Texts the generator composes (a field label with `t('Rad 1')` inside, an info value made of several texts) keep their parts: markers are closed, the wrapper turns them into lists of codes and plain strings, the build script renders static ones (field labels) into every language. The name in the Objects window comes from the generator's own `label()` through `label` and `labels`.
 
-Built so far (`plugins/core/dist/org.kizamubeam.core-generators.kzp`): gear, box, rack, pulley, cam, gear pair, drawer, insert, shelf, disc sphere box with dividers (`box-divided`, with `view` and `onChange`; its error codes come from `Generator.texts`) and the jig (`jig`, a list of workpieces filled from the selection, an image or the camera; the build replaces print-and-cut's `geom` import, which pulls in fonts, by a stub). `npm run test:core-plugins` checks that they give the same dialog, geometry, issues, info, names and 3D poses as the built-in generators for the defaults, every option, every switch and every number at its minimum and maximum, and reports the time. QuickJS is about 10 to 20 times slower than the built-in code: most cases take well under a second, nesting many parts takes longer (a gear pair with 400 teeth about 20 s, which is why `generate` may run 30 s). Not yet: stack (3D model input) and ribs (drawing surface). `tn()` texts are collected in both forms; the plugin picks the German plural form by number. Generators without a thickness parameter (gear pair) compute their 3D poses for 3 mm. The built-in versions stay active until the switch-over: callers that need results synchronously (built-in templates, 3D view, design check) need their own solution first.
+Built so far (`plugins/core/dist/org.kizamubeam.core-generators.kzp`): gear, box, rack, pulley, cam, gear pair, drawer, insert, shelf, disc sphere box with dividers (`box-divided`, with `view` and `onChange`; its error codes come from `Generator.texts`) and the jig (`jig`, a list of workpieces filled from the selection, an image or the camera; the build replaces print-and-cut's `geom` import, which pulls in fonts, by a stub). `npm run test:core-plugins` checks that they give the same dialog, geometry, issues, info, names and 3D poses as the built-in generators for the defaults, every option, every switch and every number at its minimum and maximum, and reports the time. QuickJS is about 10 to 20 times slower than the built-in code: most cases take well under a second, nesting many parts takes longer (a gear pair with 400 teeth about 20 s, which is why `generate` may run 30 s). The stack model (`stack`) gets its 3D model through `resource`; the wrapper puts it into the generator's own model store. Slicing in QuickJS is 15 to 20 times slower than built in: 50 layers of a sphere take about 4 s with 1 000 triangles and 12 s with 65 000 (built in 0.3 to 0.7 s), so the stack model needs a faster runtime (its slicing in WebAssembly) before it can replace the built-in one. Not yet: ribs (drawing surface). `tn()` texts are collected in both forms; the plugin picks the German plural form by number. Generators without a thickness parameter (gear pair) compute their 3D poses for 3 mm. The built-in versions stay active until the switch-over: callers that need results synchronously (built-in templates, 3D view, design check) need their own solution first.
 
 ## Tests
 

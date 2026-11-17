@@ -20,6 +20,11 @@ export type Spawn = (m: PluginManifest) => PluginProcess;
 let spawn: Spawn = (m) => inProcess(m.runtime, m.code);
 export const setPluginSpawn = (s: Spawn) => void (spawn = s);
 
+/** Data of a resource the app keeps (a 3D model as `kzm1:` text), or null while it is not loaded */
+export type ResourceSource = (kind: string, id: string) => string | null;
+let resourceSource: ResourceSource = () => null;
+export const setResourceSource = (s: ResourceSource) => void (resourceSource = s);
+
 const listeners = new Set<(id: string) => void>();
 /** Called with the generator id whenever a plugin answer arrives; returns the function that stops listening */
 export function onPluginResult(f: (id: string) => void): () => void {
@@ -86,7 +91,8 @@ export function localNumbers(s: string): string {
 /** Number values: whole numbers as they are (like t() in the app: „z=1000“), decimals in the user's format */
 const localNumber = (x: number) => (Number.isInteger(x) ? String(x) : x.toLocaleString(undefined, { maximumFractionDigits: 6 }));
 
-export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }): PluginGenerator {
+export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }, opts: { resource?: ResourceSource } = {}): PluginGenerator {
+  const source: ResourceSource = (kind, id) => opts.resource?.(kind, id) ?? resourceSource(kind, id);
   let proc: PluginProcess | null = null;
   const cache = new Map<string, Entry>();
   const running = new Map<string, Promise<void>>();
@@ -94,7 +100,17 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
   const labels = new Map<string, { label?: PluginText; parts?: Record<string, PluginText> }>();
   const text = (key: string, values?: Record<string, string | number>) => pluginText(m.texts, lang, key, values);
   const name = text('name') ?? m.id;
-  const keyOf = (p: Params) => JSON.stringify(m.schema.map((s) => p[s.key] ?? null));
+  // Parameters that name a resource (a 3D model): the plugin gets its data before it computes
+  const resourceParams = m.schema.filter((s) => s.type === 'data' && s.resource);
+  /** Resources these parameters need and their data (null while the app has not loaded it) */
+  const resourcesOf = (p: Params) =>
+    resourceParams.flatMap((s) => {
+      const id = String(p[s.key] ?? '');
+      const kind = (s as { resource: string }).resource;
+      return id ? [{ kind, id, data: source(kind, id) }] : [];
+    });
+  // A result computed while a model was missing is not the result once it has loaded
+  const keyOf = (p: Params) => JSON.stringify([...m.schema.map((s) => p[s.key] ?? null), ...resourcesOf(p).map((r) => r.data !== null)]);
   const codeText = (code: string, values?: Record<string, string | number>) =>
     appCodeText(code, name) ?? text(code, values) ?? t('Fehler in der Erweiterung „{name}“: {code}', { name, code });
   const values = (v?: Record<string, PluginText | number>) => v && Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'number' ? localNumber(x) : render(x)]));
@@ -135,6 +151,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     let r = running.get(k);
     if (r) return r;
     const input = { ...p };
+    for (const res of resourcesOf(p)) if (res.data !== null) (proc ??= spawn(m)).setResource({ kind: res.kind, id: res.id, data: res.data });
     r = (async () => {
       const entry: Entry = { validate: await call('validate', input, checkIssues) };
       if (!missing.has('view')) {
@@ -211,6 +228,16 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     manifest: m,
     texts: new Proxy(texts, { get: (o, code: string) => o[code] ?? (() => codeText(code)) }),
     ...(m.preview ? { preview: m.preview } : {}),
+    ...(m.inputs?.length
+      ? {
+          inputs: m.inputs.map((x) => ({ kind: x.kind })),
+          fromInputs(inp) {
+            const x = m.inputs!.find((i) => i.kind === 'model3d');
+            if (!x || !inp.model) return undefined;
+            return { [x.param]: inp.model.id, ...(x.name ? { [x.name]: inp.model.name } : {}) };
+          },
+        }
+      : {}),
     validate(p) {
       const e = entry(p);
       if (!e) return [{ level: 'error', code: PENDING, msg: codeText(PENDING) }];

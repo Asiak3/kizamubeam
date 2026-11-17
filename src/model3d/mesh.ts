@@ -1,6 +1,7 @@
 // Dreiecksnetze (3D-Modelle) lesen, verschweißen, prüfen und kompakt speichern. Ohne DOM, damit es auch in den
 // Node-Tests läuft. Einheiten wie in der Datei (STL kennt keine; meist mm).
 import { t } from '../i18n';
+import { fromBase64, toBase64 } from '../base64';
 
 export interface Mesh {
   /** Eckpunkte x, y, z hintereinander */
@@ -174,18 +175,6 @@ export function decodeMesh(s: string): Mesh {
   for (let i = 0; i < tri.length; i++, o += 4) tri[i] = dv.getUint32(o, true);
   if (tri.some((i) => i >= nv)) throw new MeshError(t('Die Modelldaten sind beschädigt.'));
   return { pos, tri };
-}
-
-function toBase64(b: Uint8Array): string {
-  let s = '';
-  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
-  return btoa(s);
-}
-function fromBase64(s: string): Uint8Array {
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
 }
 
 /** Kurze Kennung aus den Daten (FNV-1a, zwei Läufe), gleiche Modelle ergeben dieselbe */

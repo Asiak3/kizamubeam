@@ -56,7 +56,8 @@ export type ParamSpec =
   /** Empty text fields show the suggestion from Generator.view().autoText */
   | (SpecBase & { type: 'text'; def: string })
   /** Text, der nicht im Dialog erscheint (z. B. Kennung eines eingelesenen 3D-Modells) */
-  | (SpecBase & { type: 'data'; def: string });
+  /** resource: the value is the id of data the app keeps (a 3D model); plugins get that data before they compute */
+  | (SpecBase & { type: 'data'; def: string; resource?: 'model3d' });
 
 export interface Issue {
   /** Betroffenes Feld (fehlt bei Problemen, die mehrere Felder betreffen) */

@@ -35,6 +35,17 @@ export interface PluginManifest {
   /** Lists and actions of the dialog (schema version 2); labels are text keys */
   lists?: GenList[];
   actions?: GenAction[];
+  /**
+   * What the plugin can be opened with: a 3D model the user imports goes into `param` (a data parameter with
+   * resource model3d), its file name into `name`
+   */
+  inputs?: PluginInput[];
+}
+
+export interface PluginInput {
+  kind: 'model3d';
+  param: string;
+  name?: string;
 }
 
 export class ManifestError extends Error {}
@@ -134,6 +145,10 @@ function param(v: unknown, i: number): ParamSpec {
   }
   if (type === 'text' || type === 'data') {
     if (typeof v.def !== 'string' || v.def.length > 10_000) throw new ManifestError(t('{where}: def muss ein Text sein', { where: at }));
+    if (type === 'data' && v.resource !== undefined) {
+      if (v.resource !== 'model3d') throw new ManifestError(t('{where}: unbekannte Ressource „{kind}“', { where: at, kind: String(v.resource) }));
+      return { ...base, type, def: v.def, resource: 'model3d' };
+    }
     return { ...base, type, def: v.def };
   }
   throw new ManifestError(t('{where}: unbekannter Typ „{type}“', { where: at, type: String(type) }));
@@ -282,6 +297,22 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
     const m: PluginManifest = { id, version: version as number, api: api as number, type: 'generator', kind: kind as 'part' | 'assembly', runtime: runtime as Runtime, code, sha256: sum, schema, texts: tx };
     if (typeof raw.icon === 'string' && /^[a-zA-Z][a-zA-Z0-9-]{0,40}$/.test(raw.icon)) m.icon = raw.icon;
     if (isObj(raw.preview) && raw.preview.center === true) m.preview = { center: true };
+    if (raw.inputs !== undefined) {
+      if (!Array.isArray(raw.inputs) || raw.inputs.length > 4) fail(t('ungültige Angabe „inputs“'));
+      m.inputs = (raw.inputs as unknown[]).map((x, i) => {
+        const at = `inputs[${i}]`;
+        if (!isObj(x) || x.kind !== 'model3d') return fail(t('{where}: unbekannte Eingabe', { where: at }));
+        const param = schema.find((s) => s.key === x.param);
+        if (!param || param.type !== 'data' || param.resource !== 'model3d') return fail(t('{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein', { where: at }));
+        const out: PluginInput = { kind: 'model3d', param: param.key };
+        if (x.name !== undefined) {
+          const n = schema.find((s) => s.key === x.name);
+          if (!n || (n.type !== 'data' && n.type !== 'text')) return fail(t('{where}: „name“ muss ein Text-Parameter sein', { where: at }));
+          out.name = n.key;
+        }
+        return out;
+      });
+    }
     if (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined)) {
       if ((raw.dialog.version as number) < 2) fail(t('Listen und Aktionen brauchen „dialog“ Version 2'));
       Object.assign(m, dialogParts(raw.dialog, schema));

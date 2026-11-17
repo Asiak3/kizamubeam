@@ -36,6 +36,7 @@ export const CORE = {
   discsphere: { file: 'src/generators/discsphere', name: 'DISCSPHERE' },
   fingerbox: { file: 'src/generators/fingerbox', name: 'FINGERBOX' },
   // Print-and-cut marks pull in geom (with fonts); the jig never uses its boundsOf
+  stack: { file: 'src/generators/stack', name: 'STACK' },
   jig: { file: 'src/generators/jig', name: 'JIG', stub: { geom: 'export const boundsOf = () => { throw new Error("not in plugins"); };' } },
 };
 
@@ -157,7 +158,7 @@ export async function corePlugin(id) {
         put(`${s.key}.${v}`, label);
         return v;
       });
-    for (const k of ['advanced', 'resetOnNew', 'showIf']) if (s[k] !== undefined) p[k] = s[k];
+    for (const k of ['advanced', 'resetOnNew', 'showIf', 'resource']) if (s[k] !== undefined) p[k] = s[k];
     return p;
   });
   for (const de of sourceTexts(node.files)) put(codeOf(de), de);
@@ -194,11 +195,18 @@ export async function corePlugin(id) {
     if (a.field) out.field = a.field;
     return out;
   });
+  // Opened with a 3D model: which parameters fromInputs fills with its id and file name
+  let inputs;
+  if (g.inputs?.some((x) => x.kind === 'model3d') && g.fromInputs) {
+    const filled = g.fromInputs({ model: { id: '\u0000id', name: '\u0000name' } }) ?? {};
+    const keyOf = (v) => Object.keys(filled).find((k) => filled[k] === v);
+    if (keyOf('\u0000id')) inputs = [{ kind: 'model3d', param: keyOf('\u0000id'), ...(keyOf('\u0000name') ? { name: keyOf('\u0000name') } : {}) }];
+  }
   const sha256 = createHash('sha256').update(code).digest('hex');
   return {
     id: g.id, type: 'generator', api: 1, version: g.version, kind: g.kind, runtime: 'js', code, sha256,
     icon: g.icon, dialog: lists || actions ? { version: 2, ...(lists ? { lists } : {}), ...(actions ? { actions } : {}) } : { version: 1 },
-    ...(g.preview?.center ? { preview: { center: true } } : {}), params, texts,
+    ...(g.preview?.center ? { preview: { center: true } } : {}), ...(inputs ? { inputs } : {}), params, texts,
   };
 }
 

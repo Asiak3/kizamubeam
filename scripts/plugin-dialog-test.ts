@@ -243,6 +243,42 @@ await test('stage 3: image and camera inputs, a field next to a button, placehol
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'pic', inputs: ['video'] }] } }), /Eingabe|input/);
 });
 
+await test('3D model input: resource sent once per engine, opened through inputs, checked with a sample', async () => {
+  const { encodeMesh, meshId, weld } = await import('../src/model3d/mesh');
+  const code = `let calls = 0; const models = {};
+  globalThis.plugin = {
+    resource: ({ kind, id, data }) => { calls++; models[id] = data.length; return null; },
+    validate: (p) => models[p.model] ? [] : [{ level: 'error', code: 'noModel' }],
+    generate: (p) => ({ parts: [{ key: 'a', subs: [{ closed: true, nodes: [{x:0,y:0},{x:models[p.model] / 10,y:0},{x:0,y:1}] }], at: { x: 0, y: 0 } }], info: [['calls', String(calls)], ['name', p.name]] }),
+  };`;
+  const params = [{ key: 'model', type: 'data', def: '', resource: 'model3d' }, { key: 'name', type: 'data', def: '' }, { key: 'size', type: 'length', min: 1, max: 100, def: 10 }];
+  const texts = { en: { name: 'Model', desc: 'Model', noModel: 'No model', calls: 'Calls' } };
+  const m = manifest(code, { params, texts, inputs: [{ kind: 'model3d', param: 'model', name: 'name' }] });
+  assert.deepEqual(m.inputs, [{ kind: 'model3d', param: 'model', name: 'name' }]);
+  const tet = encodeMesh(weld(Float32Array.from([[0, 0, 0], [9, 0, 0], [0, 9, 0], [0, 0, 0], [0, 0, 9], [9, 0, 0], [0, 0, 0], [0, 9, 0], [0, 0, 9], [9, 0, 0], [0, 0, 9], [0, 9, 0]].flat())));
+  const { mesh: sdkMesh } = await import('../plugins/sdk/ts/index');
+  const { decodeMesh } = await import('../src/model3d/mesh');
+  assert.deepEqual(sdkMesh(tet), decodeMesh(tet), 'SDK mesh() reads the app format');
+  assert.equal(sdkMesh('kzm1:AAAA'), null);
+  const s = await runDialog(m, [{ $model: { name: 'tet', data: tet } }, { size: 20 }, { size: 30 }]);
+  assert.deepEqual(s[0].issues.map((i) => i.code), ['noModel']);
+  assert.equal(s[1].params.model, meshId(tet));
+  assert.equal(s[1].params.name, 'tet');
+  assert.equal(s[1].parts[0].box.maxX, tet.length / 10);
+  assert.deepEqual(s[3].info, [['Calls', '1'], ['Model', 'tet']], 'the model is sent once');
+  await assert.rejects(runDialog(m, [{ $model: { data: 'stl' } }]), ScriptError);
+  // The catalogue check opens it with a sample model
+  assert.deepEqual((await checkPlugin(m)).errors, []);
+  // A plugin without resource() still computes; the app does not send what it cannot use
+  const plain = manifest(code.replace(/resource: .*?\n/, ''), { params, texts, inputs: [{ kind: 'model3d', param: 'model' }] });
+  const r = await runDialog(plain, [{ $model: { data: tet } }]);
+  assert.deepEqual(r[1].issues.map((i) => i.code), ['noModel']);
+  // Manifest: resource kinds and inputs are checked
+  assert.throws(() => manifest(code, { params: [{ key: 'model', type: 'data', def: '', resource: 'video' }], texts }), /video/);
+  assert.throws(() => manifest(code, { params: [{ key: 'model', type: 'data', def: '' }], texts, inputs: [{ kind: 'model3d', param: 'model' }] }), /resource/);
+  assert.throws(() => manifest(code, { params, texts, inputs: [{ kind: 'model3d', param: 'model', name: 'size' }] }), /name/);
+});
+
 await test('check: a good plugin passes, randomness, crashes and missing texts are found', async () => {
   const ok = await checkPlugin(manifest(TRAY));
   assert.deepEqual(ok.errors, []);

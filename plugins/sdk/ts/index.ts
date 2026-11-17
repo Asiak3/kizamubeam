@@ -96,6 +96,24 @@ export function pixels(img: Image): Uint8Array {
   }
   return out;
 }
+/** A 3D model as the app hands it to resource(): positions (x, y, z per vertex, mm) and triangles (3 indices each) */
+export interface Mesh {
+  pos: Float32Array;
+  tri: Uint32Array;
+}
+/** Decode a 3D model (`kzm1:` + base64 of: vertex count, triangle count as uint32, then float32 positions and uint32 indices, little endian) */
+export function mesh(data: string): Mesh | null {
+  if (!data.startsWith('kzm1:')) return null;
+  const b = pixels({ width: 0, height: 0, data: data.slice(5) });
+  const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  if (b.length < 8) return null;
+  const nv = dv.getUint32(0, true), nt = dv.getUint32(4, true);
+  if (8 + nv * 12 + nt * 12 !== b.length) return null;
+  const pos = new Float32Array(nv * 3), tri = new Uint32Array(nt * 3);
+  for (let i = 0; i < pos.length; i++) pos[i] = dv.getFloat32(8 + i * 4, true);
+  for (let i = 0; i < tri.length; i++) tri[i] = dv.getUint32(8 + nv * 12 + i * 4, true);
+  return { pos, tri };
+}
 /** Answer of onEvent: parameters to change (e.g. new rows of a list) and a short message for the dialog */
 export interface EventResult {
   patch?: Params;
@@ -117,6 +135,11 @@ export interface Plugin<P extends Params = Params> {
   onChange?(input: { key: string; old: Params[string]; params: P }): Change | null;
   /** Optional: a button of the manifest's dialog.actions was pressed; inputs holds what the action declares */
   onEvent?(input: { action: string; params: P; inputs: EventInputs }): EventResult | null;
+  /**
+   * Optional: data a parameter with "resource" names (kind "model3d": a 3D model, decode it with mesh()). Called
+   * once before the first call that needs it, and again after the plugin was restarted; keep it by id.
+   */
+  resource?(input: { kind: string; id: string; data: string }): null;
 }
 
 /** Register the plugin's functions with the app */

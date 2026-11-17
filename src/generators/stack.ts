@@ -222,7 +222,7 @@ export const STACK: Generator = {
   },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
-    { key: 'model', type: 'data', label: t('Modell'), def: '' },
+    { key: 'model', type: 'data', label: t('Modell'), def: '', resource: 'model3d' },
     { key: 'name', type: 'data', label: t('Dateiname'), def: '' },
     {
       key: 'up', type: 'enum', label: t('Oben im Modell'), def: 'z',

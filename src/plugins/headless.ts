@@ -11,6 +11,7 @@ import { pluginGenerator } from './generator';
 import { pluginText, type PluginManifest } from './manifest';
 import { sha256 } from '../pdfcrypt';
 import { hex } from './manifest';
+import { encodeMesh, meshId, weld } from '../model3d/mesh';
 
 export interface DialogState {
   params: Params;
@@ -39,10 +40,13 @@ export class ScriptError extends Error {}
  * set of fields the user commits, one after the other; each goes through onChange like in the dialog. When the
  * plugin asks a question, `$answer` in the step picks the option (0, 1, 2); without it the user cancels and the
  * field gets its previous value back. `$action` clicks an action button after the fields, with `$selection` (a list
- * of { name, polys }) as the selection it hands over.
+ * of { name, polys }) as the selection it hands over. `$model` opens a 3D model like the user importing one:
+ * `{ name, data }` with data in the app's `kzm1:` format (see encodeMesh); it fills the parameters the manifest's
+ * `inputs` name.
  */
 export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = []): Promise<DialogState[]> {
-  const g = pluginGenerator(m, { id: 'headless', name: m.id });
+  const models = new Map<string, string>();
+  const g = pluginGenerator(m, { id: 'headless', name: m.id }, { resource: (kind, id) => (kind === 'model3d' ? models.get(id) ?? null : null) });
   try {
     const out: DialogState[] = [];
     let p = defaultParams(g);
@@ -50,7 +54,15 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
       let ask: DialogState['ask'];
       let message: string | undefined;
       if (i > 0) {
-        const { $answer, $action, $selection, $image, $camera, ...step } = steps[i - 1];
+        const { $answer, $action, $selection, $image, $camera, $model, ...step } = steps[i - 1];
+        if ($model !== undefined) {
+          const md = $model as { name?: unknown; data?: unknown };
+          if (typeof md.data !== 'string' || !md.data.startsWith('kzm1:')) throw new ScriptError(`step ${i}: $model needs data in the kzm1: format`);
+          if (!g.fromInputs) throw new ScriptError(`step ${i}: the plugin does not take a 3D model`);
+          const id = meshId(md.data);
+          models.set(id, md.data);
+          p = normalizeParams(g, { ...p, ...g.fromInputs({ model: { id, name: String(md.name ?? '') } }) }, p);
+        }
         if ($answer !== undefined && !(Number.isInteger($answer) && ($answer as number) >= 0)) throw new ScriptError(`step ${i}: $answer must be an option number`);
         const bad = checkInput(g, step).filter((x) => x.level === 'error');
         if (bad.length) throw new ScriptError(`step ${i}: ${bad.map((x) => x.msg).join('; ')}`);
@@ -129,6 +141,13 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
   }
 }
 
+/** 3D model the check opens a plugin with when it takes one: an octahedron, 60 mm across */
+const SAMPLE_MODEL = (() => {
+  const v = [[30, 0, 0], [-30, 0, 0], [0, 30, 0], [0, -30, 0], [0, 0, 30], [0, 0, -30]];
+  const f = [[0, 2, 4], [2, 1, 4], [1, 3, 4], [3, 0, 4], [2, 0, 5], [1, 2, 5], [3, 1, 5], [0, 3, 5]];
+  return { name: 'Sample', data: encodeMesh(weld(Float32Array.from(f.flatMap((t) => t.flatMap((i) => v[i]))))) };
+})();
+
 /** Selection the check hands to an action that fills an empty dialog: a 40 × 30 mm rectangle with a round hole */
 const SAMPLE_SELECTION: GenSelected[] = [{
   name: 'Sample',
@@ -176,12 +195,13 @@ export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
     }
   };
   try {
-    // A dialog that starts empty (a list filled from the selection) is filled once with a sample selection
-    let start: Record<string, unknown>[] = [];
-    let first = await runDialog(m);
+    // A plugin that is opened with a 3D model gets a sample model; a dialog that starts empty (a list filled from
+    // the selection) is filled once with a sample selection
+    let start: Record<string, unknown>[] = m.inputs?.some((x) => x.kind === 'model3d') ? [{ $model: SAMPLE_MODEL }] : [];
+    let first = (await runDialog(m, start)).slice(start.length ? 1 : 0);
     const fill = m.actions?.find((a) => a.inputs?.includes('selection'));
     if (!first[0].parts.length && fill) {
-      start = [{ $action: fill.id, $selection: SAMPLE_SELECTION }];
+      start = [...start, { $action: fill.id, $selection: SAMPLE_SELECTION }];
       first = await runDialog(m, start);
     }
     note(first, 'defaults');

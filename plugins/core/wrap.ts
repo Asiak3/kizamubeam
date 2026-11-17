@@ -4,6 +4,7 @@ import type { GenEvent, Generator, Params, ParamValue } from '../../src/generato
 import { fromBase64, type PluginImage, type PluginText } from '../../src/plugins/contract';
 import { pieces, type Piece } from './i18n-shim';
 import { codeOf } from './codes';
+import { registerMesh } from '../../src/model3d/store';
 
 const image = (im: PluginImage) => ({ width: im.width, height: im.height, data: fromBase64(im.data) });
 
@@ -33,6 +34,15 @@ gt.structuredClone ??= <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 export function wrap(g: Generator) {
   (globalThis as unknown as { plugin: unknown }).plugin = {
+    // Data a parameter names (a 3D model): kept in the generator's own model store, as in the app
+    ...(g.schema.some((s) => s.type === 'data' && s.resource)
+      ? {
+          resource(r: { kind: string; id: string; data: string }) {
+            if (r.kind === 'model3d' && !registerMesh(r.id, r.data)) throw new Error('bad-model');
+            return null;
+          },
+        }
+      : {}),
     validate(p: Params) {
       return g.validate(p).map((i) => {
         const tx = i.code ? { code: i.code } : toText(i.msg);
