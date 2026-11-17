@@ -16,6 +16,7 @@ setQuickJSWasm(qjs.buffer.slice(qjs.byteOffset, qjs.byteOffset + qjs.byteLength)
 const { buildCatalog } = await import('../src/catalog');
 const { parsePack } = await import('../src/packs');
 const { checkPlugin } = await import('../src/plugins/headless');
+const { loadNetFixtures } = await import('./net-fixtures.mjs');
 
 // argv: node, run-ts.mjs, dieses Skript, Zielordner
 const out = process.argv[3];
@@ -33,6 +34,8 @@ for (const n of readdirSync(src).filter((f) => f.endsWith('.kzp'))) {
 }
 // Plugin packs from source
 const sources: Record<string, string> = {};
+/** Recorded server answers of plugins with network access, by pack file */
+const netAnswers: Record<string, ReturnType<typeof loadNetFixtures>> = {};
 const pluginRoot = join(root, 'plugins');
 for (const d of readdirSync(pluginRoot, { withFileTypes: true })) {
   const dir = join(pluginRoot, d.name);
@@ -43,12 +46,13 @@ for (const d of readdirSync(pluginRoot, { withFileTypes: true })) {
   if (files.some(([n]) => n === name)) throw new Error(`${name} exists in packs/ and plugins/${d.name}`);
   files.push([name, readFileSync(join(dir, 'dist', name), 'utf8')]);
   copies.push([join(dir, 'dist', name), name]);
+  netAnswers[name] = loadNetFixtures(dir);
   sources[id] = `${REPO}/plugins/${d.name}`;
 }
 // Every plugin must pass the check before it goes into the catalogue
 for (const [name, text] of files) {
   for (const m of parsePack(text, '9999.0.0').plugins) {
-    const r = await checkPlugin(m);
+    const r = await checkPlugin(m, { net: netAnswers[name] ?? [] });
     for (const w of r.warnings) console.log(`${name} ${m.id}: warning: ${w}`);
     if (r.errors.length) throw new Error(`${name} ${m.id}: ${r.errors.join('; ')}`);
   }

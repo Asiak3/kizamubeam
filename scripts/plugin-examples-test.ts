@@ -246,6 +246,49 @@ await test('layered art (#159): levels from an image, nested plates with a frame
   g.dispose();
 });
 
+await test('street map (#280): map from recorded OSM answers, find a place, invert, lines, buildings', async () => {
+  const { runDialog, useNetAnswers } = await import('../src/plugins/headless');
+  const { loadNetFixtures } = await import('./net-fixtures.mjs');
+  execFileSync('node', ['scripts/plugin-pack.mjs', '--build', 'plugins/street-map'], { stdio: 'ignore' });
+  const m = parsePack(buildPluginPack('plugins/street-map')).plugins[0];
+  assert.deepEqual(m.network!.map((h) => h.hostname), ['nominatim.openstreetmap.org', 'overpass-api.de']);
+  const answers = loadNetFixtures('plugins/street-map');
+  const check = await checkPlugin(m, { net: answers });
+  assert.deepEqual(check.errors, [], 'catalogue check');
+  assert.deepEqual(check.warnings, [], 'catalogue check warnings');
+  // Without recorded answers the check says what is missing
+  assert.match((await checkPlugin(m)).errors.join(' '), /net-fixtures\.json/);
+  useNetAnswers(m, answers);
+  const s = await runDialog(m, [{ query: 'Example Gate' }, { $action: 'find' }, { invert: true }, { invert: false, roadStyle: 'lines', roads: 'all' }, { roadStyle: 'bands', buildings: true }, { span: 2000 }, { query: '' }, { $action: 'find' }, { query: '48.1, 11.5' }, { $action: 'find' }]);
+  const d = s[0];
+  assert.deepEqual(d.issues, []);
+  assert.deepEqual(d.info, [['Place', 'Brandenburger Tor, Berlin'], ['Scale', '1 : 5300'], ['Roads', '19'], ['Data', '© OpenStreetMap contributors']]);
+  assert.equal(d.parts.length, 1);
+  assert.ok(Math.abs(d.parts[0].box.maxX - d.parts[0].box.minX - 150) < 1e-6, 'the plate is 150 mm wide');
+  const found = s[2];
+  assert.equal(found.message, 'Found: Example Gate, Example Square, Example City');
+  assert.equal(found.params.center, '52.516275,13.377704');
+  assert.equal(found.params.placeName, 'Example Gate, Example Square, Example City');
+  assert.notEqual(s[3].geometry, found.geometry, 'inverted');
+  assert.notEqual(s[4].geometry, found.geometry, 'roads as lines');
+  assert.deepEqual(s[5].info.find((r) => r[0] === 'Buildings'), ['Buildings', '43']);
+  assert.deepEqual(s[6].issues.map((i) => i.code), ['buildingsLarge']);
+  assert.equal(s[6].info.find((r) => r[0] === 'Buildings'), undefined, 'no buildings for a large map');
+  assert.equal(s[8].message, 'Enter a place or address.');
+  assert.equal(s[10].params.center, '48.1,11.5');
+  // The geometry: roads, water and the park as filled areas on the plate, lines when asked
+  const g = pluginGenerator(m, { id: 'map', name: 'map' });
+  const bands = await G.buildGenAsync(g, G.normalizeParams(g, { ...G.defaultParams(g), parks: true }));
+  const marks = bands.parts[0].marks!;
+  assert.ok(marks.length > 20 && marks.every((x) => x.closed), 'closed areas to fill');
+  for (const x of marks) for (const q of x.nodes) assert.ok(Math.abs(q.x) <= 75.001 && Math.abs(q.y) <= 75.001, 'clipped to the plate');
+  const lines = await G.buildGenAsync(g, G.normalizeParams(g, { ...G.defaultParams(g), roadStyle: 'lines' }));
+  assert.ok(lines.parts[0].marks!.some((x) => !x.closed), 'roads as open lines');
+  const circle = await G.buildGenAsync(g, G.normalizeParams(g, { ...G.defaultParams(g), shape: 'circle' }));
+  for (const x of circle.parts[0].marks!) for (const q of x.nodes) assert.ok(Math.hypot(q.x, q.y) <= 75.01, 'clipped to the circle');
+  g.dispose();
+});
+
 if (failed) {
   console.log(`${failed} failed`);
   process.exit(1);

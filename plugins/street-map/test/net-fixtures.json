@@ -1,0 +1,20 @@
+{
+  "answers": [
+    {
+      "host": "overpass",
+      "path": "/interpreter",
+      "match": "building",
+      "file": "buildings.json"
+    },
+    {
+      "host": "overpass",
+      "path": "/interpreter",
+      "file": "base.json"
+    },
+    {
+      "host": "nominatim",
+      "path": "/search",
+      "file": "search.json"
+    }
+  ]
+}

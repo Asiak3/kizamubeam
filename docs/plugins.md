@@ -213,7 +213,7 @@ At most 4 servers. `network` needs `fetch` in `host` and the other way round. Th
 - At most 10 MB and 20 seconds per request; only the declared content types; HTTP errors come back as their status with `net-status`.
 - Answers are kept for an hour (50 MB at most), so a live preview does not ask the server again.
 
-The test load before installing makes no requests (a plugin that asks for data counts as answered). The headless runner has no network either: requests come back `net-denied` unless a test sets its own transport and consent (`setNetTransport`, `setNetConsent` in `src/plugins/net.ts`, as `scripts/plugin-net-test.ts` does).
+The test load before installing makes no requests (a plugin that asks for data counts as answered). The headless runner and `npm run plugin:check` have no network either: they answer requests from recorded answers, `net-fixtures.json` next to `plugin.json` or in its `test/` folder: `{ "answers": [{ "host", "path", "match"?, "status"?, "contentType"?, "file" }] }`. A request gets the first answer with its server id and a URL starting with the server's base plus `path`; `match` is a text the URL or POST body must contain. Requests without an answer fail with `net-offline`, and the check says how to add one. `useNetAnswers(manifest, answers)` in `src/plugins/headless.ts` does the same for a plugin's own tests; the catalogue build checks every plugin this way. Example: `plugins/street-map` (#280 stage 10), whose `test/` folder has a small made-up town.
 
 Error codes: `net-unknown-host`, `net-method`, `net-offline`, `net-denied`, `net-local`, `net-failed`, `net-status`, `net-type`, `net-too-large`. A plugin that ends its call with one of them gets the app's explanation shown to the user.
 

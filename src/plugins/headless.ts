@@ -15,6 +15,41 @@ import { sha256 } from '../pdfcrypt';
 import { hex } from './manifest';
 import { encodeMesh, meshId, weld } from '../model3d/mesh';
 import { isToolType, pluginTool, sampleInput, type ToolInput, type ToolResult } from './tool';
+import { clearNetCache, setNetConsent, setNetTransport } from './net';
+
+/**
+ * A recorded answer of a server for plugins with network access (#280): the headless runner has no network, so
+ * requests are answered from these. A request matches the first answer with its server id, a path the URL starts
+ * with below the server's base, and (if given) a text the URL or POST body contains.
+ */
+export interface NetAnswer {
+  host: string;
+  path: string;
+  match?: string;
+  status?: number;
+  contentType?: string;
+  text: string;
+}
+
+/** Answer the requests of a plugin from recorded answers (all servers allowed); unknown requests fail net-offline */
+export function useNetAnswers(m: PluginManifest, answers: readonly NetAnswer[]) {
+  clearNetCache();
+  setNetConsent(() => Promise.resolve(true));
+  setNetTransport(async (r) => {
+    let what = r.url;
+    try {
+      what += ' ' + decodeURIComponent((r.body ?? '').replace(/\+/g, ' '));
+    } catch {
+      what += ' ' + (r.body ?? '');
+    }
+    const a = answers.find((x) => {
+      const h = m.network?.find((n) => n.id === x.host);
+      return h && r.url.startsWith(h.base + x.path) && (x.match === undefined || what.includes(x.match));
+    });
+    if (!a) throw new Error('net-offline');
+    return { status: a.status ?? 200, contentType: a.contentType ?? 'application/json', bytes: new TextEncoder().encode(a.text) };
+  });
+}
 
 export interface DialogState {
   params: Params;
@@ -345,8 +380,9 @@ async function checkGenerator(m: PluginManifest, errors: string[], note: (states
   for (const step of steps) note(await runDialog(m, [...start, step]), JSON.stringify(step));
 }
 
-export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
+export async function checkPlugin(m: PluginManifest, opts: { net?: readonly NetAnswer[] } = {}): Promise<CheckReport> {
   const errors: string[] = [];
+  if (m.network?.length) useNetAnswers(m, opts.net ?? []);
   const warnings: string[] = [];
   const codes = new Set<string>();
   const crash = /^plugin-/;
@@ -364,7 +400,8 @@ export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
   } catch (e) {
     errors.push(e instanceof Error ? e.message : String(e));
   }
-  for (const c of codes) if (c !== 'plugin-text' && pluginText(m.texts, 'en', c) === undefined) warnings.push(`no English text for code "${c}"`);
+  if (m.network?.length && errors.some((e) => /net-offline/.test(e))) errors.push('the plugin loads data from the internet: give recorded answers for its requests (net-fixtures.json next to plugin.json, see docs/plugins.md)');
+  for (const c of codes) if (c !== 'plugin-text' && !c.startsWith('net-') && pluginText(m.texts, 'en', c) === undefined) warnings.push(`no English text for code "${c}"`);
   for (const s of m.schema) if (pluginText(m.texts, 'en', s.key) === undefined) warnings.push(`no English label for parameter "${s.key}"`);
   if (pluginText(m.texts, 'en', 'desc') === undefined) warnings.push('no English text "desc" (toolbox tooltip)');
   return { id: m.id, errors, warnings };

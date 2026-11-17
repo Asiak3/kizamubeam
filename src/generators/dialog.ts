@@ -315,6 +315,14 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       const path = subsToPath2D(pt.shape.subs);
       ctx.fill(path, 'evenodd');
       ctx.stroke(path);
+      // Engraving on the part (labels, glue marks, a map) as thin lines
+      if (pt.marks?.length) {
+        ctx.save();
+        ctx.strokeStyle = css.getPropertyValue('--accent').trim() || '#2f6fd6';
+        ctx.lineWidth = 0.8 / k;
+        ctx.stroke(subsToPath2D(pt.marks));
+        ctx.restore();
+      }
     }
     if (old && matEntry) {
       const pt = calibPatch();
