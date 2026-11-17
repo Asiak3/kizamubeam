@@ -52,6 +52,15 @@ export interface PluginManifest {
   host?: string[];
   /** Servers the app may fetch data from for the plugin (#280); needs the host function fetch */
   network?: PluginNetHost[];
+  /** Plug-in joints (generators): kind of fit and the number parameter that holds the play (design check) */
+  fit?: { kind: 'pair' | 'slot'; play: string };
+  /** The parts form one connected assembly that the assembly check examines */
+  assemblyCheck?: boolean;
+  /**
+   * Place of the toolbox tile and toolbar action; texts under tile.name and tile.action. Only the generators that
+   * come with the app use it; extensions are listed under „From extensions“.
+   */
+  tile?: { group: string; before?: string; since?: string };
 }
 
 /**
@@ -150,6 +159,8 @@ const KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/;
 const TEXT_KEY_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,80}$/;
 const LANG_RE = /^[a-z]{2,3}(?:-[A-Z]{2})?$/;
 const HEX64 = /^[0-9a-f]{64}$/;
+/** Toolbox group, tile id or version of a tile */
+const TILE_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,40}$/;
 const MAX_PARAMS = 100;
 const MAX_OPTIONS = 60;
 const MAX_TEXTS = 2000;
@@ -487,6 +498,24 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
       if (new Set(m.network.map((x) => x.id)).size !== m.network.length) fail(t('ungültige Angabe „network“'));
       if (!m.host?.includes('fetch')) fail(t('„network“ braucht die Host-Funktion „fetch“'));
     } else if (m.host?.includes('fetch')) fail(t('„network“ braucht die Host-Funktion „fetch“'));
+    if (type !== 'generator' && (raw.fit !== undefined || raw.assemblyCheck !== undefined || raw.tile !== undefined)) fail(t('ungültige Angabe „{key}“', { key: 'fit/assemblyCheck/tile' }));
+    if (raw.fit !== undefined) {
+      const f = raw.fit;
+      const play = isObj(f) ? schema.find((s) => s.key === f.play) : undefined;
+      if (!isObj(f) || (f.kind !== 'pair' && f.kind !== 'slot') || !play || !(NUMERIC as readonly string[]).includes(play.type)) fail(t('ungültige Angabe „{key}“', { key: 'fit' }));
+      m.fit = { kind: (f as { kind: 'pair' | 'slot' }).kind, play: play!.key };
+    }
+    if (raw.assemblyCheck !== undefined) {
+      if (typeof raw.assemblyCheck !== 'boolean') fail(t('ungültige Angabe „{key}“', { key: 'assemblyCheck' }));
+      if (raw.assemblyCheck) m.assemblyCheck = true;
+    }
+    if (raw.tile !== undefined) {
+      const tl = raw.tile;
+      const ok = (x: unknown) => x === undefined || (typeof x === 'string' && TILE_RE.test(x));
+      if (!isObj(tl) || typeof tl.group !== 'string' || !TILE_RE.test(tl.group) || !ok(tl.before) || !ok(tl.since)) fail(t('ungültige Angabe „{key}“', { key: 'tile' }));
+      const x = tl as { group: string; before?: string; since?: string };
+      m.tile = { group: x.group, ...(x.before ? { before: x.before } : {}), ...(x.since ? { since: x.since } : {}) };
+    }
     if (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined || raw.dialog.surface !== undefined)) {
       if ((raw.dialog.version as number) < 2) fail(t('Listen und Aktionen brauchen „dialog“ Version 2'));
       Object.assign(m, dialogParts(raw.dialog, schema, keys));

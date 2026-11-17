@@ -6,17 +6,25 @@ import { initDialogDrag } from './dialogDrag';
 import { t } from './i18n';
 import { initPlugins, PENDING } from './plugins/registry';
 import { workerProcess } from './plugins/client';
-import { setResourceSource } from './plugins/generator';
+import { setPluginSpawn, setResourceSource } from './plugins/generator';
+import type { PluginManifest } from './plugins/manifest';
+import { useCoreGenerators } from './plugins/core';
+import { CORE_PACK_TEXT } from './plugins/corePack';
 import { initPluginNet } from './plugins/netUi';
 import { meshData } from './model3d/store';
 import { imageResource } from './plugins/imageResource';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 canvas.tabIndex = 0;
+// Plugins run in their own Worker. The generators that come with the app (core pack) are registered before the
+// editor reads the last project: their plugins migrate parameters of older files.
+const spawn = (m: PluginManifest) => workerProcess(m.runtime, m.code, m.host ?? []);
+setPluginSpawn(spawn);
+useCoreGenerators(CORE_PACK_TEXT);
 const editor = new Editor(canvas);
-// Plugins of extensions run in their own Worker. Parts whose formulas waited for a plugin are recomputed once it answers.
+// Plugins of extensions. Parts whose formulas waited for a plugin are recomputed once it answers.
 initPlugins(
-  (m) => workerProcess(m.runtime, m.code, m.host ?? []),
+  spawn,
   () => {
     if (editor.paramProblems.some((x) => x.issues.some((i) => i.code === PENDING))) editor.applyParams();
   },

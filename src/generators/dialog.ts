@@ -7,7 +7,7 @@ import type { GenShape, Obj } from '../model';
 import type { BuildResult } from './index';
 import { subsToPath2D } from '../geom';
 import { dec, t, tn } from '../i18n';
-import { autoText, buildGen, defaultParams, fieldActive, GENERATORS, genLabel, getGenerator, normalizeParams, resolveBinds } from './index';
+import { autoText, buildGen, defaultParams, fieldActive, GENERATORS, genLabel, genReady, getGenerator, normalizeParams, resolveBinds } from './index';
 import { evalExpr, f2 } from '../dom';
 import { evaluate, formatNumber, namesIn, projectParams } from '../params';
 import type { GenAsk, GenChange, Generator, Params, ParamSpec, ParamValue } from './types';
@@ -50,7 +50,7 @@ const PREVIEW_DELAY_MS = 120;
 const fmtNum = (v: number) => (Number.isInteger(v) ? String(v) : f2(v));
 
 /** Generator-Dialog: neues Bauteil erzeugen (ohne o) oder die Parameter eines vorhandenen ändern */
-export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params) {
+export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params, migrated = false) {
   const old = o?.shape.kind === 'gen' ? o.shape : null;
   const g = getGenerator(old?.gen ?? genId);
   if (!g) {
@@ -60,6 +60,8 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     ed.emit('tool');
     return;
   }
+  // Parameters of an older version that a plugin migrates in its Worker: open once they are migrated
+  if (old && !migrated && old.v < g.version && g.upgrade) return void genReady(old).then(() => openGenDialog(ed, genId, o, init, true));
   const p = initialDialogParams(g, old, init);
   for (const s of g.schema) if (s.type === 'text' && isSuggested(g, s.key, p)) p[s.key] = '';
   // Felder mit Formel aus Projekt-Parametern (z. B. Dicke); beim Erstellen ohne Formeln

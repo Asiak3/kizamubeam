@@ -163,6 +163,7 @@ with application/file/native/hardware boundaries excluded).
 
 ## Joints, generators and 3D
 
+- Built-in generators as plugins (#327): box, gear, drawer, shelf, insert and the other built-in generators run as plugins from a pack that comes with the app, in their own Worker, so the editor stays usable while they compute. Dialogs, toolbox tiles, the 3D view, the design and assembly check and built-in templates work as before; parameters of older projects are migrated by the plugin when the file is opened, and the stored geometry stays until you edit the part. Tests: `npm run test:core-plugins`.
 - Joints for laser-cut parts (“Joint” tool): finger joints and tab-and-slot on straight edges of existing shapes, with material thickness, kerf and clearance (negative = press fit). Edge 1 gets the fingers or tabs, edge 2 the counterpart or the slots; a single drawn line is replaced by the slots. The result stays an ordinary, editable path.
 - Cross-lap joints in the same tool: both edges get slots of material thickness, and the depth is a share of the board width (edge 1 e.g. 50 %, edge 2 the rest). Several slots divide the edge into equal compartments, for grid inserts and bottle dividers, for example.
 - Snap-fit and hook joints in the same tool: snap tabs with two flexible tongues and catch hooks (overhang, hook length and spring slot adjustable), and L-shaped hook tabs whose slot is lengthened by the hook length (insert, then slide).

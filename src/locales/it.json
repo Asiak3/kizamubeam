@@ -4952,5 +4952,6 @@
   "{where}: „methods“ darf nur GET und POST enthalten": "{where}: “methods” può contenere solo GET e POST",
   "„network“ braucht die Host-Funktion „fetch“": "“network” richiede la funzione host “fetch”",
   "„{name}“ darf Daten laden von: {hosts}": "“{name}” può caricare dati da: {hosts}",
-  "„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:": "“{name}” carica dati da internet. KizamuBeam chiede prima della prima richiesta e le effettua da sé, solo verso questi server:"
+  "„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:": "“{name}” carica dati da internet. KizamuBeam chiede prima della prima richiesta e le effettua da sé, solo verso questi server:",
+  "ungültige Angabe „{key}“": "«{key}» non valido"
 }

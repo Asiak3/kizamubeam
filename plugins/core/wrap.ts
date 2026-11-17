@@ -77,6 +77,14 @@ export function wrap(g: Generator) {
       };
     },
     // Only generators that have them: the app then knows the plugin has no such function
+    ...(g.migrate
+      ? {
+          // Parameters saved by an older version of the generator
+          migrate(input: { params: Params; from: number }) {
+            return g.migrate!(input.params, input.from);
+          },
+        }
+      : {}),
     ...(g.view
       ? {
           view(p: Params) {

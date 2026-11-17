@@ -372,6 +372,11 @@ export interface Generator {
   /** Kurzer Name für das Objekte-Fenster, z. B. „Zahnrad z=24 m=2“; bei Baugruppen mit dem Schlüssel des Teils */
   label(p: Params, part?: string): string;
   migrate?(p: Params, from: number): Params;
+  /**
+   * Like migrate, for generators that compute elsewhere (plugins in a Worker): loadGen starts it when a file is
+   * read, and genReady() waits for it before the parameters are edited
+   */
+  upgrade?(p: Params, from: number): Promise<Params>;
   /** Values the dialog shows that depend on the parameters: suggestions for empty text fields (by key) */
   view?(p: Params): GenView;
   /**

@@ -221,6 +221,11 @@ export interface Plugin<P extends Params = Params> {
   /** Optional: the dialog closed; drop what open kept */
   close?(): null;
   /**
+   * Optional: parameters saved by an older version of the plugin (from = their version) → the parameters of this
+   * version. Called when a project is opened; the stored geometry stays until the user edits the part.
+   */
+  migrate?(input: { params: Params; from: number }): Params;
+  /**
    * Optional: data a parameter with "resource" names (kind "model3d": a 3D model, decode it with mesh()). Called
    * once before the first call that needs it, and again after the plugin was restarted; keep it by id.
    */

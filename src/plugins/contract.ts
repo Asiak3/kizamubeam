@@ -18,7 +18,8 @@ export const PLUGIN_API = 1;
 /** draw, onSurface: the drawing surface of the dialog */
 /** open, close: a dialog with the plugin was opened or closed (a session: keep or drop expensive work) */
 /** apply: a path tool or image filter computes its result for the selection (#205 stage 3) */
-export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent' | 'resource' | 'draw' | 'onSurface' | 'open' | 'close' | 'apply';
+/** migrate: parameters saved by an older version of the plugin ({ params, from }) → parameters of this version */
+export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent' | 'resource' | 'draw' | 'onSurface' | 'open' | 'close' | 'apply' | 'migrate';
 
 /** Limits for one plugin (#205: time, memory, output size) */
 export const LIMITS = {
@@ -28,7 +29,7 @@ export const LIMITS = {
    * layout too (a stack model slices the model to count its layers), resource decodes a 3D model; draw may compute
    * the layout for new parameters, onSurface answers pointer events (finishing a line may look into the model)
    */
-  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000, resource: 20000, draw: 30000, onSurface: 5000, open: 30000, close: 2000, apply: 30000 } as Record<PluginFn, number>,
+  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000, resource: 20000, draw: 30000, onSurface: 5000, open: 30000, close: 2000, apply: 30000, migrate: 2000 } as Record<PluginFn, number>,
   /** Options of a question (ask) */
   askOptions: 3,
   /** Memory of the JavaScript engine or the WebAssembly instance */
@@ -348,6 +349,9 @@ function checkPatch(v: unknown): Record<string, unknown> {
   }
   return out;
 }
+
+/** Check and copy the answer of migrate(): the parameters as plain values */
+export const checkMigrate = (v: unknown): Record<string, unknown> => checkPatch(v);
 
 /** Check and copy the answer of view() */
 export function checkView(v: unknown): PluginView {

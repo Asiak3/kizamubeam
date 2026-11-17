@@ -152,6 +152,8 @@ export async function corePlugin(id) {
     const tile = g.tile.text((s) => s);
     if (tile.desc) put('desc', tile.desc);
     if (tile.keys) put('keys', tile.keys);
+    put('tile.name', tile.name);
+    put('tile.action', tile.action);
   }
   if (c.label) {
     put('label', c.label.text);
@@ -234,6 +236,10 @@ export async function corePlugin(id) {
     icon: g.icon, ...(host.length ? { host } : {}),
     dialog: lists || actions || surface ? { version: v3 ? 3 : 2, ...(lists ? { lists } : {}), ...(actions ? { actions } : {}), ...(surface ? { surface } : {}) } : { version: 1 },
     ...(g.preview?.center ? { preview: { center: true } } : {}), ...(inputs ? { inputs } : {}), params, texts,
+    // Toolbox place, plug-in joints and assembly check come from the generator too (the app reads them from here)
+    ...(g.tile ? { tile: { group: g.tile.group, ...(g.tile.before ? { before: g.tile.before } : {}), ...(g.tile.since ? { since: g.tile.since } : {}) } } : {}),
+    ...(g.fit ? { fit: g.fit } : {}),
+    ...(g.assemblyCheck ? { assemblyCheck: true } : {}),
   };
 }
 

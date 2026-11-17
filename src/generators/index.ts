@@ -189,9 +189,44 @@ export function genLabel(s: GenShape): string {
  */
 export function loadGen(s: GenShape) {
   const g = getGenerator(s.gen);
-  if (!g) return;
-  if (g.migrate && s.v < g.version) s.params = g.migrate(s.params, s.v);
-  s.v = Math.max(s.v, g.version);
+  if (!g || s.v >= g.version) return;
+  if (g.migrate) s.params = g.migrate(s.params, s.v);
+  else if (g.upgrade) {
+    // A plugin migrates in its Worker: the shape keeps its version until the answer is there
+    if (upgrading.has(s) || failed.has(s)) return;
+    const from = s.v;
+    const version = g.version;
+    const run = g
+      .upgrade(s.params, from)
+      .then((p) => {
+        if (s.v !== from) return;
+        s.params = p;
+        s.v = version;
+      })
+      .catch(() => {
+        // Parameters stay as saved (not asked again in this session; the next load of the file tries again)
+        failed.add(s);
+      })
+      .finally(() => upgrading.delete(s));
+    upgrading.set(s, run);
+    return;
+  }
+  s.v = g.version;
+}
+
+/** Plugin migrations started by loadGen and not answered yet, and those that failed */
+const upgrading = new WeakMap<GenShape, Promise<void>>();
+const failed = new WeakSet<GenShape>();
+/** A plugin is still migrating the parameters of this part */
+export const genUpgrading = (s: GenShape) => upgrading.has(s);
+
+/**
+ * Wait until the parameters of a part are migrated to its generator's version (plugins migrate in their Worker);
+ * at once when there is nothing to migrate. Whoever edits a part's parameters waits for this first.
+ */
+export function genReady(s: GenShape): Promise<void> {
+  loadGen(s);
+  return upgrading.get(s) ?? Promise.resolve();
 }
 
 /**

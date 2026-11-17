@@ -5,7 +5,7 @@
 // a result (the dialog, formula recomputation) listens to onPluginResult and asks again.
 import type { GenAction, GenChange, GenDrawing, GenEventResult, GenItem, GenList, GenResult, Generator, GenSurface, GenSurfaceResult, GenView, Params } from '../generators/types';
 import type { AsmPoses } from '../generators/pose';
-import { checkChange, checkDrawing, checkEvent, eventInputs, checkGenResult, checkIssues, checkView, ContractError, type PluginEventResult, type PluginFn, type PluginGenResult, type PluginIssue, type PluginItem, type PluginText, type PluginView } from './contract';
+import { checkChange, checkDrawing, checkEvent, eventInputs, checkGenResult, checkMigrate, checkIssues, checkView, ContractError, type PluginEventResult, type PluginFn, type PluginGenResult, type PluginIssue, type PluginItem, type PluginText, type PluginView } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
 import type { PluginManifest } from './manifest';
@@ -56,12 +56,18 @@ export interface PluginGenerator extends Generator {
   /** Tooltip and search words of its toolbox tile (group „From extensions“; no Generator.tile, the toolbox adds it) */
   desc: string;
   keys: string;
+  /** A generator that comes with the app (the core pack): own toolbox tile, no extension name on its parts */
+  core?: boolean;
   /** Compute validate and, without errors, generate for these parameters (normalised) */
   prepare(p: Params): Promise<void>;
   dispose(): void;
 }
 
-export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }, opts: { resource?: ResourceSource; noNet?: boolean } = {}): PluginGenerator {
+/**
+ * opts.core: a generator that comes with the app (plugins/core.ts): it takes its toolbox tile from the manifest
+ * and saves no extension name with its parts
+ */
+export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }, opts: { resource?: ResourceSource; noNet?: boolean; core?: boolean } = {}): PluginGenerator {
   const source: ResourceSource = (kind, id) => opts.resource?.(kind, id) ?? resourceSource(kind, id);
   let proc: PluginProcess | null = null;
   const cache = new Map<string, Entry>();
@@ -233,8 +239,26 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     icon: m.icon && ICONS[m.icon] ? m.icon : 'packs',
     schema,
     pack,
-    ext: pack.name,
+    ...(opts.core ? { core: true } : { ext: pack.name }),
     manifest: m,
+    ...(m.fit ? { fit: m.fit } : {}),
+    ...(m.assemblyCheck ? { assemblyCheck: true } : {}),
+    ...(opts.core && m.tile
+      ? {
+          tile: {
+            ...m.tile,
+            text: () => ({ name: text('tile.name') ?? name, desc: text('desc') ?? '', keys: text('keys') ?? '', action: text('tile.action') ?? name }),
+          },
+        }
+      : {}),
+    async upgrade(p, from) {
+      // Only parts of older versions get here, so it is asked every time (an SDK answers „no function“ for
+      // versions it leaves alone); without an answer the parameters stay as they are
+      const r = await call('migrate', { params: { ...p }, from }, checkMigrate);
+      if ('ok' in r) return r.ok as Params;
+      if (r.error === 'plugin-no-function') return p;
+      throw new Error(r.error);
+    },
     texts: new Proxy(texts, { get: (o, code: string) => o[code] ?? (() => codeText(code)) }),
     ...(m.preview ? { preview: m.preview } : {}),
     ...(m.inputs?.length

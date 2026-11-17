@@ -30,7 +30,8 @@ export function onToolsChanged(f: () => void): () => void {
 export function pluginConflict(pack: Pack, id: string): string | null {
   const g = getGenerator(id);
   if (!g) return null;
-  if (isPluginGenerator(g)) return g.pack.id === pack.id ? null : t('Die Kennung „{id}“ benutzt schon die Erweiterung „{name}“.', { id, name: g.pack.name });
+  // The generators that come with the app (core pack) count as built-in, even for a pack that copies their id
+  if (isPluginGenerator(g) && !g.core) return g.pack.id === pack.id ? null : t('Die Kennung „{id}“ benutzt schon die Erweiterung „{name}“.', { id, name: g.pack.name });
   return t('Die Kennung „{id}“ gehört zu einem eingebauten Generator.', { id });
 }
 

@@ -317,6 +317,13 @@ pub trait Plugin {
     fn close() -> Option<Value> {
         None
     }
+    /// Optional: parameters saved by an older version of this plugin (`from` = their version, the manifest's
+    /// `version` is the current one) → the parameters of this version, e.g. `Some(json!({ ..., "layout": "rows" }))`.
+    /// The app calls it when a project is opened; the stored geometry stays until the user edits the part.
+    /// `None` (the default) keeps the parameters as they are.
+    fn migrate(_params: &Value, _from: u32) -> Option<Value> {
+        None
+    }
     /// Optional: data a parameter with `"resource"` names (`kind` "model3d": a 3D model, see [`mesh`]). Called
     /// once before the first call that needs it and again after a restart; keep it by `id` (e.g. in a
     /// `thread_local!`). Return `false` for data the plugin cannot read. The default means no resources.
@@ -360,6 +367,10 @@ pub fn dispatch<P: Plugin>(name: &str, input: Value) -> Result<Value, String> {
             P::open(&p).ok_or_else(missing)
         }
         "close" => P::close().ok_or_else(missing),
+        "migrate" => {
+            let from = input.get("from").and_then(Value::as_u64).ok_or("bad-input")? as u32;
+            P::migrate(input.get("params").unwrap_or(&Value::Null), from).ok_or_else(missing)
+        }
         "apply" => {
             let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
             P::apply(&input, &p).ok_or_else(missing)
@@ -424,6 +435,9 @@ mod surface_tests {
         fn on_surface(event: &Value, surface: &Value, _p: &P) -> Option<Value> {
             Some(json!({ "state": { "at": event["x"] }, "view": surface["view"] }))
         }
+        fn migrate(params: &Value, from: u32) -> Option<Value> {
+            (from < 2).then(|| json!({ "n": params["n"].as_f64().unwrap_or(0.0) * 10.0 }))
+        }
     }
 
     #[test]
@@ -435,6 +449,9 @@ mod surface_tests {
         assert_eq!(s, json!({ "state": { "at": 2 }, "view": "side" }));
         let e = dispatch::<Dot>("onEvent", json!({ "action": "del", "row": 3, "inputs": {}, "params": { "n": 1 } })).unwrap();
         assert_eq!(e["message"], "del 3");
+        let m = dispatch::<Dot>("migrate", json!({ "params": { "n": 2 }, "from": 1 })).unwrap();
+        assert_eq!(m, json!({ "n": 20.0 }));
+        assert_eq!(dispatch::<Dot>("migrate", json!({ "params": { "n": 2 }, "from": 2 })), Err("plugin-no-function".into()));
     }
 }
 

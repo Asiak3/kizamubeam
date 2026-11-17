@@ -334,6 +334,63 @@ await test('app callers wait for a plugin in place of a built-in generator: 3D s
   }
 });
 
+await test('the app uses the core pack: tiles, fits, assembly check and migrations come from the plugins', async () => {
+  const { register, getGenerator, GENERATORS, loadGen, genReady, genUpgrading } = G;
+  const { useCoreGenerators, CORE_PACK_ID } = await import('../src/plugins/core');
+  const { isPluginGenerator } = await import('../src/plugins/generator');
+  const { pluginConflict } = await import('../src/plugins/registry');
+  const { t } = await import('../src/i18n');
+  const builtIn = new Map(GENERATORS.map((g) => [g.id, g]));
+  const order = GENERATORS.map((g) => g.id);
+  const text = readFileSync(new URL('../plugins/core/dist/org.kizamubeam.core-generators.kzp', import.meta.url), 'utf8');
+  const ids = useCoreGenerators(text);
+  try {
+    assert.deepEqual([...ids].sort(), [...builtIn.keys()].sort(), 'every built-in generator comes from the pack');
+    assert.deepEqual(GENERATORS.map((g) => g.id), order, 'same toolbox order');
+    for (const id of ids) {
+      const g = getGenerator(id)!;
+      const b = builtIn.get(id)!;
+      assert.ok(isPluginGenerator(g) && g.core, id);
+      assert.equal(g.ext, undefined, `${id}: no extension name on its parts`);
+      assert.equal(g.version, b.version, `${id}: version`);
+      assert.deepEqual(g.fit, b.fit, `${id}: fit`);
+      assert.equal(!!g.assemblyCheck, !!b.assemblyCheck, `${id}: assembly check`);
+      assert.equal(!!g.tile, !!b.tile, `${id}: tile`);
+      if (b.tile) {
+        const { text: bt, ...bp } = b.tile;
+        const { text: gt, ...gp } = g.tile!;
+        assert.deepEqual(gp, bp, `${id}: tile place`);
+        assert.deepEqual(gt(t), bt(t), `${id}: tile texts`);
+      }
+    }
+    // The manifest checks the new entries
+    const { parsePlugin } = await import('../src/plugins/manifest');
+    const raw = JSON.parse(text).plugins.find((x: { id: string }) => x.id === 'box');
+    assert.throws(() => parsePlugin({ ...raw, fit: { kind: 'pair', play: 'nope' } }, 'box'), /fit/);
+    assert.throws(() => parsePlugin({ ...raw, tile: { group: '' } }, 'box'), /tile/);
+    assert.throws(() => parsePlugin({ ...raw, assemblyCheck: 'yes' }, 'box'), /assemblyCheck/);
+    // A pack that copies the core pack's id cannot take over its generators
+    assert.match(pluginConflict({ id: CORE_PACK_ID, name: 'copy' } as never, 'box') ?? '', /eingebauten/);
+    // Parameters of an older project: the plugin migrates them in its Worker, the shape waits with its version
+    const old = { kind: 'gen', gen: 'box', v: 1, params: { ...G.defaultParams(builtIn.get('box')!), partLayout: 'packed' } } as never as import('../src/model').GenShape;
+    const want = builtIn.get('box')!.migrate!({ ...old.params }, 1);
+    loadGen(old);
+    assert.equal(old.v, 1, 'version stays until the plugin answers');
+    assert.ok(genUpgrading(old));
+    await genReady(old);
+    assert.equal(old.v, 2);
+    assert.deepEqual(old.params, want);
+    // Up to date: nothing to wait for
+    await genReady(old);
+    assert.ok(!genUpgrading(old));
+  } finally {
+    for (const g of builtIn.values()) {
+      getGenerator(g.id) !== g && (getGenerator(g.id) as { dispose?: () => void }).dispose?.();
+      register(g);
+    }
+  }
+});
+
 await test('all pass the catalogue check', async () => {
   for (const m of pack.plugins) {
     const r = await checkPlugin(m);
