@@ -1,7 +1,8 @@
 // Anbindung an Clipper (Angus Johnson, JS-Port): Kurven in Ganzzahl-Linienzüge zerlegen und Ergebnisse
 // wieder als Bézierpfade einpassen. Ohne Abhängigkeit von geom.ts, damit auch die Schrift-Engine es nutzen kann.
 import ClipperLib from 'clipper-lib';
-import { apply, IDENT, Mat, Pt, SubPath } from './model';
+import type { Pt, SubPath } from './model';
+import { apply, IDENT, type Mat } from './mat';
 import { bezierPt, segments } from './curves';
 import { fitPolyline } from './fit';
 

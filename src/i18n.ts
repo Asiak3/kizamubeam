@@ -74,7 +74,8 @@ function readPref(): LangPref {
 let pref: LangPref = readPref();
 /** Aktive Sprache; wird beim Start festgelegt, ein Wechsel lädt die Oberfläche neu. */
 export const lang: Lang = pref === 'system' ? systemLang() : pref;
-document.documentElement.lang = lang;
+// Not in Workers (plugins), which have no document
+if (typeof document !== 'undefined') document.documentElement.lang = lang;
 
 export const langPref = () => pref;
 

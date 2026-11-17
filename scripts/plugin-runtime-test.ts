@@ -153,6 +153,22 @@ await test('host functions from WebAssembly through the kzb.host_call import', a
   assert.equal(await code(p.call('generate', { pts: 'x' })), 'host-bad-input');
 });
 
+await test('the plugin Worker starts without the DOM (no document, no localStorage)', async () => {
+  // Every module the Worker imports runs in a Worker scope; a module that touches document at import time
+  // (i18n via model.ts) made every plugin crash in the app
+  // Loaded at run time: run-ts bundles this test and cannot bundle esbuild itself
+  const { createRequire } = await import('node:module');
+  const name = 'esbuild';
+  const { build } = createRequire(import.meta.url)(name) as typeof import('esbuild');
+  const r = await build({ entryPoints: [new URL('../src/plugins/worker.ts', import.meta.url).pathname], bundle: true, format: 'iife', write: false, metafile: true, logLevel: 'silent' });
+  const inputs = Object.keys(r.metafile!.inputs).filter((k) => k.startsWith('src/'));
+  for (const bad of ['src/i18n.ts', 'src/model.ts', 'src/dom.ts']) assert.ok(!inputs.includes(bad), `${bad} is in the Worker`);
+  const { runInNewContext } = await import('node:vm');
+  const self: Record<string, unknown> = {};
+  runInNewContext(r.outputFiles[0].text, { self, console, URL, TextEncoder, TextDecoder, navigator: { languages: ['en'] }, crypto: globalThis.crypto, setTimeout, clearTimeout });
+  assert.equal(typeof self.onmessage, 'function');
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

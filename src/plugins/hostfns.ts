@@ -5,7 +5,7 @@
 // Runs inside the plugin Worker (and in Node tests); each call counts toward the time limit of the plugin call.
 import ClipperLib from 'clipper-lib';
 import type { Pt, SubPath } from '../model';
-import { IDENT } from '../model';
+import { IDENT } from '../mat';
 import { execute, FLATTEN_TOL, flattenSub, pathsToSubs, SCALE, type Paths } from '../clip';
 import { fitPolyline } from '../fit';
 import { traceGray } from '../trace';
