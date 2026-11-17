@@ -1,7 +1,7 @@
 // Plugin entry of an extension pack (`plugins` in .kzp format version 2, issue #205): what the plugin is, its
 // parameters and texts, and its code. Everything is checked here before a plugin is registered; a mistake refuses
 // the whole pack. No DOM, no editor: the same checks run in the app and in the tests.
-import type { GenAction, GenActionInput, GenColumn, GenList, GenSurface, ParamSpec, ParamValue, Rule } from '../generators/types';
+import type { GenAction, GenActionInput, GenColumn, GenList, GenStep, GenSurface, ParamSpec, ParamValue, Rule } from '../generators/types';
 import { LIMITS, PLUGIN_API } from './contract';
 import { base64ToBytes, type Runtime } from './engine';
 import { HOST_FNS } from './hostfns';
@@ -41,6 +41,8 @@ export interface PluginManifest {
   actions?: GenAction[];
   /** Drawing surface (schema version 3); view labels and help are text keys */
   surface?: GenSurface;
+  /** Steps of the dialog (schema version 5); labels are text keys */
+  steps?: GenStep[];
   /**
    * What the plugin can be opened with: a 3D model the user imports goes into `param` (a data parameter with
    * resource model3d), its file name into `name`
@@ -70,7 +72,8 @@ export class ManifestError extends Error {}
  * conditions on action buttons. A plugin that needs a newer schema is refused with an update hint instead of being
  * shown half-broken.
  */
-export const DIALOG_VERSION = 4;
+export const DIALOG_VERSION = 5;
+const MAX_STEPS = 8;
 const MAX_VIEWS = 6;
 const MAX_ROW_ACTIONS = 4;
 const MAX_LISTS = 4;
@@ -218,19 +221,24 @@ function column(v: unknown, at: string): GenColumn {
     });
     return { ...base, type: 'enum', options };
   }
+  if (v.type === 'color') return { ...base, type: 'color', ...(v.readonly === true ? { readonly: true } : {}) };
   throw new ManifestError(t('{where}: unbekannter Typ „{type}“', { where: at, type: String(v.type) }));
 }
 
-/** Lists, actions (schema version 2), the surface (version 3) and images kept with the project (version 4) of a dialog */
-function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<string>): { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface } {
-  const out: { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface } = {};
+/**
+ * Lists, actions (schema version 2), the surface (version 3), images kept with the project (version 4), steps,
+ * sortable lists and colour columns (version 5) of a dialog
+ */
+function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<string>): { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface; steps?: GenStep[] } {
+  const out: { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface; steps?: GenStep[] } = {};
   const v3 = (d.version as number) >= 3;
   const needs3 = (at: string) => {
     if (!v3) throw new ManifestError(t('{where}: braucht „dialog“ Version 3', { where: at }));
   };
-  const needs4 = (at: string) => {
-    if ((d.version as number) < 4) throw new ManifestError(t('{where}: braucht „dialog“ Version {n}', { where: at, n: 4 }));
+  const needs = (n: number, at: string) => {
+    if ((d.version as number) < n) throw new ManifestError(t('{where}: braucht „dialog“ Version {n}', { where: at, n }));
   };
+  const needs4 = (at: string) => needs(4, at);
   if (d.lists !== undefined) {
     if (!Array.isArray(d.lists) || d.lists.length > MAX_LISTS) throw new ManifestError(t('ungültige Angabe „dialog“'));
     out.lists = d.lists.map((l, i) => {
@@ -255,7 +263,13 @@ function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<
           return { id: a.id, label: textKey(a.label ?? a.id, ra), ...(a.title !== undefined ? { title: textKey(a.title, ra) } : {}) };
         });
       }
-      if (list.columns.some((c) => c.type !== 'text' && c.type !== 'enum' && c.placeholder)) needs3(at);
+      if (list.columns.some((c) => c.type !== 'text' && c.type !== 'enum' && c.type !== 'color' && c.placeholder)) needs3(at);
+      if (list.columns.some((c) => c.type === 'color')) needs(5, at);
+      if (l.sort === true) (needs(5, at), (list.sort = true));
+      if (l.fixedLast !== undefined) {
+        if (!list.sort || !isNum(l.fixedLast) || !Number.isInteger(l.fixedLast) || l.fixedLast < 0 || l.fixedLast > 100) throw new ManifestError(t('{where}: „fixedLast“ braucht „sort“ und eine Zahl von 0 bis 100', { where: at }));
+        list.fixedLast = l.fixedLast as number;
+      }
       return list;
     });
   }
@@ -304,6 +318,24 @@ function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<
     }
     if (sf.help !== undefined) surface.help = textKey(sf.help, 'surface');
     out.surface = surface;
+  }
+  if (d.steps !== undefined) {
+    needs(5, 'steps');
+    if (!Array.isArray(d.steps) || d.steps.length < 2 || d.steps.length > MAX_STEPS) throw new ManifestError(t('{where}: 2 bis {n} Schritte', { where: 'steps', n: MAX_STEPS }));
+    // Every field, list, action and the surface may appear in one step at most
+    const known = new Set([...schema.filter((s) => s.type !== 'data').map((s) => s.key), ...(out.lists ?? []).map((l) => l.param), ...(out.actions ?? []).map((a) => a.id), ...(out.surface ? ['surface'] : [])]);
+    const used = new Set<string>();
+    out.steps = d.steps.map((st, i) => {
+      const at = `steps[${i}]`;
+      if (!isObj(st) || typeof st.id !== 'string' || !KEY_RE.test(st.id)) throw new ManifestError(t('{where}: Kennung fehlt oder ist ungültig', { where: at }));
+      if (!Array.isArray(st.items)) throw new ManifestError(t('ungültige Angabe „dialog“'));
+      const items = st.items.map((x) => {
+        if (typeof x !== 'string' || !known.has(x) || used.has(x)) throw new ManifestError(t('{where}: „{item}“ ist kein Feld, keine Liste, keine Aktion oder schon in einem Schritt', { where: at, item: String(x) }));
+        used.add(x);
+        return x;
+      });
+      return { id: st.id, label: textKey(st.label ?? st.id, at), items };
+    });
   }
   return out;
 }

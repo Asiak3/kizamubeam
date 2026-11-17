@@ -86,6 +86,30 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     ctx.globalAlpha = 1;
   };
 
+  /** A region map as a picture, one pixel per cell in the region's colour (kept per map) */
+  const bitmaps = new WeakMap<object, HTMLCanvasElement>();
+  const regionBitmap = (g: NonNullable<GenLayer['regions']>): HTMLCanvasElement => {
+    let c = bitmaps.get(g);
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = g.width;
+    c.height = g.height;
+    const img = new ImageData(g.width, g.height);
+    const rgb = g.colors.map((x) => [parseInt(x.slice(1, 3), 16), parseInt(x.slice(3, 5), 16), parseInt(x.slice(5, 7), 16)]);
+    for (let i = 0; i < g.data.length; i++) {
+      const v = g.data[i];
+      const q = v ? rgb[v - 1] : undefined;
+      if (!q) continue;
+      img.data[i * 4] = q[0];
+      img.data[i * 4 + 1] = q[1];
+      img.data[i * 4 + 2] = q[2];
+      img.data[i * 4 + 3] = 255;
+    }
+    c.getContext('2d')!.putImageData(img, 0, 0);
+    bitmaps.set(g, c);
+    return c;
+  };
+
   /** A layer as a picture for the current size and scale */
   const picture = (L: GenLayer, col: Record<GenStyle, string>): HTMLCanvasElement => {
     const { w } = size();
@@ -130,6 +154,14 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
       ctx.drawImage(tmp, 0, 0);
       ctx.setTransform(r, 0, 0, r, 0, 0);
       ctx.globalAlpha = 1;
+    }
+    if (L.regions) {
+      const g = L.regions;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.globalAlpha = L.alpha ?? 0.7;
+      ctx.drawImage(regionBitmap(g), sx(g.frame.x0), sy(g.frame.y0), (g.frame.x1 - g.frame.x0) * fit.k, (g.frame.y1 - g.frame.y0) * fit.k);
+      ctx.restore();
     }
     if (L.items) drawItems(ctx, L.items, col);
     if (pictures.size > MAX_LAYERS * 2) pictures.delete(pictures.keys().next().value!);
@@ -184,7 +216,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
         }
         if (!isOpen() || token !== drawSeq) continue;
         for (const L of d.layers ?? []) {
-          if (L.tris || L.items) {
+          if (L.tris || L.items || L.regions) {
             layers.delete(L.key);
             layers.set(L.key, L);
             for (const id of [...pictures.keys()]) if (id.startsWith(L.key + '\u0000')) pictures.delete(id);
@@ -271,6 +303,18 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
         const u = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
         if (Math.hypot(ax + u * dx - px, ay + u * dy - py) < HIT_LINE) return it.id;
       }
+    }
+    // Region maps of the shown layers, the topmost first: "<layer key>:<region>"
+    const shown = drawing?.layers ?? [];
+    const x = (px - fit.ox) / fit.k, y = (py - fit.oy) / fit.k;
+    for (let i = shown.length - 1; i >= 0; i--) {
+      const g = layers.get(shown[i].key)?.regions;
+      if (!g) continue;
+      const cx = Math.floor(((x - g.frame.x0) / (g.frame.x1 - g.frame.x0)) * g.width);
+      const cy = Math.floor(((y - g.frame.y0) / (g.frame.y1 - g.frame.y0)) * g.height);
+      if (cx < 0 || cy < 0 || cx >= g.width || cy >= g.height) continue;
+      const v = g.data[cy * g.width + cx];
+      if (v) return `${shown[i].key}:${v - 1}`;
     }
     return undefined;
   };

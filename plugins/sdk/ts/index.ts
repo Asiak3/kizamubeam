@@ -144,10 +144,28 @@ export type Item =
   | { type: 'line'; pts: [number, number][]; closed?: boolean; style?: Style; width?: number; dash?: boolean; alpha?: number; id?: string }
   | { type: 'handle'; x: number; y: number; id: string; style?: Style; size?: number }
   | { type: 'text'; x: number; y: number; text: Text; style?: Style };
+/**
+ * A region map on the surface: width × height cells over frame (mm), one byte per cell as base64 (0 = none,
+ * n = region n − 1), filled with colors[n − 1] ("#rrggbb"). A click on a region arrives as hit "<layer key>:<region>";
+ * `regionMap()` builds the data.
+ */
+export interface Regions {
+  frame: { x0: number; y0: number; x1: number; y1: number };
+  width: number;
+  height: number;
+  data: string;
+  colors: string[];
+}
+/** A region map from region numbers per cell (-1 = none) */
+export function regionMap(frame: Regions['frame'], width: number, height: number, cells: ArrayLike<number>, colors: string[]): Regions {
+  const b = new Uint8Array(width * height);
+  for (let i = 0; i < b.length; i++) b[i] = cells[i] >= 0 && cells[i] < 255 ? cells[i] + 1 : 0;
+  return { frame, width, height, data: base64(b), colors };
+}
 /** What draw() returns: the area to show, layers the app keeps by key (send their content only when not in have), shapes */
 export interface Drawing {
   frame: { x0: number; y0: number; x1: number; y1: number };
-  layers?: { key: string; tris?: number[]; items?: Item[]; alpha?: number }[];
+  layers?: { key: string; tris?: number[]; items?: Item[]; alpha?: number; regions?: Regions }[];
   items: Item[];
   /** Send pointer moves without a pressed button (e.g. while drawing a line) */
   track?: boolean;

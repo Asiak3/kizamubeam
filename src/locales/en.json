@@ -4925,5 +4925,9 @@
   "„{name}“ hat keine Formen geliefert; die Auswahl wurde entfernt (Ctrl+Z macht es rückgängig).": "“{name}” returned no shapes; the selection was removed (Ctrl+Z undoes it).",
   "Erst ein Bild in der Zeichnung auswählen.": "Select an image in the drawing first.",
   "{where}: braucht „dialog“ Version {n}": "{where}: needs “dialog” version {n}",
-  "{where}: „store“ muss ein data-Parameter mit „resource“: „image“ sein, und die Aktion braucht ein Bild": "{where}: “store” must be a data parameter with “resource”: “image”, and the action needs an image"
+  "{where}: „store“ muss ein data-Parameter mit „resource“: „image“ sein, und die Aktion braucht ein Bild": "{where}: “store” must be a data parameter with “resource”: “image”, and the action needs an image",
+  "Ziehen oder Alt+↑/↓ zum Umsortieren": "Drag or press Alt+↑/↓ to reorder",
+  "{where}: 2 bis {n} Schritte": "{where}: 2 to {n} steps",
+  "{where}: „fixedLast“ braucht „sort“ und eine Zahl von 0 bis 100": "{where}: “fixedLast” needs “sort” and a number from 0 to 100",
+  "{where}: „{item}“ ist kein Feld, keine Liste, keine Aktion oder schon in einem Schritt": "{where}: “{item}” is not a field, list or action, or is already in a step"
 }

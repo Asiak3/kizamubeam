@@ -14,6 +14,7 @@ const { buildPluginPack } = await import('./plugin-pack.mjs');
 const { parsePack } = await import('../src/packs');
 const { pluginGenerator } = await import('../src/plugins/generator');
 const { runDialog, checkPlugin, ScriptError } = await import('../src/plugins/headless');
+const { defaultParams } = await import('../src/generators/index');
 // Endless loops below should not wait for the full generate limit
 (await import('../src/plugins/contract')).LIMITS.callMs.generate = 3000;
 
@@ -66,7 +67,7 @@ await test('schema v1: sections are translated, advanced wins, a newer dialog sc
   assert.equal(g.schema[4].advanced, true);
   assert.equal(g.schema[2].options[1][1], 'Sliding');
   g.dispose();
-  assert.throws(() => manifest(TRAY, { dialog: { version: 5 } }), /neuere Version|newer version/);
+  assert.throws(() => manifest(TRAY, { dialog: { version: 6 } }), /neuere Version|newer version/);
   assert.throws(() => manifest(TRAY, { dialog: 'big' }), /dialog/);
   assert.throws(() => manifest(TRAY, { params: [{ key: 'a', type: 'bool', def: true, section: '<b>' }] }), /Abschnitt|section/);
 });
@@ -193,7 +194,7 @@ await test('stage 3: lists of rows and actions with the selection', async () => 
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, version: 1 } }), /Version 2|version 2/);
   assert.throws(() => manifest(code, { params: [{ key: 'items', type: 'text', def: '' }], texts, dialog }), /data/);
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, lists: [{ param: 'items', columns: [{ key: 'x', type: 'int', min: 5, max: 1 }] }] } }), /min/);
-  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, lists: [{ param: 'items', columns: [{ key: 'x', type: 'color' }] }] } }), /color/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, lists: [{ param: 'items', columns: [{ key: 'x', type: 'swatch' }] }] } }), /swatch/);
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'a', inputs: ['video'] }] } }), /Eingabe|input/);
 });
 
@@ -410,6 +411,57 @@ await test('stage 6: images kept as resources, selectedImage and store need dial
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, version: 3 } }), /4/);
   assert.throws(() => manifest(code, { params: [{ key: 'photo', type: 'data', def: '' }], texts, dialog }), /store/);
   assert.throws(() => manifest(code, { params, texts, dialog: { version: 4, actions: [{ id: 'x', inputs: ['camera'], store: 'photo' }] } }), /store/);
+});
+
+await test('stage 7: steps, sortable lists with a fixed tail, colour columns and region maps', async () => {
+  const code = `globalThis.plugin = {
+    validate: () => [],
+    generate: (p) => ({ parts: [{ key: 'a', subs: [{ closed: true, nodes: [{x:0,y:0},{x:p.width,y:0},{x:0,y:1}] }], at: { x: 0, y: 0 } }], info: [['order', JSON.parse(p.levels).map((r) => r.c[1]).join(' ')]] }),
+    draw: () => ({ frame: { x0: 0, y0: 0, x1: 4, y1: 2 }, items: [], layers: [{ key: 'map', regions: { frame: { x0: 0, y0: 0, x1: 4, y1: 2 }, width: 2, height: 1, data: 'AQI=', colors: ['#ff0000', '#00ff00'] } }] }),
+    onSurface: ({ event }) => ({ message: String(event.hit) }),
+  };`;
+  const params = [
+    { key: 'width', type: 'length', min: 1, max: 100, def: 10 },
+    { key: 'levels', type: 'data', def: JSON.stringify([{ c: '#111111' }, { c: '#222222' }, { c: '#333333' }, { c: '#444444' }]) },
+  ];
+  const texts = { en: { name: 'Levels', desc: 'Levels', src: 'Source', lay: 'Layers', order: 'Order' } };
+  const dialog = {
+    version: 5,
+    lists: [{ param: 'levels', columns: [{ key: 'c', type: 'color' }], sort: true, fixedLast: 1 }],
+    actions: [{ id: 'go' }],
+    surface: { views: [{ id: 'v' }] },
+    steps: [{ id: 'src', label: 'src', items: ['width', 'go'] }, { id: 'lay', label: 'lay', items: ['levels', 'surface'] }],
+  };
+  const m = manifest(code, { params, texts, dialog });
+  const g = pluginGenerator(m, { id: 'p', name: 'P' });
+  assert.deepEqual(g.steps, [{ id: 'src', label: 'Source', items: ['width', 'go'] }, { id: 'lay', label: 'Layers', items: ['levels', 'surface'] }]);
+  assert.equal(g.lists![0].sort, true);
+  assert.equal(g.lists![0].fixedLast, 1);
+  assert.deepEqual(g.lists![0].columns[0], { key: 'c', label: 'c', type: 'color' });
+  // The region map arrives as bytes; a click on it reports the layer key and region
+  const d = await g.draw!({ view: 'v', state: null, selected: {}, have: [] }, defaultParams(g));
+  assert.deepEqual([...d.layers![0].regions!.data], [1, 2]);
+  g.dispose();
+  const { columnValue, moveRow } = await import('../src/generators/lists');
+  assert.equal(columnValue({ key: 'c', label: 'c', type: 'color' }, '#ABCDEF'), '#abcdef');
+  assert.equal(columnValue({ key: 'c', label: 'c', type: 'color' }, 'red'), '#000000');
+  const lst = { param: 'levels', label: '', columns: [], sort: true, fixedLast: 1 };
+  const p0 = { levels: params[1].def };
+  assert.equal(moveRow(p0, lst, 2, 3), null, 'the fixed last row is not passed');
+  assert.equal(moveRow(p0, lst, 3, 0), null, 'the fixed last row does not move');
+  const s = await runDialog(m, [{ $move: { list: 'levels', from: 2, to: 0 } }, { $surface: [{ type: 'down', x: 3, y: 1, hit: 'map:1' }] }]);
+  assert.deepEqual(s[1].info, [['Order', '3 1 2 4']]);
+  await assert.rejects(runDialog(m, [{ $move: { list: 'levels', from: 0, to: 3 } }]), ScriptError);
+  // Manifest checks: version 5, known and unique step items, fixedLast only with sort, region maps
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, version: 4 } }), /5/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, steps: [{ id: 'a', items: ['width'] }, { id: 'b', items: ['width'] }] } }), /width/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, steps: [{ id: 'a', items: ['nope'] }, { id: 'b', items: [] }] } }), /nope/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, steps: [{ id: 'a', items: [] }] } }), /2/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, lists: [{ ...dialog.lists[0], sort: false }] } }), /fixedLast/);
+  const { checkDrawing } = await import('../src/plugins/contract');
+  const bad = (regions: unknown) => assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], layers: [{ key: 'k', regions }] }));
+  bad({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, width: 2, height: 2, data: 'AQI=', colors: [] });
+  bad({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, width: 2, height: 1, data: 'AQI=', colors: ['red'] });
 });
 
 await test('check: a good plugin passes, randomness, crashes and missing texts are found', async () => {

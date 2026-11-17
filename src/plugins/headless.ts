@@ -8,6 +8,7 @@ import { fromBase64 } from './contract';
 import { toBase64 } from '../base64';
 import type { GenSelected } from '../generators/host';
 import { buildGen, checkInput, defaultParams, fieldActive, normalizeParams } from '../generators/index';
+import { moveRow } from '../generators/lists';
 import { pluginGenerator } from './generator';
 import { pluginText, type PluginManifest } from './manifest';
 import { sha256 } from '../pdfcrypt';
@@ -47,7 +48,8 @@ export class ScriptError extends Error {}
  * of { name, polys }) as the selection it hands over. `$model` opens a 3D model like the user importing one:
  * `{ name, data }` with data in the app's `kzm1:` format (see encodeMesh); it fills the parameters the manifest's
  * `inputs` name. `$image` is the picked (or selected) image of an action, { name?, width, height, data } with RGBA as
- * base64; an action with `store` keeps it in that parameter like the app does. `$row` with `$action` clicks a button of that list row. `$view` switches the drawing surface to a
+ * base64; an action with `store` keeps it in that parameter like the app does. `$move: { list, from, to }` drags a
+ * row of a sortable list to another place. `$row` with `$action` clicks a button of that list row. `$view` switches the drawing surface to a
  * view, `$surface` sends it a list of pointer events ({ type, x, y, hit?, from?, drag?, key? }, mm in the view).
  */
 export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = []): Promise<DialogState[]> {
@@ -74,7 +76,16 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
       let ask: DialogState['ask'];
       let message: string | undefined;
       if (i > 0) {
-        const { $answer, $action, $row, $selection, $image, $camera, $model, $view, $surface, ...step } = steps[i - 1];
+        const { $answer, $action, $row, $selection, $image, $camera, $model, $view, $surface, $move, ...step } = steps[i - 1];
+        if ($move !== undefined) {
+          // A row dragged to another place in a sortable list, like the dialog does it
+          const mv = $move as { list?: unknown; from?: unknown; to?: unknown };
+          const list = g.lists?.find((l) => l.param === mv.list && l.sort);
+          if (!list) throw new ScriptError(`step ${i}: $move needs a sortable list`);
+          const v = moveRow(p, list, Number(mv.from), Number(mv.to));
+          if (v === null) throw new ScriptError(`step ${i}: row ${String(mv.from)} cannot move to ${String(mv.to)}`);
+          p = normalizeParams(g, { ...p, [list.param]: v }, p);
+        }
         if ($model !== undefined) {
           const md = $model as { name?: unknown; data?: unknown };
           if (typeof md.data !== 'string' || !md.data.startsWith('kzm1:')) throw new ScriptError(`step ${i}: $model needs data in the kzm1: format`);

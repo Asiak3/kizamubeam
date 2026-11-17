@@ -2627,6 +2627,49 @@ body.dock-resizing #canvas {
   display: none;
 }
 
+/* Steps of a generator dialog (#211 stage 7): numbered tabs, one step at a time */
+.gen-steps {
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+}
+.gen-steps button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.gen-steps button.invalid {
+  border-color: var(--warn, #d9822b);
+  color: var(--warn, #d9822b);
+}
+.gen-step .jig-panel:first-child {
+  margin-top: 0;
+}
+/* Sortable rows and colour swatches in dialog lists */
+.gen-grip {
+  cursor: grab;
+  color: var(--muted, #888);
+  user-select: none;
+  letter-spacing: -2px;
+  padding: 0 2px;
+}
+.gen-grip.off {
+  visibility: hidden;
+}
+.jig-row:focus {
+  outline: 1px solid var(--accent);
+}
+.jig-row.dragging {
+  opacity: 0.5;
+}
+.gen-swatch {
+  display: inline-block;
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
 /* 3D-Ansicht */
 .win-view3d {
   display: flex;

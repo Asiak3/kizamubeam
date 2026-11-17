@@ -210,10 +210,12 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   const sections = new Map<string, HTMLElement[]>();
   // Fields an action shows next to its button (e.g. the real width of an image)
   const actionFields = new Set((g.actions ?? []).map((a) => a.field).filter((k): k is string => !!k));
+  // Fields a step of the dialog shows (#211 stage 7) are placed there instead
+  const inStep = new Set((g.steps ?? []).flatMap((st) => st.items));
   for (const s of g.schema) {
     const els = field(s);
     rows.set(s.key, els);
-    if (actionFields.has(s.key)) continue;
+    if (actionFields.has(s.key) || inStep.has(s.key)) continue;
     if (s.advanced) adv.push(...els);
     else if (s.section) {
       if (!sections.has(s.section)) sections.set(s.section, []);
@@ -235,6 +237,29 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   // checked like user input
   const surface = surfaceArea(g, p, (patch) => patchFields('', patch), () => dlg.open);
   const lists = listsArea(g, p, (patch) => patchFields('', patch), host, () => dlg.open, (key) => rows.get(key) ?? [], surface);
+
+  // Steps (#211 stage 7): numbered tabs above the fields, one step shown at a time
+  const stepTabs = (g.steps ?? []).map((st, i) => h('button', { class: 'small', type: 'button', onclick: () => showStep(i) }, `${i + 1} ${st.label}`));
+  const stepPanels = (g.steps ?? []).map((st) => {
+    const form = h('div', { class: 'form' });
+    const panel = h('div', { class: 'gen-step' }, form);
+    for (const item of st.items) {
+      const fieldEls = rows.get(item);
+      if (fieldEls?.length && !actionFields.has(item)) form.append(...fieldEls);
+      else if (item === 'surface' && surface) panel.append(surface.el);
+      else {
+        const box = lists?.listEl(item) ?? lists?.actionEl(item);
+        if (box) panel.append(h('div', { class: 'jig-panel gen-lists' }, box));
+      }
+    }
+    if (!form.childElementCount) form.remove();
+    return panel;
+  });
+  function showStep(i: number) {
+    stepPanels.forEach((el, k) => (el.hidden = k !== i));
+    stepTabs.forEach((b, k) => b.classList.toggle('on', k === i));
+  }
+  if (stepPanels.length) showStep(0);
 
   const render = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde
@@ -262,6 +287,8 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       const bad = r.issues.some((i) => i.key === s.key && i.level === 'error');
       rows.get(s.key)!.forEach((el) => el.classList.toggle('invalid', bad));
     }
+    // A step with an error in one of its fields is marked, so it can be found from another step
+    (g.steps ?? []).forEach((st, k) => stepTabs[k].classList.toggle('invalid', r.issues.some((i) => i.level === 'error' && !!i.key && st.items.includes(i.key))));
     infoEl.replaceChildren(...r.info.map(([k, v]) => h('div', {}, h('span', { class: 'muted' }, k), ' ', v)));
     okBtn.disabled = addBtn.disabled = !built || asking;
     surface?.refresh(np);
@@ -474,15 +501,17 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     'dialog',
     { class: 'offset-dialog gen-dialog' },
     h('h3', {}, old ? t('{name} bearbeiten', { name: g.name }) : t('{name} erstellen', { name: g.name })),
+    stepTabs.length ? h('div', { class: 'conn-row gen-steps', role: 'tablist' }, ...stepTabs) : null,
     h('div', { class: 'qr-layout' },
       h('div', {},
+        ...stepPanels,
         h('div', { class: 'form' }, ...main),
         ...sectionEls,
         adv.length ? h('details', {}, h('summary', {}, t('Erweitert')), h('div', { class: 'form' }, ...adv)) : null,
       ),
       h('div', {}, canvas, infoEl),
     ),
-    surface?.el ?? null,
+    inStep.has('surface') ? null : (surface?.el ?? null),
     lists?.el ?? null,
     askEl,
     issuesEl,

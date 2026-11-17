@@ -4925,5 +4925,9 @@
   "„{name}“ hat keine Formen geliefert; die Auswahl wurde entfernt (Ctrl+Z macht es rückgängig).": "“{name}” não retornou formas; a seleção foi removida (Ctrl+Z desfaz).",
   "Erst ein Bild in der Zeichnung auswählen.": "Selecione primeiro uma imagem no desenho.",
   "{where}: braucht „dialog“ Version {n}": "{where}: precisa da versão {n} de “dialog”",
-  "{where}: „store“ muss ein data-Parameter mit „resource“: „image“ sein, und die Aktion braucht ein Bild": "{where}: “store” deve ser um parâmetro data com “resource”: “image”, e a ação precisa de uma imagem"
+  "{where}: „store“ muss ein data-Parameter mit „resource“: „image“ sein, und die Aktion braucht ein Bild": "{where}: “store” deve ser um parâmetro data com “resource”: “image”, e a ação precisa de uma imagem",
+  "Ziehen oder Alt+↑/↓ zum Umsortieren": "Arraste ou pressione Alt+↑/↓ para reordenar",
+  "{where}: 2 bis {n} Schritte": "{where}: de 2 a {n} etapas",
+  "{where}: „fixedLast“ braucht „sort“ und eine Zahl von 0 bis 100": "{where}: “fixedLast” precisa de “sort” e de um número de 0 a 100",
+  "{where}: „{item}“ ist kein Feld, keine Liste, keine Aktion oder schon in einem Schritt": "{where}: “{item}” não é um campo, uma lista nem uma ação, ou já está em uma etapa"
 }

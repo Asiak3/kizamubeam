@@ -5,7 +5,7 @@ import { subsToPath2D } from '../geom';
 import { t } from '../i18n';
 import type { SubPath } from '../model';
 import type { GenHost } from './host';
-import { readRows, removeRow, setCell } from './lists';
+import { moveRow, readRows, removeRow, setCell } from './lists';
 import { ruleHolds } from './index';
 import type { SurfaceArea } from './dialogSurface';
 import type { GenAction, GenEvent, GenEventResult, GenImage, Generator, GenList, Params } from './types';
@@ -14,6 +14,10 @@ export interface ListsArea {
   el: HTMLElement;
   /** Show the current parameters (after a patch, undo, or a new plugin answer) */
   refresh(p: Params): void;
+  /** Heading and rows of a list, to place it in a step of the dialog */
+  listEl(param: string): HTMLElement | undefined;
+  /** An action's button (and its field), to place it in a step of the dialog */
+  actionEl(id: string): HTMLElement | undefined;
 }
 
 function thumb(subs: SubPath[], turn: number): HTMLCanvasElement {
@@ -85,6 +89,11 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
         if (c.type === 'enum') {
           input = h('select', { title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLSelectElement).value) },
             ...c.options.map(([v, label]) => h('option', { value: String(v), selected: String(v) === String(row[c.key]) }, label)));
+        } else if (c.type === 'color') {
+          const v = /^#[0-9a-f]{6}$/i.test(String(row[c.key])) ? String(row[c.key]) : '#000000';
+          input = c.readonly
+            ? h('span', { class: 'gen-swatch', title: c.title ?? c.label, style: `background:${v}` })
+            : h('input', { type: 'color', class: 'gen-swatch', value: v, title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLInputElement).value) });
         } else if (c.type === 'text') {
           input = h('input', { type: 'text', class: 'jig-name', value: String(row[c.key] ?? ''), maxlength: c.max ?? 200, placeholder: (c === firstText ? auto[i] : undefined) ?? c.placeholder?.replace('{n}', String(i + 1)) ?? '', title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLInputElement).value.trim()) });
         } else {
@@ -94,13 +103,16 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
           input = h('input', { type: 'number', class: 'jig-count', min: String(c.min), max: String(c.max), step: c.type === 'int' ? '1' : 'any', value: shownValue, placeholder: c.placeholder ?? '', title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLInputElement).value) });
         }
         if (c.type === 'text' && !main.length) main.push(input, h('span', { class: 'muted' }, info[i] ?? ''));
-        else cells.push(c.type === 'enum' ? input : h('label', {}, c.label, ' ', input));
+        else cells.push(c.type === 'enum' || c.type === 'color' ? input : h('label', {}, c.label, ' ', input));
       }
       if (main.length) cells.splice(list.shape ? 1 : 0, 0, h('div', { class: 'jig-col' }, ...main));
       else if (info[i]) cells.push(h('span', { class: 'muted' }, info[i]));
       cells.push(...rowActions);
       if (list.remove) cells.push(h('button', { class: 'btn small', title: list.removeTitle ?? t('Entfernen'), onclick: () => set({ [list.param]: removeRow(current, list, i) }) }, '×'));
-      const rowEl = h('div', { class: 'jig-row' }, ...cells);
+      const fixed = i >= rows.length - Math.min(rows.length, list.fixedLast ?? 0);
+      if (list.sort) cells.unshift(h('span', { class: 'gen-grip' + (fixed ? ' off' : ''), title: fixed ? '' : t('Ziehen oder Alt+↑/↓ zum Umsortieren'), draggable: fixed ? 'false' : 'true' }, '⋮⋮'));
+      const rowEl = h('div', { class: 'jig-row', ...(list.sort ? { tabindex: '-1' } : {}) }, ...cells);
+      if (list.sort) sortable(list, rowEl, i, i0);
       // A click on the row (not on its fields and buttons) selects it
       if (list.select)
         rowEl.addEventListener('click', (e) => {
@@ -109,6 +121,56 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
           mark();
         });
       el.append(rowEl);
+    });
+    if (focusAfter?.list === i0) {
+      el.querySelectorAll<HTMLElement>(':scope > .jig-row')[focusAfter.row]?.focus();
+      focusAfter = null;
+    }
+  };
+
+  /** Reorder rows: drag the grip onto another row, or Alt+↑/↓ in the row; the selected row moves along */
+  let dragging: { list: number; row: number } | null = null;
+  let focusAfter: { list: number; row: number } | null = null;
+  const move = (list: GenList, i0: number, from: number, to: number) => {
+    const v = moveRow(current, list, from, to);
+    if (v === null) return;
+    const sel = surface?.state().selected[list.param];
+    focusAfter = { list: i0, row: to };
+    set({ [list.param]: v });
+    if (sel !== undefined && sel >= 0) {
+      // Where the selected row is now
+      const order = readRows(current, list).map((_, k) => k);
+      const [x] = order.splice(from, 1);
+      order.splice(to, 0, x);
+      const now = order.indexOf(sel);
+      if (now !== sel) surface?.selectRow(list.param, now);
+    }
+  };
+  const sortable = (list: GenList, rowEl: HTMLElement, i: number, i0: number) => {
+    rowEl.addEventListener('dragstart', (e) => {
+      dragging = { list: i0, row: i };
+      e.dataTransfer?.setData('text/plain', String(i));
+      rowEl.classList.add('dragging');
+    });
+    rowEl.addEventListener('dragend', () => {
+      dragging = null;
+      rowEl.classList.remove('dragging');
+    });
+    rowEl.addEventListener('dragover', (e) => {
+      if (dragging?.list === i0) e.preventDefault();
+    });
+    rowEl.addEventListener('drop', (e) => {
+      if (dragging?.list !== i0) return;
+      e.preventDefault();
+      const from = dragging.row;
+      dragging = null;
+      move(list, i0, from, i);
+    });
+    rowEl.addEventListener('keydown', (e) => {
+      if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      move(list, i0, i, i + (e.key === 'ArrowUp' ? -1 : 1));
     });
   };
 
@@ -198,9 +260,14 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
     });
     return [h('button', { class: 'btn small', title: a.title ?? '', onclick: () => file.click() }, a.label), ...extra, file];
   };
+  const listBoxes = lists.map((list, i) => h('div', { class: 'gen-list' }, h('h4', {}, list.label), listEls[i]));
+  const actionBoxes = actions.map((a) => {
+    const els = button(a);
+    return els.length ? h('span', { class: 'gen-action' }, ...els) : null;
+  });
   const el = h('div', { class: 'jig-panel gen-lists' },
-    ...lists.flatMap((list, i) => [h('h4', {}, list.label), listEls[i]]),
-    actions.length ? h('div', { class: 'conn-row' }, ...actions.flatMap(button)) : null,
+    ...listBoxes,
+    actions.length ? h('div', { class: 'conn-row' }, ...actionBoxes) : null,
     note,
   );
   const refresh = (np: Params) => {
@@ -213,5 +280,10 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
     mark();
   };
   refresh(p);
-  return { el, refresh };
+  return {
+    el,
+    refresh,
+    listEl: (param) => listBoxes[lists.findIndex((l) => l.param === param)],
+    actionEl: (id) => actionBoxes[actions.findIndex((a) => a.id === id)] ?? undefined,
+  };
 }

@@ -162,11 +162,12 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     ...(l.rowActions ? { rowActions: l.rowActions.map((a) => ({ id: a.id, label: text(a.label) ?? a.label, ...(a.title ? { title: text(a.title) ?? a.title } : {}) })) } : {}),
     columns: l.columns.map((c) => {
       const out = { ...c, label: text(c.label) ?? c.label, ...(c.title ? { title: text(c.title) ?? c.title } : {}) };
-      if (out.type !== 'enum' && out.placeholder) out.placeholder = text(out.placeholder) ?? '';
+      if ('placeholder' in out && out.placeholder) out.placeholder = text(out.placeholder) ?? '';
       if (out.type === 'enum') out.options = out.options.map(([v, k]) => [v, text(k) ?? String(v)]);
       return out;
     }),
   }));
+  const steps = m.steps?.map((st) => ({ ...st, label: text(st.label) ?? st.id }));
   const actions: GenAction[] | undefined = m.actions?.map((a) => ({ ...a, label: text(a.label) ?? a.label, ...(a.title ? { title: text(a.title) ?? a.title } : {}) }));
   const surface: GenSurface | undefined = m.surface && {
     ...m.surface,
@@ -240,6 +241,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       return out;
     },
     ...(lists ? { lists } : {}),
+    ...(steps ? { steps } : {}),
     ...(actions ? { actions } : {}),
     async onEvent(ev, p): Promise<GenEventResult | void> {
       sendResources(p);

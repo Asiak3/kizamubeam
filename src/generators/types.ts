@@ -134,6 +134,8 @@ export type GenColumn = { key: string; label: string; title?: string } & (
   /** placeholder: shown instead of 0 (e.g. „auto“ where 0 means automatic) */
   | { type: 'int' | 'number' | 'length'; min: number; max: number; placeholder?: string }
   | { type: 'enum'; options: [string | number, string][] }
+  /** A colour "#rrggbb", shown as a swatch; editable with a colour picker unless readonly (#211 stage 7) */
+  | { type: 'color'; readonly?: boolean }
 );
 
 /**
@@ -157,6 +159,21 @@ export interface GenList {
   select?: boolean;
   /** Buttons on every row; a click calls onEvent with the action id and the row number */
   rowActions?: { id: string; label: string; title?: string }[];
+  /** Rows can be reordered by dragging their handle or with Alt+↑/↓ (#211 stage 7) */
+  sort?: boolean;
+  /** With sort: this many rows at the end stay where they are (e.g. the back plate) */
+  fixedLast?: number;
+}
+
+/**
+ * A step of the dialog (#211 stage 7): the dialog shows numbered tabs, one step at a time. `items` names the
+ * fields (parameter keys), lists (their parameter), action buttons (their id) and "surface" it shows; anything
+ * no step names is shown below the steps. The preview, info and issues are always visible.
+ */
+export interface GenStep {
+  id: string;
+  label: string;
+  items: string[];
 }
 
 /**
@@ -241,6 +258,12 @@ export interface GenLayer {
   key: string;
   /** Filled triangles as a flat list x0, y0, x1, y1, x2, y2, … */
   tris?: number[];
+  /**
+   * A region map (#211 stage 7): `width` × `height` cells over the rectangle `frame` (mm in the view), one byte
+   * per cell, row by row from the top left: 0 = no region, n = region n − 1. Each region is filled with its colour
+   * from `colors`; a click on a region reports `hit: "<layer key>:<region>"` (after handles and lines).
+   */
+  regions?: { frame: { x0: number; y0: number; x1: number; y1: number }; width: number; height: number; data: Uint8Array | Uint8ClampedArray; colors: string[] };
   items?: GenItem[];
   /** Opacity of the triangles */
   alpha?: number;
@@ -381,6 +404,8 @@ export interface Generator {
   ext?: string;
   /** Lists in the dialog, each bound to a data parameter (#335 stage 3) */
   lists?: GenList[];
+  /** The dialog in numbered steps (#211 stage 7) */
+  steps?: GenStep[];
   /** Buttons in the dialog; a click calls onEvent with the declared inputs */
   actions?: GenAction[];
   /** An action was clicked; plugins answer asynchronously */

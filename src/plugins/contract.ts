@@ -49,6 +49,8 @@ export const LIMITS = {
   points: 1_000_000,
   tris: 2_000_000,
   layers: 4,
+  /** Cells of a region map on the drawing surface (2000 × 2000) */
+  regionCells: 4_000_000,
   /** Size of the surface state as JSON */
   stateBytes: 1024 * 1024,
   /** Pixels of an image a filter gets or returns, and the longest side */
@@ -435,6 +437,18 @@ export function checkDrawing(v: unknown): PluginDrawing {
         layer.tris = (l.tris as unknown[]).map((x) => num(x, 'tris'));
       }
       if (l.items !== undefined) layer.items = checkItems(l.items, count);
+      if (l.regions !== undefined) {
+        // A region map: one byte per cell, 0 = none, n = region n - 1, with a colour per region
+        const g = l.regions;
+        if (!isObj(g) || !isObj(g.frame) || !Array.isArray(g.colors) || g.colors.length > 255) return fail('regions');
+        const w = g.width, h = g.height;
+        if (!Number.isInteger(w) || !Number.isInteger(h) || (w as number) < 1 || (h as number) < 1 || (w as number) * (h as number) > LIMITS.regionCells || typeof g.data !== 'string') return fail('regions');
+        const data = fromBase64(g.data);
+        if (data.length !== (w as number) * (h as number)) fail('region data must have width × height bytes');
+        const colors = g.colors.map((c) => (typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c : fail('region colour')));
+        const fr = g.frame;
+        layer.regions = { frame: { x0: num(fr.x0, 'regions frame'), y0: num(fr.y0, 'regions frame'), x1: num(fr.x1, 'regions frame'), y1: num(fr.y1, 'regions frame') }, width: w as number, height: h as number, data, colors };
+      }
       if (l.alpha !== undefined) layer.alpha = Math.max(0, Math.min(1, num(l.alpha, 'alpha')));
       return layer;
     });
