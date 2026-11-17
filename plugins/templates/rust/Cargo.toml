@@ -1,0 +1,23 @@
+[package]
+name = "kzb-template"
+version = "1.0.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+description = "Template for a KizamuBeam generator plugin in Rust/WebAssembly"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+kzb-plugin = { path = "../../sdk/rust" }
+serde = { version = "1", features = ["derive"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[workspace]

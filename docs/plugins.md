@@ -132,7 +132,23 @@ The module has no imports and exports:
 | `kzb_alloc` | `(len: u32) -> u32` | a buffer the host writes into |
 | `kzb_call` | `(fn_ptr, fn_len, in_ptr, in_len: u32) -> i64` | UTF-8 function name and JSON input; returns `(ptr << 32) \| len` of a UTF-8 JSON envelope `{"ok": …}` or `{"error": "code"}`, valid until the next call |
 
-The example [`plugins/hole-plate`](../plugins/hole-plate) (plate with a pattern of holes) implements this in Rust; `src/abi.rs` can be copied into other plugins.
+The Rust SDK (below) implements this ABI; the example [`plugins/hole-plate`](../plugins/hole-plate) (plate with a pattern of holes) uses it.
+
+## Writing a plugin
+
+Start from a template and change it:
+
+- [`plugins/templates/typescript`](../plugins/templates/typescript): a name tag in TypeScript. `src/index.ts` imports the SDK from [`plugins/sdk/ts`](../plugins/sdk/ts/index.ts): the types (`Params`, `Part`, `SubPath`, `Issue`, `GenResult`), `definePlugin` and shape helpers (`polygon`, `rect`, `circle`, `regular`, `roundedRect`, `mm` for numbers in info rows).
+- [`plugins/templates/rust`](../plugins/templates/rust): the same tag in Rust with the crate [`kzb-plugin`](../plugins/sdk/rust) (`plugins/sdk/rust`). Implement the `Plugin` trait (`validate`, `generate` on `serde_json::Value` parameters) and call `export_plugin!(MyPlugin)`; the macro provides the ABI exports. Builders: `Issue::error("code").on("key").value("max", 5)`, `GenResult::new().part(Part::new("tag", subs).at(x, y)).info("area", …)`, shapes in `kzb_plugin::geom`. Needs `rustup target add wasm32-unknown-unknown`.
+
+Copy the template folder to `plugins/<your-name>/`, give the pack and the plugin your own ids (reverse domain, for example `io.github.you.coaster`), adjust the parameters and texts in `plugin.json`, then:
+
+```sh
+node scripts/plugin-pack.mjs --build plugins/<your-name>   # builds the code and writes dist/<id>.kzp
+npm run plugin:check plugins/<your-name>                   # the catalogue's check
+```
+
+Install the `.kzp` in the app under Extensions to try it. `build` in `plugin.json` lists the recipes the catalogue runs: `{ "esbuild": "src/index.ts", "out": "dist/plugin.js" }` or `{ "rust": ".", "out": "dist/plugin.wasm" }`; `"code": "@dist/plugin.js"` points at the result. A plugin in `plugins/<name>/` is built from source and published by the catalogue workflow once it is merged.
 
 ## Headless runner and check
 
@@ -157,4 +173,4 @@ So far gear and box are built (`plugins/core/dist/org.kizamubeam.core-generators
 
 ## Tests
 
-`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output), plugins in packs (`scripts/plugin-packs-test.ts`) and the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`).
+`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output), plugins in packs (`scripts/plugin-packs-test.ts`) the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`) and both templates (`scripts/plugin-sdk-test.ts`, the Rust one only where the wasm32 target is installed).

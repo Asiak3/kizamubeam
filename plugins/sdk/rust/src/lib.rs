@@ -1,0 +1,179 @@
+//! SDK for KizamuBeam plugins in Rust (issue #205). A plugin is a `cdylib` built for `wasm32-unknown-unknown`
+//! with no imports. It gets parameters as JSON and returns issues or geometry as JSON; see docs/plugins.md.
+//!
+//! ```ignore
+//! use kzb_plugin::{export_plugin, geom, Issue, Part, Plugin, GenResult};
+//! #[derive(serde::Deserialize)]
+//! struct Params { width: f64, height: f64 }
+//! struct Plate;
+//! impl Plugin for Plate {
+//!     type Params = Params;
+//!     fn validate(p: &Params) -> Vec<Issue> { vec![] }
+//!     fn generate(p: &Params) -> Result<GenResult, String> {
+//!         Ok(GenResult::new().part(Part::new("plate", vec![geom::rect(p.width, p.height)])))
+//!     }
+//! }
+//! export_plugin!(Plate);
+//! ```
+pub mod abi;
+pub mod geom;
+
+use serde::Serialize;
+use serde_json::Value;
+
+/// Version of the call protocol this SDK implements (PLUGIN_API in the app)
+pub const API: i32 = 1;
+
+/// A point in mm, y pointing down
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct Pt {
+    pub x: f64,
+    pub y: f64,
+}
+
+/// A path node; `cin`/`cout` are the Bézier handles before and after it (absolute coordinates)
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Node {
+    pub x: f64,
+    pub y: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cin: Option<Pt>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cout: Option<Pt>,
+}
+
+impl Node {
+    pub fn new(x: f64, y: f64) -> Self {
+        Node { x, y, cin: None, cout: None }
+    }
+    pub fn curve(x: f64, y: f64, cin: (f64, f64), cout: (f64, f64)) -> Self {
+        Node { x, y, cin: Some(Pt { x: cin.0, y: cin.1 }), cout: Some(Pt { x: cout.0, y: cout.1 }) }
+    }
+}
+
+/// One outline: closed for parts and holes
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct SubPath {
+    pub nodes: Vec<Node>,
+    pub closed: bool,
+}
+
+/// A generated part: outline and holes in local coordinates (centre at the origin), suggested position `at`
+#[derive(Clone, Debug, Serialize)]
+pub struct Part {
+    pub key: String,
+    pub subs: Vec<SubPath>,
+    pub at: Pt,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub marks: Vec<SubPath>,
+}
+
+impl Part {
+    pub fn new(key: &str, subs: Vec<SubPath>) -> Self {
+        Part { key: key.into(), subs, at: Pt { x: 0.0, y: 0.0 }, marks: vec![] }
+    }
+    pub fn at(mut self, x: f64, y: f64) -> Self {
+        self.at = Pt { x, y };
+        self
+    }
+    /// Engraving on the part (e.g. a part number), same coordinates as `subs`
+    pub fn marks(mut self, marks: Vec<SubPath>) -> Self {
+        self.marks = marks;
+        self
+    }
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Level {
+    Error,
+    Warn,
+}
+
+/// A problem with the parameters. `code` is a text key of the plugin's manifest; `values` fill its placeholders.
+#[derive(Clone, Debug, Serialize)]
+pub struct Issue {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    pub level: Level,
+    pub code: String,
+    #[serde(skip_serializing_if = "serde_json::Map::is_empty")]
+    pub values: serde_json::Map<String, Value>,
+}
+
+impl Issue {
+    pub fn error(code: &str) -> Self {
+        Issue { key: None, level: Level::Error, code: code.into(), values: Default::default() }
+    }
+    pub fn warn(code: &str) -> Self {
+        Issue { key: None, level: Level::Warn, code: code.into(), values: Default::default() }
+    }
+    /// The parameter the problem belongs to (highlighted in the dialog)
+    pub fn on(mut self, key: &str) -> Self {
+        self.key = Some(key.into());
+        self
+    }
+    pub fn value(mut self, name: &str, v: impl Into<Value>) -> Self {
+        self.values.insert(name.into(), v.into());
+        self
+    }
+}
+
+/// Answer of `generate`: parts and rows for the info table (`[text code, value]`)
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct GenResult {
+    pub parts: Vec<Part>,
+    pub info: Vec<(String, String)>,
+}
+
+impl GenResult {
+    pub fn new() -> Self {
+        Self::default()
+    }
+    pub fn part(mut self, p: Part) -> Self {
+        self.parts.push(p);
+        self
+    }
+    pub fn info(mut self, code: &str, value: impl ToString) -> Self {
+        self.info.push((code.into(), value.to_string()));
+        self
+    }
+}
+
+/// A generator plugin. `validate` runs first; `generate` only when it reported no error.
+pub trait Plugin {
+    type Params: serde::de::DeserializeOwned;
+    fn validate(p: &Self::Params) -> Vec<Issue>;
+    /// An `Err(code)` is shown as an error with the text of that code
+    fn generate(p: &Self::Params) -> Result<GenResult, String>;
+}
+
+/// Call a plugin function by name with JSON input (used by `export_plugin!`, also handy in tests)
+pub fn dispatch<P: Plugin>(name: &str, input: Value) -> Result<Value, String> {
+    let p: P::Params = serde_json::from_value(input).map_err(|_| "bad-input".to_string())?;
+    let json = |v: serde_json::Result<Value>| v.map_err(|_| "plugin-bad-output".to_string());
+    match name {
+        "validate" => json(serde_json::to_value(P::validate(&p))),
+        "generate" => P::generate(&p).and_then(|r| json(serde_json::to_value(r))),
+        _ => Err("plugin-no-function".into()),
+    }
+}
+
+/// Export the WebAssembly functions the app calls (`kzb_api`, `kzb_alloc`, `kzb_call`) for a `Plugin`
+#[macro_export]
+macro_rules! export_plugin {
+    ($plugin:ty) => {
+        #[no_mangle]
+        pub extern "C" fn kzb_api() -> i32 {
+            $crate::API
+        }
+        #[no_mangle]
+        pub extern "C" fn kzb_alloc(len: u32) -> u32 {
+            $crate::abi::alloc(len)
+        }
+        #[no_mangle]
+        pub extern "C" fn kzb_call(fn_ptr: u32, fn_len: u32, in_ptr: u32, in_len: u32) -> u64 {
+            $crate::abi::call(fn_ptr, fn_len, in_ptr, in_len, $crate::dispatch::<$plugin>)
+        }
+    };
+}
