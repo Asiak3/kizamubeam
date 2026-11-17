@@ -26,16 +26,20 @@ const h = (id: number, pos: number, from: number, to: number): Wall => ({ id, ax
 const v = (id: number, pos: number, from: number, to: number): Wall => ({ id, axis: 'v', pos, from, to });
 
 test('reading: broken, wrong or too large text is refused; a good layout comes back the same', () => {
-  for (const bad of ['{', '[]', '"x"', '{"walls":{}}', '{"walls":[{"id":1}]}', '{"walls":[{"id":0,"axis":"h","pos":1,"from":0,"to":5}]}',
-    '{"walls":[{"id":1,"axis":"z","pos":1,"from":0,"to":5}]}', '{"walls":[{"id":1,"axis":"h","pos":1,"from":0,"to":5},{"id":1,"axis":"v","pos":1,"from":0,"to":5}]}',
-    '{"ref":[0,5],"walls":[]}', 'x'.repeat(100_001)])
+  for (const bad of ['[', '{}', '"x"', '{"walls":[]}', '[{"id":1}]', '[{"id":0,"axis":"h","pos":1,"from":0,"to":5}]',
+    '[{"id":1,"axis":"z","pos":1,"from":0,"to":5}]', '[{"id":1,"axis":"h","pos":1,"from":0,"to":5},{"id":1,"axis":"v","pos":1,"from":0,"to":5}]', 'x'.repeat(100_001)])
     assert.equal(readLayout(bad), null, bad.slice(0, 60));
-  const many = { walls: Array.from({ length: 101 }, (_, i) => h(i + 1, i, 0, 5)) };
+  for (const bad of ['[0,5]', '[5]', '{', '"x"', '{"w":5}'])
+    assert.equal(readLayout('[]', bad), null, `reference ${bad}`);
+  const many = Array.from({ length: 101 }, (_, i) => h(i + 1, i, 0, 5));
   assert.equal(readLayout(JSON.stringify(many)), null, 'more than 100 walls');
   assert.deepEqual(readLayout(''), { ref: [0, 0], walls: [] }, 'empty text = no walls');
+  assert.deepEqual(readLayout('[]', '[50,60]'), { ref: [50, 60], walls: [] });
   const l = sampleLayout(W, D);
-  assert.deepEqual(readLayout(writeLayout(l)), { ref: l.ref, walls: l.walls.map((x) => ({ ...x, pos: Math.round(x.pos * 1000) / 1000, from: Math.round(x.from * 1000) / 1000, to: Math.round(x.to * 1000) / 1000 })) });
-  assert.deepEqual(readLayout('{"walls":[{"id":3,"axis":"v","pos":10,"from":50,"to":20}]}')!.walls[0], v(3, 10, 20, 50), 'from and to in order');
+  const stored = writeLayout(l);
+  assert.deepEqual(readLayout(stored.walls, stored.wallsRef), { ref: l.ref, walls: l.walls.map((x) => ({ ...x, pos: Math.round(x.pos * 1000) / 1000, from: Math.round(x.from * 1000) / 1000, to: Math.round(x.to * 1000) / 1000 })) });
+  assert.equal(writeLayout({ ref: [0, 0], walls: [] }).wallsRef, '', 'no reference size: empty');
+  assert.deepEqual(readLayout('[{"id":3,"axis":"v","pos":10,"from":50,"to":20,"note":"x"}]')!.walls[0], v(3, 10, 20, 50), 'from and to in order, other keys of a row ignored');
 });
 
 test('scaling: proportional to the reference size, unchanged without one', () => {

@@ -52,19 +52,26 @@ export const MAX_TEXT = 100_000;
 /** Two positions closer than this count as the same point (mm) */
 export const EPS = 0.01;
 
-/** Read the stored layout; null when it cannot be read (broken JSON, wrong shape, too large) */
-export function readLayout(text: string): Layout | null {
+const parse = (text: string): { v: unknown } | null => {
   if (typeof text !== 'string' || text.length > MAX_TEXT) return null;
-  let v: unknown;
   try {
-    v = JSON.parse(text || '{}');
+    return { v: text ? JSON.parse(text) : undefined };
   } catch {
     return null;
   }
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
-  const o = v as Record<string, unknown>;
-  const ref = o.ref,
-    walls = o.walls ?? [];
+};
+
+/**
+ * Read the stored layout from its two parameters: the walls, a JSON list of rows as the dialog's list keeps them
+ * (`[{ id, axis, pos, from, to }]`), and the inner size they were placed in (`[w, d]`, empty = never scaled).
+ * null when it cannot be read (broken JSON, wrong shape, too large).
+ */
+export function readLayout(wallsText: string, refText = ''): Layout | null {
+  const a = parse(wallsText),
+    b = parse(refText);
+  if (!a || !b) return null;
+  const walls = a.v ?? [],
+    ref = b.v;
   const num = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
   if (ref !== undefined && !(Array.isArray(ref) && ref.length === 2 && ref.every((x) => num(x) && x > 0))) return null;
   if (!Array.isArray(walls) || walls.length > MAX_WALLS) return null;
@@ -82,9 +89,11 @@ export function readLayout(text: string): Layout | null {
   return { ref: (ref as [number, number] | undefined) ?? [0, 0], walls: out };
 }
 
-/** The layout as stored text */
-export const writeLayout = (l: Layout) =>
-  JSON.stringify({ ref: l.ref.map(r3), walls: l.walls.map((w) => ({ id: w.id, axis: w.axis, pos: r3(w.pos), from: r3(w.from), to: r3(w.to) })) });
+/** The layout as the values of its two parameters */
+export const writeLayout = (l: Layout) => ({
+  walls: JSON.stringify(l.walls.map((w) => ({ id: w.id, axis: w.axis, pos: r3(w.pos), from: r3(w.from), to: r3(w.to) }))),
+  wallsRef: l.ref[0] > 0 && l.ref[1] > 0 ? JSON.stringify(l.ref.map(r3)) : '',
+});
 const r3 = (x: number) => Math.round(x * 1000) / 1000;
 
 /** Scale the walls proportionally from the reference size to the inner size w × d (sizes changed outside the dialog) */

@@ -24,6 +24,7 @@ interface P {
   dividerDrop: number;
   finger: number;
   walls: string;
+  wallsRef: string;
 }
 
 /** Values of the layer's material for the fields; slotPlay (slot width over the thickness) is the total play of a
@@ -65,7 +66,7 @@ function model(p: P, d: Dims): Model | Issue {
     dd = d.D - 2 * t;
   if (!(w > 2 * t && dd > 2 * t)) return { level: 'error', code: 'box-small' };
   if (innerHeight(d) < 2 * t) return { key: 'height', level: 'error', code: 'walls-low', values: { min: 2 * t } };
-  const l = readLayout(p.walls);
+  const l = readLayout(p.walls, p.wallsRef);
   if (!l) return { key: 'walls', level: 'error', code: 'walls-bad' };
   // Smallest sizes (user, 17 nov 2026; to be reviewed after the test cuts): one thickness of clear space between
   // walls and joints, walls and free ends two thicknesses long

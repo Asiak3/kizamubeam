@@ -45,7 +45,8 @@
         { "key": "clearance", "type": "length", "min": -1, "max": 2, "def": 0.1, "showIf": { "eq": ["fromMaterial", false] } },
         { "key": "kerf", "type": "length", "min": 0, "max": 1, "def": 0, "showIf": { "eq": ["fromMaterial", false] } },
         { "key": "finger", "type": "length", "min": 2, "max": 100, "def": 10, "advanced": true },
-        { "key": "walls", "type": "data", "def": "{\"ref\":[94,194],\"walls\":[{\"id\":1,\"axis\":\"h\",\"pos\":97,\"from\":0,\"to\":94},{\"id\":2,\"axis\":\"v\",\"pos\":47,\"from\":0,\"to\":150.35},{\"id\":3,\"axis\":\"h\",\"pos\":150.35,\"from\":47,\"to\":94},{\"id\":4,\"axis\":\"v\",\"pos\":19.74,\"from\":97,\"to\":169.75}]}" }
+        { "key": "walls", "type": "data", "def": "[{\"id\":1,\"axis\":\"h\",\"pos\":97,\"from\":0,\"to\":94},{\"id\":2,\"axis\":\"v\",\"pos\":47,\"from\":0,\"to\":150.35},{\"id\":3,\"axis\":\"h\",\"pos\":150.35,\"from\":47,\"to\":94},{\"id\":4,\"axis\":\"v\",\"pos\":19.74,\"from\":97,\"to\":169.75}]" },
+        { "key": "wallsRef", "type": "data", "def": "[94,194]" }
       ],
       "texts": {
         "en": {
@@ -58,6 +59,7 @@
           "height": "Height",
           "thickness": "Material thickness",
           "walls": "Inner walls",
+          "wallsRef": "Size the inner walls were placed in",
           "part.floor": "Floor",
           "walls-bad": "The wall list cannot be read.",
           "box-small": "The box is too small for the material thickness.",
@@ -108,6 +110,7 @@
           "height": "Höhe",
           "thickness": "Materialstärke",
           "walls": "Innenwände",
+          "wallsRef": "Innenmaß, in dem die Wände gesetzt wurden",
           "part.floor": "Boden",
           "walls-bad": "Die Wandliste kann nicht gelesen werden.",
           "box-small": "Der Kasten ist zu klein für die Materialstärke.",
@@ -158,6 +161,7 @@
           "height": "Alto",
           "thickness": "Grosor del material",
           "walls": "Paredes interiores",
+          "wallsRef": "Medida interior en la que se colocaron las paredes",
           "part.floor": "Suelo",
           "walls-bad": "No se puede leer la lista de paredes.",
           "box-small": "La caja es demasiado pequeña para el grosor del material.",
@@ -208,6 +212,7 @@
           "height": "Altezza",
           "thickness": "Spessore del materiale",
           "walls": "Pareti interne",
+          "wallsRef": "Misura interna in cui sono state posizionate le pareti",
           "part.floor": "Fondo",
           "walls-bad": "Impossibile leggere l'elenco delle pareti.",
           "box-small": "La scatola è troppo piccola per lo spessore del materiale.",
@@ -258,6 +263,7 @@
           "height": "Altura",
           "thickness": "Espessura do material",
           "walls": "Paredes internas",
+          "wallsRef": "Medida interna em que as paredes foram posicionadas",
           "part.floor": "Fundo",
           "walls-bad": "Não é possível ler a lista de paredes.",
           "box-small": "A caixa é pequena demais para a espessura do material.",
