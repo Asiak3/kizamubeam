@@ -71,6 +71,16 @@ export function appCodeText(code: string, name: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Numbers in texts from a plugin in the number format of the interface: plugins have no locale (QuickJS writes
+ * 1234.5), the built-in generators use toLocaleString. Decimal numbers inside a text („⌀ 12.5 mm“) are converted.
+ */
+export function localNumbers(s: string): string {
+  return s.replace(/-?\d+\.\d+/g, (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 6 }));
+}
+const localValues = (v?: Record<string, string | number>) =>
+  v && Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'number' ? x.toLocaleString(undefined, { maximumFractionDigits: 6 }) : localNumbers(x)]));
+
 export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }): PluginGenerator {
   let proc: PluginProcess | null = null;
   const cache = new Map<string, Entry>();
@@ -80,7 +90,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
   const keyOf = (p: Params) => JSON.stringify(m.schema.map((s) => p[s.key] ?? null));
   const codeText = (code: string, values?: Record<string, string | number>) =>
     appCodeText(code, name) ?? text(code, values) ?? t('Fehler in der Erweiterung „{name}“: {code}', { name, code });
-  const issue = (i: PluginIssue): Issue => ({ ...(i.key ? { key: i.key } : {}), level: i.level, code: i.code, msg: codeText(i.code, i.values) });
+  const issue = (i: PluginIssue): Issue => ({ ...(i.key ? { key: i.key } : {}), level: i.level, code: i.code, msg: codeText(i.code, localValues(i.values)) });
   const errorOf = (e: unknown) => (e instanceof EngineError ? e.code : e instanceof Error && 'code' in e ? String((e as { code: unknown }).code) : 'plugin-crash');
 
   const call = async <T>(fn: 'validate' | 'generate', p: Params, check: (v: unknown) => T): Promise<Outcome<T>> => {
@@ -164,7 +174,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       const r = entry(p)?.generate;
       if (!r) throw new Error(PENDING);
       if ('error' in r) throw new Error(r.error);
-      const out: GenResult = { parts: r.ok.parts.map((x) => ({ ...x })), info: r.ok.info.map(([k, v]) => [text(k) ?? k, v]) };
+      const out: GenResult = { parts: r.ok.parts.map((x) => ({ ...x })), info: r.ok.info.map(([k, v]) => [text(k) ?? k, localNumbers(v)]) };
       if (r.ok.plan) out.plan = r.ok.plan;
       return out;
     },
@@ -173,7 +183,9 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       return r && 'ok' in r ? (r.ok.poses ?? null) : null;
     },
     label(p, part) {
-      const values = Object.fromEntries(m.schema.map((s) => [s.key, typeof p[s.key] === 'number' ? Math.round((p[s.key] as number) * 100) / 100 : String(p[s.key])]));
+      const values = Object.fromEntries(
+        m.schema.map((s) => [s.key, typeof p[s.key] === 'number' ? (p[s.key] as number).toLocaleString(undefined, { maximumFractionDigits: 3 }) : String(p[s.key])]),
+      );
       const base = text('label', values) ?? name;
       return part ? `${base} · ${text(`part.${part}`) ?? part}` : base;
     },

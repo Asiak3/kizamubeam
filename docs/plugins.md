@@ -145,6 +145,16 @@ The example [`plugins/hole-plate`](../plugins/hole-plate) (plate with a pattern 
 - two runs give the same geometry (no randomness or clock; use a seed parameter),
 - issue codes, parameter labels and `desc` have English texts (warnings).
 
+## Built-in generators as plugins
+
+The built-in generators move to the plugin system (#205, #327). `npm run plugin:core` (`scripts/build-core-plugins.mjs`) builds them as JavaScript plugins from their unchanged source in `src/generators`:
+
+- The generator is bundled with `plugins/core/wrap.ts` and a stand-in for `src/i18n` (`plugins/core/i18n-shim.ts`). A plugin has no language, so `t()` returns the German source text as a marker; the wrapper turns issue texts and info labels into text codes (`plugins/core/codes.ts`) with their values.
+- The manifest is generated from the same source: parameters, rules, labels, tooltips and options, plus every `t()` text of the bundled files as a code, translated from `src/locales` into all app languages.
+- The app writes numbers in plugin texts in the number format of the interface (QuickJS has no locale).
+
+So far gear and box are built (`plugins/core/dist/org.kizamubeam.core-generators.kzp`). `npm run test:core-plugins` checks that they give the same dialog, geometry, issues, info and 3D poses as the built-in generators, and reports the time: QuickJS is roughly ten times slower than the built-in code, which is still well below the dialog's limits for these two. The built-in versions stay active until the switch-over: generators whose label needs computed values (box), and callers that need results synchronously (built-in templates, 3D view, design check), need their own solution first.
+
 ## Tests
 
 `npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output), plugins in packs (`scripts/plugin-packs-test.ts`) and the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`).
