@@ -4960,5 +4960,6 @@
   "„network“ braucht die Host-Funktion „fetch“": "“network” necesita la función de host “fetch”",
   "„{name}“ darf Daten laden von: {hosts}": "“{name}” puede cargar datos de: {hosts}",
   "„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:": "“{name}” carga datos de internet. KizamuBeam pregunta antes de la primera solicitud y las hace por sí mismo, solo a estos servidores:",
-  "ungültige Angabe „{key}“": "«{key}» no válido"
+  "ungültige Angabe „{key}“": "«{key}» no válido",
+  "Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).": "No se pudo acceder al servidor de «{name}» (sin conexión, resolución de nombres, TLS o tiempo de espera agotado)."
 }

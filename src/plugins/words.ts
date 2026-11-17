@@ -41,6 +41,7 @@ export function appCodeText(code: string, name: string): string | undefined {
     case 'net-denied':
       return t('Die Erweiterung „{name}“ darf keine Daten aus dem Internet laden (Fenster „Erweiterungen“).', { name });
     case 'net-failed':
+      return t('Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).', { name });
     case 'net-status':
     case 'net-too-large':
     case 'net-type':

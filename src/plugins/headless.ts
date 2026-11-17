@@ -29,6 +29,8 @@ export interface NetAnswer {
   status?: number;
   contentType?: string;
   text: string;
+  /** Fail the request with this code instead of answering (net-failed: the server cannot be reached) */
+  error?: string;
 }
 
 /** Answer the requests of a plugin from recorded answers (all servers allowed); unknown requests fail net-offline */
@@ -47,6 +49,7 @@ export function useNetAnswers(m: PluginManifest, answers: readonly NetAnswer[]) 
       return h && r.url.startsWith(h.base + x.path) && (x.match === undefined || what.includes(x.match));
     });
     if (!a) throw new Error('net-offline');
+    if (a.error) throw new Error(a.error);
     return { status: a.status ?? 200, contentType: a.contentType ?? 'application/json', bytes: new TextEncoder().encode(a.text) };
   });
 }

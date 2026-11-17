@@ -2,7 +2,7 @@
   "format": "kizamubeam-pack",
   "formatVersion": 2,
   "id": "org.kizamubeam.street-map",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": {
     "en": "Street map",
     "de": "Stadtplan",
@@ -63,6 +63,32 @@
           ],
           "rate": 1,
           "purpose": "net.overpass",
+          "attribution": "© OpenStreetMap contributors"
+        },
+        {
+          "id": "overpassCoffee",
+          "base": "https://overpass.private.coffee/api",
+          "methods": [
+            "POST"
+          ],
+          "types": [
+            "json"
+          ],
+          "rate": 1,
+          "purpose": "net.overpassCoffee",
+          "attribution": "© OpenStreetMap contributors"
+        },
+        {
+          "id": "overpassDresel",
+          "base": "https://ovp.dresel.systems/api",
+          "methods": [
+            "POST"
+          ],
+          "types": [
+            "json"
+          ],
+          "rate": 1,
+          "purpose": "net.overpassDresel",
           "attribution": "© OpenStreetMap contributors"
         }
       ],
@@ -301,14 +327,17 @@
           "enterPlace": "Enter a place or address.",
           "found": "Found: {name}",
           "notFound": "Nothing found for “{q}”.",
-          "serverBusy": "The map server is busy. Try again in a minute.",
+          "serverBusy": "The map servers are busy. Try again in a minute.",
           "info.place": "Place",
           "info.scale": "Scale",
           "scale": "1 : {n}",
           "info.roads": "Roads",
           "info.buildings": "Buildings",
           "net.nominatim": "Finds the place you search for (only when you press “Find place”)",
-          "net.overpass": "Loads the roads, water and buildings around the place"
+          "net.overpass": "Loads the roads, water and buildings around the place",
+          "net.overpassCoffee": "Second map server (private.coffee), used when the first one cannot be reached",
+          "net.overpassDresel": "Third map server (dresel.systems, Europe only), used when the others cannot be reached",
+          "serverDown": "No map server could be reached (connection failed: no internet, a firewall, or the servers are down). Try again later."
         },
         "de": {
           "name": "Stadtplan",
@@ -350,14 +379,17 @@
           "enterPlace": "Ort oder Adresse eingeben.",
           "found": "Gefunden: {name}",
           "notFound": "Nichts gefunden für „{q}“.",
-          "serverBusy": "Der Kartenserver ist ausgelastet. Versuche es in einer Minute noch einmal.",
+          "serverBusy": "Die Kartenserver sind ausgelastet. Versuche es in einer Minute noch einmal.",
           "info.place": "Ort",
           "info.scale": "Maßstab",
           "scale": "1 : {n}",
           "info.roads": "Straßen",
           "info.buildings": "Gebäude",
           "net.nominatim": "Findet den gesuchten Ort (nur bei „Ort suchen“)",
-          "net.overpass": "Lädt Straßen, Wasser und Gebäude rund um den Ort"
+          "net.overpass": "Lädt Straßen, Wasser und Gebäude rund um den Ort",
+          "net.overpassCoffee": "Zweiter Kartenserver (private.coffee), wenn der erste nicht erreichbar ist",
+          "net.overpassDresel": "Dritter Kartenserver (dresel.systems, nur Europa), wenn die anderen nicht erreichbar sind",
+          "serverDown": "Kein Kartenserver war erreichbar (Verbindung fehlgeschlagen: kein Internet, eine Firewall oder die Server sind ausgefallen). Versuche es später noch einmal."
         },
         "it": {
           "name": "Mappa stradale",
@@ -399,14 +431,17 @@
           "enterPlace": "Inserisci un luogo o un indirizzo.",
           "found": "Trovato: {name}",
           "notFound": "Nessun risultato per «{q}».",
-          "serverBusy": "Il server delle mappe è occupato. Riprova tra un minuto.",
+          "serverBusy": "I server delle mappe sono occupati. Riprova tra un minuto.",
           "info.place": "Luogo",
           "info.scale": "Scala",
           "scale": "1 : {n}",
           "info.roads": "Strade",
           "info.buildings": "Edifici",
           "net.nominatim": "Trova il luogo cercato (solo con «Cerca luogo»)",
-          "net.overpass": "Carica strade, acqua ed edifici intorno al luogo"
+          "net.overpass": "Carica strade, acqua ed edifici intorno al luogo",
+          "net.overpassCoffee": "Secondo server delle mappe (private.coffee), se il primo non è raggiungibile",
+          "net.overpassDresel": "Terzo server delle mappe (dresel.systems, solo Europa), se gli altri non sono raggiungibili",
+          "serverDown": "Nessun server delle mappe raggiungibile (connessione non riuscita: niente internet, un firewall o server non attivi). Riprova più tardi."
         }
       }
     }

@@ -251,7 +251,7 @@ await test('street map (#280): map from recorded OSM answers, find a place, inve
   const { loadNetFixtures } = await import('./net-fixtures.mjs');
   execFileSync('node', ['scripts/plugin-pack.mjs', '--build', 'plugins/street-map'], { stdio: 'ignore' });
   const m = parsePack(buildPluginPack('plugins/street-map')).plugins[0];
-  assert.deepEqual(m.network!.map((h) => h.hostname), ['nominatim.openstreetmap.org', 'overpass-api.de']);
+  assert.deepEqual(m.network!.map((h) => h.hostname), ['nominatim.openstreetmap.org', 'overpass-api.de', 'overpass.private.coffee', 'ovp.dresel.systems']);
   const answers = loadNetFixtures('plugins/street-map');
   const check = await checkPlugin(m, { net: answers });
   assert.deepEqual(check.errors, [], 'catalogue check');
@@ -287,6 +287,31 @@ await test('street map (#280): map from recorded OSM answers, find a place, inve
   const circle = await G.buildGenAsync(g, G.normalizeParams(g, { ...G.defaultParams(g), shape: 'circle' }));
   for (const x of circle.parts[0].marks!) for (const q of x.nodes) assert.ok(Math.hypot(q.x, q.y) <= 75.01, 'clipped to the circle');
   g.dispose();
+});
+
+await test('street map: an unreachable or busy Overpass server falls back to the next; none reachable says so', async () => {
+  const { runDialog, useNetAnswers } = await import('../src/plugins/headless');
+  const { loadNetFixtures } = await import('./net-fixtures.mjs');
+  const m = parsePack(buildPluginPack('plugins/street-map')).plugins[0];
+  const answers = loadNetFixtures('plugins/street-map');
+  const on = (id: string) => answers.filter((a) => a.host === 'overpass').map((a) => ({ ...a, host: id }));
+  const down = (id: string) => ({ host: id, path: '/interpreter', text: '', error: 'net-failed' });
+  const busy = (id: string) => ({ host: id, path: '/interpreter', text: '', status: 429 });
+  const roads = (st: { info: [string, string][] }) => st.info.find((r) => r[0] === 'Roads')?.[1];
+  // First server unreachable: the second one answers with the same data
+  useNetAnswers(m, [down('overpass'), ...on('overpassCoffee'), ...answers]);
+  const second = (await runDialog(m))[0];
+  assert.deepEqual(second.issues, []);
+  assert.equal(roads(second), '19');
+  // First unreachable, second busy: the third (Europe) answers
+  useNetAnswers(m, [down('overpass'), busy('overpassCoffee'), ...on('overpassDresel'), ...answers]);
+  assert.equal(roads((await runDialog(m))[0]), '19');
+  // None reachable: a message that says the servers could not be reached; all busy: try again later
+  useNetAnswers(m, [down('overpass'), down('overpassCoffee'), down('overpassDresel'), ...answers]);
+  assert.deepEqual((await runDialog(m))[0].issues.map((i) => i.code), ['serverDown']);
+  assert.match((await runDialog(m))[0].issues[0].msg, /No map server could be reached/);
+  useNetAnswers(m, [busy('overpass'), busy('overpassCoffee'), busy('overpassDresel'), ...answers]);
+  assert.deepEqual((await runDialog(m))[0].issues.map((i) => i.code), ['serverBusy']);
 });
 
 if (failed) {

@@ -65,12 +65,34 @@ const BASE_QUERY =
   'way["waterway"~"^(river|canal|stream|riverbank)$"];way["landuse"~"^(reservoir|basin|forest|grass|meadow)$"];way["leisure"~"^(park|garden)$"];';
 const BUILDING_QUERY = 'way["building"];';
 
+/**
+ * Overpass servers in the order they are tried (ids from the manifest): the main instance, then public instances
+ * listed on the OSM wiki (private.coffee: worldwide; dresel.systems: Europe). A server that cannot be reached or is
+ * busy is skipped; the one that answered is asked first next time.
+ */
+const OVERPASS = ['overpass', 'overpassCoffee', 'overpassDresel'];
+let preferred = 0;
+/** Server busy (Overpass answers 429 when its slots are taken, 503/504 when overloaded) */
+const busy = (r: NetResponse) => r.status === 429 || (r.status !== undefined && r.status >= 500);
+
 /** Ask the app for Overpass data; throws net-pending until it is there */
 function fetchOsm(b: number[], body: string): OsmEl[] {
-  const r: NetResponse = host.fetch({ host: 'overpass', path: '/interpreter', method: 'POST', body: `data=${encodeURIComponent(overpass(b, body))}` });
-  if (r.error) throw new Error(r.status === 429 || r.status === 503 || r.status === 504 ? 'serverBusy' : r.error);
-  const j = JSON.parse(r.text ?? '{}') as { elements?: OsmEl[] };
-  return j.elements ?? [];
+  const req = { path: '/interpreter', method: 'POST' as const, body: `data=${encodeURIComponent(overpass(b, body))}` };
+  let last: NetResponse | null = null;
+  for (let k = 0; k < OVERPASS.length; k++) {
+    const i = (preferred + k) % OVERPASS.length;
+    const r: NetResponse = host.fetch({ host: OVERPASS[i], ...req });
+    // Not reachable (connection, name lookup, TLS, time-out) or busy: the next server
+    if (r.error === 'net-failed' || (r.error === 'net-status' && busy(r))) {
+      last = r;
+      continue;
+    }
+    if (r.error) throw new Error(r.error);
+    preferred = i;
+    const j = JSON.parse(r.text ?? '{}') as { elements?: OsmEl[] };
+    return j.elements ?? [];
+  }
+  throw new Error(last && last.error === 'net-status' ? 'serverBusy' : 'serverDown');
 }
 
 /** Douglas–Peucker on flat [x0, y0, …] */
