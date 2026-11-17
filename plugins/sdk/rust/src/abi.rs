@@ -1,6 +1,7 @@
 //! KizamuBeam plugin ABI version 1 (see src/plugins/engine.ts in the app): the host writes the function name and
 //! the JSON input into buffers from `kzb_alloc` and calls `kzb_call`, which returns `(ptr << 32) | len` of a JSON
-//! envelope `{"ok": …}` or `{"error": "code"}`. No imports: the module only computes.
+//! envelope `{"ok": …}` or `{"error": "code"}`. The only import is `kzb.host_call` (see [`crate::host`]), and only
+//! when the plugin uses host functions.
 use std::cell::RefCell;
 
 thread_local! {
@@ -44,4 +45,31 @@ pub fn call(fn_ptr: u32, fn_len: u32, in_ptr: u32, in_len: u32, f: impl Fn(&str,
         Err(_) => Err("bad-input".into()),
     };
     respond(r)
+}
+
+/// Copy and free a buffer the host filled during this call (the answer of a host function)
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+pub(crate) fn take(ptr: u32, len: u32) -> Vec<u8> {
+    let out = unsafe { slice(ptr, len).to_vec() };
+    BUFS.with(|b| b.borrow_mut().retain(|v| v.as_ptr() as u32 != ptr));
+    out
+}
+
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "kzb")]
+extern "C" {
+    fn host_call(name_ptr: *const u8, name_len: u32, in_ptr: *const u8, in_len: u32) -> u64;
+}
+
+/// Call a host function by name with JSON input; the answer envelope as bytes
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn host_raw(name: &str, input: &[u8]) -> Vec<u8> {
+    let packed = unsafe { host_call(name.as_ptr(), name.len() as u32, input.as_ptr(), input.len() as u32) };
+    take((packed >> 32) as u32, packed as u32)
+}
+
+/// Outside WebAssembly (native tests) there is no host: every call fails with host-unavailable
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn host_raw(_name: &str, _input: &[u8]) -> Vec<u8> {
+    br#"{"error":"host-unavailable"}"#.to_vec()
 }

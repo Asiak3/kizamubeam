@@ -4914,5 +4914,10 @@
   "Lage der Ebene quer zur Ansicht (mm)": "Position of the plane across the view (mm)",
   "wie oben": "as above",
   "{ribs} von {count} Rippen": "{ribs} of {count} ribs",
-  "{where}: braucht „dialog“ Version 3": "{where}: needs “dialog” version 3"
+  "{where}: braucht „dialog“ Version 3": "{where}: needs “dialog” version 3",
+  "Berechnung abbrechen": "Cancel computation",
+  "Neu berechnen": "Compute again",
+  "Die Berechnung wurde abgebrochen.": "The computation was cancelled.",
+  "Die Erweiterung „{name}“ hat eine Funktion von KizamuBeam falsch aufgerufen ({code}).": "The extension “{name}” called a KizamuBeam function incorrectly ({code}).",
+  "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "unknown host function in “host” (allowed: {list})"
 }

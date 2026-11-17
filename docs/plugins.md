@@ -1,13 +1,13 @@
 # Plugins (developer notes)
 
-Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205) and of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335): runtime, plugins in extension packs (format version 2), generator plugins in the toolbox, dialog schema version 1 and the headless runner. Stage 2 of #335 adds `view` (suggested texts) and `onChange` with in-dialog questions, stage 3 lists of rows and action buttons with the selection, an image file or the camera image as input (dialog schema version 2), stage 4 a drawing surface, selectable rows and row buttons (dialog schema version 3). 3D models reach plugins as resources.
+Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205) and of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335): runtime, plugins in extension packs (format version 2), generator plugins in the toolbox, dialog schema version 1 and the headless runner. Stage 2 of #335 adds `view` (suggested texts) and `onChange` with in-dialog questions, stage 3 lists of rows and action buttons with the selection, an image file or the camera image as input (dialog schema version 2), stage 4 a drawing surface, selectable rows and row buttons (dialog schema version 3). 3D models reach plugins as resources. Stage 5 of [#211](https://github.com/KizamuBeam/kizamubeam/issues/211) adds host functions (boolean operations, offsets, curve fitting, tracing), progress reports, cancelling and sessions.
 
 A plugin computes geometry from parameters. It gets JSON in and gives JSON out. It cannot reach files, the network, the DOM, Tauri or the editor. Every plugin runs in its own Web Worker, and the app checks every answer before anything reaches the drawing.
 
 Two runtimes are supported:
 
 - **JavaScript / TypeScript** runs in QuickJS compiled to WebAssembly (`quickjs-emscripten`). Compile TypeScript to one plain script first.
-- **WebAssembly** (for example Rust) is instantiated without any imports.
+- **WebAssembly** (for example Rust) is instantiated without imports, apart from the one host function bridge `kzb.host_call` (see below).
 
 Code: [`src/plugins/`](../src/plugins). `contract.ts` holds the limits and the output checks, `engine.ts` the two runtimes, `worker.ts` the Worker and `client.ts` the main-thread side (`workerProcess` in the app, `inProcess` for Node tests).
 
@@ -113,6 +113,8 @@ A missing text falls back to its key. The app checks everything before it regist
 | `onEvent` (optional) | `{ action, params, inputs, row?, surface? }` | `null` or `{ patch?, message?, state?, view?, select? }` (an action button of dialog version 2, a row button of version 3) |
 | `draw` (optional) | `{ view, state, selected, have, params }` | `{ frame, items, layers?, track? }` (the drawing surface of version 3) |
 | `onSurface` (optional) | `{ event, surface, params }` | like `onEvent` |
+| `open` (optional) | parameters | anything (ignored): the dialog was opened; prepare caches for this session |
+| `close` (optional) | `null` | anything (ignored): the dialog was closed; free what `open` prepared |
 
 A part is `{ key, subs, at, marks? }`; a plugin with `"kind": "part"` returns exactly one, an assembly any number. `subs` uses the same sub-path format as the editor (`{ nodes: [{ x, y, cin?, cout?, smooth? }], closed }`). `info` is a list of `[label, value]` rows for the dialog. Issue and info codes are translated through the plugin's texts, so a plugin never builds user-facing sentences.
 
@@ -130,13 +132,34 @@ A failure is reported as a code, for example `holes-touch`. Codes the app itself
 | `plugin-memory` | The plugin used more memory than allowed |
 | `plugin-crash` | The engine or the Worker stopped |
 | `plugin-bad-code` | The code could not be loaded |
-| `plugin-imports` | A WebAssembly module asks for imports |
+| `plugin-imports` | A WebAssembly module asks for imports other than `kzb.host_call` |
 | `plugin-newer-api` | The plugin was built for a newer call protocol |
 | `plugin-too-large` | The code is larger than 8 MB |
 | `plugin-no-function` | The plugin does not provide the called function |
+| `plugin-cancelled` | The user cancelled the computation; the Worker is terminated and started again for the next call |
+| `host-not-allowed` | The plugin called a host function its manifest does not name in `host` |
+| `host-bad-input` | A host function got input it cannot use |
+| `host-failed` | A host function failed |
 | `plugin-bad-output` | The answer breaks the contract (wrong types, NaN, too many parts or nodes, coordinates out of range, duplicate keys) |
 
-Limits (`LIMITS` in `contract.ts`): `validate` 10 s, `generate` 30 s, `view` and `onChange` 2 s, `onEvent` 10 s, `resource` 20 s, `draw` 30 s (it may lay out new parameters), `onSurface` 5 s, 512 MB memory, 8 MB code, 32 MB answer, 2000 parts, 500 000 nodes, coordinates within ±100 m; a drawing has at most 20 000 shapes, 1 000 000 points and 2 000 000 triangles.
+Limits (`LIMITS` in `contract.ts`): `validate` 10 s, `generate` 30 s, `view` and `onChange` 2 s, `onEvent` 10 s, `resource` 20 s, `draw` 30 s (it may lay out new parameters), `onSurface` 5 s, `open` 30 s, `close` 2 s, 512 MB memory, 8 MB code, 32 MB answer, 2000 parts, 500 000 nodes, coordinates within ±100 m; a drawing has at most 20 000 shapes, 1 000 000 points and 2 000 000 triangles.
+
+## Host functions, progress, cancelling and sessions (#211 stage 5)
+
+**Host functions** are building blocks of the app a plugin may call while it computes, instead of bundling its own (`src/plugins/hostfns.ts`). They are pure computation on the data the plugin hands over; none reaches the editor, files or the network. A plugin names the ones it uses in its manifest, `"host": ["boolean", "fit"]`; calling another one fails with `host-not-allowed`. Their time counts toward the time limit of the plugin call. Input and answer are JSON, sub-paths in the editor's format:
+
+| Function | Input | Answer |
+| --- | --- | --- |
+| `boolean` | `{ op: "union" \| "difference" \| "intersection" \| "xor", a: subs, b?: subs }` | closed sub-paths of Bézier curves; holes within each side by even-odd |
+| `offset` | `{ subs, delta (mm, negative = inward, ±1000), join?: "round" \| "miter" \| "square" }` | closed sub-paths; open sub-paths get a band of width 2 × \|delta\| |
+| `fit` | `{ pts: [[x, y], …], closed?, tolerance? (mm, 0.05) }` | one sub-path of Bézier curves through the points |
+| `trace` | `{ width, height, data (one gray byte per pixel, base64), threshold? (128), smooth? 0 … 1 (0.5), ignoreLess? (pixels², 4), scale? (mm per pixel, 1) }` | closed outlines of the dark areas, from the top left |
+
+**Progress.** `progress` needs no manifest entry: a number 0 … 1 or `{ done, text? }` (text at most 200 characters). The dialog shows it next to “Computing …”, at most every 150 ms. While a plugin computes, the dialog offers **Cancel computation**: the Worker is terminated, the call fails with `plugin-cancelled`, and **Compute again** (also offered after `plugin-timeout`) starts it afresh.
+
+**Sessions.** `open` is called with the parameters when the plugin's dialog opens, `close` when it closes. A plugin may keep caches between them (for example a sliced model while the user changes other parameters); it must still give the same result for the same parameters without them, because the Worker can be restarted at any time.
+
+In JavaScript the functions are methods of `globalThis.host` (`host.boolean({ … })`, `host.progress(0.5)`); a failure throws an `Error` whose message is the code. In the TypeScript SDK they are typed (`host` from `plugins/sdk/ts`); in Rust `kzb_plugin::host("fit", &json!({ … }))` returns `Result<Value, String>` and `kzb_plugin::progress(0.5)` reports progress; the `Plugin` trait has `open` and `close`.
 
 ## JavaScript
 
@@ -159,7 +182,7 @@ globalThis.plugin = {
 
 ## WebAssembly (ABI version 1)
 
-The module has no imports and exports:
+The module exports the following; its only allowed import is `kzb.host_call`, and only a plugin that uses host functions needs it:
 
 | Export | Signature | Meaning |
 | --- | --- | --- |
@@ -167,6 +190,10 @@ The module has no imports and exports:
 | `kzb_api` | `() -> i32` | protocol version, `1` |
 | `kzb_alloc` | `(len: u32) -> u32` | a buffer the host writes into |
 | `kzb_call` | `(fn_ptr, fn_len, in_ptr, in_len: u32) -> i64` | UTF-8 function name and JSON input; returns `(ptr << 32) \| len` of a UTF-8 JSON envelope `{"ok": …}` or `{"error": "code"}`, valid until the next call |
+
+| Import | Signature | Meaning |
+| --- | --- | --- |
+| `kzb.host_call` | `(name_ptr, name_len, in_ptr, in_len: u32) -> i64` | calls a host function (or `progress`) with UTF-8 name and JSON input; the host writes the JSON envelope into a buffer from `kzb_alloc` and returns `(ptr << 32) \| len`. The buffer belongs to the plugin until its call returns |
 
 The Rust SDK (below) implements this ABI; the example [`plugins/hole-plate`](../plugins/hole-plate) (plate with a pattern of holes) uses it.
 
@@ -211,4 +238,4 @@ Built so far (`plugins/core/dist/org.kizamubeam.core-generators.kzp`): gear, box
 
 ## Tests
 
-`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output), plugins in packs (`scripts/plugin-packs-test.ts`) the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`) and both templates (`scripts/plugin-sdk-test.ts`, the Rust one only where the wasm32 target is installed).
+`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output, host functions from both runtimes), plugins in packs (`scripts/plugin-packs-test.ts`) the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`) and both templates (`scripts/plugin-sdk-test.ts`, the Rust one only where the wasm32 target is installed).

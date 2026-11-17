@@ -17,7 +17,7 @@ export const PENDING = 'plugin-pending';
 
 /** Starts the process of a plugin: a Worker in the app, the current thread in Node */
 export type Spawn = (m: PluginManifest) => PluginProcess;
-let spawn: Spawn = (m) => inProcess(m.runtime, m.code);
+let spawn: Spawn = (m) => inProcess(m.runtime, m.code, m.host ?? []);
 export const setPluginSpawn = (s: Spawn) => void (spawn = s);
 
 /** Data of a resource the app keeps (a 3D model as `kzm1:` text), or null while it is not loaded */
@@ -62,6 +62,12 @@ export function appCodeText(code: string, name: string): string | undefined {
   switch (code) {
     case PENDING:
       return t('Wird berechnet …');
+    case 'plugin-cancelled':
+      return t('Die Berechnung wurde abgebrochen.');
+    case 'host-bad-input':
+    case 'host-failed':
+    case 'host-not-allowed':
+      return t('Die Erweiterung „{name}“ hat eine Funktion von KizamuBeam falsch aufgerufen ({code}).', { name, code });
     case 'plugin-timeout':
       return t('Die Erweiterung „{name}“ hat zu lange gerechnet.', { name });
     case 'plugin-memory':
@@ -128,8 +134,18 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
 
   /** Optional functions (view, onChange) the plugin turned out not to have: not called again */
   const missing = new Set<PluginFn>();
+  /** Progress of the running computation (host.progress), shown with „being computed“ */
+  let progress: { done: number; text?: string } | null = null;
+  const start = (): PluginProcess => {
+    const p = spawn(m);
+    p.onProgress = (done, text) => {
+      progress = { done, ...(text !== undefined ? { text } : {}) };
+      listeners.forEach((f) => f(m.id));
+    };
+    return p;
+  };
   const call = async <T>(fn: PluginFn, input: unknown, check: (v: unknown) => T): Promise<Outcome<T>> => {
-    proc ??= spawn(m);
+    proc ??= start();
     try {
       return { ok: check(await proc.call(fn, input)) };
     } catch (e) {
@@ -151,8 +167,9 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     let r = running.get(k);
     if (r) return r;
     const input = { ...p };
-    for (const res of resourcesOf(p)) if (res.data !== null) (proc ??= spawn(m)).setResource({ kind: res.kind, id: res.id, data: res.data });
+    for (const res of resourcesOf(p)) if (res.data !== null) (proc ??= start()).setResource({ kind: res.kind, id: res.id, data: res.data });
     r = (async () => {
+      progress = null;
       const entry: Entry = { validate: await call('validate', input, checkIssues) };
       if (!missing.has('view')) {
         const v = await call('view', input, checkView);
@@ -175,6 +192,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       remember(k, entry);
     })().finally(() => {
       running.delete(k);
+      progress = null;
       listeners.forEach((f) => f(m.id));
     });
     running.set(k, r);
@@ -230,7 +248,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
   const item = (it: PluginItem): GenItem => (it.type === 'text' ? { ...it, text: render(it.text) } : it);
   /** Resources the surface needs are sent like before computing */
   const sendResources = (p: Params) => {
-    for (const res of resourcesOf(p)) if (res.data !== null) (proc ??= spawn(m)).setResource({ kind: res.kind, id: res.id, data: res.data });
+    for (const res of resourcesOf(p)) if (res.data !== null) (proc ??= start()).setResource({ kind: res.kind, id: res.id, data: res.data });
   };
 
   const texts: Record<string, () => string> = { [PENDING]: () => codeText(PENDING) };
@@ -261,7 +279,10 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       : {}),
     validate(p) {
       const e = entry(p);
-      if (!e) return [{ level: 'error', code: PENDING, msg: codeText(PENDING) }];
+      if (!e) {
+        const pct = progress ? ` ${Math.round(progress.done * 100)} %${progress.text ? ` · ${localNumbers(progress.text)}` : ''}` : '';
+        return [{ level: 'error', code: PENDING, msg: codeText(PENDING) + pct }];
+      }
       return 'ok' in e.validate ? e.validate.ok.map(issue) : [{ level: 'error', code: e.validate.error, msg: codeText(e.validate.error) }];
     },
     generate(p): GenResult {
@@ -341,6 +362,19 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     desc,
     keys: text('keys') ?? '',
     prepare,
+    cancel() {
+      if (running.size) proc?.cancel();
+    },
+    recompute(p) {
+      cache.delete(keyOf(p));
+      void prepare(p);
+    },
+    openSession(p) {
+      if (!missing.has('open')) void call('open', { ...p }, (v) => v);
+    },
+    closeSession() {
+      if (proc && !missing.has('close')) void call('close', null, (v) => v);
+    },
     dispose() {
       proc?.dispose();
       proc = null;

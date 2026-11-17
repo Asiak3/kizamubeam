@@ -201,6 +201,25 @@ pub fn mesh(data: &str) -> Option<(Vec<f32>, Vec<u32>)> {
     Some((pos, tri))
 }
 
+/// Call a host function of the app (#211): `"boolean"` (`{ "op": "union" | "difference" | "intersection" | "xor",
+/// "a": [sub-paths], "b": [sub-paths] }`), `"offset"` (`{ "subs", "delta", "join"? }`), `"fit"` (`{ "pts": [[x, y], …],
+/// "closed"?, "tolerance"? }`) or `"trace"` (`{ "width", "height", "data": gray bytes as base64, "threshold"?,
+/// "smooth"?, "ignoreLess"?, "scale"? }`). The manifest must list it under `"host"`. `Err(code)` on failure, e.g.
+/// `host-not-allowed` or `host-bad-input`.
+pub fn host(name: &str, input: &Value) -> Result<Value, String> {
+    let bytes = serde_json::to_vec(input).map_err(|_| "host-bad-input".to_string())?;
+    let env: Value = serde_json::from_slice(&abi::host_raw(name, &bytes)).map_err(|_| "host-failed".to_string())?;
+    match env.get("error").and_then(Value::as_str) {
+        Some(code) => Err(code.to_string()),
+        None => Ok(env.get("ok").cloned().unwrap_or(Value::Null)),
+    }
+}
+
+/// Report progress of a long computation (0 … 1); the dialog shows it next to „being computed“
+pub fn progress(done: f64) {
+    let _ = host("progress", &serde_json::json!(done));
+}
+
 /// A generator plugin. `validate` runs first; `generate` only when it reported no error.
 pub trait Plugin {
     type Params: serde::de::DeserializeOwned;
@@ -242,6 +261,15 @@ pub trait Plugin {
     fn on_surface(_event: &Value, _surface: &Value, _p: &Self::Params) -> Option<Value> {
         None
     }
+    /// Optional: a dialog with this plugin opened (a session, #211): a place to do expensive work once, e.g.
+    /// prepare an input, and keep it for the following calls. Return `Some(Value::Null)`.
+    fn open(_p: &Self::Params) -> Option<Value> {
+        None
+    }
+    /// Optional: the dialog closed; drop what `open` kept.
+    fn close() -> Option<Value> {
+        None
+    }
     /// Optional: data a parameter with `"resource"` names (`kind` "model3d": a 3D model, see [`mesh`]). Called
     /// once before the first call that needs it and again after a restart; keep it by `id` (e.g. in a
     /// `thread_local!`). Return `false` for data the plugin cannot read. The default means no resources.
@@ -280,6 +308,11 @@ pub fn dispatch<P: Plugin>(name: &str, input: Value) -> Result<Value, String> {
             let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
             P::on_event_with(&action, &inputs, &ctx, &p).ok_or_else(missing)
         }
+        "open" => {
+            let p = params(input)?;
+            P::open(&p).ok_or_else(missing)
+        }
+        "close" => P::close().ok_or_else(missing),
         "draw" => {
             let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
             P::draw(&input, &p).ok_or_else(missing)

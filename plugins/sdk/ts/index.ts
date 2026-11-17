@@ -178,12 +178,34 @@ export interface Plugin<P extends Params = Params> {
   draw?(input: Surface & { have: string[]; params: P }): Drawing;
   /** Optional: a pointer or key event on the drawing surface */
   onSurface?(input: { event: Pointer; surface: Surface; params: P }): EventResult | null;
+  /** Optional: a dialog with the plugin opened (a session); do expensive work once and keep it for the following calls */
+  open?(p: P): null;
+  /** Optional: the dialog closed; drop what open kept */
+  close?(): null;
   /**
    * Optional: data a parameter with "resource" names (kind "model3d": a 3D model, decode it with mesh()). Called
    * once before the first call that needs it, and again after the plugin was restarted; keep it by id.
    */
   resource?(input: { kind: string; id: string; data: string }): null;
 }
+
+/**
+ * Host functions of the app (#211), callable while the plugin computes. The manifest lists the ones it uses under
+ * "host" (progress needs no entry). They throw an Error whose message is a code (host-not-allowed, host-bad-input).
+ */
+export interface Host {
+  /** Boolean operation on closed outlines: a op b */
+  boolean(input: { op: 'union' | 'difference' | 'intersection' | 'xor'; a: SubPath[]; b?: SubPath[] }): SubPath[];
+  /** Offset by delta mm (negative = inward); open sub-paths become a band */
+  offset(input: { subs: SubPath[]; delta: number; join?: 'round' | 'miter' | 'square' }): SubPath[];
+  /** Bézier curves through points */
+  fit(input: { pts: [number, number][]; closed?: boolean; tolerance?: number }): SubPath;
+  /** Outlines of the dark areas of a grayscale image (one byte per pixel, base64), in mm from the top left */
+  trace(input: { width: number; height: number; data: string; threshold?: number; smooth?: number; ignoreLess?: number; scale?: number }): SubPath[];
+  /** Report progress 0 … 1 of a long computation, optionally with a short text */
+  progress(done: number, text?: string): void;
+}
+export const host: Host = (globalThis as unknown as { host: Host }).host;
 
 /** Register the plugin's functions with the app */
 export function definePlugin<P extends Params = Params>(plugin: Plugin<P>) {

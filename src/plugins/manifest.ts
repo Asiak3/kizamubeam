@@ -4,6 +4,7 @@
 import type { GenAction, GenActionInput, GenColumn, GenList, GenSurface, ParamSpec, ParamValue, Rule } from '../generators/types';
 import { LIMITS, PLUGIN_API } from './contract';
 import { base64ToBytes, type Runtime } from './engine';
+import { HOST_FNS } from './hostfns';
 import { sha256 } from '../pdfcrypt';
 import { t } from '../i18n';
 
@@ -42,6 +43,8 @@ export interface PluginManifest {
    * resource model3d), its file name into `name`
    */
   inputs?: PluginInput[];
+  /** Host functions the plugin calls (hostfns.ts: boolean, offset, fit, trace); progress needs no entry */
+  host?: string[];
 }
 
 export interface PluginInput {
@@ -355,6 +358,11 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
         }
         return out;
       });
+    }
+    if (raw.host !== undefined) {
+      if (!Array.isArray(raw.host) || !raw.host.every((x) => typeof x === 'string' && (HOST_FNS as readonly string[]).includes(x)))
+        fail(t('unbekannte Host-Funktion in „host“ (erlaubt: {list})', { list: HOST_FNS.join(', ') }));
+      if ((raw.host as string[]).length) m.host = [...new Set(raw.host as string[])];
     }
     if (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined || raw.dialog.surface !== undefined)) {
       if ((raw.dialog.version as number) < 2) fail(t('Listen und Aktionen brauchen „dialog“ Version 2'));

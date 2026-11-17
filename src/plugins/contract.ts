@@ -16,7 +16,8 @@ export const PLUGIN_API = 1;
 /** Plugin functions the app calls */
 /** resource: data a parameter refers to (e.g. a 3D model), sent once per process before it is needed */
 /** draw, onSurface: the drawing surface of the dialog */
-export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent' | 'resource' | 'draw' | 'onSurface';
+/** open, close: a dialog with the plugin was opened or closed (a session: keep or drop expensive work) */
+export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent' | 'resource' | 'draw' | 'onSurface' | 'open' | 'close';
 
 /** Limits for one plugin (#205: time, memory, output size) */
 export const LIMITS = {
@@ -26,7 +27,7 @@ export const LIMITS = {
    * layout too (a stack model slices the model to count its layers), resource decodes a 3D model; draw may compute
    * the layout for new parameters, onSurface answers pointer events (finishing a line may look into the model)
    */
-  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000, resource: 20000, draw: 30000, onSurface: 5000 } as Record<PluginFn, number>,
+  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000, resource: 20000, draw: 30000, onSurface: 5000, open: 30000, close: 2000 } as Record<PluginFn, number>,
   /** Options of a question (ask) */
   askOptions: 3,
   /** Memory of the JavaScript engine or the WebAssembly instance */
@@ -115,6 +116,9 @@ function subs(v: unknown, what: string, count: { nodes: number }): SubPath[] {
     return { nodes, closed: s.closed === true };
   });
 }
+
+/** Sub-paths a plugin hands over (to a host function): checked like parts, at most LIMITS.nodes nodes */
+export const checkSubPaths = (v: unknown, what = 'subs'): SubPath[] => subs(v, what, { nodes: 0 });
 
 /** Check and copy the answer of validate(); anything outside the contract is an error */
 export function checkIssues(v: unknown): PluginIssue[] {

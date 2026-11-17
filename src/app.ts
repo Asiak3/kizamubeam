@@ -14,7 +14,7 @@ canvas.tabIndex = 0;
 const editor = new Editor(canvas);
 // Plugins of extensions run in their own Worker. Parts whose formulas waited for a plugin are recomputed once it answers.
 initPlugins(
-  (m) => workerProcess(m.runtime, m.code),
+  (m) => workerProcess(m.runtime, m.code, m.host ?? []),
   () => {
     if (editor.paramProblems.some((x) => x.issues.some((i) => i.code === PENDING))) editor.applyParams();
   },

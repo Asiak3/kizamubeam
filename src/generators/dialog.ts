@@ -14,7 +14,7 @@ import type { GenAsk, GenChange, Generator, Params, ParamSpec, ParamValue } from
 import { library, entryLabel } from '../materials';
 import { genFitPatch } from '../fitcheck';
 import { genHost } from '../genHost';
-import { onPluginResult } from '../plugins/generator';
+import { onPluginResult, PENDING } from '../plugins/generator';
 import { listsArea } from './dialogLists';
 import { surfaceArea } from './dialogSurface';
 
@@ -253,6 +253,11 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     if (Object.keys(binds).length) for (const pt of r.parts) pt.shape.bind = { ...binds };
     built = r.parts.length ? r : null;
     issuesEl.replaceChildren(...r.issues.map((i) => h('div', { class: i.level === 'error' ? 'error' : 'warn' }, i.msg)));
+    // A plugin still computing can be stopped; a stopped or timed-out run can be started again
+    if (g.cancel && r.issues.some((i) => i.code === PENDING))
+      issuesEl.append(h('button', { class: 'btn small', onclick: () => g.cancel!() }, t('Berechnung abbrechen')));
+    else if (g.recompute && r.issues.some((i) => i.code === 'plugin-cancelled' || i.code === 'plugin-timeout'))
+      issuesEl.append(h('button', { class: 'btn small', onclick: () => g.recompute!(np) }, t('Neu berechnen')));
     for (const s of g.schema) {
       const bad = r.issues.some((i) => i.key === s.key && i.level === 'error');
       rows.get(s.key)!.forEach((el) => el.classList.toggle('invalid', bad));
@@ -507,10 +512,12 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     if (pending) clearTimeout(pending);
     pending = 0;
     stopListening();
+    g.closeSession?.();
     dlg.remove();
   });
   document.body.append(dlg);
   dlg.showModal();
+  g.openSession?.(normalizeParams(g, p));
   flush();
 }
 

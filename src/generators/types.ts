@@ -377,6 +377,13 @@ export interface Generator {
   actions?: GenAction[];
   /** An action was clicked; plugins answer asynchronously */
   onEvent?(ev: GenEvent, p: Params): GenEventResult | void | Promise<GenEventResult | void>;
+  /** Stop computing (plugins in a Worker); the parameters then report „cancelled“ until recompute() */
+  cancel?(): void;
+  /** Compute these parameters again (after a cancelled or failed run) */
+  recompute?(p: Params): void;
+  /** The dialog opened or closed (#211 sessions): plugins may keep expensive work for the dialog's lifetime */
+  openSession?(p: Params): void;
+  closeSession?(): void;
   /** A drawing surface in the dialog (#335 stage 4) */
   surface?: GenSurface;
   /** What the surface shows for these parameters */

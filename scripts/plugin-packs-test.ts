@@ -17,7 +17,7 @@ const qjs = readFileSync(new URL('../node_modules/@jitl/quickjs-wasmfile-release
 setQuickJSWasm(qjs.buffer.slice(qjs.byteOffset, qjs.byteOffset + qjs.byteLength));
 const { buildPluginPack } = await import('./plugin-pack.mjs');
 const P = await import('../src/packs');
-const { pluginGenerator, PENDING, onPluginResult } = await import('../src/plugins/generator');
+const { pluginGenerator, PENDING, onPluginResult, setPluginSpawn } = await import('../src/plugins/generator');
 const { initPlugins, pluginGenerators, pluginProblems, testLoadPlugins } = await import('../src/plugins/registry');
 const { inProcess } = await import('../src/plugins/client');
 // Endless loops below should not wait for the full generate limit
@@ -100,6 +100,8 @@ await test('pack format 2: refused manifests', () => {
   bad((x) => delete x.plugins[0].texts.en, /Texte fehlen/);
   bad((x) => (x.plugins[0].texts.en['<b>'] = 'x'), /Ungültiger Text/);
   bad((x) => (x.plugins[0].id = 'Not An Id'), /ungültige Kennung/);
+  bad((x) => (x.plugins[0].host = ['fit', 'network']), /Host-Funktion/);
+  assert.deepEqual(P.parsePack(JSON.stringify({ ...plate(), plugins: [{ ...plate().plugins[0], host: ['fit', 'fit', 'trace'] }] })).plugins[0].host, ['fit', 'trace']);
   bad((x) => x.plugins.push(x.plugins[0]), /doppelter Kennung/);
   // A data-only pack in format 1 stays valid
   const old = { format: 'kizamubeam-pack', id: 'com.example.old', version: '1.0.0', name: 'Old', devices: [{ name: 'Old laser', fw: 'grbl', bedW: 400, bedH: 400 }] };
@@ -200,6 +202,48 @@ await test('plugin generator: crashes, timeouts and broken output become issues'
   const r3 = await G.buildGenAsync(g3, G.defaultParams(g3));
   assert.equal(r3.issues.at(-1)!.msg, 'Zu groß: höchstens {max} mm', 'a code thrown by generate uses the plugin text');
   g3.dispose();
+});
+
+await test('plugin generator: progress in the pending message, cancel, recompute, sessions (#211)', async () => {
+  const calls: string[] = [];
+  let release: ((v: unknown) => void) | null = null;
+  let fail: ((e: unknown) => void) | null = null;
+  let proc: import('../src/plugins/client').PluginProcess;
+  setPluginSpawn(() => (proc = {
+    call: (fn, input) => {
+      calls.push(fn);
+      if (fn === 'generate') return new Promise((res, rej) => ((release = res), (fail = rej)));
+      if (fn === 'validate') return Promise.resolve([]);
+      if (fn === 'view') return Promise.reject(Object.assign(new Error('x'), { code: 'plugin-no-function' }));
+      return Promise.resolve(fn === 'open' ? (input as { size: number }).size : null);
+    },
+    setResource() {},
+    cancel: () => fail?.(Object.assign(new Error('plugin-cancelled'), { code: 'plugin-cancelled' })),
+    dispose() {},
+  }));
+  try {
+    const g = pluginGenerator(P.parsePack(jsPack(SQUARE)).plugins[0], { id: 'com.example.js', name: 'JS example' });
+    const p = G.normalizeParams(g, { size: 20 });
+    const done = g.prepare(p);
+    await new Promise((r) => setTimeout(r, 0));
+    proc!.onProgress!(0.42, 'Teil 3/7');
+    assert.match(G.buildGen(g, p).issues[0].msg, /42 % · Teil 3\/7$/);
+    g.cancel!();
+    await done;
+    assert.equal(G.buildGen(g, p).issues[0].code, 'plugin-cancelled');
+    g.recompute!(p);
+    await new Promise((r) => setTimeout(r, 0));
+    release!({ parts: [{ key: 'a', at: { x: 0, y: 0 }, subs: [] }], info: [] });
+    await g.prepare(p);
+    assert.equal(G.buildGen(g, p).parts.length, 1);
+    g.openSession!(p);
+    g.closeSession!();
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(calls.filter((c) => c === 'open' || c === 'close'), ['open', 'close']);
+    g.dispose();
+  } finally {
+    setPluginSpawn((m) => inProcess(m.runtime, m.code, m.host ?? []));
+  }
 });
 
 await test('hole plate (WebAssembly) through the generator interface', async () => {

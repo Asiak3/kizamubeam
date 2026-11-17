@@ -4914,5 +4914,10 @@
   "Lage der Ebene quer zur Ansicht (mm)": "Posizione del piano trasversale alla vista (mm)",
   "wie oben": "come sopra",
   "{ribs} von {count} Rippen": "{ribs} di {count} costole",
-  "{where}: braucht „dialog“ Version 3": "{where}: richiede «dialog» versione 3"
+  "{where}: braucht „dialog“ Version 3": "{where}: richiede «dialog» versione 3",
+  "Berechnung abbrechen": "Annulla calcolo",
+  "Neu berechnen": "Ricalcola",
+  "Die Berechnung wurde abgebrochen.": "Il calcolo è stato annullato.",
+  "Die Erweiterung „{name}“ hat eine Funktion von KizamuBeam falsch aufgerufen ({code}).": "L'estensione «{name}» ha chiamato in modo errato una funzione di KizamuBeam ({code}).",
+  "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "funzione host sconosciuta in «host» (consentite: {list})"
 }

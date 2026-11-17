@@ -103,6 +103,56 @@ await test('contract: bad output is refused', () => {
   assert.deepEqual(r.parts[0].subs[0].nodes[0], { x: 1, y: 2 });
 });
 
+await test('host functions from JavaScript: boolean, offset, fit, trace, progress', async () => {
+  const px = new Uint8Array(16).fill(255);
+  px[5] = px[6] = px[9] = px[10] = 0;
+  const gray = Buffer.from(px).toString('base64');
+  const src = `globalThis.plugin = { generate: () => {
+    const sq = (x, y, s) => ({ closed: true, nodes: [{ x, y }, { x: x + s, y }, { x: x + s, y: y + s }, { x, y: y + s }] });
+    const u = host.boolean({ op: 'union', a: [sq(0, 0, 10)], b: [sq(5, 5, 10)] });
+    const o = host.offset({ subs: [sq(0, 0, 10)], delta: 1, join: 'miter' });
+    const f = host.fit({ pts: [[0, 0], [5, 2], [10, 0]] });
+    const t = host.trace({ width: 4, height: 4, data: '${gray}', smooth: 0, ignoreLess: 0, scale: 2 });
+    host.progress(0.5); host.progress({ done: 2, text: 'fast' });
+    let err = ''; try { host.boolean({ op: 'nope', a: [] }); } catch (e) { err = e.message; }
+    return { parts: [{ key: 'u', at: { x: 0, y: 0 }, subs: u }, { key: 'o', at: { x: 0, y: 0 }, subs: o }, { key: 'f', at: { x: 0, y: 0 }, subs: [f] }, { key: 't', at: { x: 0, y: 0 }, subs: t }], info: [['err', err]] };
+  } };`;
+  const p = inProcess('js', src, ['boolean', 'offset', 'fit', 'trace']);
+  const seen: [number, string | undefined][] = [];
+  p.onProgress = (d, t) => seen.push([d, t]);
+  const r = checkGenResult(await p.call('generate', {}));
+  const box = (key: string) => {
+    const xs = r.parts.find((q) => q.key === key)!.subs.flatMap((s) => s.nodes.map((n) => n.x));
+    return [Math.min(...xs), Math.max(...xs)];
+  };
+  assert.equal(r.parts[0].subs.length, 1, 'union is one outline');
+  assert.deepEqual(box('u').map((v) => Math.round(v * 100) / 100), [0, 15]);
+  assert.deepEqual(box('o').map((v) => Math.round(v * 100) / 100), [-1, 11]);
+  assert.equal(r.parts[2].subs[0].nodes[0].x, 0);
+  assert.ok(r.parts[3].subs.length === 1 && box('t')[1] <= 6.01 && box('t')[0] >= 1.99, 'traced square, scaled ×2');
+  assert.equal(r.info[0][1], 'host-bad-input');
+  assert.deepEqual(seen, [[0.5, undefined], [1, 'fast']]);
+});
+
+await test('host functions the manifest does not name are refused', async () => {
+  const p = inProcess('js', `globalThis.plugin = { generate: () => { host.fit({ pts: [[0, 0], [1, 1]] }); return { parts: [], info: [] }; } };`, ['boolean']);
+  assert.equal(await code(p.call('generate', {})), 'host-not-allowed');
+  const q = inProcess('js', `globalThis.plugin = { generate: () => { host.progress(0.3); return { parts: [], info: [] }; } };`);
+  assert.deepEqual(checkGenResult(await q.call('generate', {})).parts, [], 'progress needs no entry');
+});
+
+// A Rust module (no_std) whose kzb_call hands its input to host "fit" and returns the answer envelope
+const hostWasm = Uint8Array.from(atob('AGFzbQEAAAABEgNgBH9/f38BfmABfwF/YAABfwIRAQNremIJaG9zdF9jYWxsAAADBAMBAgAFAwEAEgYJAX8BQYCAwAALBysEBm1lbW9yeQIACWt6Yl9hbGxvYwABB2t6Yl9hcGkAAghremJfY2FsbAADCk8DMwEBf0EAQQBBACgChIDEgAAiASABIABqQYCABEsbIgEgAGo2AoSAxIAAIAFBhIDAgABqCwQAQQELFABBgIDAgABBAyACIAMQgICAgAALCwwBAEGAgMAACwNmaXQAbwRuYW1lAAcGdC53YXNtAT8EAB5fUk52Q3NlNG1wNlhMTWg5UV8xdDlob3N0X2NhbGwBCWt6Yl9hbGxvYwIHa3piX2FwaQMIa3piX2NhbGwHEgEAD19fc3RhY2tfcG9pbnRlcgkKAQAHLnJvZGF0YQA9CXByb2R1Y2VycwEMcHJvY2Vzc2VkLWJ5AQVydXN0Yx0xLjk3LjAgKDJkODE0NGI3OCAyMDI2LTA3LTA3KQCUAQ90YXJnZXRfZmVhdHVyZXMIKwtidWxrLW1lbW9yeSsPYnVsay1tZW1vcnktb3B0KxZjYWxsLWluZGlyZWN0LW92ZXJsb25nKwptdWx0aXZhbHVlKw9tdXRhYmxlLWdsb2JhbHMrE25vbnRyYXBwaW5nLWZwdG9pbnQrD3JlZmVyZW5jZS10eXBlcysIc2lnbi1leHQ='), (c) => c.charCodeAt(0));
+
+await test('host functions from WebAssembly through the kzb.host_call import', async () => {
+  const p = inProcess('wasm', hostWasm, ['fit']);
+  const sub = (await p.call('generate', { pts: [[0, 0], [5, 2], [10, 0]] })) as { nodes: { x: number }[] };
+  assert.equal(sub.nodes[0].x, 0);
+  assert.equal(sub.nodes.at(-1)!.x, 10);
+  assert.equal(await code(inProcess('wasm', hostWasm).call('generate', { pts: [[0, 0], [1, 1]] })), 'host-not-allowed');
+  assert.equal(await code(p.call('generate', { pts: 'x' })), 'host-bad-input');
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

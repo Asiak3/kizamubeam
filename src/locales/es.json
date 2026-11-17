@@ -4914,5 +4914,10 @@
   "Lage der Ebene quer zur Ansicht (mm)": "Posición del plano transversal a la vista (mm)",
   "wie oben": "como arriba",
   "{ribs} von {count} Rippen": "{ribs} de {count} costillas",
-  "{where}: braucht „dialog“ Version 3": "{where}: necesita «dialog» versión 3"
+  "{where}: braucht „dialog“ Version 3": "{where}: necesita «dialog» versión 3",
+  "Berechnung abbrechen": "Cancelar cálculo",
+  "Neu berechnen": "Volver a calcular",
+  "Die Berechnung wurde abgebrochen.": "Se ha cancelado el cálculo.",
+  "Die Erweiterung „{name}“ hat eine Funktion von KizamuBeam falsch aufgerufen ({code}).": "La extensión «{name}» llamó incorrectamente a una función de KizamuBeam ({code}).",
+  "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "función de host desconocida en «host» (permitidas: {list})"
 }

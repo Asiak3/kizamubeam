@@ -1,6 +1,6 @@
 // Main-thread side of a plugin: starts its Worker, sends calls one at a time and enforces the time limit by
 // terminating the Worker (it is started again for the next call). Answers come back as checked JSON values.
-import { createEngine, Engine, EngineError, unwrap, type Runtime } from './engine';
+import { createEngine, Engine, EngineError, unwrap, type EngineOptions, type Runtime } from './engine';
 import { LIMITS, type PluginFn } from './contract';
 import type { WorkerReply, WorkerRequest } from './worker';
 
@@ -12,6 +12,10 @@ export interface PluginProcess {
    * again after the plugin was restarted. The newest few are kept.
    */
   setResource(r: PluginResource): void;
+  /** Progress of the call running now (the plugin reports it with host.progress) */
+  onProgress?: (done: number, text?: string) => void;
+  /** Stop the running call (and those waiting): they fail with plugin-cancelled; the next call starts afresh */
+  cancel(): void;
   dispose(): void;
 }
 
@@ -58,7 +62,7 @@ function replyError(msg: string): EngineError {
 }
 
 /** Run a plugin in its own Worker (the app) */
-export function workerProcess(runtime: Runtime, code: string | Uint8Array): PluginProcess {
+export function workerProcess(runtime: Runtime, code: string | Uint8Array, host: string[] = []): PluginProcess {
   let worker: Worker | null = null;
   let loaded: Promise<void> | null = null;
   let seq = 0;
@@ -70,6 +74,10 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array): Plug
     resources.reset();
     worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (ev: MessageEvent<WorkerReply>) => {
+      if (ev.data.progress !== undefined) {
+        if (pending.has(ev.data.seq)) proc.onProgress?.(ev.data.progress, ev.data.text);
+        return;
+      }
       const p = pending.get(ev.data.seq);
       if (p) (pending.delete(ev.data.seq), p.resolve(ev.data));
     };
@@ -77,7 +85,7 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array): Plug
       ev.preventDefault();
       kill('plugin-crash');
     };
-    loaded = send({ seq: ++seq, op: 'load', runtime, code }, 30_000).then((r) => {
+    loaded = send({ seq: ++seq, op: 'load', runtime, code, host }, 30_000).then((r) => {
       if (r.error) throw replyError(r.error);
     });
     loaded.catch(() => kill('plugin-crash'));
@@ -96,7 +104,7 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array): Plug
       worker!.postMessage(req);
     });
 
-  return {
+  const proc: PluginProcess = {
     call(fn, input) {
       // One call at a time per plugin; a timed-out call restarts the Worker for the next one
       const one = async (f: PluginFn, inp: unknown) => {
@@ -122,18 +130,23 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array): Plug
       return p;
     },
     setResource: (r) => resources.set(r),
+    cancel: () => {
+      if (pending.size) kill('plugin-cancelled');
+    },
     dispose: () => kill('plugin-disposed'),
   };
+  return proc;
 }
 
 /** Run a plugin in the current thread (Node tests, headless runner); same answers, no hard time limit for WebAssembly */
-export function inProcess(runtime: Runtime, code: string | Uint8Array): PluginProcess {
+export function inProcess(runtime: Runtime, code: string | Uint8Array, host: string[] = []): PluginProcess {
   let engine: Promise<Engine> | null = null;
   const resources = resourceSet();
-  return {
+  const opts: EngineOptions = { host, onProgress: (done, text) => proc.onProgress?.(done, text) };
+  const proc: PluginProcess = {
     async call(fn, input) {
       if (!engine) resources.reset();
-      const e = await (engine ??= createEngine(runtime, code));
+      const e = await (engine ??= createEngine(runtime, code, opts));
       try {
         for (const res of resources.pending()) {
           try {
@@ -149,9 +162,12 @@ export function inProcess(runtime: Runtime, code: string | Uint8Array): PluginPr
       }
     },
     setResource: (r) => resources.set(r),
+    // The current thread cannot be interrupted; a call here always runs to its end or its time limit
+    cancel() {},
     dispose() {
       engine?.then((e) => e.dispose());
       engine = null;
     },
   };
+  return proc;
 }
