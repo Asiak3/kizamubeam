@@ -3,9 +3,9 @@
 // Worker. The bridge is a small cache per plugin: prepare(params) computes validate and generate once, the
 // synchronous functions read from the cache and report „being computed“ until the answer is there. Whoever shows
 // a result (the dialog, formula recomputation) listens to onPluginResult and asks again.
-import type { GenResult, Generator, Issue, Params, ParamSpec } from '../generators/types';
+import type { GenChange, GenResult, Generator, Issue, Params, ParamSpec } from '../generators/types';
 import type { AsmPoses } from '../generators/pose';
-import { checkGenResult, checkIssues, ContractError, type PluginGenResult, type PluginIssue, type PluginText } from './contract';
+import { checkChange, checkGenResult, checkIssues, checkView, ContractError, type PluginFn, type PluginGenResult, type PluginIssue, type PluginText, type PluginView } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
 import { pluginText, type PluginManifest } from './manifest';
@@ -36,6 +36,8 @@ type Outcome<T> = { ok: T } | { error: string };
 interface Entry {
   validate: Outcome<PluginIssue[]>;
   generate?: Outcome<PluginGenResult>;
+  /** Answer of view(), when the plugin has it */
+  view?: PluginView;
 }
 
 export interface PluginGenerator extends Generator {
@@ -108,12 +110,16 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
   });
   const errorOf = (e: unknown) => (e instanceof EngineError ? e.code : e instanceof Error && 'code' in e ? String((e as { code: unknown }).code) : 'plugin-crash');
 
-  const call = async <T>(fn: 'validate' | 'generate', p: Params, check: (v: unknown) => T): Promise<Outcome<T>> => {
+  /** Optional functions (view, onChange) the plugin turned out not to have: not called again */
+  const missing = new Set<PluginFn>();
+  const call = async <T>(fn: PluginFn, input: unknown, check: (v: unknown) => T): Promise<Outcome<T>> => {
     proc ??= spawn(m);
     try {
-      return { ok: check(await proc.call(fn, p)) };
+      return { ok: check(await proc.call(fn, input)) };
     } catch (e) {
-      return { error: errorOf(e) };
+      const code = errorOf(e);
+      if (code === 'plugin-no-function') missing.add(fn);
+      return { error: code };
     }
   };
 
@@ -131,6 +137,10 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     const input = { ...p };
     r = (async () => {
       const entry: Entry = { validate: await call('validate', input, checkIssues) };
+      if (!missing.has('view')) {
+        const v = await call('view', input, checkView);
+        if ('ok' in v) entry.view = v.ok;
+      }
       const v = entry.validate;
       // A part generator makes exactly one part (assemblies any number)
       const check = (x: unknown) => {
@@ -198,6 +208,21 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       const out: GenResult = { parts: r.ok.parts.map((x) => ({ ...x })), info: r.ok.info.map(([k, v]) => [label(k), render(v)]) };
       if (r.ok.plan) out.plan = r.ok.plan;
       return out;
+    },
+    view(p) {
+      const v = entry(p)?.view;
+      return v?.autoText ? { autoText: Object.fromEntries(Object.entries(v.autoText).map(([k, x]) => [k, render(x)])) } : {};
+    },
+    async onChange(key, old, p): Promise<GenChange | void> {
+      if (missing.has('onChange')) return;
+      const r = await call('onChange', { key, old, params: { ...p } }, checkChange);
+      if (!('ok' in r)) return;
+      const { patch, ask } = r.ok;
+      if (!patch && !ask) return;
+      return {
+        ...(patch ? { patch: patch as Params } : {}),
+        ...(ask ? { ask: { question: render(ask.question), options: ask.options.map((o) => ({ label: render(o.label), patch: o.patch as Params })) } } : {}),
+      };
     },
     poses(p): AsmPoses | null {
       const r = cache.get(keyOf(p))?.generate;

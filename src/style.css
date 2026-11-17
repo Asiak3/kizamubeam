@@ -2593,6 +2593,16 @@ body.dock-resizing #canvas {
 .gen-issues .warn {
   color: #b7791f;
 }
+.gen-ask {
+  max-width: 560px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent, #3b82f6);
+  border-radius: 6px;
+}
+.gen-ask p {
+  margin: 0 0 6px;
+}
 
 /* Rippenmodell: Abschnitte zeichnen */
 .ribs-panel {

@@ -10,7 +10,7 @@ import { dec, t, tn } from '../i18n';
 import { autoText, buildGen, defaultParams, fieldActive, GENERATORS, genLabel, getGenerator, normalizeParams, resolveBinds } from './index';
 import { evalExpr, f2 } from '../dom';
 import { evaluate, formatNumber, namesIn, projectParams } from '../params';
-import type { GenChange, Generator, Params, ParamSpec, ParamValue } from './types';
+import type { GenAsk, GenChange, Generator, Params, ParamSpec, ParamValue } from './types';
 import { library, entryLabel } from '../materials';
 import { genFitPatch } from '../fitcheck';
 import { genHost } from '../genHost';
@@ -254,7 +254,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       rows.get(s.key)!.forEach((el) => el.classList.toggle('invalid', bad));
     }
     infoEl.replaceChildren(...r.info.map(([k, v]) => h('div', {}, h('span', { class: 'muted' }, k), ' ', v)));
-    okBtn.disabled = addBtn.disabled = !built;
+    okBtn.disabled = addBtn.disabled = !built || asking;
     panel?.refresh(np);
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -314,6 +314,11 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   // Aktion (Klick, Enter, Übernehmen) wird eine ausstehende Berechnung nachgeholt, damit nichts mit alten Werten entsteht.
   let pending = 0;
   let renderMs = 0;
+  /** A question of the generator is open (OK and Add stay off) */
+  let asking = false;
+  /** Counts committed fields, so a late plugin answer to an older change is dropped */
+  let changeSeq = 0;
+  const askEl = h('div', { class: 'gen-ask', role: 'alertdialog', hidden: true });
   const flush = () => {
     if (pending) clearTimeout(pending);
     pending = 0;
@@ -330,25 +335,46 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
    */
   function changed(key: string, before: ParamValue, undo: () => void): boolean {
     if (!g!.onChange) return false;
-    let r: GenChange | void;
+    let r: GenChange | void | Promise<GenChange | void>;
     try {
       r = g!.onChange(key, before, normalizeParams(g!, p));
     } catch {
       return false;
     }
-    if (!r || (!r.patch && !r.ask)) return false;
-    let patch = r.patch ?? {};
-    if (r.ask) {
-      // Until the in-dialog question of #335 stage 2: a confirmation that applies the first option
-      const opt = r.ask.options[0];
-      if (!opt || !confirm(r.ask.question)) {
-        undo();
-        update();
-        return true;
-      }
-      patch = { ...patch, ...opt.patch };
+    if (r instanceof Promise) {
+      // A plugin answers from its Worker: the field stays as committed until then; the answer only counts while
+      // the field still holds that value and no other question is open
+      const committed = p[key];
+      const token = ++changeSeq;
+      void r.then(
+        (x) => {
+          if (dlg.open && token === changeSeq && p[key] === committed) applyChange(key, x, undo);
+        },
+        () => undefined,
+      );
+      return false;
     }
-    // Checked against the schema like user input; text fields show the new text
+    return applyChange(key, r, undo);
+  }
+  /** Apply the answer of onChange: a patch at once, a question inside the dialog first */
+  function applyChange(key: string, r: GenChange | void, undo: () => void): boolean {
+    if (!r || (!r.patch && !r.ask)) return false;
+    const base = r.patch ?? {};
+    if (r.ask) {
+      showAsk(r.ask, (opt) => {
+        if (opt) patchFields(key, { ...base, ...opt.patch });
+        else {
+          undo();
+          update();
+        }
+      });
+      return true;
+    }
+    patchFields(key, base);
+    return true;
+  }
+  /** Checked against the schema like user input; text fields show the new text */
+  function patchFields(key: string, patch: Params) {
     const keys = Object.keys(patch).filter((k) => k !== key && g!.schema.some((s) => s.key === k));
     const np = normalizeParams(g!, { ...p, ...patch }, p);
     for (const k of keys) {
@@ -356,10 +382,44 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       delete binds[k];
       const control = textInputs.get(k);
       if (control) control.value = String(np[k]);
+      else showValue(k);
       if (isSuggested(g!, k, p)) p[k] = '';
     }
     update();
-    return true;
+  }
+  /** Show a value set by the generator in its field (number, choice, switch) */
+  function showValue(k: string) {
+    const v = p[k];
+    const el = dlg.querySelector<HTMLElement>(`#gen-${CSS.escape(k)}`);
+    if (el instanceof HTMLSelectElement) el.value = String(v);
+    else if (el instanceof HTMLInputElement) el.value = typeof v === 'number' ? fmtNum(v) : String(v);
+    for (const row of rows.get(k) ?? []) {
+      const box = row.querySelector<HTMLInputElement>('input[type=checkbox]');
+      if (box) box.checked = !!v;
+    }
+  }
+  /**
+   * The generator's question inside the dialog (#335 stage 2): its options and Cancel; until it is answered,
+   * OK and Add stay off. Cancel restores the field.
+   */
+  function showAsk(ask: GenAsk, done: (opt: GenAsk['options'][number] | null) => void) {
+    askEl.hidden = false;
+    asking = true;
+    okBtn.disabled = addBtn.disabled = true;
+    const finish = (opt: GenAsk['options'][number] | null) => {
+      askEl.hidden = true;
+      askEl.replaceChildren();
+      asking = false;
+      done(opt);
+    };
+    askEl.replaceChildren(
+      h('p', {}, ask.question),
+      h('div', { class: 'dialog-buttons' },
+        h('button', { class: 'btn', onclick: () => finish(null) }, t('Abbrechen')),
+        ...ask.options.map((o, i) => h('button', { class: i === 0 ? 'btn primary' : 'btn', onclick: () => finish(o) }, o.label)),
+      ),
+    );
+    (askEl.querySelector('.btn.primary') as HTMLButtonElement | null)?.focus();
   }
   const update = () => {
     if (renderMs <= SLOW_PREVIEW_MS) return flush();
@@ -413,6 +473,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       h('div', {}, canvas, infoEl),
     ),
     panel?.el ?? null,
+    askEl,
     issuesEl,
     calibNote,
     kerfNote,

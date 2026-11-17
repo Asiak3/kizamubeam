@@ -19,6 +19,10 @@ export interface DialogState {
   parts: { key: string; at: Pt; subs: number; nodes: number; box: { minX: number; minY: number; maxX: number; maxY: number } }[];
   /** SHA-256 of the generated geometry, to compare runs */
   geometry: string;
+  /** Suggestions the dialog shows in empty text fields (view) */
+  autoText: Record<string, string>;
+  /** Question the plugin asked in this step (onChange), with the option labels */
+  ask?: { question: string; options: string[] };
 }
 
 /** Thrown when a script step does not fit the schema (unknown key, wrong type, out of range) */
@@ -26,7 +30,9 @@ export class ScriptError extends Error {}
 
 /**
  * Run the dialog of a plugin generator: the default parameters first, then one state per step. A step is the
- * set of fields the user changes at once.
+ * set of fields the user commits, one after the other; each goes through onChange like in the dialog. When the
+ * plugin asks a question, `$answer` in the step picks the option (0, 1, 2); without it the user cancels and the
+ * field gets its previous value back.
  */
 export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = []): Promise<DialogState[]> {
   const g = pluginGenerator(m, { id: 'headless', name: m.id });
@@ -34,10 +40,33 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
     const out: DialogState[] = [];
     let p = defaultParams(g);
     for (let i = 0; i <= steps.length; i++) {
+      let ask: DialogState['ask'];
       if (i > 0) {
-        const bad = checkInput(g, steps[i - 1]).filter((x) => x.level === 'error');
+        const { $answer, ...step } = steps[i - 1];
+        if ($answer !== undefined && !(Number.isInteger($answer) && ($answer as number) >= 0)) throw new ScriptError(`step ${i}: $answer must be an option number`);
+        const bad = checkInput(g, step).filter((x) => x.level === 'error');
         if (bad.length) throw new ScriptError(`step ${i}: ${bad.map((x) => x.msg).join('; ')}`);
-        p = normalizeParams(g, { ...p, ...steps[i - 1] }, p);
+        for (const [key, value] of Object.entries(step)) {
+          const old = p[key];
+          p = normalizeParams(g, { ...p, [key]: value }, p);
+          if (p[key] === old) continue;
+          const r = await g.onChange!(key, old, p);
+          if (!r) continue;
+          let patch = r.patch ?? {};
+          if (r.ask) {
+            ask = { question: r.ask.question, options: r.ask.options.map((o) => o.label) };
+            const opt = $answer === undefined ? undefined : r.ask.options[$answer as number];
+            if ($answer !== undefined && !opt) throw new ScriptError(`step ${i}: the question has no option ${$answer}`);
+            if (!opt) {
+              p = { ...p, [key]: old };
+              continue;
+            }
+            patch = { ...patch, ...opt.patch };
+          }
+          const keys = Object.keys(patch).filter((k) => k !== key && g.schema.some((s) => s.key === k));
+          const np = normalizeParams(g, { ...p, ...patch }, p);
+          for (const k of keys) p[k] = np[k];
+        }
       }
       await g.prepare(p);
       const r = buildGen(g, p);
@@ -60,6 +89,8 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
         info: r.info,
         parts,
         geometry: hex(sha256(new TextEncoder().encode(JSON.stringify(r.parts.map((x) => [x.shape.part, x.at, x.shape.subs, x.marks ?? null]))))),
+        autoText: g.view?.(p).autoText ?? {},
+        ...(ask ? { ask } : {}),
       });
     }
     return out;

@@ -1,6 +1,6 @@
 // Turns a built-in generator (src/generators) into a plugin: validate and generate with JSON in and out, issue
 // texts, info rows and labels as text codes. Bundled together with the generator by scripts/build-core-plugins.mjs.
-import type { Generator, Params } from '../../src/generators/types';
+import type { Generator, Params, ParamValue } from '../../src/generators/types';
 import type { PluginText } from '../../src/plugins/contract';
 import { pieces, type Piece } from './i18n-shim';
 import { codeOf } from './codes';
@@ -14,6 +14,10 @@ const piece = (p: Piece): PluginText => {
 const text = (list: Piece[]): PluginText => (list.length === 1 ? piece(list[0]) : list.map(piece));
 /** A string from the generator as a plugin text (plain, one code or a list) */
 const toText = (s: string) => text(pieces(s));
+
+// QuickJS has no structuredClone; the generators only clone plain data
+const gt = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
+gt.structuredClone ??= <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 
 export function wrap(g: Generator) {
   (globalThis as unknown as { plugin: unknown }).plugin = {
@@ -37,5 +41,26 @@ export function wrap(g: Generator) {
         ...(poses ? { poses } : {}),
       };
     },
+    // Only generators that have them: the app then knows the plugin has no such function
+    ...(g.view
+      ? {
+          view(p: Params) {
+            const v = g.view!(p);
+            return v.autoText ? { autoText: Object.fromEntries(Object.entries(v.autoText).map(([k, x]) => [k, toText(x)])) } : {};
+          },
+        }
+      : {}),
+    ...(g.onChange
+      ? {
+          onChange(input: { key: string; old: ParamValue; params: Params }) {
+            const r = g.onChange!(input.key, input.old, input.params);
+            if (!r || r instanceof Promise) return null;
+            return {
+              ...(r.patch ? { patch: r.patch } : {}),
+              ...(r.ask ? { ask: { question: toText(r.ask.question), options: r.ask.options.map((o) => ({ label: toText(o.label), patch: o.patch })) } } : {}),
+            };
+          },
+        }
+      : {}),
   };
 }

@@ -134,6 +134,7 @@ export type GenInput =
  * Question the app asks the user after a change (the only way a generator can ask anything, #335).
  * Each option applies its patch; cancelling restores the value before the change.
  */
+/** A question the dialog shows inside itself (#335): up to three options, each with a patch; Cancel keeps the previous value */
 export interface GenAsk {
   question: string;
   options: { label: string; patch: Params }[];
@@ -165,9 +166,10 @@ export interface Generator {
   view?(p: Params): { autoText?: Record<string, string> };
   /**
    * Called when the user commits a field (number fields on leaving them, choices at once) with its previous value.
-   * The returned patch is checked against the schema like user input.
+   * The returned patch is checked against the schema like user input. Plugins answer asynchronously (a Promise);
+   * the dialog applies the answer only if the field still has the committed value.
    */
-  onChange?(key: string, old: ParamValue, p: Params): GenChange | void;
+  onChange?(key: string, old: ParamValue, p: Params): GenChange | void | Promise<GenChange | void>;
   /** Preview in the dialog: center = centre the parts' bounding box instead of the assembly origin */
   preview?: { center?: boolean };
   /** Texts for issue codes that generate() may throw (Error.message = code); buildGen translates them */

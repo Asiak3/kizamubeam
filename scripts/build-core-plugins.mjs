@@ -34,6 +34,7 @@ export const CORE = {
   insert: { file: 'src/generators/insert', name: 'INSERT' },
   shelf: { file: 'src/generators/shelf', name: 'SHELF' },
   discsphere: { file: 'src/generators/discsphere', name: 'DISCSPHERE' },
+  fingerbox: { file: 'src/generators/fingerbox', name: 'FINGERBOX' },
 };
 
 const i18nShim = {
@@ -144,6 +145,8 @@ export async function corePlugin(id) {
     return p;
   });
   for (const de of sourceTexts(node.files)) put(codeOf(de), de);
+  // Codes generate() throws (Generator.texts), e.g. „ratio-count“
+  for (const [code, text] of Object.entries(g.texts ?? {})) put(code, text());
   const sha256 = createHash('sha256').update(code).digest('hex');
   return {
     id: g.id, type: 'generator', api: 1, version: g.version, kind: g.kind, runtime: 'js', code, sha256,

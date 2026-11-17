@@ -19,7 +19,9 @@ const { assemblyPoses, genThickness } = await import('../src/view3d/poses');
 const pack = parsePack(readFileSync(new URL('../plugins/core/dist/org.kizamubeam.core-generators.kzp', import.meta.url), 'utf8'));
 
 let failed = 0;
+/** ONLY=<text> runs only the tests whose name contains it */
 async function test(name: string, fn: () => Promise<void> | void) {
+  if (process.env.ONLY && !name.includes(process.env.ONLY)) return;
   try {
     await fn();
     console.log(`ok   ${name}`);
@@ -88,6 +90,7 @@ async function same(id: string, cases: Record<string, unknown>[]) {
       close(b.parts.map((x) => [x.shape.part, x.at, x.shape.subs, x.marks]), a.parts.map((x) => [x.shape.part, x.at, x.shape.subs, x.marks]), `${what}: parts`);
       // Generators without a thickness parameter compute poses for 3 mm in the plugin (the 3D view's default)
       if (core.poses && a.parts.length) close(plug.poses!(p, 3), assemblyPoses(id, p, genThickness(p, 3)), `${what}: poses`);
+      if (core.view) assert.deepEqual(plug.view!(p), core.view(p), `${what}: view`);
       if (a.parts.length) {
         assert.equal(plug.label(p), core.label(p), `${what}: label`);
         for (const x of a.parts) if (x.shape.part) assert.equal(plug.label(p, x.shape.part), core.label(p, x.shape.part), `${what}: label of ${x.shape.part}`);
@@ -137,6 +140,28 @@ function sweep(id: string): Record<string, unknown>[] {
 
 for (const id of ['rack', 'pulley', 'cam', 'gearpair', 'drawer', 'insert', 'shelf', 'discsphere'])
   await test(`${id} as a plugin: same dialog, geometry, issues, info and poses`, () => same(id, sweep(id)));
+
+await test('box-divided as a plugin: same dialog, geometry, suggestions; onChange with patch and question', async () => {
+  await same('box-divided', [...sweep('box-divided'), { compartmentsX: 3, ratiosX: '1:2:1' }, { ratiosY: '30mm:*' }, { ratiosX: '1:0' }, { ratiosX: '(1' }]);
+  const core = G.getGenerator('box-divided')!;
+  const plug = pluginGenerator(pack.plugins.find((x) => x.id === 'box-divided')!, { id: pack.id, name: 'core' });
+  try {
+    for (const [key, old, raw] of [
+      ['compartmentsX', 3, { compartmentsX: 4, ratiosX: '1:2:1' }],
+      ['compartmentsX', 4, { compartmentsX: 2, ratiosX: '1:2:1:1' }],
+      ['compartmentsX', 4, { compartmentsX: 2, ratiosX: '10mm:2:3:4' }],
+      ['compartmentsY', 2, { compartmentsY: 2 }],
+      ['width', 100, { width: 120 }],
+    ] as const) {
+      const p = G.normalizeParams(core, raw);
+      assert.deepEqual(await plug.onChange!(key, old, p) ?? null, core.onChange!(key, old, p) ?? null, `${key} ${old} → ${JSON.stringify(raw)}`);
+    }
+    const asked = await plug.onChange!('compartmentsX', 4, G.normalizeParams(core, { compartmentsX: 2, ratiosX: '10mm:2:3:4' }));
+    assert.deepEqual(asked, { ask: { question: 'Diese Fachwerte werden entfernt: 3 : 4. Fortfahren?', options: [{ label: 'OK', patch: { ratiosX: '10mm:2' } }] } });
+  } finally {
+    plug.dispose();
+  }
+});
 
 await test('all pass the catalogue check', async () => {
   for (const m of pack.plugins) {

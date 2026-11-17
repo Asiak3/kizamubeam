@@ -161,16 +161,34 @@ pub trait Plugin {
     fn validate(p: &Self::Params) -> Vec<Issue>;
     /// An `Err(code)` is shown as an error with the text of that code
     fn generate(p: &Self::Params) -> Result<GenResult, String>;
+    /// Optional: suggestions for empty text fields, `json!({ "autoText": { "key": "…" } })`
+    fn view(_p: &Self::Params) -> Option<Value> {
+        None
+    }
+    /// Optional: the user committed field `key` (previous value `old`); answer `json!({ "patch": { … } })` or
+    /// `json!({ "ask": { "question": …, "options": [{ "label": …, "patch": { … } }] } })`, `Some(Value::Null)` for
+    /// nothing to do. `None` (the default) tells the app the plugin has no onChange.
+    fn on_change(_key: &str, _old: &Value, _p: &Self::Params) -> Option<Value> {
+        None
+    }
 }
 
 /// Call a plugin function by name with JSON input (used by `export_plugin!`, also handy in tests)
 pub fn dispatch<P: Plugin>(name: &str, input: Value) -> Result<Value, String> {
-    let p: P::Params = serde_json::from_value(input).map_err(|_| "bad-input".to_string())?;
+    let params = |v: Value| serde_json::from_value::<P::Params>(v).map_err(|_| "bad-input".to_string());
     let json = |v: serde_json::Result<Value>| v.map_err(|_| "plugin-bad-output".to_string());
+    let missing = || "plugin-no-function".to_string();
     match name {
-        "validate" => json(serde_json::to_value(P::validate(&p))),
-        "generate" => P::generate(&p).and_then(|r| json(serde_json::to_value(r))),
-        _ => Err("plugin-no-function".into()),
+        "validate" => json(serde_json::to_value(P::validate(&params(input)?))),
+        "generate" => P::generate(&params(input)?).and_then(|r| json(serde_json::to_value(r))),
+        "view" => P::view(&params(input)?).ok_or_else(missing),
+        "onChange" => {
+            let key = input.get("key").and_then(Value::as_str).ok_or("bad-input")?.to_string();
+            let old = input.get("old").cloned().unwrap_or(Value::Null);
+            let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
+            P::on_change(&key, &old, &p).ok_or_else(missing)
+        }
+        _ => Err(missing()),
     }
 }
 

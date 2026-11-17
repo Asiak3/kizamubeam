@@ -54,10 +54,22 @@ export interface GenResult {
   /** Names of the parts of an assembly by part key */
   labels?: Record<string, Text>;
 }
+/** Answer of onChange: parameters to change as well, or a question (up to three options, each with a patch) */
+export interface Change {
+  patch?: Params;
+  ask?: { question: Text; options: { label: Text; patch: Params }[] };
+}
 export interface Plugin<P extends Params = Params> {
   validate(p: P): Issue[];
   /** Runs only when validate reported no error; throw new Error('code') to report a problem */
   generate(p: P): GenResult;
+  /** Optional: suggestions the dialog shows in empty text fields, by parameter key */
+  view?(p: P): { autoText?: Record<string, Text> };
+  /**
+   * Optional: called when the user commits a field, with its previous value. The patch is checked against the
+   * schema like user input; a question is shown inside the dialog, Cancel restores the field.
+   */
+  onChange?(input: { key: string; old: Params[string]; params: P }): Change | null;
 }
 
 /** Register the plugin's functions with the app */

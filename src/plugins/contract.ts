@@ -1,5 +1,6 @@
 // Plugin contract (issue #205, stage 1): what a plugin may return, checked before anything reaches the editor.
-// Plugins exchange JSON only. Calls: validate(params) → issues, generate(params) → parts, info, labels, poses, plan.
+// Plugins exchange JSON only. Calls: validate(params) → issues, generate(params) → parts, info, labels, poses, plan;
+// optional (#335 stage 2): view(params) → suggested texts, onChange({ key, old, params }) → patch or a question.
 // No DOM, no Editor, so the same checks run in the Worker, in the app and in Node tests.
 import type { Node, Pt, SubPath } from '../model';
 import type { Params, PlanSheet } from '../generators/types';
@@ -9,12 +10,14 @@ import type { AsmPoses, Pose, V3 } from '../generators/pose';
 export const PLUGIN_API = 1;
 
 /** Plugin functions the app calls */
-export type PluginFn = 'validate' | 'generate';
+export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange';
 
 /** Limits for one plugin (#205: time, memory, output size) */
 export const LIMITS = {
   /** Time per call in ms; the Worker is terminated after it. generate runs in a Worker (the editor stays usable), and nesting many parts in QuickJS takes a while (a 400-tooth gear pair: about 20 s) */
-  callMs: { validate: 2000, generate: 30000 } as Record<PluginFn, number>,
+  callMs: { validate: 2000, generate: 30000, view: 2000, onChange: 2000 } as Record<PluginFn, number>,
+  /** Options of a question (ask) */
+  askOptions: 3,
   /** Memory of the JavaScript engine or the WebAssembly instance */
   memoryBytes: 512 * 1024 * 1024,
   /** Size of the plugin code */
@@ -181,3 +184,54 @@ export function checkGenResult(v: unknown): PluginGenResult {
 
 /** Parameters handed to a plugin: plain JSON copy */
 export const callInput = (p: Params): Params => JSON.parse(JSON.stringify(p));
+
+/** Answer of view(): suggestions for empty text fields by parameter key */
+export interface PluginView {
+  autoText?: Record<string, PluginText>;
+}
+
+/** Answer of onChange(): parameters to change as well, or a question whose options each carry a patch */
+export interface PluginChange {
+  patch?: Record<string, unknown>;
+  ask?: { question: PluginText; options: { label: PluginText; patch: Record<string, unknown> }[] };
+}
+
+/** A patch: plain values by parameter key (checked against the schema by the app like user input) */
+function checkPatch(v: unknown): Record<string, unknown> {
+  if (!isObj(v)) return fail('patch');
+  const out: Record<string, unknown> = {};
+  for (const [k, x] of Object.entries(v).slice(0, 200)) {
+    if (typeof x === 'number' ? !Number.isFinite(x) : typeof x === 'string' ? x.length > 100_000 : typeof x !== 'boolean') fail(`patch value ${k}`);
+    out[str(k, 'patch key', 80)] = x;
+  }
+  return out;
+}
+
+/** Check and copy the answer of view() */
+export function checkView(v: unknown): PluginView {
+  if (v === null || v === undefined) return {};
+  if (!isObj(v)) return fail('view');
+  const out: PluginView = {};
+  if (v.autoText !== undefined) {
+    if (!isObj(v.autoText)) fail('autoText');
+    out.autoText = Object.fromEntries(Object.entries(v.autoText as Record<string, unknown>).slice(0, 200).map(([k, x]) => [str(k, 'autoText key', 80), checkText(x)]));
+  }
+  return out;
+}
+
+/** Check and copy the answer of onChange(); null or {} means nothing to do */
+export function checkChange(v: unknown): PluginChange {
+  if (v === null || v === undefined) return {};
+  if (!isObj(v)) return fail('change');
+  const out: PluginChange = {};
+  if (v.patch !== undefined) out.patch = checkPatch(v.patch);
+  if (v.ask !== undefined) {
+    const a = v.ask;
+    if (!isObj(a) || !Array.isArray(a.options) || !a.options.length || a.options.length > LIMITS.askOptions) return fail('ask');
+    out.ask = {
+      question: checkText(a.question),
+      options: a.options.map((o) => (isObj(o) ? { label: checkText(o.label), patch: checkPatch(o.patch ?? {}) } : fail('ask option'))),
+    };
+  }
+  return out;
+}

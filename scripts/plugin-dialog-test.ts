@@ -90,6 +90,46 @@ await test('headless runner: steps, visible fields, issues and parts like the di
   await assert.rejects(runDialog(m, [{ width: 1000 }]), ScriptError);
 });
 
+await test('stage 2: view suggests texts, onChange patches fields or asks inside the dialog', async () => {
+  const code = `globalThis.plugin = {
+    validate: () => [],
+    generate: (p) => ({ parts: [{ key: 'base', subs: [{ closed: true, nodes: [{x:0,y:0},{x:p.width,y:0},{x:0,y:10}] }], at: { x: 0, y: 0 } }], info: [] }),
+    view: (p) => ({ autoText: { note: { code: 'noteFor', values: { w: p.width } } } }),
+    onChange: ({ key, old, params }) => {
+      if (key === 'lid' && params.lid) return { patch: { lidGap: 1, nope: 3, width: 999 } };
+      if (key === 'width' && params.width < old) return { ask: { question: { code: 'shrink', values: { from: old } }, options: [{ label: 'keep', patch: { lidGap: 2 } }, { label: { code: 'half' }, patch: { lidGap: old / 100, width: 1 } }] } };
+      return null;
+    },
+  };`;
+  const params = [
+    { key: 'width', type: 'length', min: 10, max: 300, def: 100 },
+    { key: 'lid', type: 'bool', def: false },
+    { key: 'lidGap', type: 'length', min: 0, max: 5, def: 0.2 },
+    { key: 'note', type: 'text', def: '' },
+  ];
+  const m = manifest(code, { params, texts: { en: { name: 'Tray', desc: 'A tray', width: 'Width', lid: 'Lid', lidGap: 'Gap', note: 'Note', noteFor: 'Tray {w}', shrink: 'Smaller than {from}?', keep: 'Keep', half: 'Half' } } });
+  const s = await runDialog(m, [{ lid: true }, { width: 50 }, { width: 50, $answer: 1 }, { width: 40, $answer: 0 }]);
+  assert.deepEqual(s[0].autoText, { note: 'Tray 100' });
+  // A patch goes through the schema: unknown keys are dropped, values clamped to their range
+  assert.equal(s[1].params.lidGap, 1);
+  assert.equal(s[1].params.width, 300, 'patched values are clamped to the schema');
+  assert.equal('nope' in s[1].params, false);
+  // Question without an answer: Cancel restores the field
+  assert.deepEqual(s[2].ask, { question: 'Smaller than 300?', options: ['keep', 'Half'] }, 'plain texts as they are, codes translated');
+  assert.equal(s[2].params.width, 300);
+  assert.equal(s[3].params.lidGap, 3, 'second option');
+  assert.equal(s[3].params.width, 50, 'a patch does not change the field the user committed');
+  assert.equal(s[3].autoText.note, 'Tray 50');
+  assert.equal(s[4].params.lidGap, 2, 'first option');
+  assert.equal(s[4].params.width, 40);
+  await assert.rejects(runDialog(m, [{ width: 20, $answer: 5 }]), ScriptError);
+  // Without view and onChange the plugin is asked once and then left alone
+  const plain = manifest(TRAY);
+  const r = await runDialog(plain, [{ width: 50 }, { width: 60 }]);
+  assert.deepEqual(r[2].autoText, {});
+  assert.equal(r[2].params.width, 60);
+});
+
 await test('check: a good plugin passes, randomness, crashes and missing texts are found', async () => {
   const ok = await checkPlugin(manifest(TRAY));
   assert.deepEqual(ok.errors, []);
