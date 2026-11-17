@@ -7,6 +7,8 @@ import { etc, verifyAsync } from '@noble/ed25519';
 import { compareVersions } from './updates';
 import { localText, Pack, parsePack, PACK_EXT } from './packs';
 import { t } from './i18n';
+import { PLUGIN_API } from './plugins/contract';
+import { codeBytes } from './plugins/manifest';
 
 /**
  * Where the signed catalogue is published, tried in this order. GitHub Pages of the KizamuBeam organization first,
@@ -43,6 +45,18 @@ export interface CatalogEntry {
   materials: number;
   /** Bibliotheks-Einträge (fehlt in älteren Katalogen) */
   assets: number;
+  /** Plugins (program code, #205); 0 in older catalogues */
+  plugins: number;
+  /** Runtimes of the plugins */
+  runtimes?: ('js' | 'wasm')[];
+  /** Highest plugin call protocol the pack needs */
+  pluginApi?: number;
+  /** Size of all plugin code in bytes */
+  codeSize?: number;
+  /** Where the source of the plugins is (https only) */
+  source?: string;
+  /** Servers the plugins may fetch data from (#280), host names */
+  network?: string[];
   /** Paketdatei relativ zu catalog.json */
   file: string;
   sha256: string;
@@ -101,7 +115,12 @@ export function parseCatalog(text: string): Catalog {
       name: p.name, ...(p.description ? { description: p.description } : {}),
       ...(typeof p.author === 'string' ? { author: p.author } : {}),
       ...(typeof p.homepage === 'string' && p.homepage.startsWith('https://') ? { homepage: p.homepage } : {}),
-      devices: n(p.devices), templates: n(p.templates), materials: n(p.materials), assets: n(p.assets),
+      devices: n(p.devices), templates: n(p.templates), materials: n(p.materials), assets: n(p.assets), plugins: n(p.plugins),
+      ...(Array.isArray(p.runtimes) ? { runtimes: p.runtimes.filter((r): r is 'js' | 'wasm' => r === 'js' || r === 'wasm') } : {}),
+      ...(n(p.pluginApi) ? { pluginApi: n(p.pluginApi) } : {}),
+      ...(n(p.codeSize) ? { codeSize: n(p.codeSize) } : {}),
+      ...(typeof p.source === 'string' && p.source.startsWith('https://') ? { source: p.source } : {}),
+      ...(Array.isArray(p.network) && p.network.length ? { network: p.network.filter((x): x is string => typeof x === 'string' && /^[a-z0-9.-]{1,253}$/.test(x)).slice(0, 16) } : {}),
       file: p.file, sha256: p.sha256, size: n(p.size),
     });
   }
@@ -113,6 +132,7 @@ export type CatalogState = 'install' | 'update' | 'installed' | 'newer-installed
 /** Was der Knopf eines Eintrags anbietet, je nach installierter Version und App-Version */
 export function catalogState(e: CatalogEntry, installed: Pack | undefined, appVersion: string): CatalogState {
   if (e.minApp && compareVersions(appVersion, e.minApp) < 0) return 'needs-app';
+  if (e.pluginApi && e.pluginApi > PLUGIN_API) return 'needs-app';
   if (!installed) return 'install';
   const c = compareVersions(e.version, installed.version);
   return c > 0 ? 'update' : c === 0 ? 'installed' : 'newer-installed';
@@ -161,9 +181,10 @@ export async function fetchCatalogPack(e: CatalogEntry, url = catalogSource): Pr
 
 /**
  * Katalog aus Paketdateien bauen (beim Veröffentlichen der Website). Jede Datei muss „<Kennung>.kzp“ heißen
- * und gültig sein; Fehler brechen ab, damit kein fehlerhaftes Paket in den Katalog gerät.
+ * und gültig sein; Fehler brechen ab, damit kein fehlerhaftes Paket in den Katalog gerät. sources: link to the
+ * source of a plugin pack by pack id (packs built from plugins/ in this repository).
  */
-export async function buildCatalog(files: [name: string, text: string][], generated: string): Promise<string> {
+export async function buildCatalog(files: [name: string, text: string][], generated: string, sources: Record<string, string> = {}): Promise<string> {
   const packs: CatalogEntry[] = [];
   for (const [name, text] of [...files].sort(([a], [b]) => a.localeCompare(b))) {
     // App-Version sehr hoch: minApp darf neuer sein als diese Version der Werkzeuge
@@ -174,7 +195,16 @@ export async function buildCatalog(files: [name: string, text: string][], genera
       id: p.id, version: p.version, ...(p.minApp ? { minApp: p.minApp } : {}),
       name: raw.name, ...(raw.description ? { description: raw.description } : {}),
       ...(p.author ? { author: p.author } : {}), ...(p.homepage ? { homepage: p.homepage } : {}),
-      devices: p.devices.length, templates: p.templates.length, materials: p.materials.length, assets: p.assets.length,
+      devices: p.devices.length, templates: p.templates.length, materials: p.materials.length, assets: p.assets.length, plugins: p.plugins.length,
+      ...(p.plugins.length
+        ? {
+            runtimes: [...new Set(p.plugins.map((x) => x.runtime))].sort(),
+            pluginApi: Math.max(...p.plugins.map((x) => x.api)),
+            codeSize: p.plugins.reduce((s, x) => s + codeBytes(x.code).length, 0),
+          }
+        : {}),
+      ...(p.plugins.some((x) => x.network?.length) ? { network: [...new Set(p.plugins.flatMap((x) => (x.network ?? []).map((h) => h.hostname)))].sort() } : {}),
+      ...(sources[p.id] ? { source: sources[p.id] } : {}),
       file: name, sha256: await sha256Hex(text), size: new TextEncoder().encode(text).length,
     });
   }

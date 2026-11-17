@@ -40,6 +40,9 @@ jobs:
       - name: Plugin runtime and plugin pack tests (#205)
         run: npm run test:plugins
 
+      - name: Gear and box built as plugins give the same results (#205)
+        run: npm run test:core-plugins
+
       - name: G-code regression tests
         run: npm run test:gcode
 

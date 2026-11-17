@@ -7,10 +7,13 @@ import { assetUrl, registerAsset, restoreAssets } from '../images';
 import { meshData, registerMesh, restoreMeshes } from '../model3d/store';
 import { invalidate, invalidateText } from '../geom';
 import { t } from '../i18n';
-import { loadGen } from '../generators';
+import { getGenerator, loadGen } from '../generators';
 import type { Editor } from '../editor';
 import { bumpShapeVersion } from './shared';
 import { docKey, makeTab } from './tabs';
+
+/** Ids in the image store (hashId in images.ts) */
+const ASSET_ID = /^[0-9a-f]{16,32}$/;
 
 const STORAGE_KEY = 'kizamubeam.autosave';
 
@@ -158,7 +161,19 @@ export class EditorDocument {
   /** IDs aller im Dokument verwendeten Bilder */
   assetIds(this: Editor, objs: Obj[] = allObjs(this.doc)): string[] {
     const ids = new Set<string>();
-    for (const [o] of leaves(objs)) if (o.shape.kind === 'image') ids.add(o.shape.asset);
+    for (const [o] of leaves(objs)) {
+      if (o.shape.kind === 'image') ids.add(o.shape.asset);
+      // Images a generator keeps in a parameter (plugins, #211 stage 6); without the generator installed, every
+      // parameter that looks like an image id, so the image is not lost when the project is saved again
+      else if (o.shape.kind === 'gen') {
+        const g = getGenerator(o.shape.gen);
+        const keys = g ? g.schema.filter((s) => s.type === 'data' && s.resource === 'image').map((s) => s.key) : Object.keys(o.shape.params);
+        for (const k of keys) {
+          const v = o.shape.params[k];
+          if (typeof v === 'string' && ASSET_ID.test(v)) ids.add(v);
+        }
+      }
+    }
     return [...ids];
   }
   /** Kennungen aller 3D-Modelle, die Generator-Teile benutzen (Parameter „model“) */

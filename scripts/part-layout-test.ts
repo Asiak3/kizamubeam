@@ -2,6 +2,7 @@ import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import ClipperLib from 'clipper-lib';
 import { buildGen, defaultParams, getGenerator, loadGen, type BuiltPart } from '../src/generators';
+import './builtin-generators';
 import { flattenSub, SCALE } from '../src/clip';
 import { grow, type Poly } from '../src/nest';
 import { IDENT } from '../src/model';

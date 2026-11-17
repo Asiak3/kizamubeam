@@ -329,6 +329,12 @@ export function countSummary(devices: number, templates: number, materials: numb
 export interface InstalledPack {
   file: string;
   pack: Pack;
+  /** SHA-256 of the installed file (hex), to compare with the catalogue */
+  sha256: string;
+  /** Switched off by the user: its content and plugins are not active (#206) */
+  disabled: boolean;
+  /** Version kept from before the last update or install, for one rollback */
+  previous?: string;
 }
 export interface BrokenPack {
   file: string;
@@ -336,11 +342,15 @@ export interface BrokenPack {
 }
 
 let installed: InstalledPack[] = [];
+let all: InstalledPack[] = [];
 let broken: BrokenPack[] = [];
 let ready: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
+/** Active packs (installed and not switched off) */
 export const installedPacks = () => installed;
+/** All installed packs, switched off ones included (the Extensions window) */
+export const allPacks = () => all;
 export const brokenPacks = () => broken;
 export const onPacksChanged = (f: () => void) => void listeners.add(f);
 export const packFileName = (id: string) => `${id}.${PACK_EXT}`;
@@ -433,6 +443,46 @@ export function packTemplates(): (PackTemplate & { key: string; pack: string })[
 const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 export const hasPackFolder = isTauri;
 const STORE_KEY = 'kizamubeam.packs';
+const DISABLED_KEY = 'kizamubeam.packs.disabled';
+const VERIFIED_KEY = 'kizamubeam.packs.verified';
+/** File name of the version kept for a rollback; „~“ cannot occur in a pack id */
+const PREV = '~prev';
+export const previousFileName = (id: string) => `${id}${PREV}.${PACK_EXT}`;
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    return (JSON.parse(localStorage.getItem(key) ?? 'null') as T) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeJson(key: string, v: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(v));
+  } catch {
+    /* settings storage not available: the state is not remembered */
+  }
+}
+const disabledIds = () => new Set(readJson<string[]>(DISABLED_KEY, []));
+/** SHA-256 of pack files that came from the signed catalogue, per pack id (current and previous version) */
+const verifiedShas = () => readJson<Record<string, string[]>>(VERIFIED_KEY, {});
+
+export async function textSha256(text: string): Promise<string> {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Whether this installed file is one the signed catalogue delivered */
+export const packVerified = (p: InstalledPack) => verifiedShas()[p.pack.id]?.includes(p.sha256) ?? false;
+
+/** Remember that the catalogue lists exactly this file (called after the catalogue was checked) */
+export function markVerified(id: string, sha256: string) {
+  const v = verifiedShas();
+  const list = v[id] ?? [];
+  if (list.includes(sha256)) return;
+  v[id] = [sha256, ...list].slice(0, 2);
+  writeJson(VERIFIED_KEY, v);
+}
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   const api = await import('@tauri-apps/api/core');
@@ -462,15 +512,31 @@ async function readAll(): Promise<[string, string][]> {
 export async function loadPacks(): Promise<void> {
   const ok: InstalledPack[] = [];
   const bad: BrokenPack[] = [];
-  for (const [file, text] of await readAll()) {
+  const files = await readAll();
+  const prev = new Map<string, string>();
+  for (const [file, text] of files) if (file.endsWith(`${PREV}.${PACK_EXT}`)) prev.set(file, text);
+  const off = disabledIds();
+  for (const [file, text] of files) {
+    if (prev.has(file)) continue;
     try {
-      ok.push({ file, pack: parsePack(text) });
+      const pack = parsePack(text);
+      const old = prev.get(previousFileName(pack.id));
+      let previous: string | undefined;
+      if (old) {
+        try {
+          previous = parsePack(old).version;
+        } catch {
+          /* kept version no longer readable: no rollback */
+        }
+      }
+      ok.push({ file, pack, sha256: await textSha256(text), disabled: off.has(pack.id), ...(previous ? { previous } : {}) });
     } catch (e) {
       bad.push({ file, error: e instanceof Error ? e.message : String(e) });
     }
   }
   ok.sort((a, b) => a.pack.name.localeCompare(b.pack.name));
-  installed = ok;
+  all = ok;
+  installed = ok.filter((x) => !x.disabled);
   broken = bad;
   listeners.forEach((f) => f());
 }
@@ -485,37 +551,75 @@ export function ensurePacks(): Promise<void> {
 
 /** Was eine Installation bewirkt: neu, Update, gleiche oder ältere Version */
 export function installKind(p: Pack): { kind: 'new' | 'update' | 'same' | 'downgrade'; old?: Pack } {
-  const old = installed.find((x) => x.pack.id === p.id)?.pack;
+  const old = all.find((x) => x.pack.id === p.id)?.pack;
   if (!old) return { kind: 'new' };
   const c = compareVersions(p.version, old.version);
   return { kind: c > 0 ? 'update' : c === 0 ? 'same' : 'downgrade', old };
 }
 
-/** Geprüftes Paket speichern (ersetzt eine installierte Version) und seine Materialien übernehmen */
-export async function installPack(text: string): Promise<Pack> {
-  const p = parsePack(text);
-  const file = packFileName(p.id);
+async function writeFile(file: string, text: string) {
   if (isTauri()) await invoke<void>('pack_write', { file, contents: text });
   else {
     const s = store();
     s[file] = text;
     setStore(s);
   }
-  library.syncPack(p.id, p.materials);
-  await loadPacks();
-  return p;
 }
-
-/** Paket entfernen; unveränderte Materialien daraus verschwinden aus der Bibliothek */
-export async function removePack(file: string) {
-  const id = installed.find((x) => x.file === file)?.pack.id;
+async function deleteFile(file: string) {
   if (isTauri()) await invoke<void>('pack_delete', { file });
   else {
     const s = store();
     delete s[file];
     setStore(s);
   }
-  if (id) library.syncPack(id, []);
+}
+
+/**
+ * Geprüftes Paket speichern (ersetzt eine installierte Version) und seine Materialien übernehmen. The replaced
+ * version is kept for one rollback. verified: the text came from the signed catalogue.
+ */
+export async function installPack(text: string, opts: { verified?: boolean } = {}): Promise<Pack> {
+  const p = parsePack(text);
+  const file = packFileName(p.id);
+  const old = (await readAll()).find(([f]) => f === file)?.[1];
+  if (old && old !== text) await writeFile(previousFileName(p.id), old);
+  await writeFile(file, text);
+  if (opts.verified) markVerified(p.id, await textSha256(text));
+  if (!disabledIds().has(p.id)) library.syncPack(p.id, p.materials);
+  await loadPacks();
+  return p;
+}
+
+/** Go back to the version kept before the last update (the current one is kept instead) */
+export async function restorePrevious(id: string): Promise<Pack> {
+  const text = (await readAll()).find(([f]) => f === previousFileName(id))?.[1];
+  if (!text) throw new Error(t('Keine frühere Version vorhanden.'));
+  return installPack(text);
+}
+
+/** Switch a pack off (its content and plugins disappear until it is switched on again) or on */
+export async function setPackDisabled(id: string, disabled: boolean) {
+  const off = disabledIds();
+  if (disabled) off.add(id);
+  else off.delete(id);
+  writeJson(DISABLED_KEY, [...off]);
+  const p = all.find((x) => x.pack.id === id)?.pack;
+  library.syncPack(id, disabled || !p ? [] : p.materials);
+  await loadPacks();
+}
+
+/** Paket entfernen; unveränderte Materialien daraus verschwinden aus der Bibliothek */
+export async function removePack(file: string) {
+  const id = all.find((x) => x.file === file)?.pack.id;
+  await deleteFile(file);
+  if (id) {
+    if ((await readAll()).some(([f]) => f === previousFileName(id))) await deleteFile(previousFileName(id));
+    library.syncPack(id, []);
+    const off = disabledIds();
+    if (off.delete(id)) writeJson(DISABLED_KEY, [...off]);
+    const v = verifiedShas();
+    if (v[id]) (delete v[id], writeJson(VERIFIED_KEY, v));
+  }
   await loadPacks();
 }
 

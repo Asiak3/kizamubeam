@@ -13,7 +13,7 @@
 import { t, tn } from '../i18n';
 import type { Mesh } from './mesh';
 import type { V3 } from './slice';
-import { ribsLayout, worldMesh, type Section, type View } from '../generators/ribs';
+import { ribsLayout, sectionName, worldMesh, type Section, type View } from '../generators/ribs';
 import type { Params } from '../generators/types';
 
 export interface Suggestion {
@@ -451,11 +451,11 @@ export function suggestSections(raw: Mesh, p: Params): Suggestion {
     }
     t0 -= vs / 2;
     t1 += vs / 2;
-    sections.push({ name: t('Rumpf'), view, pts: [[r1(mx + dx * t0), r1(my + dy * t0)], [r1(mx + dx * t1), r1(my + dy * t1)]], offset: r1(planeOff), spacing: 0, radius: 0, extend: 0 });
+    sections.push({ name: '', role: 'body', view, pts: [[r1(mx + dx * t0), r1(my + dy * t0)], [r1(mx + dx * t1), r1(my + dy * t1)]], offset: r1(planeOff), spacing: 0, radius: 0, extend: 0 });
     tails.forEach((c, i) => {
-      const name = tails.length > 1 ? t('Ende {n}', { n: i + 1 }) : t('Schwanz');
+      const role = tails.length > 1 ? { role: 'end' as const, n: i + 1 } : { role: 'tail' as const };
       // Reicht ein Stück in den Rumpf, damit das Rückgrat zusammenhängt
-      sections.push({ name, view, pts: mk(c, 0.03, false, true), offset: r1(planeOff), spacing: 0, radius: 0, extend: r1(Math.max(2 * thickness, (rBody * vs) / 2)) });
+      sections.push({ name: '', ...role, view, pts: mk(c, 0.03, false, true), offset: r1(planeOff), spacing: 0, radius: 0, extend: r1(Math.max(2 * thickness, (rBody * vs) / 2)) });
     });
   }
   const legSecs = new Set<Section>();
@@ -463,7 +463,7 @@ export function suggestSections(raw: Mesh, p: Params): Suggestion {
   legs.forEach((l, i) => {
     // Beinplatte reicht bis an die Rumpf-Achse, damit sie in den Rumpf-Rippen steckt
     const top = l.pts[0];
-    const rumpf = sections.find((x) => x.name === t('Rumpf'));
+    const rumpf = sections.find((x) => x.role === 'body');
     let extend = 3 * thickness;
     if (rumpf) {
       const [[ax, ay], [bx, by]] = rumpf.pts;
@@ -471,7 +471,7 @@ export function suggestSections(raw: Mesh, p: Params): Suggestion {
       const zAxis = ay + Math.max(0, Math.min(1, u)) * (by - ay);
       extend = Math.max(3 * thickness, Math.min(80, zAxis - top[1]));
     }
-    const leg: Section = { name: t('Bein {n}', { n: i + 1 }), view, pts: l.pts.map((q) => [r1(q[0]), r1(q[1])] as [number, number]), offset: r1(l.off), spacing: 0, radius: 0, extend: r1(extend) };
+    const leg: Section = { name: '', role: 'leg', n: i + 1, view, pts: l.pts.map((q) => [r1(q[0]), r1(q[1])] as [number, number]), offset: r1(l.off), spacing: 0, radius: 0, extend: r1(extend) };
     sections.push(leg);
     legSecs.add(leg);
   });
@@ -486,7 +486,7 @@ export function suggestSections(raw: Mesh, p: Params): Suggestion {
       secs = keep;
     }
   const nLegs = secs.filter((x) => legSecs.has(x)).length;
-  const found = secs.filter((x) => !legSecs.has(x)).map((x) => x.name);
+  const found = secs.filter((x) => !legSecs.has(x)).map((x) => sectionName(x, secs.indexOf(x)));
   if (nLegs) found.push(tn('{n} Bein', '{n} Beine', nLegs));
   return { sections: secs, found: found.join(', ') };
 }

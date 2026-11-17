@@ -1,7 +1,6 @@
 // What a generator panel or input may read from the app (#341, #211): a narrow, read-only view instead of the
 // Editor. Plugins later get the same data through host functions.
 import type { Pt } from '../model';
-import type { Params } from './types';
 
 /** A selected top-level object: its name and its closed outlines in workspace mm */
 export interface GenSelected {
@@ -19,12 +18,10 @@ export interface GenHost {
   selection(): GenSelected[];
   bed(): { w: number; h: number };
   cameraImages(): GenCameraImage[];
-}
-
-/** Extra area of a generator dialog (e.g. drawing rib sections, collecting jig workpieces); writes only parameters */
-export interface GenPanel {
-  el: HTMLElement;
-  refresh(np: Params): void;
+  /** The selected image of the drawing (the first one): its decoded picture, its id in the image store and name */
+  selectedImage?(): { image: CanvasImageSource; width: number; height: number; asset: string; name: string } | null;
+  /** Keep an image file with the project (image store); its id, or null when it cannot be read */
+  keepImage?(file: Blob): Promise<string | null>;
 }
 
 /** What the app hands to Generator.fromInputs for the inputs a generator declares */

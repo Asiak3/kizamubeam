@@ -4,7 +4,7 @@ import ClipperLib from 'clipper-lib';
 import type { Pt, SubPath } from '../model';
 import { IDENT } from '../model';
 import { execute, flattenSub, Paths, SCALE } from '../clip';
-import { buildGen, getGenerator, normalizeParams, Params } from '../generators';
+import { buildGen, getGenerator, isPending, normalizeParams, Params } from '../generators';
 import { assemblyPoses, cross, dot, genThickness, Pose, V3 } from './poses';
 
 export interface Solid {
@@ -64,17 +64,20 @@ export function outlineSegments(polys: Pt[][], th: number, angleDeg = 25): numbe
 /**
  * Alle Teile einer Baugruppe in Lage, ohne Schnittfuge (so, wie sie nach dem Lasern aussehen).
  * keys: nur diese Teile (vom Nutzer gelöschte fehlen); fallbackTh: Dicke, wenn der Generator keine kennt.
- * Liefert null, wenn der Generator unbekannt ist, keinen räumlichen Aufbau hat oder die Parameter fehlerhaft sind.
+ * Liefert null, wenn der Generator unbekannt ist, keinen räumlichen Aufbau hat oder die Parameter fehlerhaft sind,
+ * und 'pending', solange ein Plugin noch rechnet (danach meldet onPluginResult das Ergebnis).
  */
-export function asmSolids(gen: string, raw: Params, fallbackTh: number, keys?: Set<string>): Solid[] | null {
+export function asmSolids(gen: string, raw: Params, fallbackTh: number, keys?: Set<string>): Solid[] | null | 'pending' {
   const g = getGenerator(gen);
   if (!g) return null;
   // Für die Körper zählt nur die Form der Teile, nicht ihre Lage: ohne das Zusammenschieben (nestParts)
   const params = normalizeParams(g, { ...raw, kerf: 0, partLayout: 'rows' });
   const th = genThickness(params, fallbackTh);
+  // Generate first: a plugin generator starts computing here and knows its poses only afterwards
+  const r = buildGen(g, params);
+  if (isPending(r)) return 'pending';
   const poses = assemblyPoses(gen, params, th);
   if (!poses) return null;
-  const r = buildGen(g, params);
   if (!r.parts.length) return null;
   const out: Solid[] = [];
   for (const p of r.parts) {

@@ -1,0 +1,417 @@
+{
+  "format": "kizamubeam-pack",
+  "formatVersion": 2,
+  "id": "org.kizamubeam.layered-art",
+  "version": "1.0.0",
+  "name": {
+    "en": "Layered art",
+    "de": "Schichtbild",
+    "it": "Arte a strati"
+  },
+  "description": {
+    "en": "Turns a logo, drawing or photo into stacked plates that are cut and glued on top of each other for depth.",
+    "de": "Macht aus einem Logo, einer Zeichnung oder einem Foto gestapelte Platten, die geschnitten und für Tiefe übereinander geklebt werden.",
+    "it": "Trasforma un logo, un disegno o una foto in pannelli sovrapposti, tagliati e incollati uno sull'altro per dare profondità."
+  },
+  "author": "KizamuBeam",
+  "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/layered-art",
+  "build": [
+    {
+      "esbuild": "src/index.ts",
+      "out": "dist/layered-art.js"
+    }
+  ],
+  "plugins": [
+    {
+      "id": "org.kizamubeam.layered-art",
+      "type": "generator",
+      "api": 1,
+      "version": 1,
+      "kind": "assembly",
+      "runtime": "js",
+      "code": "@dist/layered-art.js",
+      "icon": "stack",
+      "host": [
+        "trace",
+        "nest"
+      ],
+      "preview": {
+        "center": true
+      },
+      "params": [
+        {
+          "key": "photo",
+          "type": "data",
+          "def": "",
+          "resource": "image"
+        },
+        {
+          "key": "mode",
+          "type": "enum",
+          "options": [
+            [
+              "logo",
+              "mode.logo"
+            ],
+            [
+              "photo",
+              "mode.photo"
+            ]
+          ],
+          "def": "logo",
+          "title": "mode.title"
+        },
+        {
+          "key": "plates",
+          "type": "int",
+          "min": 2,
+          "max": 12,
+          "def": 5,
+          "title": "plates.title"
+        },
+        {
+          "key": "width",
+          "type": "length",
+          "min": 30,
+          "max": 1500,
+          "def": 120,
+          "title": "width.title"
+        },
+        {
+          "key": "thickness",
+          "type": "length",
+          "min": 0.5,
+          "max": 20,
+          "def": 3
+        },
+        {
+          "key": "frame",
+          "type": "length",
+          "min": 0,
+          "max": 200,
+          "def": 8,
+          "title": "frame.title"
+        },
+        {
+          "key": "thin",
+          "type": "length",
+          "min": 0,
+          "max": 20,
+          "def": 1.5,
+          "title": "thin.title"
+        },
+        {
+          "key": "minPiece",
+          "type": "number",
+          "min": 0,
+          "max": 10000,
+          "def": 10,
+          "title": "minPiece.title"
+        },
+        {
+          "key": "marks",
+          "type": "bool",
+          "def": true,
+          "title": "marks.title"
+        },
+        {
+          "key": "detail",
+          "type": "length",
+          "min": 0.2,
+          "max": 3,
+          "def": 0.5,
+          "title": "detail.title",
+          "advanced": true
+        },
+        {
+          "key": "levels",
+          "type": "data",
+          "def": "[]"
+        }
+      ],
+      "dialog": {
+        "version": 5,
+        "actions": [
+          {
+            "id": "pick",
+            "label": "pick",
+            "inputs": [
+              "image"
+            ],
+            "store": "photo"
+          },
+          {
+            "id": "sel",
+            "label": "sel",
+            "title": "sel.title",
+            "inputs": [
+              "selectedImage"
+            ],
+            "store": "photo"
+          },
+          {
+            "id": "swap",
+            "label": "swap"
+          },
+          {
+            "id": "reset",
+            "label": "reset"
+          }
+        ],
+        "lists": [
+          {
+            "param": "levels",
+            "label": "levelsList",
+            "empty": "levelsEmpty",
+            "columns": [
+              {
+                "key": "c",
+                "label": "c",
+                "type": "color",
+                "readonly": true
+              }
+            ],
+            "sort": true,
+            "fixedLast": 1,
+            "select": true,
+            "remove": true,
+            "removeTitle": "remove.title",
+            "rowActions": [
+              {
+                "id": "join",
+                "label": "join",
+                "title": "join.title"
+              }
+            ]
+          }
+        ],
+        "surface": {
+          "views": [
+            {
+              "id": "map",
+              "label": "view.map"
+            }
+          ],
+          "height": 240,
+          "help": "help"
+        },
+        "steps": [
+          {
+            "id": "source",
+            "label": "step.source",
+            "items": [
+              "mode",
+              "pick",
+              "sel"
+            ]
+          },
+          {
+            "id": "panel",
+            "label": "step.panel",
+            "items": [
+              "plates",
+              "width",
+              "thickness",
+              "frame",
+              "thin",
+              "minPiece",
+              "marks"
+            ]
+          },
+          {
+            "id": "layers",
+            "label": "step.layers",
+            "items": [
+              "levels",
+              "surface",
+              "swap",
+              "reset"
+            ]
+          }
+        ]
+      },
+      "texts": {
+        "en": {
+          "name": "Layered art",
+          "desc": "Turns a logo, drawing or photo into stacked plates that are cut and glued on top of each other for depth.",
+          "keys": "layered art depth plates stack logo photo relief multilayer",
+          "label": "Layered art ({n} plates)",
+          "part.back": "Back plate (1)",
+          "part.plate": "Plate {n}",
+          "part.front": "Plate {n} (front)",
+          "step.source": "Source",
+          "step.panel": "Panel",
+          "step.layers": "Layers",
+          "mode": "Image type",
+          "mode.logo": "Logo / drawing",
+          "mode.photo": "Photo",
+          "mode.title": "Logo: split by colours (few flat colours, hard edges). Photo: split by brightness, dark at the back.",
+          "pick": "Open image …",
+          "sel": "Selected image",
+          "sel.title": "Use the image selected in the drawing",
+          "plates": "Number of plates",
+          "plates.title": "Plates including the back plate; the image is split into this many levels.",
+          "width": "Width",
+          "width.title": "Width of the panel; the height follows the image.",
+          "thickness": "Material thickness",
+          "frame": "Frame width",
+          "frame.title": "Solid border on every plate that holds it together.",
+          "thin": "Thinnest part",
+          "thin.title": "Features narrower than this are removed or closed, so they can be cut.",
+          "minPiece": "Smallest piece (mm²)",
+          "minPiece.title": "Pieces and holes smaller than this are dropped or filled.",
+          "marks": "Glue marks and numbers",
+          "marks.title": "Each plate gets the outline of the plate above as a score mark and its gluing number on the frame.",
+          "detail": "Detail (mm per cell)",
+          "detail.title": "Resolution of the outlines; smaller is finer and slower.",
+          "levelsList": "Levels (front to back)",
+          "levelsEmpty": "Open an image first.",
+          "c": "Colour",
+          "join": "Join",
+          "join.title": "Join this level with the one behind it",
+          "remove.title": "Delete this level; its areas go to the nearest colour",
+          "swap": "Swap front and back",
+          "reset": "Split again",
+          "view.map": "Levels",
+          "help": "Click an area to select its level. Reorder levels by dragging or with Alt+↑/↓.",
+          "row.back": "back plate (1)",
+          "row.front": "front ({n})",
+          "row.plate": "plate {n}",
+          "noImage": "Open an image or use the selected one.",
+          "loading": "The image is being loaded …",
+          "fewLevels": "At least two levels are needed.",
+          "frameTooWide": "The frame is too wide for the panel.",
+          "analysed": "{n} levels found.",
+          "size": "Size",
+          "sizeValue": "{w} × {h} mm",
+          "platesInfo": "Plates",
+          "depth": "Total height",
+          "mmValue": "{v} mm",
+          "dropped": "Removed small pieces and holes",
+          "photo": "Image",
+          "levels": "Levels"
+        },
+        "de": {
+          "name": "Schichtbild",
+          "desc": "Macht aus einem Logo, einer Zeichnung oder einem Foto gestapelte Platten, die geschnitten und für Tiefe übereinander geklebt werden.",
+          "keys": "schichtbild tiefe platten stapel logo foto relief mehrlagig",
+          "label": "Schichtbild ({n} Platten)",
+          "part.back": "Rückplatte (1)",
+          "part.plate": "Platte {n}",
+          "part.front": "Platte {n} (vorn)",
+          "step.source": "Quelle",
+          "step.panel": "Platte",
+          "step.layers": "Ebenen",
+          "mode": "Bildart",
+          "mode.logo": "Logo / Zeichnung",
+          "mode.photo": "Foto",
+          "mode.title": "Logo: nach Farben aufteilen (wenige flache Farben, harte Kanten). Foto: nach Helligkeit, dunkel hinten.",
+          "pick": "Bild öffnen …",
+          "sel": "Ausgewähltes Bild",
+          "sel.title": "Das in der Zeichnung ausgewählte Bild verwenden",
+          "plates": "Anzahl Platten",
+          "plates.title": "Platten einschließlich Rückplatte; das Bild wird in so viele Ebenen geteilt.",
+          "width": "Breite",
+          "width.title": "Breite des Bilds; die Höhe folgt dem Bild.",
+          "thickness": "Materialdicke",
+          "frame": "Rahmenbreite",
+          "frame.title": "Fester Rand auf jeder Platte, der sie zusammenhält.",
+          "thin": "Dünnste Stelle",
+          "thin.title": "Schmalere Stellen werden entfernt oder geschlossen, damit sie sich schneiden lassen.",
+          "minPiece": "Kleinstes Teil (mm²)",
+          "minPiece.title": "Kleinere Teile und Löcher werden weggelassen oder gefüllt.",
+          "marks": "Klebemarken und Nummern",
+          "marks.title": "Jede Platte bekommt den Umriss der Platte darüber als Ritzlinie und ihre Klebenummer auf dem Rahmen.",
+          "detail": "Detail (mm pro Zelle)",
+          "detail.title": "Auflösung der Umrisse; kleiner ist feiner und langsamer.",
+          "levelsList": "Ebenen (vorn nach hinten)",
+          "levelsEmpty": "Erst ein Bild öffnen.",
+          "c": "Farbe",
+          "join": "Verbinden",
+          "join.title": "Diese Ebene mit der dahinter verbinden",
+          "remove.title": "Ebene löschen; ihre Flächen gehen an die nächste Farbe",
+          "swap": "Vorn und hinten tauschen",
+          "reset": "Neu aufteilen",
+          "view.map": "Ebenen",
+          "help": "Auf eine Fläche klicken wählt ihre Ebene. Ebenen per Ziehen oder Alt+↑/↓ umsortieren.",
+          "row.back": "Rückplatte (1)",
+          "row.front": "vorn ({n})",
+          "row.plate": "Platte {n}",
+          "noImage": "Ein Bild öffnen oder das ausgewählte verwenden.",
+          "loading": "Das Bild wird geladen …",
+          "fewLevels": "Es werden mindestens zwei Ebenen gebraucht.",
+          "frameTooWide": "Der Rahmen ist zu breit für das Bild.",
+          "analysed": "{n} Ebenen gefunden.",
+          "size": "Größe",
+          "sizeValue": "{w} × {h} mm",
+          "platesInfo": "Platten",
+          "depth": "Gesamthöhe",
+          "mmValue": "{v} mm",
+          "dropped": "Entfernte kleine Teile und Löcher",
+          "photo": "Bild",
+          "levels": "Ebenen"
+        },
+        "it": {
+          "name": "Arte a strati",
+          "desc": "Trasforma un logo, un disegno o una foto in pannelli sovrapposti, tagliati e incollati uno sull'altro per dare profondità.",
+          "keys": "strati profondità pannelli logo foto rilievo multistrato",
+          "label": "Arte a strati ({n} pannelli)",
+          "part.back": "Pannello di fondo (1)",
+          "part.plate": "Pannello {n}",
+          "part.front": "Pannello {n} (davanti)",
+          "step.source": "Origine",
+          "step.panel": "Pannello",
+          "step.layers": "Livelli",
+          "mode": "Tipo di immagine",
+          "mode.logo": "Logo / disegno",
+          "mode.photo": "Foto",
+          "mode.title": "Logo: divisione per colori. Foto: divisione per luminosità, lo scuro dietro.",
+          "pick": "Apri immagine …",
+          "sel": "Immagine selezionata",
+          "sel.title": "Usa l'immagine selezionata nel disegno",
+          "plates": "Numero di pannelli",
+          "plates.title": "Pannelli compreso quello di fondo; l'immagine viene divisa in altrettanti livelli.",
+          "width": "Larghezza",
+          "width.title": "Larghezza del pannello; l'altezza segue l'immagine.",
+          "thickness": "Spessore del materiale",
+          "frame": "Larghezza della cornice",
+          "frame.title": "Bordo pieno su ogni pannello che lo tiene unito.",
+          "thin": "Parte più sottile",
+          "thin.title": "Le parti più strette vengono rimosse o chiuse, così si possono tagliare.",
+          "minPiece": "Pezzo più piccolo (mm²)",
+          "minPiece.title": "Pezzi e fori più piccoli vengono eliminati o riempiti.",
+          "marks": "Segni di incollaggio e numeri",
+          "marks.title": "Ogni pannello riceve il contorno del pannello sopra come incisione e il suo numero sulla cornice.",
+          "detail": "Dettaglio (mm per cella)",
+          "detail.title": "Risoluzione dei contorni; più piccolo è più fine e più lento.",
+          "levelsList": "Livelli (dal davanti al fondo)",
+          "levelsEmpty": "Apri prima un'immagine.",
+          "c": "Colore",
+          "join": "Unisci",
+          "join.title": "Unisci questo livello con quello dietro",
+          "remove.title": "Elimina il livello; le sue aree vanno al colore più vicino",
+          "swap": "Scambia davanti e dietro",
+          "reset": "Dividi di nuovo",
+          "view.map": "Livelli",
+          "help": "Fai clic su un'area per selezionarne il livello. Riordina i livelli trascinandoli o con Alt+↑/↓.",
+          "row.back": "fondo (1)",
+          "row.front": "davanti ({n})",
+          "row.plate": "pannello {n}",
+          "noImage": "Apri un'immagine o usa quella selezionata.",
+          "loading": "Caricamento dell'immagine …",
+          "fewLevels": "Servono almeno due livelli.",
+          "frameTooWide": "La cornice è troppo larga per il pannello.",
+          "analysed": "{n} livelli trovati.",
+          "size": "Dimensioni",
+          "sizeValue": "{w} × {h} mm",
+          "platesInfo": "Pannelli",
+          "depth": "Altezza totale",
+          "mmValue": "{v} mm",
+          "dropped": "Pezzi e fori piccoli rimossi",
+          "photo": "Immagine",
+          "levels": "Livelli"
+        }
+      }
+    }
+  ]
+}

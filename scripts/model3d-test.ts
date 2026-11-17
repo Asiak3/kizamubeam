@@ -8,7 +8,9 @@ const { prepare, sliceAt, region, sliceRegion, cleanRegion, regionArea, deepestP
 const { addMesh } = await import('../src/model3d/store');
 const { STACK, stackLayout, numberStrokes, FRAMES } = await import('../src/generators/stack');
 const { RIBS, ribsLayout, worldMesh, materialAlong, ranges, splitPlate } = await import('../src/generators/ribs');
-const { buildGen, defaultParams, normalizeParams } = await import('../src/generators/index');
+const { buildGen, defaultParams, fieldActive, normalizeParams } = await import('../src/generators/index');
+await import('./builtin-generators');
+const RIBS_SURFACE = await import('../src/generators/ribsSurface');
 const { asmSolids, findOverlaps, solidBounds } = await import('../src/view3d/solids');
 const { suggestSections, voxelize } = await import('../src/model3d/suggest');
 
@@ -405,7 +407,11 @@ test('Rippenmodell: Vorschlag findet Rumpf, vier Beine und Schwanz; unterste Bei
   const sg = suggestSections(beast, p0);
   const legs = sg.sections.filter((s) => s.extend > 0 && s.offset !== sg.sections[0].offset);
   assert.equal(legs.length, 4, sg.found);
-  for (const l of legs) near(Math.abs(l.offset), 12, 1.5, `Bein ${l.name} quer`);
+  for (const l of legs) near(Math.abs(l.offset), 12, 1.5, `Bein ${l.n} quer`);
+  // Names come from the roles (stored without a name, shown in the current language)
+  assert.deepEqual(legs.map((l) => [l.name, l.role]), legs.map(() => ['', 'leg']));
+  assert.equal(sg.sections[0].role, 'body');
+  assert.match(sg.found, /^Rumpf, Schwanz, 4 Beine$/);
   // Rumpf liegt in der Spiegelebene y = 0 und ist fast waagerecht
   const r = sg.sections[0];
   assert.equal(r.view, 'xz');
@@ -421,7 +427,7 @@ test('Rippenmodell: Vorschlag findet Rumpf, vier Beine und Schwanz; unterste Bei
   // Standfläche: Die Beinrippen sind vom Boden aus gesetzt (Unterseite bei z = 0, 10, 20 …; die Spitze des
   // Test-Beins ist für eine Rippe zu klein)
   for (let si = 1; si < L.sections.length; si++) {
-    if (!legs.some((l) => l.name === L.sections[si].name)) continue;
+    if (!legs.includes(sg.sections[si])) continue;
     for (const x of L.ribs.filter((q) => q.section === si)) {
       const bottom = x.pose.o[2] + x.pose.n[2] * 1.5 - 1.5;
       const k = Math.round(bottom / 10);
@@ -483,6 +489,57 @@ test('Rippenmodell: dichter an Details, wo sich der Umriss schnell ändert', () 
   assert.ok(RIBS.validate(rp({ minSpacing: 3.2 })).some((i) => i.key === 'minSpacing' && i.level === 'error'));
   // Gleich großer kleinster Abstand ändert nichts
   assert.equal(ribsLayout(rp({ minSpacing: 10 }))!.count, even.count);
+});
+
+test('Rippenmodell: Zeichenfläche zeichnet Umriss, Teile und Achsen und nimmt Zeigerereignisse an', () => {
+  const { ribsDraw, ribsPointer, ribsEvent } = RIBS_SURFACE;
+  let p = rp();
+  const st = (state: unknown = null, sel = -1) => ({ view: 'xz', state, selected: { sections: sel } });
+  // Without sections: silhouette, part outlines and the simple axis dashed
+  const d0 = ribsDraw({ ...st(), have: [] }, p);
+  assert.ok(d0.frame.x1 - d0.frame.x0 > 100, 'frame');
+  assert.equal(d0.layers!.length, 2);
+  assert.ok(d0.layers![0].tris!.length > 100 && d0.layers![1].items!.length > 10);
+  assert.ok(d0.items.some((i) => i.type === 'line' && i.dash));
+  // Layers the app keeps come without content
+  const d1 = ribsDraw({ ...st(), have: d0.layers!.map((l) => l.key) }, p);
+  assert.ok(d1.layers!.every((l) => !l.tris && !l.items));
+  // „From the simple axis“: one section „Rumpf“ along the axis
+  const man = ribsEvent({ action: 'manual', inputs: {} }, p)!;
+  assert.equal(JSON.parse(String(man.patch!.sections)).length, 1);
+  assert.deepEqual(man.select, { sections: 0 });
+  // Draw a second section: two clicks, double click finishes and centres the plane in the material
+  p = rp({ sections: man.patch!.sections });
+  let s: unknown = ribsEvent({ action: 'draw', inputs: {}, surface: st() }, p)!.state;
+  assert.ok((s as { drawing: unknown }).drawing);
+  for (const [x, y] of [[-30, -10], [30, -10]]) s = ribsPointer({ type: 'down', x, y }, st(s), p)!.state;
+  assert.equal(ribsDraw({ ...st(s), have: [] }, p).track, true);
+  const fin = ribsPointer({ type: 'dblclick', x: 30, y: -10 }, st(s), p)!;
+  const secs = JSON.parse(String(fin.patch!.sections));
+  assert.equal(secs.length, 2);
+  assert.deepEqual(secs[1].pts, [[-30, 10], [30, 10]]);
+  assert.equal(fin.state, null);
+  // Dragging a point: down on the handle, move, up writes the sections
+  p = rp({ sections: fin.patch!.sections });
+  const items = ribsDraw({ ...st(null, 1), have: [] }, p).items;
+  assert.ok(items.some((i) => i.type === 'handle' && i.id === 'p1.0'));
+  const dn = ribsPointer({ type: 'down', x: -30, y: -10, hit: 'p1.0' }, st(null, 1), p)!;
+  assert.deepEqual(dn.select, { sections: 1 });
+  const mv = ribsPointer({ type: 'move', x: -40, y: -12, drag: true, from: { x: -30, y: -10 } }, st(dn.state, 1), p)!;
+  const up = ribsPointer({ type: 'up', x: -40, y: -12, from: { x: -30, y: -10 } }, st(mv.state, 1), p)!;
+  assert.deepEqual(JSON.parse(String(up.patch!.sections))[1].pts[0], [-40, 12]);
+  // Row actions: copy is mirrored off the middle, the simple axis clears the sections
+  const cp = ribsEvent({ action: 'copy', row: 1, inputs: {} }, p)!;
+  const three = JSON.parse(String(cp.patch!.sections));
+  assert.equal(three.length, 3);
+  assert.equal(three[2].name, '');
+  assert.deepEqual(RIBS.view!(rp({ sections: cp.patch!.sections })).rowAuto, { sections: ['Rumpf', 'Abschnitt 2', 'Abschnitt 3'] });
+  assert.deepEqual(ribsEvent({ action: 'simple', inputs: {} }, p)!.patch, { sections: '' });
+  // Selecting a row shows its view
+  assert.deepEqual(ribsPointer({ type: 'select', x: 0, y: 0, list: 'sections', row: 0 }, { ...st(), view: 'xy' }, p), { view: 'xz' });
+  // Removing the last row leaves „[]“: the simple axis fields show again
+  assert.ok(RIBS.schema.find((x) => x.key === 'axis')!.showIf);
+  assert.ok(fieldActive(RIBS.schema.find((x) => x.key === 'axis')!, rp({ sections: '[]' })));
 });
 
 if (failed) {

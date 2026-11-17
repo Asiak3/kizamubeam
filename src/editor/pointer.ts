@@ -8,6 +8,7 @@ import { t, dec } from '../i18n';
 import type { Editor } from '../editor';
 import { lassoTouchMode } from '../lasso';
 import { MAX_VECTOR_SAMPLES } from '../vectorFit';
+import { closureOf } from '../shaper';
 import { genLeaves, isMarkGroup } from './generators';
 import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, LASSO_TOUCH_HINT, RULER, SNAP_PX, TOOL_HINTS } from './shared';
 import { ARC_MIN_RADIUS, arcPoint, arcSpec, arcSubPath, newArcDraft, snapAngle, type ArcDraft, type ArcMode } from './arc';
@@ -58,7 +59,7 @@ export class EditorPointer {
 
   onDown(this: Editor, e: PointerEvent) {
     // A second pointer must not replace an in-progress freehand stroke.
-    if (this.drag?.type === 'pencil' || this.drag?.type === 'freehand-edit') return;
+    if (this.drag?.type === 'pencil' || this.drag?.type === 'shaper' || this.drag?.type === 'freehand-edit') return;
     if(this.drag?.type==='lasso')return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
@@ -217,6 +218,13 @@ export class EditorPointer {
         this.redraw();
         return;
       }
+      case 'shaper':
+        e.preventDefault();
+        this.clearSnap();
+        this.shaperCloseHint = null;
+        this.drag = { type: 'shaper', points: [wp], pointerId: e.pointerId, overflow: false };
+        this.redraw();
+        return;
       case 'pencil':
         e.preventDefault();
         this.clearSnap();
@@ -451,6 +459,27 @@ export class EditorPointer {
       case 'builder':
         if (d.pointerId !== e.pointerId) return;
         this.builderStroke(d.last, wp); d.last = wp; return;
+      case 'shaper': {
+        if (e.pointerId !== d.pointerId || d.overflow) return;
+        const samples = e.getCoalescedEvents?.() ?? [];
+        for (const sample of [...samples, e]) {
+          const p = this.evPt(sample), world = this.toWorld(p.sx, p.sy), last = d.points[d.points.length - 1];
+          if (!Number.isFinite(world.x) || !Number.isFinite(world.y)) continue;
+          if (Math.hypot(world.x - last.x, world.y - last.y) * this.view.zoom < 1) continue;
+          if (d.points.length >= MAX_VECTOR_SAMPLES) { d.overflow = true; this.hint = t('Strich zu lang. Loslassen und einen kürzeren Strich zeichnen.'); this.emit('tool'); break; }
+          d.points.push(world);
+        }
+        // Schließzustand live ansagen: derselbe Endpunktabstand wie bei der Auswertung
+        const closed = closureOf(d.points, this.shaperCloseGap).closed;
+        if (d.points.length > 1 && closed !== this.shaperCloseHint) {
+          this.shaperCloseHint = closed;
+          this.hint = closed
+            ? t('Loslassen schließt die Kontur.')
+            : t('Kontur offen: Ende zurück in den Ring am Startpunkt ziehen.');
+          this.emit('tool');
+        }
+        this.redraw(); return;
+      }
       case 'pencil': {
         if (e.pointerId !== d.pointerId || d.overflow) return;
         const samples = e.getCoalescedEvents?.() ?? [];
@@ -728,6 +757,13 @@ export class EditorPointer {
         if (d.pointerId !== e.pointerId) return;
         const p = this.evPt(e), end = this.toWorld(p.sx, p.sy);
         this.builderStroke(d.last, end); this.commitShapeBuilder(); return;
+      }
+      case 'shaper': {
+        if (e.pointerId !== d.pointerId || d.overflow) return;
+        const p = this.evPt(e), end = this.toWorld(p.sx, p.sy);
+        if (Number.isFinite(end.x) && Number.isFinite(end.y) && d.points.length < MAX_VECTOR_SAMPLES) d.points.push(end);
+        void this.finishShaper(d.points);
+        return;
       }
       case 'pencil': {
         if (e.pointerId !== d.pointerId || d.overflow) return;

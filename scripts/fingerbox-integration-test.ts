@@ -2,6 +2,7 @@ import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { EditorGenerators } from '../src/editor/generators';
 import { buildGen, defaultParams, getGenerator } from '../src/generators/index';
+import './builtin-generators';
 import { cloneObjs, defaultImageLayer, defaultLayer, loadDoc, leaves } from '../src/model';
 import type { Obj } from '../src/model';
 const gen = getGenerator('box-divided')!;

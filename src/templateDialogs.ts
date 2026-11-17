@@ -167,7 +167,7 @@ export async function openTemplateLibrary(ed: Editor) {
     );
   const builtin = (b: BuiltinTemplate) =>
     h('div', { class: 'tpl-card' },
-      h('button', { class: 'tpl-pick', onclick: () => (dlg.close(), startFromTemplate(ed, b.json())) },
+      h('button', { class: 'tpl-pick', onclick: async () => (dlg.close(), startFromTemplate(ed, await b.json())) },
         b.info.preview ? h('img', { src: svgUrl(b.info.preview), alt: '' }) : h('div', { class: 'tpl-noimg' }, '?'),
         h('b', {}, b.info.title),
         b.info.description ? h('span', { class: 'muted' }, b.info.description) : null,

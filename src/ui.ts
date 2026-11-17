@@ -11,6 +11,7 @@ import { deletePreset, loadPresets, presetOutput, savePreset } from './imagePres
 import { openFillDialog, openSaveTemplateDialog, openSeriesDialog, openTemplateLibrary } from './templateDialogs';
 import { exportDxf, exportPdf, exportSvg, importFile, installDropAndPaste, openProject, saveProcessedBitmap, saveProject } from './files';
 import { onMeshReady } from './model3d/store';
+import { onImageResourceReady } from './plugins/imageResource';
 import { assetImage, displayCanvas, onImageReady, outputGrid } from './images';
 import { onFontListChanged, refreshFonts, requestLocalFonts, systemFonts } from './fonts';
 import { openFontManager } from './fontManager';
@@ -72,6 +73,8 @@ import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { installSketchPanel } from './sketchPanel';
 import { isSketchObj } from './editor/sketch';
 import { loadRightPan } from './editor/pointer';
+import { shaperName } from './editor/shaper';
+import type { ShaperKind } from './shaper';
 import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, showWindow, windowList } from './dock';
 
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
@@ -200,6 +203,7 @@ export function buildUI(ed: Editor) {
   ed.onImport = () => importFile(ed);
   // 3D-Modelle aus der automatischen Sicherung kommen etwas später: 3D-Ansicht und Prüfung neu zeichnen
   onMeshReady(() => ed.emit('doc'));
+  onImageResourceReady(() => ed.emit('doc'));
   ed.onGridArray = () => openGridArrayDialog(ed);
   ed.onBarcodeEdit = (o) => editBarcode(ed, o);
   ed.onGenEdit = (o) => (o.shape.kind === 'gen' && o.shape.gen === PATTERN_GEN_ID ? openPatternDialog(ed, { edit: o }) : o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
@@ -273,7 +277,7 @@ function buildMenu(ed: Editor) {
       [t('Bearbeitetes Bild speichern …'), '', () => saveProcessedBitmap(ed)],
       'sep',
       [t('Schriften …'), '', () => openFontManager(ed)],
-      [t('Erweiterungen …'), '', () => openPacksDialog()],
+      [t('Erweiterungen …'), '', () => openPacksDialog(ed.doc)],
       [t('Einstellungen übertragen …'), '', () => openSyncDialog(ed)],
       [t('KI-Agenten (MCP) …'), '', () => openAgentDialog(ed)],
     ]],
@@ -304,6 +308,7 @@ function buildMenu(ed: Editor) {
       'sep',
       [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
       [t('Freihand / Bleistift'), '', () => ed.setTool('pencil')],
+      [t('Shaper'), '', () => ed.setTool('shaper')],
       [t('Kurvenpfad zeichnen'), '', () => ed.setTool('curvature')],
       [t('Bogen zeichnen'), '', () => ed.setTool('arc')],
       [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
@@ -871,6 +876,34 @@ function buildNumbar(ed: Editor) {
   const arcProps = h('span', { class: 'field', id: 'arcbar' },
     h('label', {}, t('Bogen'), arcModeSel),
     h('label', {}, t('Richtung'), arcDirSel));
+  const shaperRecognize = h('input', { type: 'checkbox' });
+  shaperRecognize.checked = ed.shaperRecognize;
+  shaperRecognize.addEventListener('change', () => { ed.shaperRecognize = shaperRecognize.checked; ed.shaperRebuild(); });
+  // Zahlenfeld, das die letzte Operation sofort neu berechnet
+  const shaperNum = (get: () => number, min: number, max: number, aria: string, set: (v: number) => void) => {
+    const input = h('input', { type: 'number', min, max, step: 0.1, value: String(get()), 'aria-label': aria, style: 'width: 7ch' });
+    input.addEventListener('change', () => {
+      const v = input.valueAsNumber;
+      if (Number.isFinite(v) && v >= min && v <= max) { set(v); ed.shaperRebuild(); }
+      else input.value = String(get());
+    });
+    return input;
+  };
+  const shaperClose = shaperNum(() => ed.shaperCloseGap, 0.2, 20, t('Schließabstand in Millimetern'), (v) => (ed.shaperCloseGap = v));
+  const shaperSmooth = shaperNum(() => ed.shaperSmoothing, 0, 20, t('Glättung in Millimetern'), (v) => (ed.shaperSmoothing = v));
+  const shaperTolerance = shaperNum(() => ed.shaperTolerance, 0.2, 20, t('Schnittbreite in Millimetern'), (v) => (ed.shaperTolerance = v));
+  const shaperPick = h('select', { 'aria-label': t('Formvorschlag der letzten Geste') });
+  shaperPick.addEventListener('change', () => {
+    const s = ed.shaperEdit;
+    if (!s) return;
+    s.pick = shaperPick.value as ShaperKind | 'freehand';
+    ed.shaperRebuild();
+  });
+  const shaperProps = h('span', { class: 'field' }, h('label', { class: 'check' }, shaperRecognize, t('Form erkennen')),
+    h('label', {}, t('Schließen (mm)'), shaperClose),
+    h('label', {}, t('Glättung (mm)'), shaperSmooth),
+    h('label', {}, t('Schnittbreite (mm)'), shaperTolerance),
+    shaperPick);
 
   // Bilder
   const imgInfo = h('span', { class: 'muted' });
@@ -909,7 +942,7 @@ function buildNumbar(ed: Editor) {
   const sepGen = sep();
 
   const sepShape = sep();
-  bar.append(geo, pencilProps, arcProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
+  bar.append(geo, pencilProps, arcProps, shaperProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
   // Text options get their own bar below the properties bar (can be hidden in the Window menu)
   $('#textbar').append(textProps);
 
@@ -931,6 +964,23 @@ function buildNumbar(ed: Editor) {
     arcProps.hidden = ed.tool !== 'arc';
     arcModeSel.value = ed.arcMode;
     arcDirSel.value = ed.arcCw ? 'cw' : 'ccw';
+    shaperProps.hidden = ed.tool !== 'shaper';
+    shaperClose.value = String(ed.shaperCloseGap);
+    shaperSmooth.value = String(ed.shaperSmoothing);
+    shaperTolerance.value = String(ed.shaperTolerance);
+    const sk = ed.shaperEditValid() ? ed.shaperEdit : null;
+    shaperPick.hidden = !sk || sk.op === 'union' || sk.op === 'subtract';
+    if (sk && !shaperPick.hidden) {
+      const key = [...sk.cands.map((c) => `${c.kind}:${shaperName(c)}`), 'freehand'].join('|');
+      if (shaperPick.dataset.key !== key) {
+        shaperPick.replaceChildren(
+          ...sk.cands.map((c) => h('option', { value: c.kind }, shaperName(c))),
+          h('option', { value: 'freehand' }, t('Freihand')),
+        );
+        shaperPick.dataset.key = key;
+      }
+      if (shaperPick.value !== sk.pick) shaperPick.value = sk.pick;
+    }
     nodeLassoButton.setAttribute('aria-pressed',String(ed.nodeLasso));nodeLassoButton.classList.toggle('active',ed.nodeLasso);
     const imgs = ed.selImages();
     imgProps.hidden = sepImg.hidden = !imgs.length;
@@ -1086,6 +1136,7 @@ function buildBars(ed: Editor) {
     { id: 'vectorfit', cat: W, icon: 'vectorfit', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
     { id: 'shape-builder', cat: W, icon: 'shapeBuilder', label: t('Formerstellung …'), run: () => beginShapeBuilder(ed), enabled: sel1, on: () => ed.tool === 'builder' },
     tool('pencil', 'pencil', t('Freihand / Bleistift: Ziehen zeichnet einen angepassten Bézierpfad')),
+  tool('shaper', 'shaper', t('Shaper: Geste formt Grundform, umfährt zum Vereinen, kreuzt zum Abziehen')),
     tool('curvature', 'curve', t('Kurven zeichnen: Klicken setzt Ecken, Ziehen formt Kurven')),
     tool('arc', 'arc', t('Bogen zeichnen: Mitte, Radius und Winkel oder drei Punkte')),
     tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
@@ -1161,7 +1212,7 @@ function buildBars(ed: Editor) {
     { id: 'series', cat: F, icon: 'series', label: t('Serie aus Tabelle (CSV) …'), run: () => openSeriesDialog(ed) },
     { id: 'newtemplate', cat: F, icon: 'template', label: t('Neu aus Vorlage …'), run: () => openTemplateLibrary(ed) },
     { id: 'filltemplate', cat: F, icon: 'filltemplate', label: t('Vorlage ausfüllen …'), run: () => openFillDialog(ed) },
-    { id: 'packs', cat: F, icon: 'packs', label: t('Erweiterungen …'), run: () => openPacksDialog() },
+    { id: 'packs', cat: F, icon: 'packs', label: t('Erweiterungen …'), run: () => openPacksDialog(ed.doc) },
     { id: 'sync', cat: F, icon: 'sync', label: t('Einstellungen übertragen …'), run: () => openSyncDialog(ed) },
     { id: 'preferences', cat: F, icon: 'settings', label: t('Einstellungen …'), run: () => void openSettings() },
     { id: 'fonts', cat: F, icon: 'fonts', short: t('Schriften'), label: t('Schriften: Google Fonts laden, eigene Schriften und Favoriten verwalten'), run: () => openFontManager(ed) },
@@ -1188,7 +1239,7 @@ function buildBars(ed: Editor) {
         'group', 'ungroup', 'isolate', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
-        'grp:select', 'tool:node', SEP, 'grp:draw', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', SEP,
+        'grp:select', 'tool:node', SEP, 'grp:draw', 'tool:shaper', 'tool:rect', 'tool:ellipse', 'tool:polygon', 'tool:text', SEP,
         'grp:bool', 'grp:contour', 'grp:path', 'grp:array', SEP, 'grp:relate', 'tool:measure', SEP, 'apps',
       ],
     },

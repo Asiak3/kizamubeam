@@ -14,6 +14,7 @@ import { RULER, HANDLE_OFF, cachedWorldPath, SNAP_COLOR } from './shared';
 import { curvaturePreview } from './vector';
 import { arcSubPath } from './arc';
 import { GRID_MIN_PX, gridLevels, gridLines, LEVEL_ALPHA } from '../grid';
+import { closurePreview } from '../shaper';
 
 function rectPath(w: number, h: number): Path2D {
   const p = new Path2D();
@@ -304,10 +305,39 @@ export class EditorRender {
       });
       ctx.restore();
     }
-    if (this.drag?.type === 'pencil') {
+    if (this.drag?.type === 'pencil' || this.drag?.type === 'shaper') {
       ctx.strokeStyle = this.layerDrawColor(this.currentLayer);
       ctx.lineWidth = 1.2 * px;
       ctx.stroke(subsToPath2D([{ nodes: this.drag.points, closed: false }]));
+    }
+    if (this.drag?.type === 'shaper') {
+      // Schließ-Vorschau in Weltkoordinaten (dieser Block läuft im Welt-Transform):
+      // Ring = erlaubter Endpunktabstand, Linie = würde schließen.
+      const pv = closurePreview(this.drag.points, this.shaperCloseGap);
+      if (pv) {
+        // Radius exakt = erlaubter Abstand; die Mindestgröße kommt vom Startpunkt-Punkt
+        const ring = pv.limit;
+        ctx.save();
+        ctx.setLineDash([4 * px, 3 * px]);
+        ctx.lineWidth = 1.2 * px;
+        ctx.strokeStyle = pv.closed ? '#3fb950' : 'rgba(150,160,170,0.85)';
+        ctx.beginPath();
+        ctx.arc(pv.start.x, pv.start.y, ring, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        if (pv.closed) {
+          ctx.strokeStyle = '#3fb950';
+          ctx.beginPath();
+          ctx.moveTo(pv.end.x, pv.end.y);
+          ctx.lineTo(pv.start.x, pv.start.y);
+          ctx.stroke();
+          ctx.fillStyle = '#3fb950';
+          ctx.beginPath();
+          ctx.arc(pv.start.x, pv.start.y, 3.5 * px, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
     }
     if (this.vectorPreview) {
       ctx.strokeStyle = '#ff6020'; ctx.lineWidth = 1.5 * px;

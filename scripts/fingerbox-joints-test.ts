@@ -4,6 +4,7 @@ import Clipper from 'clipper-lib';
 import { fieldCount, panelPolys, type BoxParams } from '../src/generators/box';
 import { fingerboxParts, fingerboxSegments, horizontalSegments, type FingerboxParams } from '../src/generators/fingerbox-experiment';
 import { buildGen, defaultParams, getGenerator, loadGen, normalizeParams } from '../src/generators';
+import './builtin-generators';
 const near = (a: number, b: number) => assert.ok(Math.abs(a-b) < 1e-6, `${a} != ${b}`);
 const cases: FingerboxParams[] = [
   { width: 100, depth: 80, height: 50, thickness: 3, finger: 10 },

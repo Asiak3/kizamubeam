@@ -141,7 +141,8 @@ A generator declares everything the app needs to know about it on its `Generator
 - `onChange(key, old, params)`: called when a field is committed; returns a `patch` and/or an `ask` (question with options, cancelling restores the field). `preview.center` centres the dialog preview; `resetOnNew` on a field makes new objects start with its default.
 - Issues carry a stable `code`; texts for codes that `generate()` throws come from `texts`. Internals throw codes, not UI text.
 
-Register a generator with `register()` in `src/generators/index.ts`. Its `id` is stored in projects and must never change.
+Its `id` is stored in projects and must never change. The generators that come with the app are not registered from this code: they are listed in `src/generators/builtin.ts` and `CORE` in `scripts/build-core-plugins.mjs`, built into the core pack and run as plugins (`src/plugins/core.ts`, see [plugins.md](plugins.md)). The app does not import their source. Node tests that compute with them directly import `scripts/builtin-generators.ts`, which registers the source with `register()`; `npm run test:core-plugins` checks that the plugins give the same results. New generators are written as plugins (#327).
+
 ## Security: CSP and markup
 
 The WebView runs under a strict Content Security Policy (`app.security.csp` in `src-tauri/tauri.conf.json`): scripts only from the app itself (plus WebAssembly), no `eval`, no inline scripts, no frames or objects. Network access from the WebView is limited to the update check (api.github.com), the extension catalog and the Google Fonts preview; everything else (machines, network cameras, settings sync, font downloads) goes through Rust. `devCsp` adds the Vite dev server. `style-src` keeps `'unsafe-inline'` because the UI sets inline styles; Tauri is told not to add nonces there (`dangerousDisableAssetCspModification`), since a nonce would switch `'unsafe-inline'` off.

@@ -1,0 +1,106 @@
+{
+  "format": "kizamubeam-pack",
+  "formatVersion": 2,
+  "id": "com.example.name-tag-rust",
+  "version": "1.0.0",
+  "name": {
+    "en": "Name tag in Rust (template)",
+    "de": "Namensschild in Rust (Vorlage)"
+  },
+  "description": {
+    "en": "Template for a generator plugin in Rust/WebAssembly."
+  },
+  "author": "Your name",
+  "build": [
+    {
+      "rust": ".",
+      "out": "dist/plugin.wasm"
+    }
+  ],
+  "plugins": [
+    {
+      "id": "com.example.name-tag-rust",
+      "type": "generator",
+      "api": 1,
+      "version": 1,
+      "kind": "part",
+      "runtime": "wasm",
+      "code": "@dist/plugin.wasm",
+      "dialog": {
+        "version": 1
+      },
+      "icon": "rect",
+      "params": [
+        {
+          "key": "width",
+          "type": "length",
+          "min": 10,
+          "max": 500,
+          "def": 70
+        },
+        {
+          "key": "height",
+          "type": "length",
+          "min": 10,
+          "max": 300,
+          "def": 25
+        },
+        {
+          "key": "corner",
+          "type": "length",
+          "min": 0,
+          "max": 50,
+          "def": 4
+        },
+        {
+          "key": "hole",
+          "type": "bool",
+          "def": true
+        },
+        {
+          "key": "holeDia",
+          "type": "length",
+          "min": 1,
+          "max": 50,
+          "def": 5,
+          "showIf": {
+            "eq": [
+              "hole",
+              true
+            ]
+          }
+        }
+      ],
+      "texts": {
+        "en": {
+          "name": "Name tag",
+          "desc": "Tag with rounded corners and an optional hanging hole.",
+          "keys": "label tag keychain",
+          "label": "Name tag {width} × {height}",
+          "width": "Width",
+          "height": "Height",
+          "corner": "Corner radius",
+          "hole": "Hanging hole",
+          "holeDia": "Hole diameter",
+          "corner-too-large": "The corner radius is larger than half the tag.",
+          "hole-too-large": "The hole is too large: at most {max} mm.",
+          "area": "Area"
+        },
+        "de": {
+          "name": "Namensschild",
+          "desc": "Schild mit runden Ecken und auf Wunsch einem Aufhängeloch.",
+          "keys": "Schild Anhänger Etikett",
+          "label": "Namensschild {width} × {height}",
+          "width": "Breite",
+          "height": "Höhe",
+          "corner": "Eckenradius",
+          "hole": "Aufhängeloch",
+          "holeDia": "Lochdurchmesser",
+          "corner-too-large": "Der Eckenradius ist größer als das halbe Schild.",
+          "hole-too-large": "Das Loch ist zu groß: höchstens {max} mm.",
+          "area": "Fläche"
+        }
+      }
+    }
+  ]
+}

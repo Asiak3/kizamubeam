@@ -1,5 +1,5 @@
 import type { Editor } from '../editor';
-import { apply, defaultLayer, IDENT, inv, isOff, newId, Node, Obj, Pt, SubPath } from '../model';
+import { apply, defaultLayer, IDENT, inv, isOff, newId, Node, Obj, Pt, Shape, SubPath } from '../model';
 import { shapeSubs } from '../geom';
 import { transformSubs } from '../importers';
 import { fitPoints, FitOptions, MAX_VECTOR_SAMPLES, refitSubpath } from '../vectorFit';
@@ -11,6 +11,13 @@ const canonical = (value: unknown) => JSON.stringify(value, (_key, v) => v && ty
   ? Object.fromEntries(Object.keys(v).sort().map((key) => [key, v[key]])) : v);
 
 export interface VectorPlan { obj: Obj; before: string; matrix: string; subs: SubPath[] }
+
+/** Freihand-Pfad aus der Geste: eine Fit-Regel für Bleistift und Shaper-Fallback. */
+export function freehandShape(points: Pt[], closed: boolean, tolerance: number): Shape | null {
+  const sub = fitPoints(points, closed, { tolerance, curves: true, preserveCorners: true });
+  if (sub.nodes.length < (closed ? 3 : 2)) return null;
+  return { kind: 'path', subs: [sub] };
+}
 
 export class EditorVector {
   vectorFitTargets(this: Editor): Obj[] {
@@ -60,26 +67,29 @@ export class EditorVector {
     return true;
   }
 
-  finishPencil(this: Editor, points: Pt[], closed: boolean) {
+  finishPencil(this: Editor, points: Pt[], closed: boolean): Obj | null {
     try {
       if (points.length < 2 || points.every((p) => Math.hypot(p.x - points[0].x, p.y - points[0].y) < 0.01)) {
-        this.hint = t('Kein Freihandpfad erstellt: zum Zeichnen ziehen, nicht nur klicken.'); this.emit('tool'); return;
+        this.hint = t('Kein Freihandpfad erstellt: zum Zeichnen ziehen, nicht nur klicken.'); this.emit('tool'); return null;
       }
       if (this.layer(this.currentLayer).locked || !this.layer(this.currentLayer).show) throw new Error(t('Eine sichtbare, entsperrte Ebene wählen.'));
-      const sub = fitPoints(points, closed, { tolerance: this.pencilTolerance, curves: true, preserveCorners: true });
-      if (sub.nodes.length < (closed ? 3 : 2)) {
-        this.hint = t('Kein Freihandpfad erstellt: für einen geschlossenen Pfad eine Fläche zeichnen oder „Geschlossener Pfad“ ausschalten.'); this.emit('tool'); return;
+      const shape = freehandShape(points, closed, this.pencilTolerance);
+      if (!shape) {
+        this.hint = t('Kein Freihandpfad erstellt: für einen geschlossenen Pfad eine Fläche zeichnen oder „Geschlossener Pfad“ ausschalten.'); this.emit('tool'); return null;
       }
+      const nodes = shape.kind === 'path' ? shape.subs[0].nodes.length : 0;
       this.snapshot(t('Freihandpfad zeichnen'));
-      const obj: Obj = { id: newId(), m: [...IDENT], layer: this.currentLayer, shape: { kind: 'path', subs: [sub] } };
+      const obj: Obj = { id: newId(), m: [...IDENT], layer: this.currentLayer, shape };
       this.doc.objs.push(obj);
       this.setSel([obj]);
-      this.hint = t('Freihandpfad erstellt: {n} Knoten. Rückgängig mit Ctrl+Z.', { n: sub.nodes.length });
+      this.hint = t('Freihandpfad erstellt: {n} Knoten. Rückgängig mit Ctrl+Z.', { n: nodes });
       this.emit('doc');
       this.emit('tool');
+      return obj;
     } catch (error) {
       this.hint = vectorError(error);
       this.emit('tool');
+      return null;
     }
   }
 

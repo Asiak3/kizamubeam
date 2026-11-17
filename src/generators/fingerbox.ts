@@ -213,7 +213,7 @@ export const FINGERBOX: Generator = {
     const p = values(raw), parts = adjustedParts(p);
     const gx = distributeGaps(p.width,p.thickness,p.compartmentsX,p.ratiosX).gaps;
     const gy = distributeGaps(p.depth,p.thickness,p.compartmentsY,p.ratiosY).gaps;
-    return { parts, info: [[t('Außenmaß'), `${p.width} × ${p.depth} × ${p.height} mm`],
+    return { parts, info: [[t('Außenmaß'), `${fmt(p.width)} × ${fmt(p.depth)} × ${fmt(p.height)} mm`],
       [t('Freie Fachbreiten'), `${gx.map(fmt).join(' : ')} mm`], [t('Freie Fachtiefen'), `${gy.map(fmt).join(' : ')} mm`], [t('Teile'), String(parts.length)]] };
   },
   label(raw, part) {

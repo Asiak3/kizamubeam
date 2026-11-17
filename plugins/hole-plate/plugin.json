@@ -10,6 +10,8 @@
     "it": "Esempio di plugin generatore in Rust/WebAssembly: una piastra con uno schema di fori quadrato o esagonale."
   },
   "author": "KizamuBeam",
+  "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/hole-plate",
+  "build": [{ "rust": ".", "out": "dist/hole-plate.wasm" }],
   "plugins": [
     {
       "id": "org.kizamubeam.hole-plate",
@@ -18,16 +20,17 @@
       "version": 1,
       "kind": "part",
       "runtime": "wasm",
+      "dialog": { "version": 1 },
       "code": "@dist/hole-plate.wasm",
       "icon": "pattern",
       "preview": { "center": true },
       "params": [
         { "key": "width", "type": "length", "min": 10, "max": 2000, "def": 120 },
         { "key": "height", "type": "length", "min": 10, "max": 2000, "def": 80 },
-        { "key": "holeDia", "type": "length", "min": 0.5, "max": 200, "def": 6 },
-        { "key": "pitch", "type": "length", "min": 1, "max": 400, "def": 10 },
-        { "key": "pattern", "type": "enum", "options": ["hex", "square"], "def": "hex" },
-        { "key": "holeShape", "type": "enum", "options": ["circle", "hex"], "def": "circle" },
+        { "key": "holeDia", "section": "holes", "type": "length", "min": 0.5, "max": 200, "def": 6 },
+        { "key": "pitch", "section": "holes", "type": "length", "min": 1, "max": 400, "def": 10 },
+        { "key": "pattern", "section": "holes", "type": "enum", "options": ["hex", "square"], "def": "hex" },
+        { "key": "holeShape", "section": "holes", "type": "enum", "options": ["circle", "hex"], "def": "circle" },
         { "key": "margin", "type": "length", "min": 0, "max": 500, "def": 6, "advanced": true },
         { "key": "corner", "type": "length", "min": 0, "max": 500, "def": 3, "advanced": true }
       ],

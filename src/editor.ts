@@ -54,6 +54,8 @@ import { EditorVector, VectorPlan } from './editor/vector';
 import type { ArcDraft, ArcMode } from './editor/arc';
 
 import { EditorOutline, type OutlinePreview } from './editor/outline';
+import { EditorShaper, type ShaperSession } from './editor/shaper';
+import { SHAPER_CLOSE_GAP } from './shaper';
 import { EditorInteraction, BuilderSession } from './editor/interaction';
 import { EditorContourOffset } from './editor/contourOffset';
 
@@ -142,6 +144,18 @@ export class Editor {
   arcCw = false;
   /** Laufender Bogen über mehrere Klicks hinweg */
   arcDraft: ArcDraft | null = null;
+  /** Shaper: Grundform-Erkennung an/aus; Schließabstand, Glättung und Schnittbreite liegen in eigenen Feldern. */
+  shaperRecognize = true;
+  /** Schnittbreite in mm (gesamt, nicht Radius). */
+  shaperTolerance = 1;
+  /** Endpunktabstand in mm, ab dem eine Geste als geschlossen gilt. */
+  shaperCloseGap = SHAPER_CLOSE_GAP;
+  /** Glättung der Geste in mm (0 = aus). */
+  shaperSmoothing = 0.8;
+  /** Nachjustierbare letzte Shaper-Operation. */
+  shaperEdit: ShaperSession | null = null;
+  /** Zuletzt angezeigter Schließzustand während des Ziehens (für den Hinweis). */
+  shaperCloseHint: boolean | null = null;
   builderSession: BuilderSession | null = null;
   suppressContextMenu = false;
   /** Drag with the right mouse button pans the view (opt-in, Edit → Settings → Mouse and keyboard) */
@@ -182,7 +196,7 @@ export class Editor {
   // Fangen an Raster, Objekten und Hilfslinien
   /** Ist der Werkzeug-Modus einer, bei dem der Mauszeiger schon ohne Ziehen fängt? */
   get drawTool() {
-    return this.tool === 'pencil' || this.tool === 'line' || this.tool === 'curvature' || this.tool === 'arc' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
+    return this.tool === 'pencil' || this.tool === 'shaper' || this.tool === 'line' || this.tool === 'curvature' || this.tool === 'arc' || this.tool === 'rect' || this.tool === 'ellipse' || this.tool === 'polygon' || this.tool === 'text' || this.tool === 'measure';
   }
 
   finishDraft() {
@@ -543,6 +557,9 @@ export class Editor {
 
   setTool(t: Tool) {
     if (t !== 'builder') this.builderSession = null;
+    // Eine neue Werkzeugwahl beendet die Nachbearbeitung der letzten Shaper-Operation
+    this.shaperEdit = null;
+    this.shaperCloseHint = null;
     if (this.drag) this.cancelDrag();
     if (this.draft) this.finishDraft();
     // Werkzeugwechsel verwirft einen laufenden Bogen (Esc bleibt die bewusste Abbruchtaste).
@@ -598,6 +615,7 @@ export interface Editor
     EditorSketch,
     EditorIsolation,
     EditorVector,
+    EditorShaper,
     EditorOutline,
     EditorInteraction,
     EditorContourOffset,
@@ -634,6 +652,7 @@ const PARTS = [
   EditorSketch,
   EditorIsolation,
   EditorVector,
+  EditorShaper,
   EditorOutline,
   EditorInteraction,
   EditorContourOffset,

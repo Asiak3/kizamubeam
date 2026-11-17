@@ -1,20 +1,6 @@
 // Verzeichnis der Generatoren und gemeinsame Abläufe: Parameter prüfen, normalisieren und Geometrie erzeugen.
 import type { GenShape, Pt, SubPath } from '../model';
 import { t } from '../i18n';
-import { BOX } from './box';
-import { FINGERBOX } from './fingerbox';
-import { CAM } from './cam';
-import { DRAWER } from './drawer';
-import { INSERT } from './insert';
-import { SHELF } from './shelf';
-import { GEAR } from './gear';
-import { GEARPAIR } from './gearpair';
-import { PULLEY } from './pulley';
-import { RACK } from './rack';
-import { DISCSPHERE } from './discsphere';
-import { STACK } from './stack';
-import { RIBS } from './ribs';
-import { JIG } from './jig';
 import { SKETCH } from '../sketch/generator';
 import { SLOT_PLACEMENT, SLOT_GENERATOR, isSlotGenerator } from '../slotPlacement';
 import { CONTOUR_OFFSET, CONTOUR_OFFSET_ID, LEGACY_CONTOUR_OFFSET_ID } from '../contourOffset';
@@ -24,7 +10,11 @@ import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
 export type { GenAsk, GenChange, Rule, GenInput, GenPart, GenTile, Generator, Issue, Params, ParamSpec } from './types';
 
-/** Registered generators in toolbox order. Use register() to add one; the built-in generators register below. */
+/**
+ * Registered generators in toolbox order. Use register() to add one. The generators that come with the app are
+ * plugins of the core pack (src/plugins/core.ts); their source in this folder is built into that pack and is not
+ * part of the app. Node tests that need them without a plugin register the source (scripts/builtin-generators.ts).
+ */
 export const GENERATORS: Generator[] = [];
 
 /** Add a generator (or replace one with the same id). Its id must stay stable: saved projects refer to it. */
@@ -40,7 +30,6 @@ export function unregister(id: string) {
   if (i >= 0) GENERATORS.splice(i, 1);
 }
 
-for (const g of [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, FINGERBOX, DRAWER, INSERT, SHELF, STACK, RIBS, DISCSPHERE, JIG]) register(g);
 
 export const getGenerator = (id: string): Generator | undefined => (id === PATTERN_GEN_ID ? PATTERN_GEN : id === CONTOUR_OFFSET_ID ? CONTOUR_OFFSET : id === LEGACY_CONTOUR_OFFSET_ID ? { ...CONTOUR_OFFSET, id, version: 1 } : id === SLOT_GENERATOR ? SLOT_PLACEMENT : isSlotGenerator(id) ? { ...SLOT_PLACEMENT, id } : id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
 
@@ -73,7 +62,7 @@ export const autoText = (g: Generator, key: string, p: Params): string => {
 };
 
 /** Standardwerte aller Felder */
-export function defaultParams(g: Generator): Params {
+export function defaultParams(g: Pick<Generator, 'schema'>): Params {
   const p: Params = {};
   for (const s of g.schema) p[s.key] = s.def;
   return p;
@@ -83,7 +72,7 @@ export function defaultParams(g: Generator): Params {
  * Beliebige Eingaben (Datei, Dialog, KI-Agent) auf das Schema bringen: fehlende Werte mit Standardwerten
  * füllen, Zahlen in den erlaubten Bereich holen, ganze Zahlen runden, unbekannte Schlüssel weglassen.
  */
-export function normalizeParams(g: Generator, raw: Record<string, unknown>, base: Params = defaultParams(g)): Params {
+export function normalizeParams(g: Pick<Generator, 'schema'>, raw: Record<string, unknown>, base: Params = defaultParams(g)): Params {
   const p: Params = {};
   for (const s of g.schema) {
     const v = raw[s.key] ?? base[s.key] ?? s.def;
@@ -101,7 +90,7 @@ export function normalizeParams(g: Generator, raw: Record<string, unknown>, base
 }
 
 /** Eingaben streng prüfen (für KI-Agenten): unbekannte Schlüssel und Werte außerhalb des Bereichs sind Fehler */
-export function checkInput(g: Generator, raw: Record<string, unknown>): Issue[] {
+export function checkInput(g: Pick<Generator, 'schema'>, raw: Record<string, unknown>): Issue[] {
   const out: Issue[] = [];
   for (const k of Object.keys(raw)) if (!g.schema.some((s) => s.key === k)) out.push({ key: k, level: 'error', msg: t('Unbekannter Parameter „{key}“', { key: k }) });
   for (const s of g.schema) {
@@ -141,6 +130,11 @@ export interface BuildResult {
  * Like buildGen, but first waits for generators that compute elsewhere (plugins, Generator.prepare). Use it where
  * the caller can wait (MCP tools); interactive code calls buildGen and listens to onPluginResult.
  */
+/** Code of the issue a generator reports while its result is computed elsewhere (a plugin in its Worker; PENDING in plugins/words.ts) */
+export const GEN_PENDING = 'plugin-pending';
+/** Whether a result is still being computed: callers that cannot wait ask again when it is there (onPluginResult) */
+export const isPending = (r: BuildResult) => r.issues.some((i) => i.code === GEN_PENDING);
+
 export async function buildGenAsync(g: Generator, params: Params): Promise<BuildResult> {
   await g.prepare?.(params);
   return buildGen(g, params);
@@ -184,9 +178,44 @@ export function genLabel(s: GenShape): string {
  */
 export function loadGen(s: GenShape) {
   const g = getGenerator(s.gen);
-  if (!g) return;
-  if (g.migrate && s.v < g.version) s.params = g.migrate(s.params, s.v);
-  s.v = Math.max(s.v, g.version);
+  if (!g || s.v >= g.version) return;
+  if (g.migrate) s.params = g.migrate(s.params, s.v);
+  else if (g.upgrade) {
+    // A plugin migrates in its Worker: the shape keeps its version until the answer is there
+    if (upgrading.has(s) || failed.has(s)) return;
+    const from = s.v;
+    const version = g.version;
+    const run = g
+      .upgrade(s.params, from)
+      .then((p) => {
+        if (s.v !== from) return;
+        s.params = p;
+        s.v = version;
+      })
+      .catch(() => {
+        // Parameters stay as saved (not asked again in this session; the next load of the file tries again)
+        failed.add(s);
+      })
+      .finally(() => upgrading.delete(s));
+    upgrading.set(s, run);
+    return;
+  }
+  s.v = g.version;
+}
+
+/** Plugin migrations started by loadGen and not answered yet, and those that failed */
+const upgrading = new WeakMap<GenShape, Promise<void>>();
+const failed = new WeakSet<GenShape>();
+/** A plugin is still migrating the parameters of this part */
+export const genUpgrading = (s: GenShape) => upgrading.has(s);
+
+/**
+ * Wait until the parameters of a part are migrated to its generator's version (plugins migrate in their Worker);
+ * at once when there is nothing to migrate. Whoever edits a part's parameters waits for this first.
+ */
+export function genReady(s: GenShape): Promise<void> {
+  loadGen(s);
+  return upgrading.get(s) ?? Promise.resolve();
 }
 
 /**

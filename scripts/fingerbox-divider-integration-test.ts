@@ -2,6 +2,7 @@ import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { makeDividers } from '../src/generators/fingerbox-dividers';
 import { buildGen, defaultParams, getGenerator } from '../src/generators/index';
+import './builtin-generators';
 const params = { width: 300, depth: 200, height: 100, thickness: 6, finger: 20, dividerHeight: 90, compartmentsX: 3, compartmentsY: 2, ratiosX: '33mm:50mm*2:1', ratiosY: '1:1' };
 const result = makeDividers(params);
 assert.deepEqual(result.gapsX, [33, 100, 143]);

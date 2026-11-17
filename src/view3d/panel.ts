@@ -16,6 +16,7 @@ import { dockWindow, isShown, onWindowShow } from '../dock';
 import { objLabel } from '../objectsPanel';
 import { genLabel } from '../generators';
 import { asmSolids, findOverlaps, Overlap, Solid, solidBounds } from './solids';
+import { onPluginResult } from '../plugins/generator';
 import { flatPose, genThickness } from './poses';
 import { assembleMates, MatePart } from './mates';
 import { Placement, spreadApart } from './spread';
@@ -182,7 +183,9 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
       if (asmDone.has(s.asm)) continue;
       const members = ed.asmMembers(s.asm);
       const keys = new Set(members.map((x) => (x.o.shape as GenShape).part ?? 'main'));
-      const parts = asmSolids(s.gen, s.params, th, keys);
+      const found = asmSolids(s.gen, s.params, th, keys);
+      // While a plugin computes, the parts show flat; its result redraws the view (onPluginResult)
+      const parts = found === 'pending' ? null : found;
       if (!parts) {
         // Ohne räumlichen Aufbau (oder mit fehlerhaften Parametern): flach zeigen wie andere Konturen
         looseShapes.push({ o, m, thick: genThickness(s.params, th) });
@@ -578,6 +581,10 @@ export function buildView3dPanel(ed: Editor) {
   });
   // Neue oder geänderte Bibliotheksmaterialien können das Aussehen ändern
   library.on(() => {
+    if (isShown('view3d')) schedule();
+  });
+  // Generators that are plugins compute in their Worker: draw again when a result arrives
+  onPluginResult(() => {
     if (isShown('view3d')) schedule();
   });
   // Bilder werden im Hintergrund aufbereitet: danach die Gravuren neu zeichnen

@@ -1,6 +1,7 @@
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { defaultParams, getGenerator, buildGen } from '../src/generators';
+import './builtin-generators';
 import { fingerboxParts, type FingerboxParams } from '../src/generators/fingerbox-experiment';
 
 // Regression: parts of a new box must never overlap in the 2D layout, even when the box is much taller than deep.

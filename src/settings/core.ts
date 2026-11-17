@@ -279,7 +279,7 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         get: () => autoInstallFonts(), set: (v) => setAutoInstallFonts(v),
       },
       { kind: 'action', id: 'extensions.fonts', label: t('Schriften'), hint: t('Google Fonts laden, eigene Schriften und Favoriten verwalten'), button: t('Öffnen …'), run: () => void openFontManager(ed) },
-      { kind: 'action', id: 'extensions.packs', label: t('Erweiterungen'), hint: t('Inhaltspakete mit Vorlagen, Motiven und Materialien installieren und verwalten.'), button: t('Öffnen …'), run: () => void openPacksDialog() },
+      { kind: 'action', id: 'extensions.packs', label: t('Erweiterungen'), hint: t('Inhaltspakete mit Vorlagen, Motiven und Materialien installieren und verwalten.'), button: t('Öffnen …'), run: () => void openPacksDialog(ed.doc) },
     ],
   });
 }

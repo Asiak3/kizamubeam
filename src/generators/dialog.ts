@@ -7,16 +7,16 @@ import type { GenShape, Obj } from '../model';
 import type { BuildResult } from './index';
 import { subsToPath2D } from '../geom';
 import { dec, t, tn } from '../i18n';
-import { autoText, buildGen, defaultParams, fieldActive, GENERATORS, genLabel, getGenerator, normalizeParams, resolveBinds } from './index';
+import { autoText, buildGen, defaultParams, fieldActive, GENERATORS, genLabel, genReady, getGenerator, normalizeParams, resolveBinds } from './index';
 import { evalExpr, f2 } from '../dom';
 import { evaluate, formatNumber, namesIn, projectParams } from '../params';
-import type { GenChange, Generator, Params, ParamSpec, ParamValue } from './types';
+import type { GenAsk, GenChange, Generator, Params, ParamSpec, ParamValue } from './types';
 import { library, entryLabel } from '../materials';
 import { genFitPatch } from '../fitcheck';
 import { genHost } from '../genHost';
-import { onPluginResult } from '../plugins/generator';
-
-/** Generatoren mit eigener Zeichenfläche unter den Feldern */
+import { onPluginResult, PENDING } from '../plugins/generator';
+import { listsArea } from './dialogLists';
+import { surfaceArea } from './dialogSurface';
 
 const LAST_KEY = (id: string) => `kizamubeam.gen.${id}`;
 
@@ -50,7 +50,7 @@ const PREVIEW_DELAY_MS = 120;
 const fmtNum = (v: number) => (Number.isInteger(v) ? String(v) : f2(v));
 
 /** Generator-Dialog: neues Bauteil erzeugen (ohne o) oder die Parameter eines vorhandenen ändern */
-export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params) {
+export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params, migrated = false) {
   const old = o?.shape.kind === 'gen' ? o.shape : null;
   const g = getGenerator(old?.gen ?? genId);
   if (!g) {
@@ -60,6 +60,8 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     ed.emit('tool');
     return;
   }
+  // Parameters of an older version that a plugin migrates in its Worker: open once they are migrated
+  if (old && !migrated && old.v < g.version && g.upgrade) return void genReady(old).then(() => openGenDialog(ed, genId, o, init, true));
   const p = initialDialogParams(g, old, init);
   for (const s of g.schema) if (s.type === 'text' && isSuggested(g, s.key, p)) p[s.key] = '';
   // Felder mit Formel aus Projekt-Parametern (z. B. Dicke); beim Erstellen ohne Formeln
@@ -207,21 +209,59 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   }
   const main: HTMLElement[] = [],
     adv: HTMLElement[] = [];
+  const sections = new Map<string, HTMLElement[]>();
+  // Fields an action shows next to its button (e.g. the real width of an image)
+  const actionFields = new Set((g.actions ?? []).map((a) => a.field).filter((k): k is string => !!k));
+  // Fields a step of the dialog shows (#211 stage 7) are placed there instead
+  const inStep = new Set((g.steps ?? []).flatMap((st) => st.items));
   for (const s of g.schema) {
     const els = field(s);
     rows.set(s.key, els);
-    (s.advanced ? adv : main).push(...els);
+    if (actionFields.has(s.key) || inStep.has(s.key)) continue;
+    if (s.advanced) adv.push(...els);
+    else if (s.section) {
+      if (!sections.has(s.section)) sections.set(s.section, []);
+      sections.get(s.section)!.push(...els);
+    } else main.push(...els);
   }
+
+  // A section whose fields are all hidden (showIf) is hidden as well
+  const sectionEls = [...sections].map(([label, els]) => h('details', { open: true, class: 'gen-section' }, h('summary', {}, label), h('div', { class: 'form' }, ...els)));
+  const sectionKeys = [...sections.keys()].map((label) => g.schema.filter((s) => !s.advanced && s.section === label));
 
   const canvas = h('canvas', { class: 'gen-preview', width: 240, height: 240 }) as HTMLCanvasElement;
   const issuesEl = h('div', { class: 'gen-issues' });
   const infoEl = h('div', { class: 'gen-info' });
   const kerfNote = h('div', { class: 'note' });
   let built: BuildResult | null = null;
-  const panel = g.panel?.(p, (patch) => {
-    Object.assign(p, patch);
-    update();
-  }, genHost(ed));
+  const host = genHost(ed);
+  // Drawing surface (#335 stage 4), lists and action buttons (stage 3) the generator declares; a patch is
+  // checked like user input
+  const surface = surfaceArea(g, p, (patch) => patchFields('', patch), () => dlg.open);
+  const lists = listsArea(g, p, (patch) => patchFields('', patch), host, () => dlg.open, (key) => rows.get(key) ?? [], surface);
+
+  // Steps (#211 stage 7): numbered tabs above the fields, one step shown at a time
+  const stepTabs = (g.steps ?? []).map((st, i) => h('button', { class: 'small', type: 'button', onclick: () => showStep(i) }, `${i + 1} ${st.label}`));
+  const stepPanels = (g.steps ?? []).map((st) => {
+    const form = h('div', { class: 'form' });
+    const panel = h('div', { class: 'gen-step' }, form);
+    for (const item of st.items) {
+      const fieldEls = rows.get(item);
+      if (fieldEls?.length && !actionFields.has(item)) form.append(...fieldEls);
+      else if (item === 'surface' && surface) panel.append(surface.el);
+      else {
+        const box = lists?.listEl(item) ?? lists?.actionEl(item);
+        if (box) panel.append(h('div', { class: 'jig-panel gen-lists' }, box));
+      }
+    }
+    if (!form.childElementCount) form.remove();
+    return panel;
+  });
+  function showStep(i: number) {
+    stepPanels.forEach((el, k) => (el.hidden = k !== i));
+    stepTabs.forEach((b, k) => b.classList.toggle('on', k === i));
+  }
+  if (stepPanels.length) showStep(0);
 
   const render = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde
@@ -233,19 +273,28 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       if (control) control.value = autoText(g, s.key, np);
     }
     for (const s of g.schema) rows.get(s.key)!.forEach((el) => (el.hidden = !fieldActive(s, np)));
+    sectionEls.forEach((el, i) => (el.hidden = !sectionKeys[i].some((s) => fieldActive(s, np))));
     const r = buildGen(g, np);
     r.issues.unshift(...rb.issues);
     if (rb.issues.some((i) => i.level === 'error')) r.parts = [];
     if (Object.keys(binds).length) for (const pt of r.parts) pt.shape.bind = { ...binds };
     built = r.parts.length ? r : null;
     issuesEl.replaceChildren(...r.issues.map((i) => h('div', { class: i.level === 'error' ? 'error' : 'warn' }, i.msg)));
+    // A plugin still computing can be stopped; a stopped or timed-out run can be started again
+    if (g.cancel && r.issues.some((i) => i.code === PENDING))
+      issuesEl.append(h('button', { class: 'btn small', onclick: () => g.cancel!() }, t('Berechnung abbrechen')));
+    else if (g.recompute && r.issues.some((i) => i.code === 'plugin-cancelled' || i.code === 'plugin-timeout'))
+      issuesEl.append(h('button', { class: 'btn small', onclick: () => g.recompute!(np) }, t('Neu berechnen')));
     for (const s of g.schema) {
       const bad = r.issues.some((i) => i.key === s.key && i.level === 'error');
       rows.get(s.key)!.forEach((el) => el.classList.toggle('invalid', bad));
     }
+    // A step with an error in one of its fields is marked, so it can be found from another step
+    (g.steps ?? []).forEach((st, k) => stepTabs[k].classList.toggle('invalid', r.issues.some((i) => i.level === 'error' && !!i.key && st.items.includes(i.key))));
     infoEl.replaceChildren(...r.info.map(([k, v]) => h('div', {}, h('span', { class: 'muted' }, k), ' ', v)));
-    okBtn.disabled = addBtn.disabled = !built;
-    panel?.refresh(np);
+    okBtn.disabled = addBtn.disabled = !built || asking;
+    surface?.refresh(np);
+    lists?.refresh(np);
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -268,6 +317,14 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       const path = subsToPath2D(pt.shape.subs);
       ctx.fill(path, 'evenodd');
       ctx.stroke(path);
+      // Engraving on the part (labels, glue marks, a map) as thin lines
+      if (pt.marks?.length) {
+        ctx.save();
+        ctx.strokeStyle = css.getPropertyValue('--accent').trim() || '#2f6fd6';
+        ctx.lineWidth = 0.8 / k;
+        ctx.stroke(subsToPath2D(pt.marks));
+        ctx.restore();
+      }
     }
     if (old && matEntry) {
       const pt = calibPatch();
@@ -304,6 +361,11 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   // Aktion (Klick, Enter, Übernehmen) wird eine ausstehende Berechnung nachgeholt, damit nichts mit alten Werten entsteht.
   let pending = 0;
   let renderMs = 0;
+  /** A question of the generator is open (OK and Add stay off) */
+  let asking = false;
+  /** Counts committed fields, so a late plugin answer to an older change is dropped */
+  let changeSeq = 0;
+  const askEl = h('div', { class: 'gen-ask', role: 'alertdialog', hidden: true });
   const flush = () => {
     if (pending) clearTimeout(pending);
     pending = 0;
@@ -320,25 +382,46 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
    */
   function changed(key: string, before: ParamValue, undo: () => void): boolean {
     if (!g!.onChange) return false;
-    let r: GenChange | void;
+    let r: GenChange | void | Promise<GenChange | void>;
     try {
       r = g!.onChange(key, before, normalizeParams(g!, p));
     } catch {
       return false;
     }
-    if (!r || (!r.patch && !r.ask)) return false;
-    let patch = r.patch ?? {};
-    if (r.ask) {
-      // Until the in-dialog question of #335 stage 2: a confirmation that applies the first option
-      const opt = r.ask.options[0];
-      if (!opt || !confirm(r.ask.question)) {
-        undo();
-        update();
-        return true;
-      }
-      patch = { ...patch, ...opt.patch };
+    if (r instanceof Promise) {
+      // A plugin answers from its Worker: the field stays as committed until then; the answer only counts while
+      // the field still holds that value and no other question is open
+      const committed = p[key];
+      const token = ++changeSeq;
+      void r.then(
+        (x) => {
+          if (dlg.open && token === changeSeq && p[key] === committed) applyChange(key, x, undo);
+        },
+        () => undefined,
+      );
+      return false;
     }
-    // Checked against the schema like user input; text fields show the new text
+    return applyChange(key, r, undo);
+  }
+  /** Apply the answer of onChange: a patch at once, a question inside the dialog first */
+  function applyChange(key: string, r: GenChange | void, undo: () => void): boolean {
+    if (!r || (!r.patch && !r.ask)) return false;
+    const base = r.patch ?? {};
+    if (r.ask) {
+      showAsk(r.ask, (opt) => {
+        if (opt) patchFields(key, { ...base, ...opt.patch });
+        else {
+          undo();
+          update();
+        }
+      });
+      return true;
+    }
+    patchFields(key, base);
+    return true;
+  }
+  /** Checked against the schema like user input; text fields show the new text */
+  function patchFields(key: string, patch: Params) {
     const keys = Object.keys(patch).filter((k) => k !== key && g!.schema.some((s) => s.key === k));
     const np = normalizeParams(g!, { ...p, ...patch }, p);
     for (const k of keys) {
@@ -346,10 +429,44 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       delete binds[k];
       const control = textInputs.get(k);
       if (control) control.value = String(np[k]);
+      else showValue(k);
       if (isSuggested(g!, k, p)) p[k] = '';
     }
     update();
-    return true;
+  }
+  /** Show a value set by the generator in its field (number, choice, switch) */
+  function showValue(k: string) {
+    const v = p[k];
+    const el = dlg.querySelector<HTMLElement>(`#gen-${CSS.escape(k)}`);
+    if (el instanceof HTMLSelectElement) el.value = String(v);
+    else if (el instanceof HTMLInputElement) el.value = typeof v === 'number' ? fmtNum(v) : String(v);
+    for (const row of rows.get(k) ?? []) {
+      const box = row.querySelector<HTMLInputElement>('input[type=checkbox]');
+      if (box) box.checked = !!v;
+    }
+  }
+  /**
+   * The generator's question inside the dialog (#335 stage 2): its options and Cancel; until it is answered,
+   * OK and Add stay off. Cancel restores the field.
+   */
+  function showAsk(ask: GenAsk, done: (opt: GenAsk['options'][number] | null) => void) {
+    askEl.hidden = false;
+    asking = true;
+    okBtn.disabled = addBtn.disabled = true;
+    const finish = (opt: GenAsk['options'][number] | null) => {
+      askEl.hidden = true;
+      askEl.replaceChildren();
+      asking = false;
+      done(opt);
+    };
+    askEl.replaceChildren(
+      h('p', {}, ask.question),
+      h('div', { class: 'dialog-buttons' },
+        h('button', { class: 'btn', onclick: () => finish(null) }, t('Abbrechen')),
+        ...ask.options.map((o, i) => h('button', { class: i === 0 ? 'btn primary' : 'btn', onclick: () => finish(o) }, o.label)),
+      ),
+    );
+    (askEl.querySelector('.btn.primary') as HTMLButtonElement | null)?.focus();
   }
   const update = () => {
     if (renderMs <= SLOW_PREVIEW_MS) return flush();
@@ -394,14 +511,19 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     'dialog',
     { class: 'offset-dialog gen-dialog' },
     h('h3', {}, old ? t('{name} bearbeiten', { name: g.name }) : t('{name} erstellen', { name: g.name })),
+    stepTabs.length ? h('div', { class: 'conn-row gen-steps', role: 'tablist' }, ...stepTabs) : null,
     h('div', { class: 'qr-layout' },
       h('div', {},
+        ...stepPanels,
         h('div', { class: 'form' }, ...main),
+        ...sectionEls,
         adv.length ? h('details', {}, h('summary', {}, t('Erweitert')), h('div', { class: 'form' }, ...adv)) : null,
       ),
       h('div', {}, canvas, infoEl),
     ),
-    panel?.el ?? null,
+    inStep.has('surface') ? null : (surface?.el ?? null),
+    lists?.el ?? null,
+    askEl,
     issuesEl,
     calibNote,
     kerfNote,
@@ -429,10 +551,12 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     if (pending) clearTimeout(pending);
     pending = 0;
     stopListening();
+    g.closeSession?.();
     dlg.remove();
   });
   document.body.append(dlg);
   dlg.showModal();
+  g.openSession?.(normalizeParams(g, p));
   flush();
 }
 

@@ -37,7 +37,10 @@ export interface AsmCuts {
 export function assemblyReport(gen: string, params: Params, keys: Set<string>, cuts?: AsmCuts): AssemblyReport | null {
   const ck = `${gen}|${JSON.stringify(params)}|${[...keys].sort().join(',')}${cuts ? '|' + cuts.sig : ''}`;
   if (cache.has(ck)) return cache.get(ck)!;
-  const solids = asmSolids(gen, params, genThickness(params, 3), keys);
+  const found = asmSolids(gen, params, genThickness(params, 3), keys);
+  // A plugin still computing: no report yet and nothing kept, the check runs again with its result
+  if (found === 'pending') return null;
+  const solids = found;
   if (solids && cuts) cuts.apply(solids);
   const r = solids && solids.length > 1 ? analyzeAssembly(solids) : null;
   if (cache.size > 20) cache.clear();

@@ -2,7 +2,7 @@
 // QR-Codes mit Platzhaltern und Bauteile mit Formeln (GenShape.bind) auf allen Seiten neu berechnet.
 import { about, allObjs, GenShape, leaves, mul, Obj, OBJ_BIND_KEYS, ObjBindKey, ObjBinds, rotate, scale, translate } from '../model';
 import { boundsOf } from '../geom';
-import { buildGen, getGenerator, resolveBinds } from '../generators';
+import { buildGen, genReady, genUpgrading, getGenerator, resolveBinds } from '../generators';
 import type { Issue } from '../generators';
 import {
   coerce, defaultValue, evaluate, hasPlaceholders, nameError, ParamType, ProjectParam, renameInExpr, renameInTemplate, Scope, scopeOf, usesName,
@@ -158,6 +158,11 @@ export class EditorParams {
       }
       const g = getGenerator(s.gen);
       if (!g) continue;
+      // Parameters of an older version still being migrated by a plugin: computed again once they are
+      if (genUpgrading(s)) {
+        void genReady(s).then(() => this.applyParams());
+        continue;
+      }
       const { params, issues } = resolveBinds(g, s.params, s.bind, scope);
       const changed = g.schema.some((x) => params[x.key] !== s.params[x.key]);
       if (changed) {

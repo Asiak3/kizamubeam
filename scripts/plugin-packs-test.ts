@@ -17,10 +17,13 @@ const qjs = readFileSync(new URL('../node_modules/@jitl/quickjs-wasmfile-release
 setQuickJSWasm(qjs.buffer.slice(qjs.byteOffset, qjs.byteOffset + qjs.byteLength));
 const { buildPluginPack } = await import('./plugin-pack.mjs');
 const P = await import('../src/packs');
-const { pluginGenerator, PENDING, onPluginResult } = await import('../src/plugins/generator');
-const { initPlugins, pluginGenerators, pluginProblems } = await import('../src/plugins/registry');
+const { pluginGenerator, PENDING, onPluginResult, setPluginSpawn } = await import('../src/plugins/generator');
+const { initPlugins, pluginGenerators, pluginProblems, testLoadPlugins } = await import('../src/plugins/registry');
 const { inProcess } = await import('../src/plugins/client');
+// Endless loops below should not wait for the full generate limit
+(await import('../src/plugins/contract')).LIMITS.callMs.generate = 3000;
 const G = await import('../src/generators/index');
+await import('./builtin-generators');
 
 let failed = 0;
 async function test(name: string, fn: () => Promise<void> | void) {
@@ -87,7 +90,7 @@ await test('pack format 2: refused manifests', () => {
   bad((x) => (x.plugins[0].sha256 = '0'.repeat(64)), /Prüfsumme/);
   bad((x) => delete x.plugins[0].sha256, /sha256/);
   bad((x) => (x.plugins[0].api = 2), /neuere Version/);
-  bad((x) => (x.plugins[0].type = 'pathtool'), /unbekannte Art/);
+  bad((x) => (x.plugins[0].type = 'exporter'), /unbekannte Art/);
   bad((x) => (x.plugins[0].runtime = 'python'), /runtime/);
   bad((x) => (x.plugins[0].code = 'AAAA'), /WebAssembly|Prüfsumme/);
   bad((x) => (x.plugins[0].params[0].def = 5000), /min ≤ def ≤ max/);
@@ -98,6 +101,8 @@ await test('pack format 2: refused manifests', () => {
   bad((x) => delete x.plugins[0].texts.en, /Texte fehlen/);
   bad((x) => (x.plugins[0].texts.en['<b>'] = 'x'), /Ungültiger Text/);
   bad((x) => (x.plugins[0].id = 'Not An Id'), /ungültige Kennung/);
+  bad((x) => (x.plugins[0].host = ['fit', 'network']), /Host-Funktion/);
+  assert.deepEqual(P.parsePack(JSON.stringify({ ...plate(), plugins: [{ ...plate().plugins[0], host: ['fit', 'fit', 'trace'] }] })).plugins[0].host, ['fit', 'trace']);
   bad((x) => x.plugins.push(x.plugins[0]), /doppelter Kennung/);
   // A data-only pack in format 1 stays valid
   const old = { format: 'kizamubeam-pack', id: 'com.example.old', version: '1.0.0', name: 'Old', devices: [{ name: 'Old laser', fw: 'grbl', bedW: 400, bedH: 400 }] };
@@ -144,6 +149,37 @@ await test('plugin generator: texts, pending result, cache, issues and labels (J
   g.dispose();
 });
 
+await test('plugin generator: labels and texts computed by the plugin (codes, values, lists, numbers)', async () => {
+  const code = `globalThis.plugin = {
+    validate: (p) => p.size > 50 ? [{ level: 'warn', code: 'plugin-text', values: { text: ['(', { code: 'side' }, ') ', '1234.5'] } }] : [],
+    generate: (p) => ({
+      parts: [{ key: 'a', subs: [{ closed: true, nodes: [{x:0,y:0},{x:p.size,y:0},{x:0,y:p.size}] }], at: { x: 0, y: 0 } }],
+      info: [[{ code: 'side' }, [{ code: 'big', values: { max: { code: 'side' } } }, ' / 2952 mm / M3000']]],
+      label: { code: 'big', values: { max: p.size } },
+      labels: { a: ['#', { code: 'side' }, ' ', String(p.size / 4)], zzz: 'not a part' },
+    }),
+  };`;
+  const g = pluginGenerator(P.parsePack(jsPack(code)).plugins[0], { id: 'com.example.js', name: 'JS example' });
+  const p = G.normalizeParams(g, { size: 22 });
+  assert.equal(g.label(p), 'Quadrat', 'not computed yet: the manifest text');
+  const r = await G.buildGenAsync(g, p);
+  assert.deepEqual(r.info, [['Seite', 'Zu groß: höchstens Seite mm / 2,952 mm / M3000']]);
+  assert.equal(g.label(p), 'Zu groß: höchstens 22 mm', 'whole numbers as they are, like t()');
+  assert.equal(g.label(p, 'a'), '#Seite 5.5');
+  const w = await G.buildGenAsync(g, G.normalizeParams(g, { size: 60 }));
+  assert.deepEqual(w.issues.map((i) => i.msg), ['(Seite) 1,234.5']);
+  assert.equal(w.parts.length, 1);
+  // Labels outlive the result cache
+  for (let i = 1; i <= 30; i++) await g.prepare(G.normalizeParams(g, { size: i }));
+  assert.equal(g.label(p), 'Zu groß: höchstens 22 mm');
+  // A label must be a text
+  const bad = pluginGenerator(P.parsePack(jsPack(code.replace("label: {", "label: 5, other: {"))).plugins[0], { id: 'com.example.js', name: 'JS example' });
+  const rb = await G.buildGenAsync(bad, p);
+  assert.equal(rb.issues[0].code, 'plugin-bad-output');
+  g.dispose();
+  bad.dispose();
+});
+
 await test('plugin generator: crashes, timeouts and broken output become issues', async () => {
   const loop = `globalThis.plugin = { validate: () => [], generate: () => { for(;;){} } };`;
   const g1 = pluginGenerator(P.parsePack(jsPack(loop)).plugins[0], { id: 'x', name: 'Loop' });
@@ -156,11 +192,59 @@ await test('plugin generator: crashes, timeouts and broken output become issues'
   const r2 = await G.buildGenAsync(g2, G.defaultParams(g2));
   assert.match(r2.issues.at(-1)!.msg, /ungültige Geometrie/);
   g2.dispose();
+  const two = `globalThis.plugin = { validate: () => [], generate: () => ({ parts: [], info: [] }) };`;
+  const m4 = P.parsePack(jsPack(two)).plugins[0];
+  const g4 = pluginGenerator({ ...m4, kind: 'part' }, { id: 'x', name: 'None' });
+  const r4 = await G.buildGenAsync(g4, G.defaultParams(g4));
+  assert.match(r4.issues.at(-1)!.msg, /ungültige Geometrie/, 'a part generator must return exactly one part');
+  g4.dispose();
   const own = `globalThis.plugin = { validate: () => [], generate: () => { throw new Error('big'); } };`;
   const g3 = pluginGenerator(P.parsePack(jsPack(own)).plugins[0], { id: 'x', name: 'Own' });
   const r3 = await G.buildGenAsync(g3, G.defaultParams(g3));
   assert.equal(r3.issues.at(-1)!.msg, 'Zu groß: höchstens {max} mm', 'a code thrown by generate uses the plugin text');
   g3.dispose();
+});
+
+await test('plugin generator: progress in the pending message, cancel, recompute, sessions (#211)', async () => {
+  const calls: string[] = [];
+  let release: ((v: unknown) => void) | null = null;
+  let fail: ((e: unknown) => void) | null = null;
+  let proc: import('../src/plugins/client').PluginProcess;
+  setPluginSpawn(() => (proc = {
+    call: (fn, input) => {
+      calls.push(fn);
+      if (fn === 'generate') return new Promise((res, rej) => ((release = res), (fail = rej)));
+      if (fn === 'validate') return Promise.resolve([]);
+      if (fn === 'view') return Promise.reject(Object.assign(new Error('x'), { code: 'plugin-no-function' }));
+      return Promise.resolve(fn === 'open' ? (input as { size: number }).size : null);
+    },
+    setResource() {},
+    cancel: () => fail?.(Object.assign(new Error('plugin-cancelled'), { code: 'plugin-cancelled' })),
+    dispose() {},
+  }));
+  try {
+    const g = pluginGenerator(P.parsePack(jsPack(SQUARE)).plugins[0], { id: 'com.example.js', name: 'JS example' });
+    const p = G.normalizeParams(g, { size: 20 });
+    const done = g.prepare(p);
+    await new Promise((r) => setTimeout(r, 0));
+    proc!.onProgress!(0.42, 'Teil 3/7');
+    assert.match(G.buildGen(g, p).issues[0].msg, /42 % · Teil 3\/7$/);
+    g.cancel!();
+    await done;
+    assert.equal(G.buildGen(g, p).issues[0].code, 'plugin-cancelled');
+    g.recompute!(p);
+    await new Promise((r) => setTimeout(r, 0));
+    release!({ parts: [{ key: 'a', at: { x: 0, y: 0 }, subs: [] }], info: [] });
+    await g.prepare(p);
+    assert.equal(G.buildGen(g, p).parts.length, 1);
+    g.openSession!(p);
+    g.closeSession!();
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual(calls.filter((c) => c === 'open' || c === 'close'), ['open', 'close']);
+    g.dispose();
+  } finally {
+    setPluginSpawn((m) => inProcess(m.runtime, m.code, m.host ?? []));
+  }
 });
 
 await test('hole plate (WebAssembly) through the generator interface', async () => {
@@ -201,6 +285,46 @@ await test('registry: installed packs register their plugins, removing the pack 
   for (const f of files) await P.removePack(f);
   assert.equal(G.getGenerator('org.kizamubeam.hole-plate'), undefined);
   assert.deepEqual(pluginProblems(), []);
+});
+
+await test('extension management (#206): rollback, switch off, verified files, test load', async () => {
+  initPlugins((m) => inProcess(m.runtime, m.code));
+  const v1 = jsPack(SQUARE);
+  const v2 = JSON.stringify({ ...JSON.parse(v1), version: '1.1.0' });
+  await P.installPack(v1);
+  assert.equal(P.allPacks()[0].previous, undefined, 'a first install keeps nothing');
+  await P.installPack(v2, { verified: true });
+  let ip = P.allPacks()[0];
+  assert.equal(ip.pack.version, '1.1.0');
+  assert.equal(ip.previous, '1.0.0');
+  assert.ok(P.packVerified(ip), 'installed from the catalogue');
+  assert.equal(P.allPacks().length, 1, 'the kept version is not listed as a pack');
+  // Rollback swaps the versions; the old file was not from the catalogue
+  await P.restorePrevious('com.example.js');
+  ip = P.allPacks()[0];
+  assert.equal(ip.pack.version, '1.0.0');
+  assert.equal(ip.previous, '1.1.0');
+  assert.ok(!P.packVerified(ip));
+  // Switched off: no content and no plugins, but still listed for the window
+  await P.setPackDisabled('com.example.js', true);
+  assert.equal(P.installedPacks().length, 0);
+  assert.ok(P.allPacks()[0].disabled);
+  assert.equal(G.getGenerator('com.example.square'), undefined);
+  assert.equal(P.installKind(P.parsePack(v1)).kind, 'same', 'a switched-off pack still counts as installed');
+  await P.setPackDisabled('com.example.js', false);
+  assert.ok(G.getGenerator('com.example.square'));
+  // Removing deletes the kept version and the remembered state
+  await P.removePack(P.allPacks()[0].file);
+  assert.equal(P.allPacks().length, 0);
+  assert.ok(![...mem.keys()].some((k) => k === 'kizamubeam.packs' && mem.get(k)!.includes('~prev')), 'kept version removed');
+  await assert.rejects(() => P.restorePrevious('com.example.js'));
+  // Test load before installing: a working plugin passes, a hanging or broken one is reported
+  assert.equal(await testLoadPlugins(P.parsePack(v1)), null);
+  const loop = P.parsePack(jsPack(`globalThis.plugin = { validate: () => [], generate: () => { for(;;){} } };`));
+  assert.match((await testLoadPlugins(loop)) ?? '', /com\.example\.square.*zu lange gerechnet/);
+  const none = P.parsePack(jsPack(`globalThis.plugin = { validate: () => [] };`));
+  assert.match((await testLoadPlugins(none)) ?? '', /fehlt eine Funktion/);
+  assert.equal(G.getGenerator('com.example.square'), undefined, 'a test load registers nothing');
 });
 
 await test('saved part of a missing extension keeps its geometry and names the extension', () => {

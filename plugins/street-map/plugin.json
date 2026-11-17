@@ -1,0 +1,414 @@
+{
+  "format": "kizamubeam-pack",
+  "formatVersion": 2,
+  "id": "org.kizamubeam.street-map",
+  "version": "1.0.0",
+  "name": {
+    "en": "Street map",
+    "de": "Stadtplan",
+    "it": "Mappa stradale"
+  },
+  "description": {
+    "en": "Engravable map of a place from OpenStreetMap: roads, water, railways, parks and buildings on a cut plate.",
+    "de": "Gravierbarer Plan eines Ortes aus OpenStreetMap: Straßen, Wasser, Bahnen, Parks und Gebäude auf einer geschnittenen Platte.",
+    "it": "Mappa incidibile di un luogo da OpenStreetMap: strade, acqua, ferrovie, parchi ed edifici su una lastra tagliata."
+  },
+  "author": "KizamuBeam",
+  "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/street-map",
+  "build": [
+    {
+      "esbuild": "src/index.ts",
+      "out": "dist/street-map.js"
+    }
+  ],
+  "plugins": [
+    {
+      "id": "org.kizamubeam.street-map",
+      "type": "generator",
+      "api": 1,
+      "version": 1,
+      "kind": "part",
+      "runtime": "js",
+      "code": "@dist/street-map.js",
+      "icon": "target",
+      "host": [
+        "fetch",
+        "region"
+      ],
+      "preview": {
+        "center": true
+      },
+      "network": [
+        {
+          "id": "nominatim",
+          "base": "https://nominatim.openstreetmap.org",
+          "methods": [
+            "GET"
+          ],
+          "types": [
+            "json"
+          ],
+          "rate": 1,
+          "purpose": "net.nominatim",
+          "attribution": "© OpenStreetMap contributors"
+        },
+        {
+          "id": "overpass",
+          "base": "https://overpass-api.de/api",
+          "methods": [
+            "POST"
+          ],
+          "types": [
+            "json"
+          ],
+          "rate": 1,
+          "purpose": "net.overpass",
+          "attribution": "© OpenStreetMap contributors"
+        }
+      ],
+      "params": [
+        {
+          "key": "query",
+          "type": "text",
+          "def": ""
+        },
+        {
+          "key": "center",
+          "type": "data",
+          "def": "52.516275,13.377704"
+        },
+        {
+          "key": "placeName",
+          "type": "data",
+          "def": "Brandenburger Tor, Berlin"
+        },
+        {
+          "key": "shape",
+          "type": "enum",
+          "options": [
+            [
+              "rect",
+              "shape.rect"
+            ],
+            [
+              "circle",
+              "shape.circle"
+            ]
+          ],
+          "def": "rect"
+        },
+        {
+          "key": "width",
+          "type": "length",
+          "min": 30,
+          "max": 600,
+          "def": 150
+        },
+        {
+          "key": "height",
+          "type": "length",
+          "min": 30,
+          "max": 600,
+          "def": 150,
+          "showIf": {
+            "eq": [
+              "shape",
+              "rect"
+            ]
+          }
+        },
+        {
+          "key": "span",
+          "type": "number",
+          "min": 200,
+          "max": 4000,
+          "def": 800
+        },
+        {
+          "key": "roads",
+          "type": "enum",
+          "options": [
+            [
+              "none",
+              "roads.none"
+            ],
+            [
+              "major",
+              "roads.major"
+            ],
+            [
+              "streets",
+              "roads.streets"
+            ],
+            [
+              "all",
+              "roads.all"
+            ]
+          ],
+          "def": "streets"
+        },
+        {
+          "key": "roadStyle",
+          "type": "enum",
+          "options": [
+            [
+              "bands",
+              "roadStyle.bands"
+            ],
+            [
+              "lines",
+              "roadStyle.lines"
+            ]
+          ],
+          "def": "bands"
+        },
+        {
+          "key": "roadWidth",
+          "type": "length",
+          "min": 0.2,
+          "max": 6,
+          "def": 1.6,
+          "showIf": {
+            "eq": [
+              "roadStyle",
+              "bands"
+            ]
+          }
+        },
+        {
+          "key": "water",
+          "type": "bool",
+          "def": true
+        },
+        {
+          "key": "rail",
+          "type": "bool",
+          "def": true
+        },
+        {
+          "key": "parks",
+          "type": "bool",
+          "def": false
+        },
+        {
+          "key": "buildings",
+          "type": "bool",
+          "def": false
+        },
+        {
+          "key": "invert",
+          "type": "bool",
+          "def": false,
+          "showIf": {
+            "eq": [
+              "roadStyle",
+              "bands"
+            ]
+          }
+        },
+        {
+          "key": "minArea",
+          "type": "number",
+          "min": 0,
+          "max": 20,
+          "def": 0.3,
+          "advanced": true
+        }
+      ],
+      "dialog": {
+        "version": 5,
+        "actions": [
+          {
+            "id": "find",
+            "label": "find",
+            "title": "find.title"
+          }
+        ],
+        "steps": [
+          {
+            "id": "place",
+            "label": "step.place",
+            "items": [
+              "query",
+              "find"
+            ]
+          },
+          {
+            "id": "size",
+            "label": "step.size",
+            "items": [
+              "shape",
+              "width",
+              "height",
+              "span"
+            ]
+          },
+          {
+            "id": "content",
+            "label": "step.content",
+            "items": [
+              "roads",
+              "roadStyle",
+              "roadWidth",
+              "water",
+              "rail",
+              "parks",
+              "buildings",
+              "invert",
+              "minArea"
+            ]
+          }
+        ]
+      },
+      "texts": {
+        "en": {
+          "name": "Street map",
+          "desc": "Engravable map of a place from OpenStreetMap: roads, water, railways, parks and buildings on a cut plate.",
+          "keys": "map city street map openstreetmap osm place location roads",
+          "label": "Map: {name}",
+          "step.place": "Place",
+          "step.size": "Size",
+          "step.content": "Content",
+          "query": "Place or address",
+          "find": "Find place",
+          "find.title": "Search OpenStreetMap (Nominatim) for the place; coordinates such as 52.5163, 13.3777 work too",
+          "center": "Centre",
+          "placeName": "Place name",
+          "span": "Map width in metres",
+          "shape": "Shape",
+          "shape.rect": "Rectangle",
+          "shape.circle": "Circle",
+          "width": "Width",
+          "height": "Height",
+          "roads": "Roads",
+          "roads.none": "None",
+          "roads.major": "Main roads",
+          "roads.streets": "Streets",
+          "roads.all": "All, with paths",
+          "roadStyle": "Roads as",
+          "roadStyle.bands": "Areas (fill)",
+          "roadStyle.lines": "Lines (score)",
+          "roadWidth": "Main road width",
+          "water": "Water",
+          "rail": "Railways",
+          "parks": "Parks and woods",
+          "buildings": "Buildings",
+          "invert": "Invert (engrave the background)",
+          "minArea": "Smallest area (mm²)",
+          "noPlace": "Find a place first.",
+          "buildingsLarge": "Buildings are only loaded for maps up to {max} m wide.",
+          "invertLines": "Invert works with roads as areas only.",
+          "enterPlace": "Enter a place or address.",
+          "found": "Found: {name}",
+          "notFound": "Nothing found for “{q}”.",
+          "serverBusy": "The map server is busy. Try again in a minute.",
+          "info.place": "Place",
+          "info.scale": "Scale",
+          "scale": "1 : {n}",
+          "info.roads": "Roads",
+          "info.buildings": "Buildings",
+          "net.nominatim": "Finds the place you search for (only when you press “Find place”)",
+          "net.overpass": "Loads the roads, water and buildings around the place"
+        },
+        "de": {
+          "name": "Stadtplan",
+          "desc": "Gravierbarer Plan eines Ortes aus OpenStreetMap: Straßen, Wasser, Bahnen, Parks und Gebäude auf einer geschnittenen Platte.",
+          "keys": "karte stadtplan straßenkarte openstreetmap osm ort straßen",
+          "label": "Stadtplan: {name}",
+          "step.place": "Ort",
+          "step.size": "Größe",
+          "step.content": "Inhalt",
+          "query": "Ort oder Adresse",
+          "find": "Ort suchen",
+          "find.title": "Sucht den Ort in OpenStreetMap (Nominatim); Koordinaten wie 52.5163, 13.3777 gehen auch",
+          "center": "Mitte",
+          "placeName": "Ortsname",
+          "span": "Kartenbreite in Metern",
+          "shape": "Form",
+          "shape.rect": "Rechteck",
+          "shape.circle": "Kreis",
+          "width": "Breite",
+          "height": "Höhe",
+          "roads": "Straßen",
+          "roads.none": "Keine",
+          "roads.major": "Hauptstraßen",
+          "roads.streets": "Straßen",
+          "roads.all": "Alle, mit Wegen",
+          "roadStyle": "Straßen als",
+          "roadStyle.bands": "Flächen (Füllen)",
+          "roadStyle.lines": "Linien (Ritzen)",
+          "roadWidth": "Breite Hauptstraße",
+          "water": "Wasser",
+          "rail": "Bahnstrecken",
+          "parks": "Parks und Wald",
+          "buildings": "Gebäude",
+          "invert": "Umkehren (Hintergrund gravieren)",
+          "minArea": "Kleinste Fläche (mm²)",
+          "noPlace": "Erst einen Ort suchen.",
+          "buildingsLarge": "Gebäude werden nur für Karten bis {max} m Breite geladen.",
+          "invertLines": "Umkehren geht nur mit Straßen als Flächen.",
+          "enterPlace": "Ort oder Adresse eingeben.",
+          "found": "Gefunden: {name}",
+          "notFound": "Nichts gefunden für „{q}“.",
+          "serverBusy": "Der Kartenserver ist ausgelastet. Versuche es in einer Minute noch einmal.",
+          "info.place": "Ort",
+          "info.scale": "Maßstab",
+          "scale": "1 : {n}",
+          "info.roads": "Straßen",
+          "info.buildings": "Gebäude",
+          "net.nominatim": "Findet den gesuchten Ort (nur bei „Ort suchen“)",
+          "net.overpass": "Lädt Straßen, Wasser und Gebäude rund um den Ort"
+        },
+        "it": {
+          "name": "Mappa stradale",
+          "desc": "Mappa incidibile di un luogo da OpenStreetMap: strade, acqua, ferrovie, parchi ed edifici su una lastra tagliata.",
+          "keys": "mappa città stradale openstreetmap osm luogo strade",
+          "label": "Mappa: {name}",
+          "step.place": "Luogo",
+          "step.size": "Dimensioni",
+          "step.content": "Contenuto",
+          "query": "Luogo o indirizzo",
+          "find": "Cerca luogo",
+          "find.title": "Cerca il luogo in OpenStreetMap (Nominatim); funzionano anche coordinate come 52.5163, 13.3777",
+          "center": "Centro",
+          "placeName": "Nome del luogo",
+          "span": "Larghezza della mappa in metri",
+          "shape": "Forma",
+          "shape.rect": "Rettangolo",
+          "shape.circle": "Cerchio",
+          "width": "Larghezza",
+          "height": "Altezza",
+          "roads": "Strade",
+          "roads.none": "Nessuna",
+          "roads.major": "Strade principali",
+          "roads.streets": "Strade",
+          "roads.all": "Tutte, con sentieri",
+          "roadStyle": "Strade come",
+          "roadStyle.bands": "Aree (riempimento)",
+          "roadStyle.lines": "Linee (incisione)",
+          "roadWidth": "Larghezza strada principale",
+          "water": "Acqua",
+          "rail": "Ferrovie",
+          "parks": "Parchi e boschi",
+          "buildings": "Edifici",
+          "invert": "Inverti (incidi lo sfondo)",
+          "minArea": "Area minima (mm²)",
+          "noPlace": "Cerca prima un luogo.",
+          "buildingsLarge": "Gli edifici vengono caricati solo per mappe larghe fino a {max} m.",
+          "invertLines": "Inverti funziona solo con strade come aree.",
+          "enterPlace": "Inserisci un luogo o un indirizzo.",
+          "found": "Trovato: {name}",
+          "notFound": "Nessun risultato per «{q}».",
+          "serverBusy": "Il server delle mappe è occupato. Riprova tra un minuto.",
+          "info.place": "Luogo",
+          "info.scale": "Scala",
+          "scale": "1 : {n}",
+          "info.roads": "Strade",
+          "info.buildings": "Edifici",
+          "net.nominatim": "Trova il luogo cercato (solo con «Cerca luogo»)",
+          "net.overpass": "Carica strade, acqua ed edifici intorno al luogo"
+        }
+      }
+    }
+  ]
+}

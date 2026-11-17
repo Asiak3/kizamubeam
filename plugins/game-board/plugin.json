@@ -1,0 +1,90 @@
+{
+  "format": "kizamubeam-pack",
+  "formatVersion": 2,
+  "id": "org.kizamubeam.game-board",
+  "version": "1.0.0",
+  "name": { "en": "Chessboard and game boards", "de": "Schachbrett und Spielbretter", "it": "Scacchiera e tavolieri", "es": "Tablero de ajedrez y juegos", "pt-BR": "Tabuleiro de xadrez e jogos" },
+  "description": {
+    "en": "Chessboards, draughts boards and any n × m board: dark squares filled, hatched, crossed or as a small checkerboard, with coordinates on the border.",
+    "de": "Schachbretter, Damebretter und beliebige n × m Bretter: dunkle Felder gefüllt, schraffiert, gekreuzt oder als kleines Schachbrett, mit Koordinaten am Rand.",
+    "it": "Scacchiere, damiere e qualsiasi tavoliere n × m: caselle scure piene, tratteggiate, incrociate o come piccola scacchiera, con coordinate sul bordo."
+  },
+  "author": "KizamuBeam",
+  "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/game-board",
+  "build": [{ "esbuild": "src/index.ts", "out": "dist/game-board.js" }],
+  "plugins": [
+    {
+      "id": "org.kizamubeam.game-board",
+      "type": "generator",
+      "api": 1,
+      "version": 1,
+      "kind": "part",
+      "runtime": "js",
+      "code": "@dist/game-board.js",
+      "icon": "grid",
+      "dialog": { "version": 1 },
+      "preview": { "center": true },
+      "params": [
+        { "key": "cols", "type": "int", "min": 2, "max": 30, "def": 8 },
+        { "key": "rows", "type": "int", "min": 2, "max": 30, "def": 8 },
+        { "key": "size", "type": "length", "min": 40, "max": 1500, "def": 320 },
+        { "key": "sizeIncludesBorder", "type": "bool", "def": false },
+        { "key": "style", "type": "enum", "options": [["fill", "style.fill"], ["hatch", "style.hatch"], ["crosshatch", "style.crosshatch"], ["cross", "style.cross"], ["mini", "style.mini"], ["none", "style.none"]], "def": "fill" },
+        { "key": "spacing", "type": "length", "min": 0.2, "max": 20, "def": 2, "showIf": { "in": ["style", ["hatch", "crosshatch"]] } },
+        { "key": "gridLines", "type": "bool", "def": true },
+        { "key": "border", "type": "length", "min": 0, "max": 100, "def": 15, "section": "section.border" },
+        { "key": "coords", "type": "bool", "def": true, "section": "section.border", "showIf": { "gt": ["border", 0] } },
+        { "key": "coordSize", "type": "length", "min": 1.5, "max": 40, "def": 7, "section": "section.border", "showIf": { "and": [{ "eq": ["coords", true] }, { "gt": ["border", 0] }] } },
+        { "key": "bothSides", "type": "bool", "def": false, "section": "section.border", "showIf": { "and": [{ "eq": ["coords", true] }, { "gt": ["border", 0] }] } },
+        { "key": "corner", "type": "length", "min": 0, "max": 100, "def": 5, "section": "section.border" }
+      ],
+      "texts": {
+        "en": {
+          "name": "Chessboard and game boards", "desc": "Chessboard or any n × m game board with filled, hatched or patterned dark squares and coordinates.", "keys": "chess chessboard draughts checkers game board squares",
+          "label": "Board {cols} × {rows}", "part.board": "board",
+          "cols": "Columns", "rows": "Rows", "size": "Width of the squares area", "size.title": "Width of all squares together, or of the whole board when the border is included.",
+          "sizeIncludesBorder": "Width includes the border",
+          "style": "Dark squares", "style.fill": "Outline (fill layer)", "style.hatch": "Hatch", "style.crosshatch": "Cross hatch", "style.cross": "Single cross", "style.mini": "Small checkerboard", "style.none": "Not marked",
+          "style.title": "Outlines are closed shapes: put them on a fill layer to engrave the dark squares solid.",
+          "spacing": "Hatch spacing", "gridLines": "Lines between squares",
+          "section.border": "Border", "border": "Border width", "coords": "Coordinates (A–H, 1–8)", "coordSize": "Coordinate height", "bothSides": "On all four sides", "corner": "Corner radius",
+          "squares-too-small": "The squares are too small: at least {min} mm.",
+          "coords-too-large": "The coordinates do not fit the border: at most {max} mm.",
+          "spacing-wide": "The hatch spacing is wide for the squares.",
+          "corner-into-board": "The corner radius is larger than the border and cuts into the squares.",
+          "square": "Square", "board-size": "Board size", "dark-squares": "Dark squares"
+        },
+        "de": {
+          "name": "Schachbrett und Spielbretter", "desc": "Schachbrett oder beliebiges n × m Spielbrett mit gefüllten, schraffierten oder gemusterten dunklen Feldern und Koordinaten.", "keys": "Schach Schachbrett Dame Spielbrett Felder",
+          "label": "Brett {cols} × {rows}", "part.board": "Brett",
+          "cols": "Spalten", "rows": "Reihen", "size": "Breite der Spielfläche", "size.title": "Breite aller Felder zusammen, oder des ganzen Bretts, wenn der Rand dazugehört.",
+          "sizeIncludesBorder": "Breite mit Rand",
+          "style": "Dunkle Felder", "style.fill": "Umriss (Füll-Layer)", "style.hatch": "Schraffur", "style.crosshatch": "Kreuzschraffur", "style.cross": "Einfaches Kreuz", "style.mini": "Kleines Schachbrett", "style.none": "Nicht markiert",
+          "style.title": "Umrisse sind geschlossene Formen: Auf einem Füll-Layer werden die dunklen Felder voll graviert.",
+          "spacing": "Schraffurabstand", "gridLines": "Linien zwischen den Feldern",
+          "section.border": "Rand", "border": "Randbreite", "coords": "Koordinaten (A–H, 1–8)", "coordSize": "Höhe der Koordinaten", "bothSides": "Auf allen vier Seiten", "corner": "Eckenradius",
+          "squares-too-small": "Die Felder sind zu klein: mindestens {min} mm.",
+          "coords-too-large": "Die Koordinaten passen nicht in den Rand: höchstens {max} mm.",
+          "spacing-wide": "Der Schraffurabstand ist groß für die Felder.",
+          "corner-into-board": "Der Eckenradius ist größer als der Rand und schneidet in die Felder.",
+          "square": "Feld", "board-size": "Brettgröße", "dark-squares": "Dunkle Felder"
+        },
+        "it": {
+          "name": "Scacchiera e tavolieri", "desc": "Scacchiera o qualsiasi tavoliere n × m con caselle scure piene, tratteggiate o a motivo e coordinate.", "keys": "scacchi scacchiera dama tavoliere caselle",
+          "label": "Tavoliere {cols} × {rows}", "part.board": "tavoliere",
+          "cols": "Colonne", "rows": "Righe", "size": "Larghezza dell’area di gioco", "size.title": "Larghezza di tutte le caselle insieme, o dell’intero tavoliere se il bordo è incluso.",
+          "sizeIncludesBorder": "Larghezza con bordo",
+          "style": "Caselle scure", "style.fill": "Contorno (layer di riempimento)", "style.hatch": "Tratteggio", "style.crosshatch": "Tratteggio incrociato", "style.cross": "Croce singola", "style.mini": "Piccola scacchiera", "style.none": "Non segnate",
+          "style.title": "I contorni sono forme chiuse: su un layer di riempimento le caselle scure vengono incise piene.",
+          "spacing": "Passo del tratteggio", "gridLines": "Linee tra le caselle",
+          "section.border": "Bordo", "border": "Larghezza del bordo", "coords": "Coordinate (A–H, 1–8)", "coordSize": "Altezza delle coordinate", "bothSides": "Su tutti e quattro i lati", "corner": "Raggio degli angoli",
+          "squares-too-small": "Le caselle sono troppo piccole: almeno {min} mm.",
+          "coords-too-large": "Le coordinate non entrano nel bordo: al massimo {max} mm.",
+          "spacing-wide": "Il passo del tratteggio è ampio per le caselle.",
+          "corner-into-board": "Il raggio degli angoli è più grande del bordo e taglia le caselle.",
+          "square": "Casella", "board-size": "Dimensioni del tavoliere", "dark-squares": "Caselle scure"
+        }
+      }
+    }
+  ]
+}

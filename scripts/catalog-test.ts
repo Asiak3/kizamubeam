@@ -67,6 +67,25 @@ await test('verifyCatalog: echte Signatur ja, geänderter Text, falscher Schlüs
   assert.equal(await C.verifyCatalog(text, sig, ''), false);
 });
 
+await test('buildCatalog: plugin packs carry plugin count, runtimes, protocol, code size and source', async () => {
+  const { buildPluginPack } = await import('./plugin-pack.mjs');
+  const text: string = buildPluginPack('plugins/hole-plate');
+  const cat = C.parseCatalog(await C.buildCatalog([['org.kizamubeam.hole-plate.kzp', text]], '', { 'org.kizamubeam.hole-plate': 'https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/hole-plate' }));
+  const e = cat.packs[0];
+  assert.equal(e.plugins, 1);
+  assert.deepEqual(e.runtimes, ['wasm']);
+  assert.equal(e.pluginApi, 1);
+  assert.ok(e.codeSize! > 100_000);
+  assert.match(e.source!, /plugins\/hole-plate$/);
+  // A newer plugin protocol than this app knows: shown, but not installable
+  assert.equal(C.catalogState({ ...e, minApp: undefined, pluginApi: 99 }, undefined, '9.0.0'), 'needs-app');
+  assert.equal(C.catalogState({ ...e, minApp: undefined }, undefined, '9.0.0'), 'install');
+  // Older catalogues without plugin fields
+  const old = C.parseCatalog(JSON.stringify({ format: 'kizamubeam-catalog', packs: [{ ...e, plugins: undefined, runtimes: undefined, pluginApi: undefined, codeSize: undefined, source: 'http://x' }] }));
+  assert.equal(old.packs[0].plugins, 0);
+  assert.equal(old.packs[0].source, undefined);
+});
+
 await test('parseCatalog: fehlerhafte Einträge fallen weg, falsches Format wird abgelehnt', () => {
   const ok = { id: 'a.b', version: '1.0.0', name: 'A', file: 'a.b.kzp', sha256: 'a'.repeat(64) };
   const cat = C.parseCatalog(JSON.stringify({ format: 'kizamubeam-catalog', packs: [ok, { ...ok, file: '../x.kzp' }, { ...ok, sha256: 'xyz' }, { ...ok, name: '' }, null] }));

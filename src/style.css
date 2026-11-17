@@ -2593,76 +2593,81 @@ body.dock-resizing #canvas {
 .gen-issues .warn {
   color: #b7791f;
 }
-
-/* Rippenmodell: Abschnitte zeichnen */
-.ribs-panel {
-  margin-top: 10px;
+.gen-ask {
   max-width: 560px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--accent, #3b82f6);
+  border-radius: 6px;
 }
-.ribs-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  margin-bottom: 4px;
+.gen-ask p {
+  margin: 0 0 6px;
 }
-.ribs-bar .grow {
-  flex: 1;
+
+/* Drawing surface of a generator dialog (#335 stage 4) */
+.gen-surface-area {
+  margin-top: 10px;
 }
-.ribs-bar button.on {
+.gen-surface-area .conn-row button.on {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
-.ribs-canvas {
-  width: 560px;
-  height: 300px;
-  max-width: 100%;
+.gen-surface {
+  width: 100%;
+  min-width: 320px;
   border: 1px solid var(--line);
   background: var(--surface);
-  cursor: crosshair;
   display: block;
+  margin-top: 4px;
 }
-.ribs-canvas:focus {
+.gen-surface:focus {
   outline: 1px solid var(--accent);
 }
-.ribs-hint:empty {
+.gen-surface-area .note:empty {
   display: none;
 }
-.ribs-list {
-  margin: 6px 0;
-  font-size: 12px;
+
+/* Steps of a generator dialog (#211 stage 7): numbered tabs, one step at a time */
+.gen-steps {
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
 }
-.ribs-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 108px 50px 64px 50px 44px 54px;
-  gap: 4px;
-  align-items: center;
-  padding: 2px 4px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.ribs-row.on {
+.gen-steps button.on {
   background: var(--accent-soft);
+  border-color: var(--accent);
 }
-.ribs-row.ribs-head {
-  cursor: default;
-  font-size: 11px;
+.gen-steps button.invalid {
+  border-color: var(--warn, #d9822b);
+  color: var(--warn, #d9822b);
 }
-.ribs-row input {
-  width: 100%;
-  min-width: 0;
-  box-sizing: border-box;
+.gen-step .jig-panel:first-child {
+  margin-top: 0;
 }
-.ribs-off {
-  display: flex;
-  gap: 2px;
+/* Sortable rows and colour swatches in dialog lists */
+.gen-grip {
+  cursor: grab;
+  color: var(--muted, #888);
+  user-select: none;
+  letter-spacing: -2px;
+  padding: 0 2px;
 }
-.ribs-count {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.gen-grip.off {
+  visibility: hidden;
 }
-.ribs-count.warn {
-  color: #b7791f;
+.jig-row:focus {
+  outline: 1px solid var(--accent);
+}
+.jig-row.dragging {
+  opacity: 0.5;
+}
+.gen-swatch {
+  display: inline-block;
+  width: 26px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
 }
 
 /* 3D-Ansicht */
@@ -3446,6 +3451,57 @@ input.bound {
   gap: 2px;
   min-width: 0;
 }
+.pack-filter {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.pack-filter .pack-search {
+  flex: 1;
+  min-width: 0;
+}
+.pack-card.disabled .pack-text {
+  opacity: 0.6;
+}
+.pack-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+.pack-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 0.8em;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pack-badge.verified {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.pack-badge.unverified {
+  border-color: var(--danger, #c0392b);
+  color: var(--danger, #c0392b);
+}
+/* Plugins that fetch data from the internet (#280) */
+.pack-badge.network {
+  border-color: var(--warn, #d9822b);
+  color: var(--warn, #d9822b);
+}
+.pack-net {
+  margin-top: 4px;
+}
+.pack-net details ul {
+  font-size: 0.85em;
+  user-select: text;
+}
+.packs-dialog .error {
+  white-space: pre-line;
+}
 .pack-url {
   user-select: text;
   overflow-wrap: break-word;
@@ -4209,8 +4265,15 @@ input.bound {
 }
 .jig-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+/* A selected row of a list that can be selected (generator dialogs, #335 stage 4) */
+.jig-row.on {
+  background: var(--accent-soft);
 }
 .jig-thumb {
   width: 32px;
@@ -4229,6 +4292,10 @@ input.bound {
 }
 input.jig-count {
   width: 60px;
+}
+/* A number field an action shows next to its button (generator dialogs, #335) */
+.gen-lists .conn-row input {
+  width: 70px;
 }
 
 /* Skizzenmodus: Leiste oben über der Arbeitsfläche */

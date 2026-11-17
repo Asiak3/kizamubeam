@@ -108,7 +108,10 @@ export function sphereNormals(shape: string): V3[] {
   const out = ns.map((v) => unit(R(v)));
   // Kleine Rundungsfehler glätten, damit oben/unten exakt senkrecht sind
   for (const v of out) for (let i = 0; i < 3; i++) if (Math.abs(v[i]) < 1e-12) v[i] = 0;
-  return out.sort((a, b) => b[2] - a[2] || b[1] - a[1] || b[0] - a[0]);
+  // Order from top to bottom; values equal up to rounding count as equal, so the order (and the disc numbers) do
+  // not depend on the last bit of sin/cos, which differs between JavaScript engines (generator as a plugin)
+  const r = (x: number) => Math.round(x * 1e9);
+  return out.sort((a, b) => r(b[2]) - r(a[2]) || r(b[1]) - r(a[1]) || r(b[0]) - r(a[0]));
 }
 
 // ---------- Aufteilung ----------

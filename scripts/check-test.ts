@@ -6,6 +6,7 @@ import type { Layer, Obj, Shape, SubPath } from '../src/model';
 const { defaultLayer, IDENT, translate } = await import('../src/model');
 const { checkDesign, DEFAULT_CHECK, removeSpans } = await import('../src/check');
 const { buildGen, defaultParams, GENERATORS, getGenerator } = await import('../src/generators/index');
+await import('./builtin-generators');
 const { library } = await import('../src/materials');
 const { t } = await import('../src/i18n');
 const { drawnFit, realGap, suggestFit, genFitPatch } = await import('../src/fitcheck');

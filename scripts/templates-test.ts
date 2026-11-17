@@ -10,6 +10,7 @@ g.localStorage = {
   removeItem: (k: string) => void mem.delete(k),
 };
 const T = await import('../src/templates');
+await import('./builtin-generators');
 const P = await import('../src/params');
 const vt = await import('../src/vartext');
 const { loadDoc, newDoc } = await import('../src/model');
@@ -97,11 +98,11 @@ await test('guessColumns und tableRows: Spalten nach Name oder Beschriftung, Zah
 
 const { builtinTemplates } = await import('../src/builtinTemplates');
 const { usesName } = await import('../src/params');
-await test('Mitgelieferte Vorlagen: gültige Dateien, alle Formeln nennen nur vorhandene Parameter', () => {
+await test('Mitgelieferte Vorlagen: gültige Dateien, alle Formeln nennen nur vorhandene Parameter', async () => {
   const list = builtinTemplates();
   assert.deepEqual(list.map((b) => b.id), ['keyfob', 'nametag', 'labelbox']);
   for (const b of list) {
-    const d = loadDoc(JSON.parse(b.json()));
+    const d = loadDoc(JSON.parse(await b.json()));
     const names = (d.params ?? []).map((p) => p.name);
     assert.ok(d.template && d.template.fields.length >= 3, b.id);
     for (const f of d.template!.fields) assert.ok(names.includes(f.name), `${b.id}: Feld ${f.name}`);

@@ -228,8 +228,8 @@ await test('Gerätevorlagen: fehlende Pflichtfelder und Unsinn', () => {
   assert.equal(p.devices[0].preset.conn, undefined);
 });
 
-await test('Vorlagen: .kzt-Inhalt mit mehrsprachigem Titel; ohne „template“ abgelehnt', () => {
-  const kzt = JSON.parse(builtinTemplates()[0].json());
+await test('Vorlagen: .kzt-Inhalt mit mehrsprachigem Titel; ohne „template“ abgelehnt', async () => {
+  const kzt = JSON.parse(await builtinTemplates()[0].json());
   kzt.template.title = { de: 'Anhänger', en: 'Key fob' };
   const p = P.parsePack(pack({ templates: [kzt] }));
   assert.equal(p.templates[0].info.title, 'Anhänger');
