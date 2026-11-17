@@ -1,7 +1,7 @@
 {
  "format": "kizamubeam-catalog",
  "version": 1,
- "generated": "2026-11-17T17:43:41.042Z",
+ "generated": "2026-11-17T20:26:19.244Z",
  "packs": [
   {
    "id": "org.kizamubeam.example",
@@ -147,7 +147,7 @@
    "codeSize": 12700,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/layered-art",
    "file": "org.kizamubeam.layered-art.kzp",
-   "sha256": "1d07e468299630d16ae11441653bfef4d9d39d9d04942bcfc68f065b8c27e549",
+   "sha256": "b69490ec8d98cf3c2edbac2bbfbe08922aff35451c5f07c1b9fe6b89527c922e",
    "size": 25812
   },
   {
