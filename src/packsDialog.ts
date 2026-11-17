@@ -7,10 +7,11 @@ import { Catalog, CatalogEntry, catalogState, fetchCatalog, fetchCatalogPack } f
 import { version as APP_VERSION } from '../package.json';
 import { lang, t, tn } from './i18n';
 import {
-  brokenPacks, countSummary, ensurePacks, hasPackFolder, installedPacks, installKind, installPack, localText, openPackFolder, Pack, PACK_EXT, packSummary, parsePack, removePack,
-  groupPresets, PresetFeature, PresetListEntry,
+  allPacks, brokenPacks, countSummary, ensurePacks, hasPackFolder, InstalledPack, installKind, installPack, localText, markVerified, openPackFolder, Pack, PACK_EXT, packSummary,
+  packVerified, parsePack, removePack, restorePrevious, setPackDisabled, groupPresets, PresetFeature, PresetListEntry,
 } from './packs';
-import { pluginConflict, pluginProblems } from './plugins/registry';
+import { pluginConflict, pluginProblems, testLoadPlugins } from './plugins/registry';
+import { leaves, type Doc } from './model';
 import { pluginText } from './plugins/manifest';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -137,7 +138,11 @@ export async function installPackFile(name: string, text: string, fromCatalog = 
     ok.onclick = async () => {
       ok.disabled = true;
       try {
-        result = await installPack(text);
+        // Atomic: the new version is only written after its plugins started and answered
+        const bad = p.plugins.length ? (err.textContent = t('Plugins werden geprüft …'), await testLoadPlugins(p)) : null;
+        err.textContent = '';
+        if (bad) throw new Error(bad);
+        result = await installPack(text, { verified: fromCatalog });
         dlg.close();
       } catch (e) {
         err.textContent = errText(e);
@@ -165,41 +170,101 @@ export async function installPackFile(name: string, text: string, fromCatalog = 
   });
 }
 
-export async function openPacksDialog() {
+/** Parts in the document made by plugins of this pack (they keep their shape but cannot be edited without it) */
+export function partsUsing(doc: Doc | undefined, pack: Pack): number {
+  if (!doc || !pack.plugins.length) return 0;
+  const ids = new Set(pack.plugins.map((m) => m.id));
+  let n = 0;
+  for (const page of doc.pages) for (const [o] of leaves(page.objs)) if (o.shape.kind === 'gen' && ids.has(o.shape.gen)) n++;
+  return n;
+}
+
+type Filter = 'all' | 'content' | 'plugins';
+const hasContent = (devices: number, templates: number, materials: number, assets: number) => devices + templates + materials + assets > 0;
+
+/** Window „Extensions“: installed packs and the catalogue, with a search and a filter for content or plugins (#206) */
+export async function openPacksDialog(doc?: Doc) {
   await ensurePacks();
   const list = h('div', { class: 'pack-list' });
   const err = h('p', { class: 'error' });
+  const search = h('input', { type: 'search', placeholder: t('Suchen …'), class: 'pack-search' }) as HTMLInputElement;
+  const filter = h('select', {},
+    h('option', { value: 'all' }, t('Alle')),
+    h('option', { value: 'content' }, t('Inhalte|Erweiterungen')),
+    h('option', { value: 'plugins' }, t('Plugins')),
+  ) as HTMLSelectElement;
+  /** Whether an entry passes the search and the filter */
+  const shown = (words: (string | undefined)[], plugins: number, content: boolean) => {
+    const f = filter.value as Filter;
+    if (f === 'plugins' && !plugins) return false;
+    if (f === 'content' && !content) return false;
+    const q = search.value.trim().toLowerCase();
+    if (!q) return true;
+    const hay = words.filter(Boolean).join(' ').toLowerCase();
+    return q.split(/\s+/).every((w) => hay.includes(w));
+  };
+  const badge = (text: string, kind: string, title = '') => h('span', { class: `pack-badge ${kind}`, title }, text);
+  const act = (f: () => Promise<unknown>) => async () => {
+    err.textContent = '';
+    try {
+      await f();
+    } catch (e) {
+      err.textContent = errText(e);
+    }
+    fill();
+    fillCatalog();
+  };
+  const card = (ip: InstalledPack) => {
+    const { pack, file } = ip;
+    const verified = packVerified(ip);
+    const badges = [
+      pack.plugins.length ? badge(t('Plugins'), 'plugins') : null,
+      verified
+        ? badge(t('Geprüft (Katalog)'), 'verified', t('Diese Datei stammt aus dem signierten KizamuBeam-Katalog.'))
+        : pack.plugins.length
+          ? badge(t('Ungeprüft'), 'unverified', t('Nicht aus dem signierten Katalog installiert.'))
+          : null,
+      ip.disabled ? badge(t('Ausgeschaltet'), 'off') : null,
+    ];
+    const remove = async () => {
+      const used = partsUsing(doc, pack);
+      const msg = t('Erweiterung „{name}“ entfernen? Unveränderte Materialien daraus verschwinden aus der Bibliothek, Geräte und Projekte bleiben.', { name: pack.name });
+      const extra = used ? '\n\n' + tn('Im offenen Projekt stammt {n} Teil aus dieser Erweiterung. Es behält seine Form, lässt sich ohne sie aber nicht mehr bearbeiten.', 'Im offenen Projekt stammen {n} Teile aus dieser Erweiterung. Sie behalten ihre Form, lassen sich ohne sie aber nicht mehr bearbeiten.', used) : '';
+      if (!confirm(msg + extra)) return;
+      await removePack(file);
+    };
+    return h('div', { class: 'pack-card' + (ip.disabled ? ' disabled' : '') },
+      h('div', { class: 'pack-text' },
+        h('div', {}, h('b', {}, pack.name), ` ${pack.version}`, pack.author ? h('span', { class: 'muted' }, ` · ${pack.author}`) : null, ' ', ...badges),
+        h('div', { class: 'muted' }, packSummary(pack)),
+        pack.description ? h('div', {}, pack.description) : null,
+        pack.homepage ? h('div', { class: 'muted pack-url' }, pack.homepage) : null,
+      ),
+      h('div', { class: 'pack-actions' },
+        h('button', { class: 'btn small', onclick: act(() => setPackDisabled(pack.id, !ip.disabled)) }, ip.disabled ? t('Einschalten') : t('Ausschalten')),
+        ip.previous
+          ? h('button', { class: 'btn small', title: t('Die Version vor der letzten Installation wiederherstellen'), onclick: act(() => restorePrevious(pack.id)) }, t('Zurück auf {version}', { version: ip.previous }))
+          : null,
+        h('button', { class: 'btn small', onclick: act(remove) }, t('Entfernen')),
+      ),
+    );
+  };
   const fill = () => {
     list.replaceChildren();
-    for (const { file, pack } of installedPacks())
-      list.append(h('div', { class: 'pack-card' },
-        h('div', { class: 'pack-text' },
-          h('div', {}, h('b', {}, pack.name), ` ${pack.version}`, pack.author ? h('span', { class: 'muted' }, ` · ${pack.author}`) : null),
-          h('div', { class: 'muted' }, packSummary(pack)),
-          pack.description ? h('div', {}, pack.description) : null,
-          pack.homepage ? h('div', { class: 'muted pack-url' }, pack.homepage) : null,
-        ),
-        h('button', {
-          class: 'btn small',
-          onclick: async () => {
-            if (!confirm(t('Erweiterung „{name}“ entfernen? Unveränderte Materialien daraus verschwinden aus der Bibliothek, Geräte und Projekte bleiben.', { name: pack.name }))) return;
-            try {
-              await removePack(file);
-              fill();
-            } catch (e) {
-              err.textContent = errText(e);
-            }
-          },
-        }, t('Entfernen')),
-      ));
+    for (const ip of allPacks()) {
+      const p = ip.pack;
+      if (shown([p.name, p.id, p.author, p.description], p.plugins.length, hasContent(p.devices.length, p.templates.length, p.materials.length, p.assets.length))) list.append(card(ip));
+    }
     for (const msg of pluginProblems()) list.append(h('p', { class: 'error' }, msg));
     for (const b of brokenPacks())
       list.append(h('div', { class: 'pack-card broken' },
         h('div', { class: 'pack-text' }, h('b', {}, b.file), h('div', { class: 'error' }, b.error)),
-        h('button', { class: 'btn small', onclick: async () => (await removePack(b.file).catch((e) => (err.textContent = errText(e))), fill()) }, t('Entfernen')),
+        h('button', { class: 'btn small', onclick: act(() => removePack(b.file)) }, t('Entfernen')),
       ));
     if (!list.children.length)
-      list.append(h('p', { class: 'note' }, t('Noch keine Erweiterungen installiert. Eine Erweiterung (.kzp) bringt Gerätevorlagen, Vorlagen oder Materialien mit, ohne dass KizamuBeam neu installiert werden muss.')));
+      list.append(h('p', { class: 'note' }, allPacks().length
+        ? t('Keine Treffer.')
+        : t('Noch keine Erweiterungen installiert. Eine Erweiterung (.kzp) bringt Gerätevorlagen, Vorlagen oder Materialien mit, ohne dass KizamuBeam neu installiert werden muss.')));
   };
   const install = async () => {
     const r = await openText(t('KizamuBeam-Erweiterung'), [PACK_EXT]);
@@ -210,7 +275,10 @@ export async function openPacksDialog() {
   // ---------- Katalog ----------
   const catList = h('div', { class: 'pack-list' });
   const catStatus = h('p', { class: 'note' });
+  const updateAll = h('button', { class: 'btn small primary', hidden: true }) as HTMLButtonElement;
   let catalog: Catalog | null = null;
+  const stateOf = (e: CatalogEntry) => catalogState(e, allPacks().find((x) => x.pack.id === e.id)?.pack, APP_VERSION);
+  const updates = () => (catalog?.packs ?? []).filter((e) => stateOf(e) === 'update');
   const fromCatalog = async (e: CatalogEntry, btn: HTMLButtonElement) => {
     btn.disabled = true;
     try {
@@ -221,50 +289,91 @@ export async function openPacksDialog() {
     }
     fillCatalog();
   };
+  /** Update every pack with a newer catalogue version; each one only after its check and test load */
+  updateAll.onclick = async () => {
+    updateAll.disabled = true;
+    err.textContent = '';
+    const failed: string[] = [];
+    let done = 0;
+    for (const e of updates()) {
+      try {
+        const text = await fetchCatalogPack(e);
+        const p = parsePack(text);
+        const why = p.plugins.map((x) => pluginConflict(p, x.id)).find(Boolean) ?? (p.plugins.length ? await testLoadPlugins(p) : null);
+        if (why) throw new Error(why);
+        await installPack(text, { verified: true });
+        done++;
+      } catch (x) {
+        failed.push(`${localText(e.name)}: ${errText(x)}`);
+      }
+    }
+    updateAll.disabled = false;
+    catStatus.textContent = tn('{n} Erweiterung aktualisiert.', '{n} Erweiterungen aktualisiert.', done);
+    err.textContent = failed.join('\n');
+    fill();
+    fillCatalog();
+  };
   const fillCatalog = () => {
     catList.replaceChildren();
+    const n = updates().length;
+    updateAll.hidden = n < 2;
+    updateAll.textContent = t('Alle aktualisieren ({n})', { n });
     if (!catalog) return;
-    const have = new Map(installedPacks().map(({ pack }) => [pack.id, pack]));
     for (const e of catalog.packs) {
-      const st = catalogState(e, have.get(e.id), APP_VERSION);
+      const name = localText(e.name);
+      const desc = localText(e.description);
+      if (!shown([name, e.id, e.author, desc], e.plugins, hasContent(e.devices, e.templates, e.materials, e.assets))) continue;
+      const st = stateOf(e);
       const label = {
         install: t('Installieren'),
         update: t('Auf {version} aktualisieren', { version: e.version }),
         installed: t('Installiert'),
         'newer-installed': t('Neuere Version installiert'),
-        'needs-app': t('Braucht KizamuBeam {version}', { version: e.minApp ?? '' }),
+        'needs-app': e.minApp ? t('Braucht KizamuBeam {version}', { version: e.minApp }) : t('Braucht eine neuere Version von KizamuBeam'),
       }[st];
       const btn = h('button', { class: 'btn small' + (st === 'install' || st === 'update' ? ' primary' : ''), disabled: st !== 'install' && st !== 'update' }, label) as HTMLButtonElement;
       btn.onclick = () => fromCatalog(e, btn);
-      const desc = localText(e.description);
+      const kinds = e.plugins ? [badge(t('Plugins'), 'plugins', (e.runtimes ?? []).map((r) => (r === 'js' ? 'JavaScript' : 'WebAssembly')).join(', '))] : [];
       catList.append(h('div', { class: 'pack-card' },
         h('div', { class: 'pack-text' },
-          h('div', {}, h('b', {}, localText(e.name)), ` ${e.version}`, e.author ? h('span', { class: 'muted' }, ` · ${e.author}`) : null),
+          h('div', {}, h('b', {}, name), ` ${e.version}`, e.author ? h('span', { class: 'muted' }, ` · ${e.author}`) : null, ' ', ...kinds),
           h('div', { class: 'muted' }, countSummary(e.devices, e.templates, e.materials, e.assets, e.plugins)),
           desc ? h('div', {}, desc) : null,
+          e.source ? h('div', { class: 'muted pack-url' }, t('Quellcode: {url}', { url: e.source })) : null,
         ),
         btn,
       ));
     }
     if (!catalog.packs.length) catList.append(h('p', { class: 'note' }, t('Der Katalog enthält noch keine Pakete.')));
+    else if (!catList.children.length) catList.append(h('p', { class: 'note' }, t('Keine Treffer.')));
   };
   const loadCatalog = async () => {
     catStatus.textContent = t('Katalog wird geladen …');
     try {
       catalog = await fetchCatalog();
-      const updates = catalog.packs.filter((e) => catalogState(e, installedPacks().find((x) => x.pack.id === e.id)?.pack, APP_VERSION) === 'update').length;
-      catStatus.textContent = updates ? tn('{n} Aktualisierung verfügbar.', '{n} Aktualisierungen verfügbar.', updates) : t('Signatur geprüft.');
+      // Installed files the signed catalogue lists exactly count as checked
+      for (const ip of allPacks()) {
+        const e = catalog.packs.find((x) => x.id === ip.pack.id);
+        if (e?.sha256 === ip.sha256) markVerified(ip.pack.id, ip.sha256);
+      }
+      const n = updates().length;
+      catStatus.textContent = n ? tn('{n} Aktualisierung verfügbar.', '{n} Aktualisierungen verfügbar.', n) : t('Signatur geprüft.');
     } catch (e) {
       catalog = null;
       catStatus.textContent = t('Katalog nicht verfügbar: {message}', { message: errText(e) });
     }
+    fill();
     fillCatalog();
   };
+  const refilter = () => (fill(), fillCatalog());
+  search.addEventListener('input', refilter);
+  filter.addEventListener('change', refilter);
   const dlg = h('dialog', { class: 'packs-dialog' },
     h('h3', {}, t('Erweiterungen')),
+    h('div', { class: 'pack-filter' }, search, filter),
     h('h4', {}, t('Installiert')),
     list,
-    h('h4', {}, t('Katalog'), ' ', h('button', { class: 'btn small', onclick: loadCatalog }, t('Neu laden'))),
+    h('h4', {}, t('Katalog'), ' ', h('button', { class: 'btn small', onclick: loadCatalog }, t('Neu laden')), ' ', updateAll),
     catStatus,
     catList,
     err,

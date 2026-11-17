@@ -18,7 +18,7 @@ setQuickJSWasm(qjs.buffer.slice(qjs.byteOffset, qjs.byteOffset + qjs.byteLength)
 const { buildPluginPack } = await import('./plugin-pack.mjs');
 const P = await import('../src/packs');
 const { pluginGenerator, PENDING, onPluginResult } = await import('../src/plugins/generator');
-const { initPlugins, pluginGenerators, pluginProblems } = await import('../src/plugins/registry');
+const { initPlugins, pluginGenerators, pluginProblems, testLoadPlugins } = await import('../src/plugins/registry');
 const { inProcess } = await import('../src/plugins/client');
 const G = await import('../src/generators/index');
 
@@ -207,6 +207,46 @@ await test('registry: installed packs register their plugins, removing the pack 
   for (const f of files) await P.removePack(f);
   assert.equal(G.getGenerator('org.kizamubeam.hole-plate'), undefined);
   assert.deepEqual(pluginProblems(), []);
+});
+
+await test('extension management (#206): rollback, switch off, verified files, test load', async () => {
+  initPlugins((m) => inProcess(m.runtime, m.code));
+  const v1 = jsPack(SQUARE);
+  const v2 = JSON.stringify({ ...JSON.parse(v1), version: '1.1.0' });
+  await P.installPack(v1);
+  assert.equal(P.allPacks()[0].previous, undefined, 'a first install keeps nothing');
+  await P.installPack(v2, { verified: true });
+  let ip = P.allPacks()[0];
+  assert.equal(ip.pack.version, '1.1.0');
+  assert.equal(ip.previous, '1.0.0');
+  assert.ok(P.packVerified(ip), 'installed from the catalogue');
+  assert.equal(P.allPacks().length, 1, 'the kept version is not listed as a pack');
+  // Rollback swaps the versions; the old file was not from the catalogue
+  await P.restorePrevious('com.example.js');
+  ip = P.allPacks()[0];
+  assert.equal(ip.pack.version, '1.0.0');
+  assert.equal(ip.previous, '1.1.0');
+  assert.ok(!P.packVerified(ip));
+  // Switched off: no content and no plugins, but still listed for the window
+  await P.setPackDisabled('com.example.js', true);
+  assert.equal(P.installedPacks().length, 0);
+  assert.ok(P.allPacks()[0].disabled);
+  assert.equal(G.getGenerator('com.example.square'), undefined);
+  assert.equal(P.installKind(P.parsePack(v1)).kind, 'same', 'a switched-off pack still counts as installed');
+  await P.setPackDisabled('com.example.js', false);
+  assert.ok(G.getGenerator('com.example.square'));
+  // Removing deletes the kept version and the remembered state
+  await P.removePack(P.allPacks()[0].file);
+  assert.equal(P.allPacks().length, 0);
+  assert.ok(![...mem.keys()].some((k) => k === 'kizamubeam.packs' && mem.get(k)!.includes('~prev')), 'kept version removed');
+  await assert.rejects(() => P.restorePrevious('com.example.js'));
+  // Test load before installing: a working plugin passes, a hanging or broken one is reported
+  assert.equal(await testLoadPlugins(P.parsePack(v1)), null);
+  const loop = P.parsePack(jsPack(`globalThis.plugin = { validate: () => [], generate: () => { for(;;){} } };`));
+  assert.match((await testLoadPlugins(loop)) ?? '', /com\.example\.square.*zu lange gerechnet/);
+  const none = P.parsePack(jsPack(`globalThis.plugin = { validate: () => [] };`));
+  assert.match((await testLoadPlugins(none)) ?? '', /fehlt eine Funktion/);
+  assert.equal(G.getGenerator('com.example.square'), undefined, 'a test load registers nothing');
 });
 
 await test('saved part of a missing extension keeps its geometry and names the extension', () => {

@@ -119,6 +119,10 @@ Each entry is a plugin with its parameters, texts and program code. Stage 1 know
 
 Installing a pack with plugins from a file asks the user to confirm that they trust its source, because the file is not signed. A plugin may not use the id of a generator built into the app or of a plugin from another installed pack. Parts made by a plugin remember the name of the extension: when it is missing, they keep their outline, can still be lasered, and the app names the extension that is needed to change their parameters.
 
+### Managing installed packs
+
+File → Extensions … can switch a pack off without removing it: its presets, templates, materials, library items and plugins disappear until it is switched on again (the list of switched-off ids is kept in the settings, `kizamubeam.packs.disabled`). Installing over an existing version keeps the old file as `<id>~prev.kzp` next to it, so “Back to x.y” can restore it once; removing a pack removes that file too. A pack counts as verified when its file has exactly the SHA-256 that the signed catalogue lists (remembered per pack, so the badge also shows offline). Before a pack with plugins is written, every plugin is started in its own Worker and computes its default parameters (`testLoadPlugins` in `src/plugins/registry.ts`); a crash, timeout or broken result keeps the installed version. “Update all” does the same for every pack with a newer catalogue version. `list_extensions` (MCP) lists switched-off packs, the verified state and the plugins with their generator ids; installing, updating and removing stay actions in the app.
+
 ## Official catalogue
 
 File → Extensions … also shows the official catalogue. It lists the packs in the [`packs/`](../packs) folder of this repository and is published with the website at `https://kizamubeam.github.io/kizamubeam/catalog/catalog.json`. Installing or updating from there needs no file download by hand, and the app shows which installed packs have a newer version.

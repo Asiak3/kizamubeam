@@ -5,7 +5,9 @@ import type { Editor } from './editor';
 import { boundsOf, Box } from './geom';
 import { IDENT } from './model';
 import { library } from './materials';
-import { brokenPacks, ensurePacks, installedPacks } from './packs';
+import { allPacks, brokenPacks, ensurePacks, packVerified } from './packs';
+import { pluginProblems } from './plugins/registry';
+import { pluginText } from './plugins/manifest';
 import { findAssets } from './assetLibrary';
 import { ASSET_CATEGORIES, AssetCategory } from './assetFormat';
 import { systemFonts } from './fonts';
@@ -101,18 +103,24 @@ const READ_TOOLS: ToolDef[] = [
   {
     name: 'list_extensions',
     title: 'Erweiterungen auflisten',
-    description: 'Installierte Erweiterungen (Inhaltspakete .kzp): Kennung, Version, Name und Inhalt (Gerätevorlagen, Vorlagen mit Datei „pack:…“ für new_from_template, Material-Einträge). Installieren und Entfernen geht nur in der App (Datei → Erweiterungen …).',
+    description: 'Installierte Erweiterungen (Pakete .kzp): Kennung, Version, Name, ob eingeschaltet (enabled) und aus dem signierten Katalog (verified), und Inhalt (Gerätevorlagen, Vorlagen mit Datei „pack:…“ für new_from_template, Material-Einträge, Plugins mit der Generator-Kennung für generate_part). Installieren, Aktualisieren, Ein-/Ausschalten und Entfernen geht nur in der App (Datei → Erweiterungen …).',
     tier: Tier.Read,
     inputSchema: { type: 'object', properties: {} },
     run: async () => {
       await ensurePacks();
       return json({
-        extensions: installedPacks().map(({ pack: p }) => ({
-          id: p.id, version: p.version, name: p.name, description: p.description, author: p.author,
-          devicePresets: p.devices.map((d) => ({ ...d.preset, source: d.source })),
-          templates: p.templates.map((tp, i) => ({ file: `pack:${p.id}/${i + 1}`, title: tp.info.title })),
-          materials: p.materials.map((m) => m.id),
-        })),
+        extensions: allPacks().map((ip) => {
+          const p = ip.pack;
+          return {
+            id: p.id, version: p.version, name: p.name, description: p.description, author: p.author,
+            enabled: !ip.disabled, verified: packVerified(ip),
+            devicePresets: p.devices.map((d) => ({ ...d.preset, source: d.source })),
+            templates: p.templates.map((tp, i) => ({ file: `pack:${p.id}/${i + 1}`, title: tp.info.title })),
+            materials: p.materials.map((m) => m.id),
+            plugins: p.plugins.map((m) => ({ generator: m.id, kind: m.kind, runtime: m.runtime, name: pluginText(m.texts, 'en', 'name') ?? m.id, version: m.version })),
+          };
+        }),
+        pluginProblems: pluginProblems(),
         broken: brokenPacks(),
       });
     },

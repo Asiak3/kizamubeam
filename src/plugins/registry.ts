@@ -1,7 +1,7 @@
 // Plugin generators of the installed extensions: registered with the generators when packs are (re)loaded,
 // removed when their pack is removed. A plugin may not take the id of a generator built into the app or of a
 // plugin from another pack; such a plugin is skipped and listed in pluginProblems().
-import { getGenerator, register, unregister } from '../generators/index';
+import { defaultParams, getGenerator, register, unregister } from '../generators/index';
 import { installedPacks, onPacksChanged, type Pack } from '../packs';
 import { isPluginGenerator, onPluginResult, pluginGenerator, PENDING, setPluginSpawn, type PluginGenerator, type Spawn } from './generator';
 import { t } from '../i18n';
@@ -52,6 +52,33 @@ export function syncPlugins() {
     active.set(id, g);
   }
   problems = bad;
+}
+
+/**
+ * Load every plugin of a pack once before it is installed (#206): start it in its own process and compute the
+ * default parameters. Returns the first problem as a message, or null when all plugins answered.
+ */
+export async function testLoadPlugins(pack: Pick<Pack, 'id' | 'name' | 'plugins'>): Promise<string | null> {
+  for (const m of pack.plugins) {
+    const g = pluginGenerator(m, { id: pack.id, name: pack.name });
+    try {
+      const p = defaultParams(g);
+      await g.prepare(p);
+      const bad = g.validate(p).find((i) => i.code?.startsWith('plugin-'));
+      if (bad) return t('Plugin „{id}“: {message}', { id: m.id, message: bad.msg });
+      if (!g.validate(p).some((i) => i.level === 'error')) {
+        try {
+          g.generate(p);
+        } catch (e) {
+          const code = e instanceof Error ? e.message : String(e);
+          return t('Plugin „{id}“: {message}', { id: m.id, message: g.texts?.[code]?.() ?? code });
+        }
+      }
+    } finally {
+      g.dispose();
+    }
+  }
+  return null;
 }
 
 let started = false;
