@@ -114,3 +114,17 @@ export function roundedRect(w: number, h: number, r: number): SubPath {
 
 /** Round to 1/1000 mm for info texts (the app shows numbers in the user's format) */
 export const mm = (v: number) => String(Math.round(v * 1000) / 1000);
+
+/** Deterministic random numbers in [0, 1) from a seed (plugins have no Math.random worth trusting: use a seed parameter) */
+export function random(seed: number): () => number {
+  let s = seed >>> 0 || 0x9e3779b9;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export { strokeText, textWidth, hasGlyph, type TextOptions } from './font';

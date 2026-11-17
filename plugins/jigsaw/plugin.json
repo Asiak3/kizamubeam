@@ -1,0 +1,94 @@
+{
+  "format": "kizamubeam-pack",
+  "formatVersion": 2,
+  "id": "org.kizamubeam.jigsaw",
+  "version": "1.0.0",
+  "name": { "en": "Jigsaw puzzle", "de": "Puzzle", "it": "Puzzle", "es": "Rompecabezas", "pt-BR": "Quebra-cabeça" },
+  "description": {
+    "en": "Jigsaw puzzle generator: interlocking pieces from a seed, each edge cut once, optional frame and piece numbers.",
+    "de": "Puzzle-Generator: ineinandergreifende Teile aus einem Startwert, jede Kante wird nur einmal geschnitten, auf Wunsch mit Rahmen und Teilenummern.",
+    "it": "Generatore di puzzle: pezzi a incastro da un seme, ogni bordo tagliato una sola volta, cornice e numeri dei pezzi a scelta."
+  },
+  "author": "KizamuBeam",
+  "homepage": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/jigsaw",
+  "build": [{ "esbuild": "src/index.ts", "out": "dist/jigsaw.js" }],
+  "plugins": [
+    {
+      "id": "org.kizamubeam.jigsaw",
+      "type": "generator",
+      "api": 1,
+      "version": 1,
+      "kind": "assembly",
+      "runtime": "js",
+      "code": "@dist/jigsaw.js",
+      "icon": "grid",
+      "dialog": { "version": 1 },
+      "preview": { "center": true },
+      "params": [
+        { "key": "width", "type": "length", "min": 30, "max": 1500, "def": 200 },
+        { "key": "height", "type": "length", "min": 30, "max": 1500, "def": 150 },
+        { "key": "cols", "type": "int", "min": 2, "max": 50, "def": 6 },
+        { "key": "rows", "type": "int", "min": 2, "max": 50, "def": 4 },
+        { "key": "seed", "type": "int", "min": 1, "max": 99999, "def": 1 },
+        { "key": "shape", "type": "enum", "options": [["classic", "shape.classic"], ["round", "shape.round"], ["square", "shape.square"]], "def": "classic" },
+        { "key": "tab", "type": "number", "min": 10, "max": 35, "def": 22, "section": "section.tabs" },
+        { "key": "jitter", "type": "number", "min": 0, "max": 100, "def": 50, "section": "section.tabs" },
+        { "key": "corner", "type": "length", "min": 0, "max": 100, "def": 0, "section": "section.edge" },
+        { "key": "frame", "type": "bool", "def": false, "section": "section.edge" },
+        { "key": "frameWidth", "type": "length", "min": 3, "max": 100, "def": 15, "section": "section.edge", "showIf": { "eq": ["frame", true] } },
+        { "key": "numbers", "type": "bool", "def": false, "section": "section.numbers" },
+        { "key": "numberSize", "type": "length", "min": 1.5, "max": 30, "def": 4, "section": "section.numbers", "showIf": { "eq": ["numbers", true] } }
+      ],
+      "texts": {
+        "en": {
+          "name": "Jigsaw puzzle", "desc": "Puzzle with interlocking pieces; every edge is cut once. Change the seed for a new layout.", "keys": "puzzle jigsaw pieces game",
+          "label": "Puzzle {cols} × {rows}", "part.puzzle": "puzzle", "part.frame": "frame",
+          "width": "Width", "height": "Height", "cols": "Columns", "rows": "Rows", "seed": "Seed",
+          "seed.title": "The same seed always gives the same puzzle; another number gives other tabs.",
+          "shape": "Tab shape", "shape.classic": "Classic", "shape.round": "Round", "shape.square": "Square",
+          "section.tabs": "Tabs", "tab": "Tab size (% of piece)", "jitter": "Irregularity (%)",
+          "jitter.title": "How much tabs vary in position and size, and how far the corners of the pieces move.",
+          "section.edge": "Edge", "corner": "Corner radius", "frame": "Frame", "frameWidth": "Frame width",
+          "section.numbers": "Numbers", "numbers": "Engrave piece numbers", "numberSize": "Number height",
+          "pieces-too-small": "The pieces are too small: at least {min} mm. Use fewer columns or rows.",
+          "corner-too-large": "The corner radius is too large for the puzzle.",
+          "corner-cuts-pieces": "The rounded corner cuts deep into the corner pieces.",
+          "numbers-large": "The numbers are large for the pieces and may run into the tabs.",
+          "pieces": "Pieces", "piece-size": "Piece size", "cut-length": "Cut length"
+        },
+        "de": {
+          "name": "Puzzle", "desc": "Puzzle mit ineinandergreifenden Teilen; jede Kante wird nur einmal geschnitten. Ein anderer Startwert gibt ein neues Muster.", "keys": "Puzzle Teile Spiel",
+          "label": "Puzzle {cols} × {rows}", "part.puzzle": "Puzzle", "part.frame": "Rahmen",
+          "width": "Breite", "height": "Höhe", "cols": "Spalten", "rows": "Reihen", "seed": "Startwert",
+          "seed.title": "Derselbe Startwert gibt immer dasselbe Puzzle, eine andere Zahl andere Nasen.",
+          "shape": "Nasenform", "shape.classic": "Klassisch", "shape.round": "Rund", "shape.square": "Eckig",
+          "section.tabs": "Nasen", "tab": "Nasengröße (% des Teils)", "jitter": "Unregelmäßigkeit (%)",
+          "jitter.title": "Wie stark Lage und Größe der Nasen schwanken und wie weit sich die Ecken der Teile verschieben.",
+          "section.edge": "Rand", "corner": "Eckenradius", "frame": "Rahmen", "frameWidth": "Rahmenbreite",
+          "section.numbers": "Nummern", "numbers": "Teilenummern gravieren", "numberSize": "Ziffernhöhe",
+          "pieces-too-small": "Die Teile sind zu klein: mindestens {min} mm. Weniger Spalten oder Reihen wählen.",
+          "corner-too-large": "Der Eckenradius ist zu groß für das Puzzle.",
+          "corner-cuts-pieces": "Die runde Ecke schneidet tief in die Eckteile.",
+          "numbers-large": "Die Nummern sind groß für die Teile und können in die Nasen laufen.",
+          "pieces": "Teile", "piece-size": "Teilgröße", "cut-length": "Schnittlänge"
+        },
+        "it": {
+          "name": "Puzzle", "desc": "Puzzle con pezzi a incastro; ogni bordo viene tagliato una sola volta. Un altro seme dà un nuovo schema.", "keys": "puzzle pezzi gioco",
+          "label": "Puzzle {cols} × {rows}", "part.puzzle": "puzzle", "part.frame": "cornice",
+          "width": "Larghezza", "height": "Altezza", "cols": "Colonne", "rows": "Righe", "seed": "Seme",
+          "seed.title": "Lo stesso seme dà sempre lo stesso puzzle; un altro numero dà altri incastri.",
+          "shape": "Forma dell’incastro", "shape.classic": "Classica", "shape.round": "Rotonda", "shape.square": "Squadrata",
+          "section.tabs": "Incastri", "tab": "Dimensione incastro (% del pezzo)", "jitter": "Irregolarità (%)",
+          "jitter.title": "Quanto variano posizione e dimensione degli incastri e quanto si spostano gli angoli dei pezzi.",
+          "section.edge": "Bordo", "corner": "Raggio degli angoli", "frame": "Cornice", "frameWidth": "Larghezza cornice",
+          "section.numbers": "Numeri", "numbers": "Incidi i numeri dei pezzi", "numberSize": "Altezza delle cifre",
+          "pieces-too-small": "I pezzi sono troppo piccoli: almeno {min} mm. Usa meno colonne o righe.",
+          "corner-too-large": "Il raggio degli angoli è troppo grande per il puzzle.",
+          "corner-cuts-pieces": "L’angolo arrotondato taglia in profondità i pezzi d’angolo.",
+          "numbers-large": "I numeri sono grandi per i pezzi e possono finire negli incastri.",
+          "pieces": "Pezzi", "piece-size": "Dimensione pezzo", "cut-length": "Lunghezza di taglio"
+        }
+      }
+    }
+  ]
+}
