@@ -112,7 +112,7 @@ export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
   } catch (e) {
     errors.push(e instanceof Error ? e.message : String(e));
   }
-  for (const c of codes) if (pluginText(m.texts, 'en', c) === undefined) warnings.push(`no English text for code "${c}"`);
+  for (const c of codes) if (c !== 'plugin-text' && pluginText(m.texts, 'en', c) === undefined) warnings.push(`no English text for code "${c}"`);
   for (const s of m.schema) if (pluginText(m.texts, 'en', s.key) === undefined) warnings.push(`no English label for parameter "${s.key}"`);
   if (pluginText(m.texts, 'en', 'desc') === undefined) warnings.push('no English text "desc" (toolbox tooltip)');
   return { id: m.id, errors, warnings };

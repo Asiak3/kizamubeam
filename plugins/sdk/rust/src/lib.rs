@@ -119,11 +119,16 @@ impl Issue {
     }
 }
 
-/// Answer of `generate`: parts and rows for the info table (`[text code, value]`)
+/// Answer of `generate`: parts, rows for the info table (`[text code, value]`) and optionally the name in the
+/// Objects window. A text is plain (`json!("…")`) or a code with values (`json!({ "code": "label", "values": { … } })`).
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct GenResult {
     pub parts: Vec<Part>,
     pub info: Vec<(String, String)>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<Value>,
+    #[serde(skip_serializing_if = "serde_json::Map::is_empty")]
+    pub labels: serde_json::Map<String, Value>,
 }
 
 impl GenResult {
@@ -136,6 +141,16 @@ impl GenResult {
     }
     pub fn info(mut self, code: &str, value: impl ToString) -> Self {
         self.info.push((code.into(), value.to_string()));
+        self
+    }
+    /// Name in the Objects window for these parameters (instead of the manifest text `label`)
+    pub fn label(mut self, text: impl Into<Value>) -> Self {
+        self.label = Some(text.into());
+        self
+    }
+    /// Name of one part of an assembly in the Objects window
+    pub fn part_label(mut self, key: &str, text: impl Into<Value>) -> Self {
+        self.labels.insert(key.into(), text.into());
         self
     }
 }

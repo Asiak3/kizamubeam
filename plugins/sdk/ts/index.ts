@@ -33,17 +33,26 @@ export interface Part {
   /** Engraving on the part, same coordinates as subs */
   marks?: SubPath[];
 }
+/**
+ * A text for the app: plain (shown as it is, numbers in the user's format), a text key of the manifest with values
+ * for its placeholders (values may be texts again), or a list of texts shown one after the other
+ */
+export type Text = string | { code: string; values?: Record<string, Text | number> } | Text[];
 /** A problem with the parameters: code is a text key of the manifest, values fill its placeholders */
 export interface Issue {
   key?: string;
   level: 'error' | 'warn';
   code: string;
-  values?: Record<string, string | number>;
+  values?: Record<string, Text | number>;
 }
 export interface GenResult {
   parts: Part[];
-  /** Rows of the info table: [text code, value] */
-  info: [string, string][];
+  /** Rows of the info table: [label, value]; a plain label is looked up as a text key first */
+  info: [Text, Text][];
+  /** Name in the Objects window for these parameters (instead of the manifest text "label") */
+  label?: Text;
+  /** Names of the parts of an assembly by part key */
+  labels?: Record<string, Text>;
 }
 export interface Plugin<P extends Params = Params> {
   validate(p: P): Issue[];

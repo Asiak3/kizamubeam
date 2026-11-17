@@ -26,6 +26,14 @@ const dicts = Object.fromEntries(LANGS.filter((l) => l !== 'de').map((l) => [l, 
 export const CORE = {
   gear: { file: 'src/generators/gear', name: 'GEAR', label: { text: 'Zahnrad z={z} m={m}', values: { z: 'teeth', m: 'module' } } },
   box: { file: 'src/generators/box', name: 'BOX' },
+  rack: { file: 'src/generators/rack', name: 'RACK' },
+  pulley: { file: 'src/generators/pulley', name: 'PULLEY' },
+  cam: { file: 'src/generators/cam', name: 'CAM' },
+  gearpair: { file: 'src/generators/gearpair', name: 'GEARPAIR' },
+  drawer: { file: 'src/generators/drawer', name: 'DRAWER' },
+  insert: { file: 'src/generators/insert', name: 'INSERT' },
+  shelf: { file: 'src/generators/shelf', name: 'SHELF' },
+  discsphere: { file: 'src/generators/discsphere', name: 'DISCSPHERE' },
 };
 
 const i18nShim = {
@@ -47,12 +55,29 @@ function codeOf(de) {
 const strip = (s) => s.split('|')[0];
 /** Text in a language: German is the source; other languages from src/locales, falling back to German */
 const tr = (de, lang) => (lang === 'de' ? strip(de) : (dicts[lang][de] ?? strip(de)));
-const unmark = (s) => {
-  if (typeof s !== 'string' || !s.startsWith('\u0001')) return null;
-  const [de, json] = s.slice(1).split('\u0002');
-  return { de, values: json ? JSON.parse(json) : undefined };
-};
-const src = (s) => unmark(s)?.de ?? s;
+const MARK = '\u0001', VALS = '\u0002', END = '\u0003';
+/** A text from the generator (plain German source, or with markers from the i18n shim) in a language */
+function render(s, lang) {
+  if (!s.includes(MARK)) return tr(s, lang);
+  let out = '';
+  let i = 0;
+  while (i < s.length) {
+    const a = s.indexOf(MARK, i);
+    if (a < 0) {
+      out += s.slice(i);
+      break;
+    }
+    out += s.slice(i, a);
+    const e = s.indexOf(END, a);
+    const body = s.slice(a + 1, e < 0 ? s.length : e);
+    const v = body.indexOf(VALS);
+    const de = v < 0 ? body : body.slice(0, v);
+    const vals = v < 0 ? {} : JSON.parse(body.slice(v + 1));
+    out += tr(de, lang).replace(/\{(\w+)\}/g, (all, k) => (k in vals ? (typeof vals[k] === 'string' ? render(vals[k], lang) : String(vals[k])) : all));
+    i = e < 0 ? s.length : e + 1;
+  }
+  return out;
+}
 
 /** All t('…') source texts in the given files (the codes a plugin can report) */
 function sourceTexts(files) {
@@ -91,10 +116,10 @@ export async function corePlugin(id) {
     rmSync(dir, { recursive: true, force: true });
   }
   const texts = Object.fromEntries(LANGS.map((l) => [l, {}]));
-  const put = (key, de) => {
-    for (const l of LANGS) texts[l][key] = tr(de, l);
+  const put = (key, s) => {
+    for (const l of LANGS) texts[l][key] = render(s, l);
   };
-  put('name', src(g.name));
+  put('name', g.name);
   if (g.tile) {
     const tile = g.tile.text((s) => s);
     if (tile.desc) put('desc', tile.desc);
@@ -106,13 +131,13 @@ export async function corePlugin(id) {
   }
   const params = g.schema.map((s) => {
     const p = { key: s.key, type: s.type };
-    if (s.label && s.type !== 'data') put(s.key, src(s.label));
-    if (s.title) put(`${s.key}.title`, src(s.title));
+    if (s.label && s.type !== 'data') put(s.key, s.label);
+    if (s.title) put(`${s.key}.title`, s.title);
     if ('min' in s) Object.assign(p, { min: s.min, max: s.max });
     p.def = s.def;
     if (s.type === 'enum')
       p.options = s.options.map(([v, label]) => {
-        put(`${s.key}.${v}`, src(label));
+        put(`${s.key}.${v}`, label);
         return v;
       });
     for (const k of ['advanced', 'resetOnNew', 'showIf']) if (s[k] !== undefined) p[k] = s[k];
@@ -133,7 +158,7 @@ export async function corePack(ids = Object.keys(CORE)) {
   return {
     format: 'kizamubeam-pack', formatVersion: 2, id: 'org.kizamubeam.core-generators', version: '1.0.0',
     name: { en: 'Built-in generators', de: 'Eingebaute Generatoren', it: 'Generatori integrati' },
-    description: { en: 'Gear and box as plugins, built from the same source as the built-in generators.' },
+    description: { en: 'Built-in generators as plugins, built from the same source.' },
     author: 'KizamuBeam', plugins,
   };
 }

@@ -82,9 +82,13 @@ A missing text falls back to its key. The app checks everything before it regist
 | Function | Input | Answer |
 | --- | --- | --- |
 | `validate` | parameters (object) | list of issues `{ key?, level: "error" \| "warn", code, values? }` |
-| `generate` | parameters (object) | `{ parts, info, poses?, plan? }` |
+| `generate` | parameters (object) | `{ parts, info, label?, labels?, poses?, plan? }` |
 
-A part is `{ key, subs, at, marks? }`; a plugin with `"kind": "part"` returns exactly one, an assembly any number. `subs` uses the same sub-path format as the editor (`{ nodes: [{ x, y, … }], closed }`). `info` is a list of `[code, value]` rows for the dialog. Issue and info codes are translated through the plugin's texts (part of the manifest in the next step), so a plugin never builds user-facing sentences.
+A part is `{ key, subs, at, marks? }`; a plugin with `"kind": "part"` returns exactly one, an assembly any number. `subs` uses the same sub-path format as the editor (`{ nodes: [{ x, y, … }], closed }`). `info` is a list of `[label, value]` rows for the dialog. Issue and info codes are translated through the plugin's texts, so a plugin never builds user-facing sentences.
+
+**Texts in answers.** Info labels and values, issue values, `label` and `labels` are texts: a plain string (shown as it is; decimal numbers and whole numbers from 1000 in the user's number format), `{ code, values? }` (a text key of the manifest, `values` fill its placeholders and may be texts again) or a list of texts shown one after the other. Number values are shown in the user's format when they have decimals. A plain info label is looked up as a text key first. The issue code `plugin-text` shows `values.text` as it is (for messages made of several texts).
+
+**Names in the Objects window.** `label` names the object for these parameters (for example with computed outer dimensions), `labels` names the parts of an assembly by key. Without them, the manifest text `label` with `{param}` placeholders and `part.<key>` are used. The app keeps computed names for the last 2000 parameter sets; a saved part shows the manifest name until its plugin has run once.
 
 A failure is reported as a code, for example `holes-touch`. Codes the app itself uses start with `plugin-`:
 
@@ -100,7 +104,7 @@ A failure is reported as a code, for example `holes-touch`. Codes the app itself
 | `plugin-no-function` | The plugin does not provide the called function |
 | `plugin-bad-output` | The answer breaks the contract (wrong types, NaN, too many parts or nodes, coordinates out of range, duplicate keys) |
 
-Limits (`LIMITS` in `contract.ts`): `validate` 2 s, `generate` 10 s, 512 MB memory, 8 MB code, 32 MB answer, 2000 parts, 500 000 nodes, coordinates within ±100 m.
+Limits (`LIMITS` in `contract.ts`): `validate` 2 s, `generate` 30 s, 512 MB memory, 8 MB code, 32 MB answer, 2000 parts, 500 000 nodes, coordinates within ±100 m.
 
 ## JavaScript
 
@@ -139,7 +143,7 @@ The Rust SDK (below) implements this ABI; the example [`plugins/hole-plate`](../
 Start from a template and change it:
 
 - [`plugins/templates/typescript`](../plugins/templates/typescript): a name tag in TypeScript. `src/index.ts` imports the SDK from [`plugins/sdk/ts`](../plugins/sdk/ts/index.ts): the types (`Params`, `Part`, `SubPath`, `Issue`, `GenResult`), `definePlugin` and shape helpers (`polygon`, `rect`, `circle`, `regular`, `roundedRect`, `mm` for numbers in info rows). It also has `random(seed)` (deterministic random numbers; plugins must give the same result for the same parameters) and a single-stroke font, `strokeText(text, size, { x, y, align, valign, angle })`, for numbers and short labels engraved as open lines (digits, A–Z and a few signs; plugins cannot use the app's fonts). The [jigsaw puzzle](../plugins/jigsaw) is a complete example.
-- [`plugins/templates/rust`](../plugins/templates/rust): the same tag in Rust with the crate [`kzb-plugin`](../plugins/sdk/rust) (`plugins/sdk/rust`). Implement the `Plugin` trait (`validate`, `generate` on `serde_json::Value` parameters) and call `export_plugin!(MyPlugin)`; the macro provides the ABI exports. Builders: `Issue::error("code").on("key").value("max", 5)`, `GenResult::new().part(Part::new("tag", subs).at(x, y)).info("area", …)`, shapes in `kzb_plugin::geom`. Needs `rustup target add wasm32-unknown-unknown`.
+- [`plugins/templates/rust`](../plugins/templates/rust): the same tag in Rust with the crate [`kzb-plugin`](../plugins/sdk/rust) (`plugins/sdk/rust`). Implement the `Plugin` trait (`validate`, `generate` on `serde_json::Value` parameters) and call `export_plugin!(MyPlugin)`; the macro provides the ABI exports. Builders: `Issue::error("code").on("key").value("max", 5)`, `GenResult::new().part(Part::new("tag", subs).at(x, y)).info("area", …).label(json!({ "code": "label" }))`, shapes in `kzb_plugin::geom`. Needs `rustup target add wasm32-unknown-unknown`.
 
 Copy the template folder to `plugins/<your-name>/`, give the pack and the plugin your own ids (reverse domain, for example `io.github.you.coaster`), adjust the parameters and texts in `plugin.json`, then:
 
@@ -169,7 +173,9 @@ The built-in generators move to the plugin system (#205, #327). `npm run plugin:
 - The manifest is generated from the same source: parameters, rules, labels, tooltips and options, plus every `t()` text of the bundled files as a code, translated from `src/locales` into all app languages.
 - The app writes numbers in plugin texts in the number format of the interface (QuickJS has no locale).
 
-So far gear and box are built (`plugins/core/dist/org.kizamubeam.core-generators.kzp`). `npm run test:core-plugins` checks that they give the same dialog, geometry, issues, info and 3D poses as the built-in generators, and reports the time: QuickJS is roughly ten times slower than the built-in code, which is still well below the dialog's limits for these two. The built-in versions stay active until the switch-over: generators whose label needs computed values (box), and callers that need results synchronously (built-in templates, 3D view, design check), need their own solution first.
+- Texts the generator composes (a field label with `t('Rad 1')` inside, an info value made of several texts) keep their parts: markers are closed, the wrapper turns them into lists of codes and plain strings, the build script renders static ones (field labels) into every language. The name in the Objects window comes from the generator's own `label()` through `label` and `labels`.
+
+Built so far (`plugins/core/dist/org.kizamubeam.core-generators.kzp`): gear, box, rack, pulley, cam, gear pair, drawer, insert, shelf and disc sphere. `npm run test:core-plugins` checks that they give the same dialog, geometry, issues, info, names and 3D poses as the built-in generators for the defaults, every option, every switch and every number at its minimum and maximum, and reports the time. QuickJS is about 10 to 20 times slower than the built-in code: most cases take well under a second, nesting many parts takes longer (a gear pair with 400 teeth about 20 s, which is why `generate` may run 30 s). Not yet: fingerbox (`onChange`, `view`), stack (3D model input), ribs and jig. Generators without a thickness parameter (gear pair) compute their 3D poses for 3 mm. The built-in versions stay active until the switch-over: callers that need results synchronously (built-in templates, 3D view, design check) need their own solution first.
 
 ## Tests
 

@@ -20,6 +20,8 @@ const P = await import('../src/packs');
 const { pluginGenerator, PENDING, onPluginResult } = await import('../src/plugins/generator');
 const { initPlugins, pluginGenerators, pluginProblems, testLoadPlugins } = await import('../src/plugins/registry');
 const { inProcess } = await import('../src/plugins/client');
+// Endless loops below should not wait for the full generate limit
+(await import('../src/plugins/contract')).LIMITS.callMs.generate = 3000;
 const G = await import('../src/generators/index');
 
 let failed = 0;
@@ -142,6 +144,37 @@ await test('plugin generator: texts, pending result, cache, issues and labels (J
   assert.equal(two.parts.length, 2);
   assert.equal(two.parts[1].at.x, 22);
   g.dispose();
+});
+
+await test('plugin generator: labels and texts computed by the plugin (codes, values, lists, numbers)', async () => {
+  const code = `globalThis.plugin = {
+    validate: (p) => p.size > 50 ? [{ level: 'warn', code: 'plugin-text', values: { text: ['(', { code: 'side' }, ') ', '1234.5'] } }] : [],
+    generate: (p) => ({
+      parts: [{ key: 'a', subs: [{ closed: true, nodes: [{x:0,y:0},{x:p.size,y:0},{x:0,y:p.size}] }], at: { x: 0, y: 0 } }],
+      info: [[{ code: 'side' }, [{ code: 'big', values: { max: { code: 'side' } } }, ' / 2952 mm / M3000']]],
+      label: { code: 'big', values: { max: p.size } },
+      labels: { a: ['#', { code: 'side' }, ' ', String(p.size / 4)], zzz: 'not a part' },
+    }),
+  };`;
+  const g = pluginGenerator(P.parsePack(jsPack(code)).plugins[0], { id: 'com.example.js', name: 'JS example' });
+  const p = G.normalizeParams(g, { size: 22 });
+  assert.equal(g.label(p), 'Quadrat', 'not computed yet: the manifest text');
+  const r = await G.buildGenAsync(g, p);
+  assert.deepEqual(r.info, [['Seite', 'Zu groß: höchstens Seite mm / 2,952 mm / M3000']]);
+  assert.equal(g.label(p), 'Zu groß: höchstens 22 mm', 'whole numbers as they are, like t()');
+  assert.equal(g.label(p, 'a'), '#Seite 5.5');
+  const w = await G.buildGenAsync(g, G.normalizeParams(g, { size: 60 }));
+  assert.deepEqual(w.issues.map((i) => i.msg), ['(Seite) 1,234.5']);
+  assert.equal(w.parts.length, 1);
+  // Labels outlive the result cache
+  for (let i = 1; i <= 30; i++) await g.prepare(G.normalizeParams(g, { size: i }));
+  assert.equal(g.label(p), 'Zu groß: höchstens 22 mm');
+  // A label must be a text
+  const bad = pluginGenerator(P.parsePack(jsPack(code.replace("label: {", "label: 5, other: {"))).plugins[0], { id: 'com.example.js', name: 'JS example' });
+  const rb = await G.buildGenAsync(bad, p);
+  assert.equal(rb.issues[0].code, 'plugin-bad-output');
+  g.dispose();
+  bad.dispose();
 });
 
 await test('plugin generator: crashes, timeouts and broken output become issues', async () => {

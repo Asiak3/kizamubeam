@@ -14,6 +14,8 @@ const { buildPluginPack } = await import('./plugin-pack.mjs');
 const { parsePack } = await import('../src/packs');
 const { pluginGenerator } = await import('../src/plugins/generator');
 const { runDialog, checkPlugin, ScriptError } = await import('../src/plugins/headless');
+// Endless loops below should not wait for the full generate limit
+(await import('../src/plugins/contract')).LIMITS.callMs.generate = 3000;
 
 let failed = 0;
 async function test(name: string, fn: () => Promise<void> | void) {

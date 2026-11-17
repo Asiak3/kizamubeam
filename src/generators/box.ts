@@ -132,12 +132,41 @@ function panelOutline(P: PanelSpec, th: number, finger: number, clearance: numbe
   const ys = coords([0, b, ...cuts.flatMap((c) => [c.y0, c.y1])].map((v) => Math.min(b, Math.max(0, v))));
   const nx = xs.length - 1,
     ny = ys.length - 1;
-  const solid = (i: number, j: number) => {
-    if (i < 0 || j < 0 || i >= nx || j >= ny) return false;
-    const cx = (xs[i] + xs[i + 1]) / 2,
-      cy = (ys[j] + ys[j + 1]) / 2;
-    return !cuts.some((c) => cx > c.x0 && cx < c.x1 && cy > c.y0 && cy < c.y1);
+  // Cells whose centre lies inside a cut are empty. Marked per cut over its range of cells (binary search on the
+  // sorted centres) instead of testing every cell against every cut: fine fingers give thousands of cuts.
+  const cxs = xs.slice(1).map((x, i) => (xs[i] + x) / 2),
+    cys = ys.slice(1).map((y, j) => (ys[j] + y) / 2);
+  /** First index whose value is greater than v */
+  const above = (vals: number[], v: number) => {
+    let lo = 0,
+      hi = vals.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (vals[m] > v) hi = m;
+      else lo = m + 1;
+    }
+    return lo;
   };
+  /** First index whose value is not less than v */
+  const notBelow = (vals: number[], v: number) => {
+    let lo = 0,
+      hi = vals.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (vals[m] < v) lo = m + 1;
+      else hi = m;
+    }
+    return lo;
+  };
+  const empty = new Uint8Array(nx * ny);
+  for (const c of cuts) {
+    const i0 = above(cxs, c.x0),
+      i1 = notBelow(cxs, c.x1),
+      j0 = above(cys, c.y0),
+      j1 = notBelow(cys, c.y1);
+    for (let i = i0; i < i1; i++) for (let j = j0; j < j1; j++) empty[i * ny + j] = 1;
+  }
+  const solid = (i: number, j: number) => i >= 0 && j >= 0 && i < nx && j < ny && !empty[i * ny + j];
   // Randkanten der Materialzellen im Uhrzeigersinn (y nach unten), Material jeweils rechts der Laufrichtung
   const next = new Map<string, [number, number][]>();
   const key = (i: number, j: number) => `${i},${j}`;

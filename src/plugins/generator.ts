@@ -5,7 +5,7 @@
 // a result (the dialog, formula recomputation) listens to onPluginResult and asks again.
 import type { GenResult, Generator, Issue, Params, ParamSpec } from '../generators/types';
 import type { AsmPoses } from '../generators/pose';
-import { checkGenResult, checkIssues, ContractError, type PluginGenResult, type PluginIssue } from './contract';
+import { checkGenResult, checkIssues, ContractError, type PluginGenResult, type PluginIssue, type PluginText } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
 import { pluginText, type PluginManifest } from './manifest';
@@ -29,6 +29,8 @@ export function onPluginResult(f: (id: string) => void): () => void {
 
 /** Answers kept per plugin (parameter sets); the dialog and the editor rarely need more than the last few */
 const CACHE = 24;
+/** Names computed by the plugin (small, so kept for many more parameter sets) */
+const LABELS = 2000;
 
 type Outcome<T> = { ok: T } | { error: string };
 interface Entry {
@@ -76,21 +78,34 @@ export function appCodeText(code: string, name: string): string | undefined {
  * 1234.5), the built-in generators use toLocaleString. Decimal numbers inside a text („⌀ 12.5 mm“) are converted.
  */
 export function localNumbers(s: string): string {
-  return s.replace(/-?\d+\.\d+/g, (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 6 }));
+  // Decimal numbers, and whole numbers from 1000 (digit grouping); not inside words or codes like „M3000“
+  return s.replace(/(?<![\w.,])-?(?:\d+\.\d+|\d{4,})(?![\w.,]?\w)/g, (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 6 }));
 }
-const localValues = (v?: Record<string, string | number>) =>
-  v && Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'number' ? x.toLocaleString(undefined, { maximumFractionDigits: 6 }) : localNumbers(x)]));
+/** Number values: whole numbers as they are (like t() in the app: „z=1000“), decimals in the user's format */
+const localNumber = (x: number) => (Number.isInteger(x) ? String(x) : x.toLocaleString(undefined, { maximumFractionDigits: 6 }));
 
 export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }): PluginGenerator {
   let proc: PluginProcess | null = null;
   const cache = new Map<string, Entry>();
   const running = new Map<string, Promise<void>>();
+  /** Names computed by the plugin, kept longer than the results (the Objects window lists every part) */
+  const labels = new Map<string, { label?: PluginText; parts?: Record<string, PluginText> }>();
   const text = (key: string, values?: Record<string, string | number>) => pluginText(m.texts, lang, key, values);
   const name = text('name') ?? m.id;
   const keyOf = (p: Params) => JSON.stringify(m.schema.map((s) => p[s.key] ?? null));
   const codeText = (code: string, values?: Record<string, string | number>) =>
     appCodeText(code, name) ?? text(code, values) ?? t('Fehler in der Erweiterung „{name}“: {code}', { name, code });
-  const issue = (i: PluginIssue): Issue => ({ ...(i.key ? { key: i.key } : {}), level: i.level, code: i.code, msg: codeText(i.code, localValues(i.values)) });
+  const values = (v?: Record<string, PluginText | number>) => v && Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'number' ? localNumber(x) : render(x)]));
+  /** A plugin text in the interface language */
+  const render = (x: PluginText): string => (typeof x === 'string' ? localNumbers(x) : Array.isArray(x) ? x.map(render).join('') : codeText(x.code, values(x.values)));
+  /** A plain text that names a code (info labels of older plugins) is shown as that text */
+  const label = (x: PluginText) => (typeof x === 'string' ? (text(x) ?? x) : render(x));
+  const issue = (i: PluginIssue): Issue => ({
+    ...(i.key ? { key: i.key } : {}),
+    level: i.level,
+    code: i.code,
+    msg: i.code === 'plugin-text' && i.values?.text !== undefined && typeof i.values.text !== 'number' ? render(i.values.text) : codeText(i.code, values(i.values)),
+  });
   const errorOf = (e: unknown) => (e instanceof EngineError ? e.code : e instanceof Error && 'code' in e ? String((e as { code: unknown }).code) : 'plugin-crash');
 
   const call = async <T>(fn: 'validate' | 'generate', p: Params, check: (v: unknown) => T): Promise<Outcome<T>> => {
@@ -124,6 +139,12 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
         return r;
       };
       if ('ok' in v && !v.ok.some((i) => i.level === 'error')) entry.generate = await call('generate', input, check);
+      const gen = entry.generate;
+      if (gen && 'ok' in gen && (gen.ok.label !== undefined || gen.ok.labels)) {
+        labels.delete(k);
+        labels.set(k, { label: gen.ok.label, parts: gen.ok.labels });
+        while (labels.size > LABELS) labels.delete(labels.keys().next().value!);
+      }
       remember(k, entry);
     })().finally(() => {
       running.delete(k);
@@ -174,7 +195,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       const r = entry(p)?.generate;
       if (!r) throw new Error(PENDING);
       if ('error' in r) throw new Error(r.error);
-      const out: GenResult = { parts: r.ok.parts.map((x) => ({ ...x })), info: r.ok.info.map(([k, v]) => [text(k) ?? k, localNumbers(v)]) };
+      const out: GenResult = { parts: r.ok.parts.map((x) => ({ ...x })), info: r.ok.info.map(([k, v]) => [label(k), render(v)]) };
       if (r.ok.plan) out.plan = r.ok.plan;
       return out;
     },
@@ -183,6 +204,10 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       return r && 'ok' in r ? (r.ok.poses ?? null) : null;
     },
     label(p, part) {
+      // A name the plugin computed for these parameters, otherwise the manifest text with parameter values
+      const known = labels.get(keyOf(p));
+      const own = known && (part ? known.parts?.[part] : known.label);
+      if (own !== undefined) return render(own);
       const values = Object.fromEntries(
         m.schema.map((s) => [s.key, typeof p[s.key] === 'number' ? (p[s.key] as number).toLocaleString(undefined, { maximumFractionDigits: 3 }) : String(p[s.key])]),
       );
@@ -196,6 +221,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       proc?.dispose();
       proc = null;
       cache.clear();
+      labels.clear();
     },
   };
   return g;

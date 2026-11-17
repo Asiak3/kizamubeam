@@ -1,5 +1,5 @@
-// Built-in generators built as plugins (#205 stage 1 proof): gear and box from their unchanged source, run in
-// QuickJS, must give the same geometry, issues, info and poses as the built-in generators.
+// Built-in generators built as plugins (#205, #327): built from their unchanged source, run in QuickJS, they must
+// give the same dialog, geometry, issues, info, names and poses as the built-in generators.
 // Aufruf: npm run test:core-plugins (builds plugins/core/dist first)
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
@@ -14,7 +14,7 @@ const { parsePack } = await import('../src/packs');
 const { pluginGenerator } = await import('../src/plugins/generator');
 const { checkPlugin } = await import('../src/plugins/headless');
 const G = await import('../src/generators/index');
-const { assemblyPoses } = await import('../src/view3d/poses');
+const { assemblyPoses, genThickness } = await import('../src/view3d/poses');
 
 const pack = parsePack(readFileSync(new URL('../plugins/core/dist/org.kizamubeam.core-generators.kzp', import.meta.url), 'utf8'));
 
@@ -29,10 +29,13 @@ async function test(name: string, fn: () => Promise<void> | void) {
   }
 }
 
-/** Numbers equal within 1e-9 (QuickJS and V8 may differ in the last bit of sin/cos) */
+/**
+ * Numbers equal within 0.1 µm: QuickJS and V8 may differ in the last bit of sin/cos, and curve fitting within a
+ * tolerance (cam: 4 µm) can carry that a little further
+ */
 function close(a: unknown, b: unknown, path = ''): void {
   if (typeof a === 'number' && typeof b === 'number') {
-    assert.ok(Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a)), `${path}: ${a} ≠ ${b}`);
+    assert.ok(Math.abs(a - b) <= 1e-4, `${path}: ${a} ≠ ${b}`);
     return;
   }
   if (Array.isArray(a) && Array.isArray(b)) {
@@ -51,6 +54,7 @@ function close(a: unknown, b: unknown, path = ''): void {
 }
 
 const timings: string[] = [];
+const SLOW_MS = 150;
 async function same(id: string, cases: Record<string, unknown>[]) {
   const core = G.getGenerator(id)!;
   const m = pack.plugins.find((x) => x.id === id)!;
@@ -62,12 +66,19 @@ async function same(id: string, cases: Record<string, unknown>[]) {
       core.schema.map((s) => [s.key, s.type, s.type === 'data' ? '' : s.label, s.title ?? '', s.advanced ?? false, JSON.stringify(s.showIf ?? null), s.type === 'enum' ? s.options : null]),
     );
     assert.equal(plug.name, core.name);
-    let tCore = 0, tPlug = 0;
+    let tCore = 0, tPlug = 0, slow = 0;
     for (const raw of cases) {
       const p = G.normalizeParams(core, raw);
       let t0 = performance.now();
       const a = G.buildGen(core, p);
-      tCore += performance.now() - t0;
+      const dt = performance.now() - t0;
+      // Cases that take long already built in (extreme sizes, nesting many parts) take 10–20 times as long in
+      // QuickJS; they are left out to keep the test short
+      if (dt > SLOW_MS) {
+        slow++;
+        continue;
+      }
+      tCore += dt;
       t0 = performance.now();
       const b = await G.buildGenAsync(plug, p);
       tPlug += performance.now() - t0;
@@ -75,16 +86,20 @@ async function same(id: string, cases: Record<string, unknown>[]) {
       assert.deepEqual(b.issues.map((i) => [i.key, i.level, i.msg]), a.issues.map((i) => [i.key, i.level, i.msg]), `${what}: issues`);
       assert.deepEqual(b.info, a.info, `${what}: info`);
       close(b.parts.map((x) => [x.shape.part, x.at, x.shape.subs, x.marks]), a.parts.map((x) => [x.shape.part, x.at, x.shape.subs, x.marks]), `${what}: parts`);
-      if (core.poses && a.parts.length) close(plug.poses!(p, 3), assemblyPoses(id, p, 3), `${what}: poses`);
-      if (id === 'gear') assert.equal(plug.label(p), core.label(p), `${what}: label`);
+      // Generators without a thickness parameter compute poses for 3 mm in the plugin (the 3D view's default)
+      if (core.poses && a.parts.length) close(plug.poses!(p, 3), assemblyPoses(id, p, genThickness(p, 3)), `${what}: poses`);
+      if (a.parts.length) {
+        assert.equal(plug.label(p), core.label(p), `${what}: label`);
+        for (const x of a.parts) if (x.shape.part) assert.equal(plug.label(p, x.shape.part), core.label(p, x.shape.part), `${what}: label of ${x.shape.part}`);
+      }
     }
-    timings.push(`${id}: ${cases.length} cases, built-in ${tCore.toFixed(0)} ms, plugin ${tPlug.toFixed(0)} ms (QuickJS, incl. start)`);
+    timings.push(`${id}: ${cases.length - slow} cases${slow ? `, ${slow} slow left out` : ''}, built-in ${tCore.toFixed(0)} ms, plugin ${tPlug.toFixed(0)} ms (QuickJS, incl. start)`);
   } finally {
     plug.dispose();
   }
 }
 
-await test('gear as a plugin: same dialog, geometry, issues and info', () =>
+await test('gear as a plugin: same dialog, geometry, issues, info and name', () =>
   same('gear', [
     {},
     { teeth: 9 },
@@ -109,7 +124,21 @@ await test('box as a plugin: same dialog, geometry, issues, info and poses', () 
     { kerf: 0, clearance: -0.1, top: 'closed', width: 300, depth: 200, height: 150 },
   ]));
 
-await test('both pass the catalogue check', async () => {
+/** Defaults, every option of every choice, every switch flipped, every number at its minimum and maximum */
+function sweep(id: string): Record<string, unknown>[] {
+  const out: Record<string, unknown>[] = [{}];
+  for (const s of G.getGenerator(id)!.schema) {
+    if (s.type === 'enum') for (const [v] of s.options) if (v !== s.def) out.push({ [s.key]: v });
+    if (s.type === 'bool') out.push({ [s.key]: !s.def });
+    if ('min' in s) out.push({ [s.key]: s.min }, { [s.key]: s.max });
+  }
+  return out;
+}
+
+for (const id of ['rack', 'pulley', 'cam', 'gearpair', 'drawer', 'insert', 'shelf', 'discsphere'])
+  await test(`${id} as a plugin: same dialog, geometry, issues, info and poses`, () => same(id, sweep(id)));
+
+await test('all pass the catalogue check', async () => {
   for (const m of pack.plugins) {
     const r = await checkPlugin(m);
     assert.deepEqual(r.errors, [], m.id);

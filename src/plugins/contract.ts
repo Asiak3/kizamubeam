@@ -1,8 +1,8 @@
 // Plugin contract (issue #205, stage 1): what a plugin may return, checked before anything reaches the editor.
-// Plugins exchange JSON only. Calls: validate(params) → issues, generate(params) → parts, info, poses, plan.
+// Plugins exchange JSON only. Calls: validate(params) → issues, generate(params) → parts, info, labels, poses, plan.
 // No DOM, no Editor, so the same checks run in the Worker, in the app and in Node tests.
 import type { Node, Pt, SubPath } from '../model';
-import type { Issue, Params, PlanSheet } from '../generators/types';
+import type { Params, PlanSheet } from '../generators/types';
 import type { AsmPoses, Pose, V3 } from '../generators/pose';
 
 /** Version of the call protocol; a plugin built for a newer one is refused with an update hint */
@@ -13,8 +13,8 @@ export type PluginFn = 'validate' | 'generate';
 
 /** Limits for one plugin (#205: time, memory, output size) */
 export const LIMITS = {
-  /** Time per call in ms; the Worker is terminated after it */
-  callMs: { validate: 2000, generate: 10000 } as Record<PluginFn, number>,
+  /** Time per call in ms; the Worker is terminated after it. generate runs in a Worker (the editor stays usable), and nesting many parts in QuickJS takes a while (a 400-tooth gear pair: about 20 s) */
+  callMs: { validate: 2000, generate: 30000 } as Record<PluginFn, number>,
   /** Memory of the JavaScript engine or the WebAssembly instance */
   memoryBytes: 512 * 1024 * 1024,
   /** Size of the plugin code */
@@ -30,12 +30,18 @@ export const LIMITS = {
   range: 100_000,
 };
 
-/** Issue as a plugin reports it: a code (translated through the manifest texts) and plain values */
+/**
+ * A text from a plugin: plain (shown as it is, numbers in the user's format), a text code of the manifest with
+ * values for its placeholders (values may be texts again), or a list of texts shown one after the other.
+ */
+export type PluginText = string | { code: string; values?: Record<string, PluginText | number> } | PluginText[];
+
+/** Issue as a plugin reports it: a code (translated through the manifest texts) and values */
 export interface PluginIssue {
   key?: string;
   level: 'error' | 'warn';
   code: string;
-  values?: Record<string, string | number>;
+  values?: Record<string, PluginText | number>;
 }
 
 export interface PluginPart {
@@ -47,8 +53,12 @@ export interface PluginPart {
 
 export interface PluginGenResult {
   parts: PluginPart[];
-  /** Rows for the dialog: [text code, value] */
-  info: [string, string][];
+  /** Rows for the dialog: [label, value]; a plain label is looked up as a text code first */
+  info: [PluginText, PluginText][];
+  /** Name in the Objects window for these parameters (instead of the manifest text "label") */
+  label?: PluginText;
+  /** Names of the parts of an assembly by part key */
+  labels?: Record<string, PluginText>;
   /** Position of every part in space (3D view, assembly check) */
   poses?: AsmPoses;
   plan?: PlanSheet;
@@ -98,10 +108,21 @@ export function checkIssues(v: unknown): PluginIssue[] {
   });
 }
 
-function checkValues(v: unknown): Record<string, string | number> {
+function checkValues(v: unknown, depth = 0): Record<string, PluginText | number> {
   if (!isObj(v)) return fail('values');
-  const out: Record<string, string | number> = {};
-  for (const [k, x] of Object.entries(v).slice(0, 20)) out[str(k, 'value name', 40)] = typeof x === 'number' && Number.isFinite(x) ? x : str(x, 'value', LIMITS.text);
+  const out: Record<string, PluginText | number> = {};
+  for (const [k, x] of Object.entries(v).slice(0, 20)) out[str(k, 'value name', 40)] = typeof x === 'number' && Number.isFinite(x) ? x : checkText(x, depth + 1);
+  return out;
+}
+
+/** Check a plugin text: plain, { code, values } or a list, at most 4 levels deep and 40 list entries */
+export function checkText(v: unknown, depth = 0): PluginText {
+  if (depth > 4) return fail('text too deep');
+  if (typeof v === 'string') return str(v, 'text');
+  if (Array.isArray(v)) return v.length <= 40 ? v.map((x) => checkText(x, depth + 1)) : fail('text list');
+  if (!isObj(v)) return fail('text');
+  const out: { code: string; values?: Record<string, PluginText | number> } = { code: str(v.code, 'text code', 80) };
+  if (v.values !== undefined) out.values = checkValues(v.values, depth);
   return out;
 }
 
@@ -125,8 +146,14 @@ export function checkGenResult(v: unknown): PluginGenResult {
     if (p.marks !== undefined) part.marks = subs(p.marks, 'part marks', count);
     return part;
   });
-  const info = v.info === undefined ? [] : Array.isArray(v.info) && v.info.length <= LIMITS.info ? v.info.map((r): [string, string] => (Array.isArray(r) && r.length === 2 ? [str(r[0], 'info'), str(r[1], 'info')] : fail('info'))) : fail('info');
+  const info = v.info === undefined ? [] : Array.isArray(v.info) && v.info.length <= LIMITS.info ? v.info.map((r): [PluginText, PluginText] => (Array.isArray(r) && r.length === 2 ? [checkText(r[0]), checkText(r[1])] : fail('info'))) : fail('info');
   const out: PluginGenResult = { parts, info };
+  if (v.label !== undefined) out.label = checkText(v.label);
+  if (v.labels !== undefined) {
+    if (!isObj(v.labels)) fail('labels');
+    out.labels = {};
+    for (const [k, x] of Object.entries(v.labels as Record<string, unknown>)) if (keys.has(k)) out.labels[k] = checkText(x);
+  }
   if (v.poses !== undefined) {
     if (!isObj(v.poses) || !isObj(v.poses.poses)) fail('poses');
     const pv = v.poses as { poses: Record<string, unknown>; spin?: unknown };
@@ -151,10 +178,6 @@ export function checkGenResult(v: unknown): PluginGenResult {
   return out;
 }
 
-/** Turn plugin issues into app issues, with texts from the manifest (fallback: the code) */
-export function toIssues(list: PluginIssue[], text: (code: string, values?: Record<string, string | number>) => string): Issue[] {
-  return list.map((i) => ({ ...(i.key ? { key: i.key } : {}), level: i.level, code: i.code, msg: text(i.code, i.values) }));
-}
 
 /** Parameters handed to a plugin: plain JSON copy */
 export const callInput = (p: Params): Params => JSON.parse(JSON.stringify(p));
