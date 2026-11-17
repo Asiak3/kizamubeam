@@ -3,7 +3,7 @@
 // Damit lässt er sich testen, über MCP aufrufen und später auch als Community-Generator laden.
 import type { Pt, SubPath } from '../model';
 import type { AsmPoses } from './pose';
-import type { GenHost, GenInputs, GenPanel, GenSelected } from './host';
+import type { GenInputs, GenSelected } from './host';
 
 export type ParamValue = number | string | boolean;
 export type Params = Record<string, ParamValue>;
@@ -128,7 +128,8 @@ export interface GenTile {
 export type GenColumn = { key: string; label: string; title?: string } & (
   /** placeholder: shown in an empty field, {n} = row number */
   | { type: 'text'; max?: number; placeholder?: string }
-  | { type: 'int' | 'number' | 'length'; min: number; max: number }
+  /** placeholder: shown instead of 0 (e.g. „auto“ where 0 means automatic) */
+  | { type: 'int' | 'number' | 'length'; min: number; max: number; placeholder?: string }
   | { type: 'enum'; options: [string | number, string][] }
 );
 
@@ -149,6 +150,10 @@ export interface GenList {
   remove?: boolean;
   /** Tooltip of the remove button */
   removeTitle?: string;
+  /** Rows can be selected by clicking them (the generator sees the selected row in its surface and actions) */
+  select?: boolean;
+  /** Buttons on every row; a click calls onEvent with the action id and the row number */
+  rowActions?: { id: string; label: string; title?: string }[];
 }
 
 /**
@@ -165,6 +170,8 @@ export interface GenAction {
   inputs?: GenActionInput[];
   /** A number parameter shown next to the button instead of among the fields (e.g. the real width of an image) */
   field?: string;
+  /** Show the button only while this condition holds */
+  showIf?: Rule;
 }
 
 /** An RGBA image, at most 1200 pixels on its longer side */
@@ -177,6 +184,10 @@ export interface GenImage {
 /** Data an action hands to Generator.onEvent */
 export interface GenEvent {
   action: string;
+  /** Row of the list whose row action was clicked */
+  row?: number;
+  /** The surface as it is now (dialogs with a surface) */
+  surface?: GenSurfaceState;
   inputs: {
     selection?: GenSelected[];
     /** The picked image file and its name without extension */
@@ -186,8 +197,97 @@ export interface GenEvent {
   };
 }
 
-/** Answer of onEvent: parameters to change, and a short message for the dialog */
-export interface GenEventResult {
+/** Answer of onEvent: parameters to change, and a short message for the dialog; surface changes as in onSurface */
+export interface GenEventResult extends GenSurfaceChange {
+  patch?: Params;
+  message?: string;
+}
+
+/**
+ * A drawing surface in the dialog (#335 stage 4). The generator describes what to draw as a list of shapes
+ * (draw) and answers pointer events (onSurface); the app does the drawing, hit testing and scaling. Coordinates
+ * are mm in the view (y down).
+ */
+export interface GenSurface {
+  /** Tabs above the surface (e.g. front, side, top); the chosen id goes to draw and onSurface */
+  views: { id: string; label: string }[];
+  /** Height in CSS pixels; the width follows the dialog */
+  height?: number;
+  /** Help line under the surface */
+  help?: string;
+}
+
+export type GenStyle = 'normal' | 'muted' | 'accent' | 'warn';
+
+/** A shape on the surface. Handles and lines with an id can be hit by the pointer (topmost first, handles before lines) */
+export type GenItem =
+  | { type: 'line'; pts: [number, number][]; closed?: boolean; style?: GenStyle; width?: number; dash?: boolean; alpha?: number; id?: string }
+  | { type: 'handle'; x: number; y: number; id: string; style?: GenStyle; size?: number }
+  | { type: 'text'; x: number; y: number; text: string; style?: GenStyle };
+
+/**
+ * A layer that rarely changes (the silhouette of a model, the outlines of the parts): the app keeps it as a
+ * picture by key, and asks without it next time (GenDrawRequest.have), so the generator leaves out its content
+ */
+export interface GenLayer {
+  key: string;
+  /** Filled triangles as a flat list x0, y0, x1, y1, x2, y2, … */
+  tris?: number[];
+  items?: GenItem[];
+  /** Opacity of the triangles */
+  alpha?: number;
+}
+
+export interface GenDrawing {
+  /** Area of the view (mm) that is fitted into the surface */
+  frame: { x0: number; y0: number; x1: number; y1: number };
+  layers?: GenLayer[];
+  items: GenItem[];
+  /** Pointer moves are sent even without a pressed button (e.g. while a line is being drawn) */
+  track?: boolean;
+}
+
+/** What the surface shows now: the view, free data of the generator (kept by the app) and the selected rows */
+export interface GenSurfaceState {
+  view: string;
+  /** JSON the generator keeps between events (e.g. a line being drawn); null at first */
+  state: unknown;
+  /** Selected row by list parameter (-1 = none) */
+  selected: Record<string, number>;
+}
+
+export interface GenDrawRequest extends GenSurfaceState {
+  /** Keys of the layers the app already has */
+  have: string[];
+}
+
+/** A pointer or key event on the surface, in mm of the view */
+export interface GenPointer {
+  type: 'down' | 'move' | 'up' | 'dblclick' | 'context' | 'key' | 'select';
+  x: number;
+  y: number;
+  /** Id of the handle or line under the pointer (down, dblclick, context) */
+  hit?: string;
+  /** Where the button was pressed (move with the button held, up) */
+  from?: { x: number; y: number };
+  /** A move with the button held */
+  drag?: boolean;
+  /** key: Enter, Escape, Delete, Backspace */
+  key?: string;
+  /** select: the list and row that was clicked */
+  list?: string;
+  row?: number;
+}
+
+/** Changes of the surface an answer may ask for */
+export interface GenSurfaceChange {
+  /** New free data (null clears it) */
+  state?: unknown;
+  view?: string;
+  select?: Record<string, number>;
+}
+
+export interface GenSurfaceResult extends GenSurfaceChange {
   patch?: Params;
   message?: string;
 }
@@ -215,6 +315,8 @@ export interface GenView {
   autoText?: Record<string, string>;
   /** A short text per row of a list (e.g. its size), by list parameter */
   rows?: Record<string, string[]>;
+  /** Suggestion per row for its empty first text cell (shown as its placeholder), by list parameter */
+  rowAuto?: Record<string, string[]>;
 }
 
 /** Answer of Generator.onChange: parameters to change as well, or a question first */
@@ -275,6 +377,10 @@ export interface Generator {
   actions?: GenAction[];
   /** An action was clicked; plugins answer asynchronously */
   onEvent?(ev: GenEvent, p: Params): GenEventResult | void | Promise<GenEventResult | void>;
-  /** Extra area in the dialog; it reads the app only through the host and writes only parameters */
-  panel?(p: Params, set: (patch: Params) => void, host?: GenHost): GenPanel;
+  /** A drawing surface in the dialog (#335 stage 4) */
+  surface?: GenSurface;
+  /** What the surface shows for these parameters */
+  draw?(req: GenDrawRequest, p: Params): GenDrawing | Promise<GenDrawing>;
+  /** A pointer or key event on the surface, or a row selected in a list */
+  onSurface?(ev: GenPointer, s: GenSurfaceState, p: Params): GenSurfaceResult | void | Promise<GenSurfaceResult | void>;
 }

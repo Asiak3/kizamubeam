@@ -2637,13 +2637,11 @@
   "Einfache Achse": "Eje simple",
   "Abschnitte von Hand festlegen": "Definir secciones a mano",
   "Rumpf, Beine und Schwanz im Modell suchen und als Abschnitte anlegen; danach von Hand korrigieren": "Busca en el modelo el tronco, las patas y la cola y los crea como secciones; después corrige a mano",
-  "Modell wird untersucht …": "Analizando el modelo …",
   "Vorschlag: {found}. Achsen prüfen und bei Bedarf ziehen.": "Propuesta: {found}. Revisa los ejes y arrástralos si hace falta.",
   "Vorschlagen": "Proponer",
   "Einfache Achse über das ganze Modell. Für Kopf, Beine oder Schwanz eigene Abschnitte zeichnen.": "Un eje simple a lo largo de todo el modelo. Para cabeza, patas o cola, dibuja secciones propias.",
   "Ebene bei": "Plano en",
   "Verlängern": "Alargar",
-  "Lage der Ebene quer zur Ansicht {view} (mm)": "Posición del plano perpendicular a la vista {view} (mm)",
   "Ebene in die Mitte des Materials an der Achse legen": "Colocar el plano en el centro del material, en el eje",
   "Mitte": "Centro",
   "Rippenabstand in diesem Abschnitt; leer = wie oben": "Separación de costillas en esta sección; vacío = como arriba",
@@ -4912,5 +4910,9 @@
   "ungültige Angabe „inputs“": "«inputs» no válido",
   "{where}: unbekannte Ressource „{kind}“": "{where}: recurso desconocido «{kind}»",
   "{where}: „name“ muss ein Text-Parameter sein": "{where}: «name» debe ser un parámetro de texto",
-  "{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein": "{where}: «param» debe ser un parámetro data con «resource»: «model3d»"
+  "{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein": "{where}: «param» debe ser un parámetro data con «resource»: «model3d»",
+  "Lage der Ebene quer zur Ansicht (mm)": "Posición del plano transversal a la vista (mm)",
+  "wie oben": "como arriba",
+  "{ribs} von {count} Rippen": "{ribs} de {count} costillas",
+  "{where}: braucht „dialog“ Version 3": "{where}: necesita «dialog» versión 3"
 }

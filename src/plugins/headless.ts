@@ -3,7 +3,7 @@
 // would show after each step: parameters, visible fields, issues, info rows and the parts. Plugin authors use it
 // in their tests; `npm run plugin:check` uses it to check a pack before it goes into the catalogue.
 import type { Pt } from '../model';
-import type { GenEvent, GenImage, Params } from '../generators/types';
+import type { GenEvent, GenImage, GenPointer, GenSurfaceResult, GenSurfaceState, Params } from '../generators/types';
 import { fromBase64 } from './contract';
 import type { GenSelected } from '../generators/host';
 import { buildGen, checkInput, defaultParams, fieldActive, normalizeParams } from '../generators/index';
@@ -28,8 +28,10 @@ export interface DialogState {
   ask?: { question: string; options: string[] };
   /** Text per row of each list (view) */
   rows: Record<string, string[]>;
-  /** Message of an action in this step (onEvent) */
+  /** Message of an action or a surface event in this step (onEvent, onSurface) */
   message?: string;
+  /** The drawing surface after the step: its view, state, selected rows and what draw() returned (counted) */
+  surface?: GenSurfaceState & { items: number; layers: number; track: boolean };
 }
 
 /** Thrown when a script step does not fit the schema (unknown key, wrong type, out of range) */
@@ -42,7 +44,8 @@ export class ScriptError extends Error {}
  * field gets its previous value back. `$action` clicks an action button after the fields, with `$selection` (a list
  * of { name, polys }) as the selection it hands over. `$model` opens a 3D model like the user importing one:
  * `{ name, data }` with data in the app's `kzm1:` format (see encodeMesh); it fills the parameters the manifest's
- * `inputs` name.
+ * `inputs` name. `$row` with `$action` clicks a button of that list row. `$view` switches the drawing surface to a
+ * view, `$surface` sends it a list of pointer events ({ type, x, y, hit?, from?, drag?, key? }, mm in the view).
  */
 export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = []): Promise<DialogState[]> {
   const models = new Map<string, string>();
@@ -50,11 +53,24 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
   try {
     const out: DialogState[] = [];
     let p = defaultParams(g);
+    const surf: GenSurfaceState = { view: g.surface?.views[0].id ?? '', state: null, selected: {} };
+    /** Apply an answer of onEvent or onSurface like the dialog: parameters checked like user input, then the surface */
+    const apply = (r: GenSurfaceResult | void) => {
+      if (!r) return;
+      if (r.patch) {
+        const keys = Object.keys(r.patch).filter((k) => g.schema.some((s) => s.key === k));
+        const np = normalizeParams(g, { ...p, ...r.patch }, p);
+        for (const k of keys) p[k] = np[k];
+      }
+      if (r.state !== undefined) surf.state = r.state;
+      if (r.view !== undefined && g.surface?.views.some((v) => v.id === r.view)) surf.view = r.view;
+      if (r.select) Object.assign(surf.selected, r.select);
+    };
     for (let i = 0; i <= steps.length; i++) {
       let ask: DialogState['ask'];
       let message: string | undefined;
       if (i > 0) {
-        const { $answer, $action, $selection, $image, $camera, $model, ...step } = steps[i - 1];
+        const { $answer, $action, $row, $selection, $image, $camera, $model, $view, $surface, ...step } = steps[i - 1];
         if ($model !== undefined) {
           const md = $model as { name?: unknown; data?: unknown };
           if (typeof md.data !== 'string' || !md.data.startsWith('kzm1:')) throw new ScriptError(`step ${i}: $model needs data in the kzm1: format`);
@@ -87,9 +103,15 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
           const np = normalizeParams(g, { ...p, ...patch }, p);
           for (const k of keys) p[k] = np[k];
         }
+        if ($view !== undefined) {
+          if (!g.surface?.views.some((v) => v.id === $view)) throw new ScriptError(`step ${i}: no view "${String($view)}"`);
+          surf.view = String($view);
+        }
+        if ($row !== undefined && !(Number.isInteger($row) && ($row as number) >= 0)) throw new ScriptError(`step ${i}: $row must be a row number`);
         if ($action !== undefined) {
-          const a = g.actions?.find((x) => x.id === $action);
-          if (!a) throw new ScriptError(`step ${i}: no action "${String($action)}"`);
+          const rowAction = $row !== undefined ? g.lists?.flatMap((l) => l.rowActions ?? []).find((x) => x.id === $action) : undefined;
+          const a = $row !== undefined ? rowAction && { id: rowAction.id, label: rowAction.label } : g.actions?.find((x) => x.id === $action);
+          if (!a) throw new ScriptError(`step ${i}: no ${$row !== undefined ? 'row ' : ''}action "${String($action)}"`);
           if ($selection !== undefined && !Array.isArray($selection)) throw new ScriptError(`step ${i}: $selection must be a list`);
           const inputs: GenEvent['inputs'] = {};
           if (a.inputs?.includes('selection')) inputs.selection = ($selection ?? []) as GenSelected[];
@@ -99,17 +121,25 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
             if (!c.bed || !(c.bed.w > 0 && c.bed.h > 0)) throw new ScriptError(`step ${i}: $camera needs bed: { w, h }`);
             inputs.camera = { ...scriptImage($camera, i), bed: { w: c.bed.w, h: c.bed.h }, ...(c.empty ? { empty: scriptImage(c.empty, i) } : {}) };
           }
-          const r = await g.onEvent!({ action: a.id, inputs }, p);
+          const ev: GenEvent = { action: a.id, inputs, ...($row !== undefined ? { row: $row as number } : {}), ...(g.surface ? { surface: { ...surf, selected: { ...surf.selected } } } : {}) };
+          const r = await g.onEvent!(ev, p);
           if (r?.message !== undefined) message = r.message;
-          if (r?.patch) {
-            const keys = Object.keys(r.patch).filter((k) => g.schema.some((s) => s.key === k));
-            const np = normalizeParams(g, { ...p, ...r.patch }, p);
-            for (const k of keys) p[k] = np[k];
+          apply(r);
+        }
+        if ($surface !== undefined) {
+          if (!g.onSurface) throw new ScriptError(`step ${i}: the plugin has no drawing surface`);
+          const events = Array.isArray($surface) ? $surface : [$surface];
+          for (const ev of events as GenPointer[]) {
+            if (!ev || typeof ev.type !== 'string' || !Number.isFinite(ev.x ?? 0) || !Number.isFinite(ev.y ?? 0)) throw new ScriptError(`step ${i}: a $surface event needs type, x and y`);
+            const r = await g.onSurface(ev, { ...surf, selected: { ...surf.selected } }, p);
+            if (r?.message !== undefined) message = r.message;
+            apply(r);
           }
         }
       }
       await g.prepare(p);
       const r = buildGen(g, p);
+      const drawn = g.draw ? await g.draw({ ...surf, selected: { ...surf.selected }, have: [] }, p) : null;
       const parts = r.parts.map((x, k) => {
         const pts = x.shape.subs.flatMap((s) => s.nodes);
         const xs = pts.map((q) => q.x);
@@ -133,6 +163,7 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
         rows: g.view?.(p).rows ?? {},
         ...(ask ? { ask } : {}),
         ...(message !== undefined ? { message } : {}),
+        ...(drawn ? { surface: { ...surf, selected: { ...surf.selected }, items: drawn.items.length, layers: drawn.layers?.length ?? 0, track: !!drawn.track } } : {}),
       });
     }
     return out;
@@ -178,7 +209,7 @@ export interface CheckReport {
 /**
  * Check a plugin like the catalogue does: the default parameters must give parts without errors (a dialog that
  * starts empty is first filled by its selection action with a sample selection), every enum option
- * and both values of every switch must run without a crash, two runs must give the same geometry, and the issue codes
+ * and both values of every switch must run without a crash, every view of a drawing surface must draw, two runs must give the same geometry, and the issue codes
  * the plugin reports should have an English text.
  */
 export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
@@ -216,6 +247,8 @@ export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
       if (s.type === 'enum') for (const [v] of s.options) if (v !== s.def) steps.push({ [s.key]: v });
       if (s.type === 'bool') steps.push({ [s.key]: !s.def });
     }
+    // Every view of the drawing surface once (other than the first, which every run draws)
+    for (const v of m.surface?.views.slice(1) ?? []) steps.push({ $view: v.id });
     for (const step of steps) note(await runDialog(m, [...start, step]), JSON.stringify(step));
   } catch (e) {
     errors.push(e instanceof Error ? e.message : String(e));

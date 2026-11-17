@@ -37,6 +37,7 @@ export const CORE = {
   fingerbox: { file: 'src/generators/fingerbox', name: 'FINGERBOX' },
   // Print-and-cut marks pull in geom (with fonts); the jig never uses its boundsOf
   stack: { file: 'src/generators/stack', name: 'STACK' },
+  ribs: { file: 'src/generators/ribs', name: 'RIBS' },
   jig: { file: 'src/generators/jig', name: 'JIG', stub: { geom: 'export const boundsOf = () => { throw new Error("not in plugins"); };' } },
 };
 
@@ -173,13 +174,20 @@ export async function corePlugin(id) {
     if (l.shape) out.shape = l.shape;
     if (l.remove) out.remove = true;
     if (l.removeTitle) (put(`${k}.remove`, l.removeTitle), (out.removeTitle = `${k}.remove`));
+    if (l.select) out.select = true;
+    if (l.rowActions)
+      out.rowActions = l.rowActions.map((a) => {
+        const ak = `${k}.action.${a.id}`;
+        put(ak, a.label);
+        return { id: a.id, label: ak, ...(a.title ? (put(`${ak}.title`, a.title), { title: `${ak}.title` }) : {}) };
+      });
     out.columns = l.columns.map((c) => {
       const ck = `${k}.${c.key}`;
       put(ck, c.label);
       const col = { key: c.key, type: c.type, label: ck };
       if (c.title) (put(`${ck}.title`, c.title), (col.title = `${ck}.title`));
       if (c.type === 'text' && c.max) col.max = c.max;
-      if (c.type === 'text' && c.placeholder) (put(`${ck}.placeholder`, c.placeholder), (col.placeholder = `${ck}.placeholder`));
+      if (c.type !== 'enum' && c.placeholder) (put(`${ck}.placeholder`, c.placeholder), (col.placeholder = `${ck}.placeholder`));
       if ('min' in c) Object.assign(col, { min: c.min, max: c.max });
       if (c.type === 'enum') col.options = c.options.map(([v, label], i) => (put(`${ck}.${i}`, label), [v, `${ck}.${i}`]));
       return col;
@@ -193,8 +201,17 @@ export async function corePlugin(id) {
     if (a.title) (put(`${k}.title`, a.title), (out.title = `${k}.title`));
     if (a.inputs) out.inputs = a.inputs;
     if (a.field) out.field = a.field;
+    if (a.showIf) out.showIf = a.showIf;
     return out;
   });
+  // Drawing surface (dialog schema 3): view labels and help under fixed keys
+  let surface;
+  if (g.surface) {
+    surface = { views: g.surface.views.map((v) => (put(`surface.${v.id}`, v.label), { id: v.id, label: `surface.${v.id}` })) };
+    if (g.surface.height) surface.height = g.surface.height;
+    if (g.surface.help) (put('surface.help', g.surface.help), (surface.help = 'surface.help'));
+  }
+  const v3 = !!surface || !!actions?.some((a) => a.showIf) || !!lists?.some((l) => l.select || l.rowActions || l.columns.some((c) => c.type !== 'text' && c.type !== 'enum' && c.placeholder));
   // Opened with a 3D model: which parameters fromInputs fills with its id and file name
   let inputs;
   if (g.inputs?.some((x) => x.kind === 'model3d') && g.fromInputs) {
@@ -205,7 +222,8 @@ export async function corePlugin(id) {
   const sha256 = createHash('sha256').update(code).digest('hex');
   return {
     id: g.id, type: 'generator', api: 1, version: g.version, kind: g.kind, runtime: 'js', code, sha256,
-    icon: g.icon, dialog: lists || actions ? { version: 2, ...(lists ? { lists } : {}), ...(actions ? { actions } : {}) } : { version: 1 },
+    icon: g.icon,
+    dialog: lists || actions || surface ? { version: v3 ? 3 : 2, ...(lists ? { lists } : {}), ...(actions ? { actions } : {}), ...(surface ? { surface } : {}) } : { version: 1 },
     ...(g.preview?.center ? { preview: { center: true } } : {}), ...(inputs ? { inputs } : {}), params, texts,
   };
 }

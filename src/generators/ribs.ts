@@ -20,7 +20,7 @@ import type { Pt, SubPath } from '../model';
 import { t, tn } from '../i18n';
 import { fitPolyline } from '../fit';
 import { arrangeParts } from './build';
-import type { Generator, GenPart, Issue, Params, PlanSheet, Rule } from './types';
+import type { GenAction, Generator, GenList, GenPart, Issue, Params, PlanSheet, Rule } from './types';
 import { getMesh } from '../model3d/store';
 import type { Mesh } from '../model3d/mesh';
 import {
@@ -28,7 +28,7 @@ import {
   regionIslands, sliceAt, sliceRegion, subtractRegions, unionRegions, V3,
 } from '../model3d/slice';
 import { numberStrokes, numberWidth, placeNumber, worldOf } from './stack';
-import { ribsPanel } from '../model3d/ribsPanel';
+import { ribsDraw, ribsEvent, ribsPointer, ribsSurface } from './ribsSurface';
 
 export interface RibsParams {
   model: string;
@@ -63,7 +63,11 @@ export const VIEWS: Record<View, { e1: V3; e2: V3; n: V3 }> = {
 
 /** Ein Abschnitt, wie er im Parameter „sections“ (JSON) steht; Maße in mm im skalierten Modell */
 export interface Section {
+  /** Name the user gave; empty = the name of its role, otherwise „Section n“ (sectionName) */
   name: string;
+  /** What the suggestion found it to be (body, tail, end n, leg n): names in every language without storing one */
+  role?: 'body' | 'tail' | 'end' | 'leg';
+  n?: number;
   view: View;
   /** Achse in der Ansicht (e1, e2) */
   pts: [number, number][];
@@ -95,6 +99,16 @@ const lin = (u: V3, x: number, v: V3, y: number, w: V3, z: number): V3 => add(ad
 /** Richtung des Rückgrats; fällt sie mit der Achse zusammen, nimmt es „oben“ (bei senkrechter Achse „vorne“) */
 export const spineDirOf = (axis: string, dir: string) => (dir !== axis ? dir : axis === 'z' ? 'y' : 'z');
 
+/** Name of a section as shown: its own, that of its role, or „Section n“ (i = its place in the list) */
+export function sectionName(s: Section, i: number): string {
+  if (s.name) return s.name;
+  if (s.role === 'body') return t('Rumpf');
+  if (s.role === 'tail') return t('Schwanz');
+  if (s.role === 'end') return t('Ende {n}', { n: s.n ?? 1 });
+  if (s.role === 'leg') return t('Bein {n}', { n: s.n ?? 1 });
+  return t('Abschnitt {n}', { n: i + 1 });
+}
+
 /** Abschnitte aus dem Parameter lesen (fehlerhafte Einträge fallen weg); null bei kaputtem JSON */
 export function parseSections(s: string): Section[] | null {
   if (!s) return [];
@@ -104,8 +118,9 @@ export function parseSections(s: string): Section[] | null {
     const num = (v: unknown, d: number) => (typeof v === 'number' && isFinite(v) ? v : d);
     return raw
       .filter((x) => x && Array.isArray(x.pts))
-      .map((x, i) => ({
-        name: typeof x.name === 'string' && x.name ? x.name : t('Abschnitt {n}', { n: i + 1 }),
+      .map((x) => ({
+        name: typeof x.name === 'string' ? x.name : '',
+        ...(['body', 'tail', 'end', 'leg'].includes(x.role) ? { role: x.role, ...(Number.isInteger(x.n) && x.n > 0 ? { n: x.n } : {}) } : {}),
         view: (['xz', 'yz', 'xy'].includes(x.view) ? x.view : 'xz') as View,
         pts: (x.pts as unknown[])
           .filter((q): q is [number, number] => Array.isArray(q) && q.length === 2 && q.every((v) => typeof v === 'number' && isFinite(v)))
@@ -173,10 +188,16 @@ export interface RibsLayout {
 
 const cache = new Map<string, RibsLayout | null>();
 
+/** Everything the layout depends on */
+export function layoutKey(raw: Params): string {
+  const p = P(raw);
+  return [p.model, p.sections, p.up, p.axis, p.spineDir, p.size, p.thickness, p.spacing, p.minSpacing, p.spineInset, p.spineOffset, p.play, p.minArea, p.kerf, p.numbers, p.numberSize, p.maxPlate].join('|');
+}
+
 /** Zerlegung in Rippen und Rückgrate (zwischengespeichert); null, wenn das Modell fehlt */
 export function ribsLayout(raw: Params): RibsLayout | null {
   const p = P(raw);
-  const key = [p.model, p.sections, p.up, p.axis, p.spineDir, p.size, p.thickness, p.spacing, p.minSpacing, p.spineInset, p.spineOffset, p.play, p.minArea, p.kerf, p.numbers, p.numberSize, p.maxPlate].join('|');
+  const key = layoutKey(raw);
   if (cache.has(key)) return cache.get(key)!;
   const mesh = p.model ? getMesh(p.model) : null;
   if (!mesh) return null;
@@ -307,7 +328,8 @@ function compute(p: RibsParams, rawMesh: Mesh, skip = new Set<number>()): RibsLa
   const parsed = parseSections(p.sections);
   if (parsed === null) bad.push(t('Die Abschnitte sind beschädigt; es gilt die einfache Achse.'));
   const secs: Sec[] = [];
-  for (const s of parsed ?? []) {
+  for (const [si, s0] of (parsed ?? []).entries()) {
+    const s = { ...s0, name: sectionName(s0, si) };
     const V = VIEWS[s.view];
     const pts = s.pts.map((q) => lin(V.e1, q[0], V.e2, q[1], V.n, s.offset));
     const cum = [0];
@@ -868,8 +890,8 @@ function center(polys: Pt[][]): Pt {
 
 // ---------- Generator ----------
 
-/** Without own sections (the ribs panel writes '' when none are left) */
-const SIMPLE: Rule = { eq: ['sections', ''] };
+/** Without own sections ('' or an empty list once the last row is removed) */
+const SIMPLE: Rule = { in: ['sections', ['', '[]']] };
 
 export const RIBS: Generator = {
   id: 'ribs',
@@ -885,7 +907,50 @@ export const RIBS: Generator = {
   assemblyCheck: true,
   inputs: [{ kind: 'model3d' }],
   fromInputs: (inp) => (inp.model ? { model: inp.model.id, name: inp.model.name } : undefined),
-  panel: (p, set) => ribsPanel(p, set),
+  // Sections: drawn on the surface, set in the list, created by the buttons (#335 stage 4)
+  get surface() {
+    return ribsSurface();
+  },
+  draw: ribsDraw,
+  onSurface: ribsPointer,
+  onEvent: ribsEvent,
+  get lists() {
+    return [{
+      param: 'sections', label: t('Abschnitte'), select: true, remove: true, removeTitle: t('Abschnitt löschen'),
+      empty: t('Einfache Achse über das ganze Modell. Für Kopf, Beine oder Schwanz eigene Abschnitte zeichnen.'),
+      columns: [
+        { key: 'name', type: 'text', label: t('Name'), max: 80 },
+        { key: 'offset', type: 'length', label: t('Ebene bei'), min: -10000, max: 10000, title: t('Lage der Ebene quer zur Ansicht (mm)') },
+        { key: 'spacing', type: 'length', label: t('Abstand'), min: 0, max: 500, placeholder: t('wie oben'), title: t('Rippenabstand in diesem Abschnitt; leer = wie oben') },
+        { key: 'extend', type: 'length', label: t('Verlängern'), min: 0, max: 1000, title: t('Rückgrat an beiden Enden um so viel über die Achse hinaus verlängern, z. B. damit die Beinplatte in den Rumpf reicht') },
+        { key: 'radius', type: 'length', label: t('Radius'), min: 0, max: 10000, placeholder: t('auto'), title: t('Gebiet um die Achse, das zu diesem Abschnitt gehört; leer = automatisch') },
+      ],
+      rowActions: [
+        { id: 'center', label: t('Mitte'), title: t('Ebene in die Mitte des Materials an der Achse legen') },
+        { id: 'copy', label: '⧉', title: t('Kopie (bei Versatz gespiegelt, z. B. für das zweite Bein)') },
+      ],
+    }] satisfies GenList[];
+  },
+  get actions() {
+    return [
+      { id: 'suggest', label: t('Vorschlagen'), title: t('Rumpf, Beine und Schwanz im Modell suchen und als Abschnitte anlegen; danach von Hand korrigieren') },
+      { id: 'manual', label: t('Abschnitte von Hand festlegen'), showIf: SIMPLE },
+      { id: 'draw', label: t('+ Abschnitt zeichnen') },
+      { id: 'simple', label: t('Einfache Achse'), showIf: { not: SIMPLE } },
+    ] satisfies GenAction[];
+  },
+  view(raw) {
+    const secs = parseSections(String(raw.sections ?? '')) ?? [];
+    if (!secs.length) return {};
+    const L = ribsLayout(raw);
+    return {
+      // Sections without a name of their own show that of their role
+      rowAuto: { sections: secs.map((s, i) => sectionName(s, i)) },
+      ...(L?.manual && L.sections.length === secs.length
+        ? { rows: { sections: L.sections.map((s) => t('{ribs} von {count} Rippen', { ribs: s.ribs, count: s.count }) + (s.bend ? ' ⚠' : '')) } }
+        : {}),
+    };
+  },
   tile: {
     group: 'model3d',
     since: '1.16.0',
@@ -955,9 +1020,9 @@ export const RIBS: Generator = {
       out.push({ key: 'minSpacing', level: 'error', msg: t('Der kleinste Abstand muss mindestens 0,5 mm größer als die Materialdicke sein.') });
       return out;
     }
-    for (const s of parseSections(p.sections) ?? [])
+    for (const [i, s] of (parseSections(p.sections) ?? []).entries())
       if (s.spacing && s.spacing < p.thickness + 0.5) {
-        out.push({ key: 'sections', level: 'error', msg: t('Abschnitt „{name}“: Der Rippenabstand muss mindestens 0,5 mm größer als die Materialdicke sein.', { name: s.name }) });
+        out.push({ key: 'sections', level: 'error', msg: t('Abschnitt „{name}“: Der Rippenabstand muss mindestens 0,5 mm größer als die Materialdicke sein.', { name: sectionName(s, i) }) });
         return out;
       }
     if (p.thickness + p.play <= p.kerf) out.push({ key: 'kerf', level: 'error', msg: t('Die Schnittfuge ist breiter als die Schlitze.') });

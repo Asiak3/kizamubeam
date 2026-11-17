@@ -225,19 +225,23 @@ await test('jig as a plugin: same dialog, geometry and rows; adding from the sel
   }
 });
 
-await test('stack as a plugin: the 3D model goes to the plugin as a resource; same layers, issues and poses', async () => {
-  const { weld } = await import('../src/model3d/mesh');
-  const { addMesh, meshData } = await import('../src/model3d/store');
+const { weld } = await import('../src/model3d/mesh');
+{
+  const { meshData } = await import('../src/model3d/store');
   const { setResourceSource } = await import('../src/plugins/generator');
   setResourceSource((kind, id) => (kind === 'model3d' ? meshData(id) : null));
-  /** Surface (u, v) → point as a welded grid */
-  const grid = (nu: number, nv: number, f: (u: number, v: number) => number[], closeV: boolean) => {
-    const soup: number[] = [];
-    const P = (i: number, j: number) => f((i % nu) / nu, closeV ? (j % nv) / nv : j / nv);
-    for (let i = 0; i < nu; i++)
-      for (let j = 0; j < nv; j++) soup.push(...P(i, j), ...P(i + 1, j), ...P(i + 1, j + 1), ...P(i, j), ...P(i + 1, j + 1), ...P(i, j + 1));
-    return weld(Float32Array.from(soup));
-  };
+}
+/** Surface (u, v) → point as a welded grid */
+function grid(nu: number, nv: number, f: (u: number, v: number) => number[], closeV: boolean) {
+  const soup: number[] = [];
+  const P = (i: number, j: number) => f((i % nu) / nu, closeV ? (j % nv) / nv : j / nv);
+  for (let i = 0; i < nu; i++)
+    for (let j = 0; j < nv; j++) soup.push(...P(i, j), ...P(i + 1, j), ...P(i + 1, j + 1), ...P(i, j), ...P(i + 1, j + 1), ...P(i, j + 1));
+  return weld(Float32Array.from(soup));
+}
+
+await test('stack as a plugin: the 3D model goes to the plugin as a resource; same layers, issues and poses', async () => {
+  const { addMesh } = await import('../src/model3d/store');
   const sphere = addMesh(grid(32, 16, (u, v) => [40 * Math.sin(v * Math.PI) * Math.cos(u * 2 * Math.PI), 40 * Math.sin(v * Math.PI) * Math.sin(u * 2 * Math.PI), 40 * Math.cos(v * Math.PI)], false));
   const torus = addMesh(grid(32, 12, (u, v) => [(30 + 8 * Math.cos(v * 2 * Math.PI)) * Math.cos(u * 2 * Math.PI), (30 + 8 * Math.cos(v * 2 * Math.PI)) * Math.sin(u * 2 * Math.PI), 8 * Math.sin(v * 2 * Math.PI)], true));
   await same('stack', [
@@ -252,6 +256,53 @@ await test('stack as a plugin: the 3D model goes to the plugin as a resource; sa
   try {
     assert.deepEqual(plug.inputs, [{ kind: 'model3d' }]);
     assert.deepEqual(plug.fromInputs!({ model: { id: torus, name: 'ring' } }), core.fromInputs!({ model: { id: torus, name: 'ring' } }));
+  } finally {
+    plug.dispose();
+  }
+});
+
+await test('ribs as a plugin: same parts and sections; the drawing surface answers like the built-in one', async () => {
+  const { addMesh } = await import('../src/model3d/store');
+  // A fish: ellipsoid 120 × 40 × 60 mm
+  const fish = addMesh(grid(32, 16, (u, v) => [60 * Math.sin(v * Math.PI) * Math.cos(u * 2 * Math.PI), 20 * Math.sin(v * Math.PI) * Math.sin(u * 2 * Math.PI), 30 * Math.cos(v * Math.PI)], false));
+  const body = JSON.stringify([{ name: 'Rumpf', view: 'xz', pts: [[-50, 30], [50, 30]], offset: 0 }, { name: '', view: 'xz', pts: [[-20, 10], [-20, 0]], offset: 8, extend: 10 }]);
+  await same('ribs', [
+    { model: '' },
+    { model: fish, name: 'fish', size: 120 },
+    { model: fish, name: 'fish', size: 120, axis: 'y', spineDir: 'z', numbers: false },
+    { model: fish, name: 'fish', size: 120, spacing: 2 },
+    { model: fish, name: 'fish', size: 120, sections: body },
+    { model: fish, name: 'fish', size: 120, sections: '[]' },
+  ]);
+  const core = G.getGenerator('ribs')!;
+  const plug = pluginGenerator(pack.plugins.find((x) => x.id === 'ribs')!, { id: pack.id, name: 'core' });
+  try {
+    // Same surface, list and buttons (with their conditions)
+    assert.deepEqual(plug.surface, core.surface);
+    assert.deepEqual(plug.lists, core.lists);
+    assert.deepEqual(plug.actions, core.actions);
+    const p = G.normalizeParams(core, { model: fish, name: 'fish', size: 120, sections: body });
+    const st = (state: unknown = null, view = 'xz') => ({ view, state, selected: { sections: 1 } });
+    // The drawing: layers once, then only their keys
+    for (const view of ['xz', 'yz', 'xy']) {
+      const a = await core.draw!({ ...st(null, view), have: [] }, p);
+      const b = await plug.draw!({ ...st(null, view), have: [] }, p);
+      close(b, a, `draw ${view}`);
+      const keys = a.layers!.map((l) => l.key);
+      close(await plug.draw!({ ...st(null, view), have: keys }, p), await core.draw!({ ...st(null, view), have: keys }, p), `draw ${view} again`);
+    }
+    // Buttons and pointer events: same answers
+    for (const ev of [{ action: 'suggest' }, { action: 'manual' }, { action: 'draw', surface: st() }, { action: 'simple' }, { action: 'copy', row: 1 }, { action: 'center', row: 1 }])
+      close(await plug.onEvent!({ inputs: {}, ...ev }, p), await core.onEvent!({ inputs: {}, ...ev }, p), ev.action);
+    const drawing = (await core.onEvent!({ action: 'draw', inputs: {}, surface: st() }, p))!.state;
+    const pointer = [
+      { ev: { type: 'down' as const, x: -30, y: -10 }, state: drawing },
+      { ev: { type: 'key' as const, x: 0, y: 0, key: 'Escape' }, state: drawing },
+      { ev: { type: 'down' as const, x: -20, y: -10, hit: 'p1.0' }, state: null },
+      { ev: { type: 'context' as const, x: -20, y: -10, hit: 'p1.0' }, state: null },
+      { ev: { type: 'select' as const, x: 0, y: 0, list: 'sections', row: 0 }, state: null },
+    ];
+    for (const { ev, state } of pointer) close(await plug.onSurface!(ev, st(state, 'yz'), p) ?? {}, (await core.onSurface!(ev, st(state, 'yz'), p)) ?? {}, ev.type);
   } finally {
     plug.dispose();
   }

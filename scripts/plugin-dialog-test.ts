@@ -66,7 +66,7 @@ await test('schema v1: sections are translated, advanced wins, a newer dialog sc
   assert.equal(g.schema[4].advanced, true);
   assert.equal(g.schema[2].options[1][1], 'Sliding');
   g.dispose();
-  assert.throws(() => manifest(TRAY, { dialog: { version: 3 } }), /neuere Version|newer version/);
+  assert.throws(() => manifest(TRAY, { dialog: { version: 4 } }), /neuere Version|newer version/);
   assert.throws(() => manifest(TRAY, { dialog: 'big' }), /dialog/);
   assert.throws(() => manifest(TRAY, { params: [{ key: 'a', type: 'bool', def: true, section: '<b>' }] }), /Abschnitt|section/);
 });
@@ -241,6 +241,107 @@ await test('stage 3: image and camera inputs, a field next to a button, placehol
   // field must be a number parameter, inputs must be known
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'pic', inputs: ['image'], field: 'items' }] } }), /field/);
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'pic', inputs: ['video'] }] } }), /Eingabe|input/);
+});
+
+await test('stage 4: a drawing surface with views, pointer events, selectable rows and row buttons', async () => {
+  // A polyline: click adds a point, dragging a handle moves it; the points are also a list with a delete button
+  const code = `globalThis.plugin = {
+    validate: (p) => JSON.parse(p.pts).length < 2 ? [{ level: 'error', code: 'few' }] : [],
+    generate: (p) => ({ parts: [{ key: 'line', subs: [{ closed: false, nodes: JSON.parse(p.pts).map((q) => ({ x: q.x, y: q.y })) }], at: { x: 0, y: 0 } }], info: [] }),
+    view: (p) => ({ rowAuto: { pts: JSON.parse(p.pts).map((_, i) => ({ code: 'point', values: { n: i + 1 } })) } }),
+    draw: (req) => {
+      const pts = (req.state && req.state.pts) || JSON.parse(req.params.pts);
+      const flip = req.view === 'side' ? -1 : 1;
+      return {
+        frame: { x0: -50, y0: -50, x1: 50, y1: 50 },
+        layers: [{ key: 'grid', ...(req.have.includes('grid') ? {} : { items: [{ type: 'line', pts: [[-50, 0], [50, 0]], style: 'muted' }] }) }],
+        items: [
+          { type: 'line', pts: pts.map((q) => [q.x, q.y * flip]) },
+          ...pts.map((q, i) => ({ type: 'handle', id: 'h' + i, x: q.x, y: q.y * flip, style: req.selected.pts === i ? 'accent' : 'normal' })),
+          { type: 'text', x: 0, y: 0, text: { code: 'count', values: { n: pts.length } } },
+        ],
+        ...(req.state && req.state.drawing ? { track: true } : {}),
+      };
+    },
+    onSurface: ({ event, surface, params }) => {
+      const pts = (surface.state && surface.state.pts) || JSON.parse(params.pts);
+      if (event.type === 'down' && event.hit) return { state: { pts, drag: Number(event.hit.slice(1)) }, select: { pts: Number(event.hit.slice(1)) } };
+      if (event.type === 'down') return { patch: { pts: JSON.stringify([...pts, { name: '', x: event.x, y: event.y }]) }, message: { code: 'added' } };
+      if (event.type === 'move' && surface.state) return { state: { ...surface.state, pts: pts.map((q, i) => (i === surface.state.drag ? { ...q, x: event.x, y: event.y } : q)) } };
+      if (event.type === 'up' && surface.state) return { state: null, patch: { pts: JSON.stringify(pts) } };
+      if (event.type === 'select') return { view: 'side' };
+      return null;
+    },
+    onEvent: ({ action, row, params, surface }) => {
+      const pts = JSON.parse(params.pts);
+      if (action === 'del') return { patch: { pts: JSON.stringify(pts.filter((_, i) => i !== row)) }, select: { pts: -1 } };
+      if (action === 'start') return { state: { drawing: true }, message: 'Click to add points (' + surface.view + ')' };
+      return null;
+    },
+  };`;
+  const dialog = {
+    version: 3,
+    surface: { views: [{ id: 'top', label: 'viewTop' }, { id: 'side', label: 'viewSide' }], height: 240, help: 'help' },
+    lists: [{ param: 'pts', label: 'ptsLabel', select: true, rowActions: [{ id: 'del', label: 'delLabel', title: 'delTitle' }], columns: [
+      { key: 'name', type: 'text', max: 20 },
+      { key: 'x', type: 'length', min: -50, max: 50 },
+      { key: 'y', type: 'length', min: -50, max: 50, placeholder: 'auto' },
+    ] }],
+    actions: [{ id: 'start', label: 'startLabel', showIf: { eq: ['pts', '[]'] } }],
+  };
+  const params = [{ key: 'pts', type: 'data', def: '[]' }];
+  const texts = { en: { name: 'Line', desc: 'A line', pts: 'Points', viewTop: 'Top', viewSide: 'Side', help: 'Click to add', ptsLabel: 'Points', delLabel: 'Delete', delTitle: 'Delete the point', startLabel: 'Start', few: 'Two points needed', point: 'Point {n}', count: '{n} points', added: 'Point added', name: 'Name', x: 'X', y: 'Y', auto: 'auto' } };
+  const m = manifest(code, { params, dialog, texts });
+  const g = pluginGenerator(m, { id: 'p', name: 'P' });
+  try {
+    assert.deepEqual(g.surface, { views: [{ id: 'top', label: 'Top' }, { id: 'side', label: 'Side' }], height: 240, help: 'Click to add' });
+    assert.deepEqual(g.lists![0].rowActions, [{ id: 'del', label: 'Delete', title: 'Delete the point' }]);
+    assert.equal(g.lists![0].select, true);
+    assert.equal((g.lists![0].columns[2] as { placeholder?: string }).placeholder, 'auto');
+    assert.deepEqual(g.actions![0].showIf, { eq: ['pts', '[]'] });
+    // Texts on the surface are translated, layers come once
+    const p = { pts: JSON.stringify([{ name: '', x: 0, y: 0 }, { name: 'B', x: 10, y: 5 }]) };
+    const d = await g.draw!({ view: 'side', state: null, selected: { pts: 1 }, have: [] }, p);
+    assert.equal(d.items.length, 4);
+    assert.deepEqual(d.items[2], { type: 'handle', id: 'h1', x: 10, y: -5, style: 'accent' });
+    assert.deepEqual(d.items[3], { type: 'text', x: 0, y: 0, text: '2 points' });
+    assert.equal(d.layers![0].items!.length, 1);
+    assert.equal((await g.draw!({ view: 'top', state: null, selected: {}, have: ['grid'] }, p)).layers![0].items, undefined);
+    await g.prepare(p);
+    assert.deepEqual(g.view!(p).rowAuto, { pts: ['Point 1', 'Point 2'] });
+  } finally {
+    g.dispose();
+  }
+  // Headless: the button with its condition, clicks, a drag and a row button
+  const s = await runDialog(m, [
+    { $action: 'start' },
+    { $surface: [{ type: 'down', x: -20, y: 0 }, { type: 'down', x: 20, y: 10 }] },
+    { $surface: [{ type: 'down', x: 20, y: 10, hit: 'h1' }, { type: 'move', x: 30, y: 15, drag: true, from: { x: 20, y: 10 } }, { type: 'up', x: 30, y: 15, from: { x: 20, y: 10 } }] },
+    { $view: 'side' },
+    { $action: 'del', $row: 0 },
+  ]);
+  assert.equal(s[0].surface!.view, 'top');
+  assert.equal(s[1].message, 'Click to add points (top)');
+  assert.equal(s[1].surface!.track, true);
+  assert.equal(s[2].message, 'Point added');
+  assert.equal(s[2].parts.length, 1);
+  assert.deepEqual(JSON.parse(String(s[3].params.pts))[1], { name: '', x: 30, y: 15 });
+  assert.deepEqual(s[3].surface!.selected, { pts: 1 });
+  assert.equal(s[3].surface!.state, null);
+  assert.equal(s[4].surface!.view, 'side');
+  assert.equal(JSON.parse(String(s[5].params.pts)).length, 1);
+  assert.deepEqual(s[5].surface!.selected, { pts: -1 });
+  await assert.rejects(runDialog(m, [{ $view: 'front' }]), ScriptError);
+  await assert.rejects(runDialog(m, [{ $action: 'start', $row: 0 }]), ScriptError);
+  // The surface and the new list and button features need dialog version 3; bad drawings are refused
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, version: 2 } }), /Version 3|version 3/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, surface: { views: [] } } }), /dialog/);
+  const { checkDrawing, checkEvent } = await import('../src/plugins/contract');
+  assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [{ type: 'circle' }] }), /item type/);
+  assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], layers: [{ key: 'a', tris: [1, 2, 3] }] }), /tris/);
+  assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [{ type: 'line', pts: [[0, 0]], style: 'pink' }] }), /style/);
+  assert.throws(() => checkEvent({ select: { pts: 1.5 } }), /select/);
+  assert.throws(() => checkEvent({ state: { big: 'x'.repeat(2 * 1024 * 1024) } }), /state/);
 });
 
 await test('3D model input: resource sent once per engine, opened through inputs, checked with a sample', async () => {

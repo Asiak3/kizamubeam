@@ -83,6 +83,13 @@ await test('JavaScript memory limit', async () => {
   assert.ok(c === 'plugin-memory' || c === 'plugin-crash' || c === 'plugin-timeout', c);
 });
 
+await test('every JavaScript engine gets its own random seed', async () => {
+  // QuickJS seeds from a millisecond clock: engines started together used to give the same numbers
+  const seen = new Set<number>();
+  for (let i = 0; i < 50; i++) seen.add(unwrap((await createEngine('js', 'globalThis.plugin = { generate: () => Math.random() };')).call('generate', '{}', 5000)) as number);
+  assert.equal(seen.size, 50);
+});
+
 await test('contract: bad output is refused', () => {
   const bad = (v: unknown) => assert.throws(() => checkGenResult(v), ContractError);
   bad(null);

@@ -1,7 +1,7 @@
 // Plugin entry of an extension pack (`plugins` in .kzp format version 2, issue #205): what the plugin is, its
 // parameters and texts, and its code. Everything is checked here before a plugin is registered; a mistake refuses
 // the whole pack. No DOM, no editor: the same checks run in the app and in the tests.
-import type { GenAction, GenActionInput, GenColumn, GenList, ParamSpec, ParamValue, Rule } from '../generators/types';
+import type { GenAction, GenActionInput, GenColumn, GenList, GenSurface, ParamSpec, ParamValue, Rule } from '../generators/types';
 import { LIMITS, PLUGIN_API } from './contract';
 import { base64ToBytes, type Runtime } from './engine';
 import { sha256 } from '../pdfcrypt';
@@ -35,6 +35,8 @@ export interface PluginManifest {
   /** Lists and actions of the dialog (schema version 2); labels are text keys */
   lists?: GenList[];
   actions?: GenAction[];
+  /** Drawing surface (schema version 3); view labels and help are text keys */
+  surface?: GenSurface;
   /**
    * What the plugin can be opened with: a 3D model the user imports goes into `param` (a data parameter with
    * resource model3d), its file name into `name`
@@ -54,9 +56,14 @@ export class ManifestError extends Error {}
  * Version of the dialog schema (#335). Version 1: fields with labels, tooltips, options, the main area, named
  * sections and „Advanced“, showIf rules, preview, info table and issue list. Version 2: lists of rows in a data
  * parameter (text, number and choice columns, an outline picture, remove) and action buttons with inputs
- * (selection, an image file, the camera image) and a number field next to a button. A plugin that needs a newer schema is refused with an update hint instead of being shown half-broken.
+ * (selection, an image file, the camera image) and a number field next to a button. Version 3: a drawing surface
+ * (draw, onSurface) with views, selectable rows and row buttons in lists, placeholders for number columns, and
+ * conditions on action buttons. A plugin that needs a newer schema is refused with an update hint instead of being
+ * shown half-broken.
  */
-export const DIALOG_VERSION = 2;
+export const DIALOG_VERSION = 3;
+const MAX_VIEWS = 6;
+const MAX_ROW_ACTIONS = 4;
 const MAX_LISTS = 4;
 const MAX_COLUMNS = 8;
 const MAX_ACTIONS = 8;
@@ -190,7 +197,9 @@ function column(v: unknown, at: string): GenColumn {
   if (v.type === 'int' || v.type === 'number' || v.type === 'length') {
     const { min, max } = v;
     if (!isNum(min) || !isNum(max) || min > max || Math.abs(min) > LIMITS.range || Math.abs(max) > LIMITS.range) throw new ManifestError(t('{where}: min, max und def müssen Zahlen mit min ≤ def ≤ max sein', { where: at }));
-    return { ...base, type: v.type, min, max };
+    const out: GenColumn = { ...base, type: v.type, min, max };
+    if (v.placeholder !== undefined) out.placeholder = textKey(v.placeholder, at);
+    return out;
   }
   if (v.type === 'enum') {
     if (!Array.isArray(v.options) || !v.options.length || v.options.length > MAX_OPTIONS) throw new ManifestError(t('{where}: „options“ muss 1 bis {n} Einträge haben', { where: at, n: MAX_OPTIONS }));
@@ -203,9 +212,13 @@ function column(v: unknown, at: string): GenColumn {
   throw new ManifestError(t('{where}: unbekannter Typ „{type}“', { where: at, type: String(v.type) }));
 }
 
-/** Lists and actions of a dialog with schema version 2 */
-function dialogParts(d: Record<string, unknown>, schema: ParamSpec[]): { lists?: GenList[]; actions?: GenAction[] } {
-  const out: { lists?: GenList[]; actions?: GenAction[] } = {};
+/** Lists, actions (schema version 2) and the surface (version 3) of a dialog */
+function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<string>): { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface } {
+  const out: { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface } = {};
+  const v3 = (d.version as number) >= 3;
+  const needs3 = (at: string) => {
+    if (!v3) throw new ManifestError(t('{where}: braucht „dialog“ Version 3', { where: at }));
+  };
   if (d.lists !== undefined) {
     if (!Array.isArray(d.lists) || d.lists.length > MAX_LISTS) throw new ManifestError(t('ungültige Angabe „dialog“'));
     out.lists = d.lists.map((l, i) => {
@@ -220,6 +233,17 @@ function dialogParts(d: Record<string, unknown>, schema: ParamSpec[]): { lists?:
       }
       if (l.remove === true) list.remove = true;
       if (l.removeTitle !== undefined) list.removeTitle = textKey(l.removeTitle, at);
+      if (l.select === true) (needs3(at), (list.select = true));
+      if (l.rowActions !== undefined) {
+        needs3(at);
+        if (!Array.isArray(l.rowActions) || l.rowActions.length > MAX_ROW_ACTIONS) throw new ManifestError(t('ungültige Angabe „dialog“'));
+        list.rowActions = l.rowActions.map((a, k) => {
+          const ra = `${at}.rowActions[${k}]`;
+          if (!isObj(a) || typeof a.id !== 'string' || !KEY_RE.test(a.id)) throw new ManifestError(t('{where}: Kennung fehlt oder ist ungültig', { where: ra }));
+          return { id: a.id, label: textKey(a.label ?? a.id, ra), ...(a.title !== undefined ? { title: textKey(a.title, ra) } : {}) };
+        });
+      }
+      if (list.columns.some((c) => c.type !== 'text' && c.type !== 'enum' && c.placeholder)) needs3(at);
       return list;
     });
   }
@@ -239,8 +263,27 @@ function dialogParts(d: Record<string, unknown>, schema: ParamSpec[]): { lists?:
         if (!f || !(f.type === 'number' || f.type === 'length' || f.type === 'int' || f.type === 'angle')) throw new ManifestError(t('{where}: „field“ muss ein Zahlen-Parameter sein', { where: at }));
         act.field = f.key;
       }
+      if (a.showIf !== undefined) (needs3(at), (act.showIf = rule(a.showIf, keys, at)));
       return act;
     });
+  }
+  if (d.surface !== undefined) {
+    needs3('surface');
+    const sf = d.surface;
+    if (!isObj(sf) || !Array.isArray(sf.views) || !sf.views.length || sf.views.length > MAX_VIEWS) throw new ManifestError(t('ungültige Angabe „dialog“'));
+    const surface: GenSurface = {
+      views: sf.views.map((v, i) => {
+        const at = `surface.views[${i}]`;
+        if (!isObj(v) || typeof v.id !== 'string' || !KEY_RE.test(v.id)) throw new ManifestError(t('{where}: Kennung fehlt oder ist ungültig', { where: at }));
+        return { id: v.id, label: textKey(v.label ?? v.id, at) };
+      }),
+    };
+    if (sf.height !== undefined) {
+      if (!isNum(sf.height) || sf.height < 100 || sf.height > 800) throw new ManifestError(t('ungültige Angabe „dialog“'));
+      surface.height = Math.round(sf.height);
+    }
+    if (sf.help !== undefined) surface.help = textKey(sf.help, 'surface');
+    out.surface = surface;
   }
   return out;
 }
@@ -313,9 +356,9 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
         return out;
       });
     }
-    if (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined)) {
+    if (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined || raw.dialog.surface !== undefined)) {
       if ((raw.dialog.version as number) < 2) fail(t('Listen und Aktionen brauchen „dialog“ Version 2'));
-      Object.assign(m, dialogParts(raw.dialog, schema));
+      Object.assign(m, dialogParts(raw.dialog, schema, keys));
     }
     return m;
   } catch (e) {

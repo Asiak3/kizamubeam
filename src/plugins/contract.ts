@@ -1,11 +1,13 @@
 // Plugin contract (issue #205, stage 1): what a plugin may return, checked before anything reaches the editor.
 // Plugins exchange JSON only. Calls: validate(params) → issues, generate(params) → parts, info, labels, poses, plan;
 // optional (#335 stage 2): view(params) → suggested texts and row texts, onChange({ key, old, params }) → patch or a
-// question; (#335 stage 3) onEvent({ action, params, inputs }) → patch and a message.
+// question; (#335 stage 3) onEvent({ action, params, inputs, row, surface }) → patch and a message; (#335 stage 4)
+// draw({ view, state, selected, have, params }) → what the surface shows, onSurface({ event, surface, params }) →
+// patch, message and the new surface state.
 // No DOM, no Editor, so the same checks run in the Worker, in the app and in Node tests.
 import type { Node, Pt, SubPath } from '../model';
 import { fromBase64, toBase64 } from '../base64';
-import type { GenEvent, Params, PlanSheet } from '../generators/types';
+import type { GenDrawing, GenEvent, GenItem, GenLayer, GenStyle, Params, PlanSheet } from '../generators/types';
 import type { AsmPoses, Pose, V3 } from '../generators/pose';
 
 /** Version of the call protocol; a plugin built for a newer one is refused with an update hint */
@@ -13,16 +15,18 @@ export const PLUGIN_API = 1;
 
 /** Plugin functions the app calls */
 /** resource: data a parameter refers to (e.g. a 3D model), sent once per process before it is needed */
-export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent' | 'resource';
+/** draw, onSurface: the drawing surface of the dialog */
+export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent' | 'resource' | 'draw' | 'onSurface';
 
 /** Limits for one plugin (#205: time, memory, output size) */
 export const LIMITS = {
   /**
    * Time per call in ms; the Worker is terminated after it. Everything runs in a Worker (the editor stays usable).
    * Nesting many parts in QuickJS takes a while (a 400-tooth gear pair: about 20 s); validate may need the whole
-   * layout too (a stack model slices the model to count its layers), resource decodes a 3D model
+   * layout too (a stack model slices the model to count its layers), resource decodes a 3D model; draw may compute
+   * the layout for new parameters, onSurface answers pointer events (finishing a line may look into the model)
    */
-  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000, resource: 20000 } as Record<PluginFn, number>,
+  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000, resource: 20000, draw: 30000, onSurface: 5000 } as Record<PluginFn, number>,
   /** Options of a question (ask) */
   askOptions: 3,
   /** Memory of the JavaScript engine or the WebAssembly instance */
@@ -38,6 +42,13 @@ export const LIMITS = {
   text: 400,
   /** Coordinates within ±range mm */
   range: 100_000,
+  /** Shapes on the surface (items of one drawing or layer) and their points, triangles of a layer */
+  items: 20_000,
+  points: 1_000_000,
+  tris: 2_000_000,
+  layers: 4,
+  /** Size of the surface state as JSON */
+  stateBytes: 1024 * 1024,
 };
 
 /**
@@ -197,6 +208,8 @@ export interface PluginView {
   autoText?: Record<string, PluginText>;
   /** A text per row of a list, by list parameter */
   rows?: Record<string, PluginText[]>;
+  /** A suggestion per row for its empty first text cell, by list parameter */
+  rowAuto?: Record<string, PluginText[]>;
 }
 
 /** An image as handed to a plugin: RGBA pixels as base64 (JSON has no bytes) */
@@ -219,10 +232,27 @@ export function eventInputs(inp: GenEvent['inputs']): Record<string, unknown> {
   return out;
 }
 
+/** Changes of the surface an answer may ask for: new free state (null clears it), view, selected rows */
+export interface PluginSurfaceChange {
+  state?: unknown;
+  view?: string;
+  select?: Record<string, number>;
+}
+
 /** Answer of onEvent(): parameters to change and a short message for the dialog */
-export interface PluginEventResult {
+export interface PluginEventResult extends PluginSurfaceChange {
   patch?: Record<string, unknown>;
   message?: PluginText;
+}
+
+/** Answer of onSurface(): like onEvent */
+export type PluginSurfaceResult = PluginEventResult;
+
+/** Answer of draw(): texts on the surface are plain (names the user typed, numbers) or codes */
+export type PluginItem = Exclude<GenItem, { type: 'text' }> | { type: 'text'; x: number; y: number; text: PluginText; style?: GenStyle };
+export interface PluginDrawing extends Omit<GenDrawing, 'items' | 'layers'> {
+  layers?: (Omit<GenLayer, 'items'> & { items?: PluginItem[] })[];
+  items: PluginItem[];
 }
 
 /** Answer of onChange(): parameters to change as well, or a question whose options each carry a patch */
@@ -251,22 +281,89 @@ export function checkView(v: unknown): PluginView {
     if (!isObj(v.autoText)) fail('autoText');
     out.autoText = Object.fromEntries(Object.entries(v.autoText as Record<string, unknown>).slice(0, 200).map(([k, x]) => [str(k, 'autoText key', 80), checkText(x)]));
   }
-  if (v.rows !== undefined) {
-    if (!isObj(v.rows)) fail('rows');
-    out.rows = Object.fromEntries(
-      Object.entries(v.rows as Record<string, unknown>).slice(0, 8).map(([k, x]) => [str(k, 'rows key', 80), Array.isArray(x) && x.length <= 2000 ? x.map((r) => checkText(r)) : fail('rows')]),
+  for (const f of ['rows', 'rowAuto'] as const) {
+    const x0 = v[f];
+    if (x0 === undefined) continue;
+    if (!isObj(x0)) fail(f);
+    out[f] = Object.fromEntries(
+      Object.entries(x0 as Record<string, unknown>).slice(0, 8).map(([k, x]) => [str(k, `${f} key`, 80), Array.isArray(x) && x.length <= 2000 ? x.map((r) => checkText(r)) : fail(f)]),
     );
   }
   return out;
 }
 
-/** Check and copy the answer of onEvent(); null means nothing to do */
+/** Check and copy the answer of onEvent() or onSurface(); null means nothing to do */
 export function checkEvent(v: unknown): PluginEventResult {
   if (v === null || v === undefined) return {};
   if (!isObj(v)) return fail('event');
   const out: PluginEventResult = {};
   if (v.patch !== undefined) out.patch = checkPatch(v.patch);
   if (v.message !== undefined) out.message = checkText(v.message);
+  if (v.state !== undefined) {
+    // Plain JSON the app keeps and hands back; its size is limited
+    const text = JSON.stringify(v.state);
+    if (text === undefined || text.length > LIMITS.stateBytes) fail('surface state');
+    out.state = JSON.parse(text);
+  }
+  if (v.view !== undefined) out.view = str(v.view, 'view', 40);
+  if (v.select !== undefined) {
+    if (!isObj(v.select)) fail('select');
+    out.select = Object.fromEntries(Object.entries(v.select as Record<string, unknown>).slice(0, 8).map(([k, x]) => [str(k, 'select key', 80), typeof x === 'number' && Number.isInteger(x) && x >= -1 ? x : fail('select row')]));
+  }
+  return out;
+}
+
+const STYLES: GenStyle[] = ['normal', 'muted', 'accent', 'warn'];
+
+/** Check and copy the shapes of a drawing; points and triangles are counted across the whole answer */
+function checkItems(v: unknown, count: { points: number }): PluginItem[] {
+  if (!Array.isArray(v) || v.length > LIMITS.items) return fail('items');
+  const style = (x: unknown) => (x === undefined ? {} : STYLES.includes(x as GenStyle) ? { style: x as GenStyle } : fail('style'));
+  const id = (x: unknown) => (x === undefined ? {} : { id: str(x, 'item id', 80) });
+  return v.map((it): PluginItem => {
+    if (!isObj(it)) return fail('item');
+    if (it.type === 'line') {
+      if (!Array.isArray(it.pts)) return fail('line');
+      count.points += it.pts.length;
+      if (count.points > LIMITS.points) fail('too many points');
+      const pts = it.pts.map((q): [number, number] => (Array.isArray(q) && q.length === 2 ? [num(q[0], 'line point'), num(q[1], 'line point')] : fail('line point')));
+      return {
+        type: 'line', pts, ...style(it.style), ...id(it.id),
+        ...(it.closed === true ? { closed: true } : {}),
+        ...(it.dash === true ? { dash: true } : {}),
+        ...(it.width !== undefined ? { width: Math.max(0.1, Math.min(10, num(it.width, 'width'))) } : {}),
+        ...(it.alpha !== undefined ? { alpha: Math.max(0, Math.min(1, num(it.alpha, 'alpha'))) } : {}),
+      };
+    }
+    if (it.type === 'handle')
+      return { type: 'handle', x: num(it.x, 'handle'), y: num(it.y, 'handle'), id: str(it.id, 'handle id', 80), ...style(it.style), ...(it.size !== undefined ? { size: Math.max(1, Math.min(10, num(it.size, 'size'))) } : {}) };
+    if (it.type === 'text') return { type: 'text', x: num(it.x, 'text'), y: num(it.y, 'text'), text: checkText(it.text), ...style(it.style) };
+    return fail('item type');
+  });
+}
+
+/** Check and copy the answer of draw() */
+export function checkDrawing(v: unknown): PluginDrawing {
+  if (!isObj(v) || !isObj(v.frame)) return fail('drawing');
+  const f = v.frame;
+  const frame = { x0: num(f.x0, 'frame'), y0: num(f.y0, 'frame'), x1: num(f.x1, 'frame'), y1: num(f.y1, 'frame') };
+  const count = { points: 0 };
+  const out: PluginDrawing = { frame, items: checkItems(v.items ?? [], count) };
+  if (v.track === true) out.track = true;
+  if (v.layers !== undefined) {
+    if (!Array.isArray(v.layers) || v.layers.length > LIMITS.layers) fail('layers');
+    out.layers = (v.layers as unknown[]).map((l) => {
+      if (!isObj(l)) return fail('layer');
+      const layer: NonNullable<PluginDrawing['layers']>[number] = { key: str(l.key, 'layer key', 400) };
+      if (l.tris !== undefined) {
+        if (!Array.isArray(l.tris) || l.tris.length % 6 || l.tris.length > LIMITS.tris * 6) fail('tris');
+        layer.tris = (l.tris as unknown[]).map((x) => num(x, 'tris'));
+      }
+      if (l.items !== undefined) layer.items = checkItems(l.items, count);
+      if (l.alpha !== undefined) layer.alpha = Math.max(0, Math.min(1, num(l.alpha, 'alpha')));
+      return layer;
+    });
+  }
   return out;
 }
 

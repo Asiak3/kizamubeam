@@ -6,6 +6,8 @@ import { t } from '../i18n';
 import type { SubPath } from '../model';
 import type { GenHost } from './host';
 import { readRows, removeRow, setCell } from './lists';
+import { ruleHolds } from './index';
+import type { SurfaceArea } from './dialogSurface';
 import type { GenAction, GenEvent, GenEventResult, GenImage, Generator, GenList, Params } from './types';
 
 export interface ListsArea {
@@ -50,7 +52,7 @@ function readImage(src: CanvasImageSource, w: number, h: number, maxPx: number):
  * Lists and actions of a generator. set() changes parameters like user input; onEvent answers may arrive later,
  * and are dropped when the dialog was closed or another action was started meanwhile.
  */
-export function listsArea(g: Generator, p: Params, set: (patch: Params) => void, host: GenHost, isOpen: () => boolean, fieldEls: (key: string) => HTMLElement[] = () => []): ListsArea | null {
+export function listsArea(g: Generator, p: Params, set: (patch: Params) => void, host: GenHost, isOpen: () => boolean, fieldEls: (key: string) => HTMLElement[] = () => [], surface?: SurfaceArea | null): ListsArea | null {
   const lists = g.lists ?? [];
   const actions = g.actions ?? [];
   if (!lists.length && !actions.length) return null;
@@ -62,15 +64,19 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
   const shown = lists.map(() => '');
   const renderList = (list: GenList, el: HTMLElement, i0: number) => {
     const rows = readRows(current, list);
-    const info = g.view?.(current).rows?.[list.param] ?? [];
+    const view = g.view?.(current);
+    const info = view?.rows?.[list.param] ?? [];
+    const auto = view?.rowAuto?.[list.param] ?? [];
     // Only when rows or their texts changed: an open field keeps its focus while other fields update the preview
-    const key = String(current[list.param] ?? '') + '\u0000' + info.join('\u0000');
+    const key = String(current[list.param] ?? '') + '\u0000' + info.join('\u0000') + '\u0000' + auto.join('\u0000');
     if (key === shown[i0]) return;
     shown[i0] = key;
     el.replaceChildren();
     if (!rows.length && list.empty) el.append(h('div', { class: 'muted' }, list.empty));
+    const firstText = list.columns.find((c) => c.type === 'text');
     rows.forEach((row, i) => {
       const cells: HTMLElement[] = [];
+      const rowActions = (list.rowActions ?? []).map((a) => h('button', { class: 'btn small', title: a.title ?? '', onclick: () => void run({ id: a.id, label: a.label }, {}, i) }, a.label));
       if (list.shape) cells.push(thumb(Array.isArray(row[list.shape.key]) ? (row[list.shape.key] as SubPath[]) : [], list.shape.rotate ? Number(row[list.shape.rotate]) || 0 : 0));
       const main: HTMLElement[] = [];
       for (const c of list.columns) {
@@ -80,21 +86,43 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
           input = h('select', { title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLSelectElement).value) },
             ...c.options.map(([v, label]) => h('option', { value: String(v), selected: String(v) === String(row[c.key]) }, label)));
         } else if (c.type === 'text') {
-          input = h('input', { type: 'text', class: 'jig-name', value: String(row[c.key] ?? ''), maxlength: c.max ?? 200, placeholder: c.placeholder?.replace('{n}', String(i + 1)) ?? '', title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLInputElement).value.trim()) });
+          input = h('input', { type: 'text', class: 'jig-name', value: String(row[c.key] ?? ''), maxlength: c.max ?? 200, placeholder: (c === firstText ? auto[i] : undefined) ?? c.placeholder?.replace('{n}', String(i + 1)) ?? '', title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLInputElement).value.trim()) });
         } else {
-          input = h('input', { type: 'number', class: 'jig-count', min: String(c.min), max: String(c.max), step: c.type === 'int' ? '1' : 'any', value: String(row[c.key] ?? ''), title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLInputElement).value) });
+          // With a placeholder, 0 shows as an empty field (e.g. „auto“)
+          const v = row[c.key];
+          const shownValue = c.placeholder && (v === 0 || v === undefined) ? '' : String(v ?? '');
+          input = h('input', { type: 'number', class: 'jig-count', min: String(c.min), max: String(c.max), step: c.type === 'int' ? '1' : 'any', value: shownValue, placeholder: c.placeholder ?? '', title: c.title ?? c.label, onchange: (e: Event) => change((e.target as HTMLInputElement).value) });
         }
         if (c.type === 'text' && !main.length) main.push(input, h('span', { class: 'muted' }, info[i] ?? ''));
         else cells.push(c.type === 'enum' ? input : h('label', {}, c.label, ' ', input));
       }
       if (main.length) cells.splice(list.shape ? 1 : 0, 0, h('div', { class: 'jig-col' }, ...main));
       else if (info[i]) cells.push(h('span', { class: 'muted' }, info[i]));
+      cells.push(...rowActions);
       if (list.remove) cells.push(h('button', { class: 'btn small', title: list.removeTitle ?? t('Entfernen'), onclick: () => set({ [list.param]: removeRow(current, list, i) }) }, '×'));
-      el.append(h('div', { class: 'jig-row' }, ...cells));
+      const rowEl = h('div', { class: 'jig-row' }, ...cells);
+      // A click on the row (not on its fields and buttons) selects it
+      if (list.select)
+        rowEl.addEventListener('click', (e) => {
+          if ((e.target as HTMLElement).closest('input, select, button')) return;
+          surface?.selectRow(list.param, i);
+          mark();
+        });
+      el.append(rowEl);
     });
   };
 
-  const run = async (a: GenAction, extra: GenEvent['inputs'] = {}) => {
+  /** Mark the selected rows of selectable lists */
+  const mark = () => {
+    const sel = surface?.state().selected ?? {};
+    lists.forEach((list, i) => {
+      if (!list.select) return;
+      listEls[i].querySelectorAll<HTMLElement>(':scope > .jig-row').forEach((r, k) => r.classList.toggle('on', sel[list.param] === k));
+    });
+  };
+  surface?.onSelect(mark);
+
+  const run = async (a: GenAction, extra: GenEvent['inputs'] = {}, row?: number) => {
     if (!g.onEvent) return;
     const token = ++seq;
     note.textContent = '';
@@ -109,18 +137,27 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
     }
     let r: GenEventResult | void;
     try {
-      r = await g.onEvent({ action: a.id, inputs }, { ...current });
+      r = await g.onEvent({ action: a.id, inputs, ...(row !== undefined ? { row } : {}), ...(surface ? { surface: surface.state() } : {}) }, { ...current });
     } catch {
       return;
     }
     if (!isOpen() || token !== seq || !r) return;
-    if (r.message !== undefined) note.textContent = r.message;
+    // With a surface, its line shows the message (e.g. how to draw); otherwise the line under the buttons
     if (r.patch && Object.keys(r.patch).length) set(r.patch);
+    if (surface && (r.state !== undefined || r.view !== undefined || r.select)) surface.change(r, r.message);
+    else if (r.message !== undefined) note.textContent = r.message;
   };
 
   // An image action asks for a file first; a camera action is offered only while there is a camera image
   const hasCamera = host.cameraImages().some((v) => v.image);
+  /** Buttons with a condition, hidden while it does not hold */
+  const conditional: { a: GenAction; els: HTMLElement[] }[] = [];
   const button = (a: GenAction): HTMLElement[] => {
+    const els = plainButton(a);
+    if (a.showIf) conditional.push({ a, els });
+    return els;
+  };
+  const plainButton = (a: GenAction): HTMLElement[] => {
     if (a.inputs?.includes('camera') && !hasCamera) return [];
     const extra = a.field ? fieldEls(a.field) : [];
     if (!a.inputs?.includes('image')) return [h('button', { class: 'btn small', title: a.title ?? '', onclick: () => void run(a) }, a.label), ...extra];
@@ -148,6 +185,11 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
   const refresh = (np: Params) => {
     current = np;
     lists.forEach((list, i) => renderList(list, listEls[i], i));
+    for (const c of conditional) {
+      const on = ruleHolds(c.a.showIf!, np);
+      c.els.forEach((e) => (e.hidden = !on));
+    }
+    mark();
   };
   refresh(p);
   return { el, refresh };

@@ -3,9 +3,9 @@
 // Worker. The bridge is a small cache per plugin: prepare(params) computes validate and generate once, the
 // synchronous functions read from the cache and report „being computed“ until the answer is there. Whoever shows
 // a result (the dialog, formula recomputation) listens to onPluginResult and asks again.
-import type { GenAction, GenChange, GenEventResult, GenList, GenResult, Generator, GenView, Issue, Params, ParamSpec } from '../generators/types';
+import type { GenAction, GenChange, GenDrawing, GenEventResult, GenItem, GenList, GenResult, Generator, GenSurface, GenSurfaceResult, GenView, Issue, Params, ParamSpec } from '../generators/types';
 import type { AsmPoses } from '../generators/pose';
-import { checkChange, checkEvent, eventInputs, checkGenResult, checkIssues, checkView, ContractError, type PluginFn, type PluginGenResult, type PluginIssue, type PluginText, type PluginView } from './contract';
+import { checkChange, checkDrawing, checkEvent, eventInputs, checkGenResult, checkIssues, checkView, ContractError, type PluginEventResult, type PluginFn, type PluginGenResult, type PluginIssue, type PluginItem, type PluginText, type PluginView } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
 import { pluginText, type PluginManifest } from './manifest';
@@ -203,14 +203,35 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     label: text(l.label) ?? l.label,
     ...(l.empty ? { empty: text(l.empty) ?? l.empty } : {}),
     ...(l.removeTitle ? { removeTitle: text(l.removeTitle) ?? l.removeTitle } : {}),
+    ...(l.rowActions ? { rowActions: l.rowActions.map((a) => ({ id: a.id, label: text(a.label) ?? a.label, ...(a.title ? { title: text(a.title) ?? a.title } : {}) })) } : {}),
     columns: l.columns.map((c) => {
       const out = { ...c, label: text(c.label) ?? c.label, ...(c.title ? { title: text(c.title) ?? c.title } : {}) };
-      if (out.type === 'text' && out.placeholder) out.placeholder = text(out.placeholder) ?? '';
+      if (out.type !== 'enum' && out.placeholder) out.placeholder = text(out.placeholder) ?? '';
       if (out.type === 'enum') out.options = out.options.map(([v, k]) => [v, text(k) ?? String(v)]);
       return out;
     }),
   }));
   const actions: GenAction[] | undefined = m.actions?.map((a) => ({ ...a, label: text(a.label) ?? a.label, ...(a.title ? { title: text(a.title) ?? a.title } : {}) }));
+  const surface: GenSurface | undefined = m.surface && {
+    ...m.surface,
+    views: m.surface.views.map((v) => ({ id: v.id, label: text(v.label) ?? v.id })),
+    ...(m.surface.help ? { help: text(m.surface.help) ?? '' } : {}),
+  };
+  /** An answer of onEvent or onSurface in the app's terms */
+  const answer = (r: PluginEventResult): GenSurfaceResult => {
+    const out: GenSurfaceResult = {};
+    if (r.patch) out.patch = r.patch as Params;
+    if (r.message !== undefined) out.message = render(r.message);
+    if (r.state !== undefined) out.state = r.state;
+    if (r.view !== undefined) out.view = r.view;
+    if (r.select) out.select = r.select;
+    return out;
+  };
+  const item = (it: PluginItem): GenItem => (it.type === 'text' ? { ...it, text: render(it.text) } : it);
+  /** Resources the surface needs are sent like before computing */
+  const sendResources = (p: Params) => {
+    for (const res of resourcesOf(p)) if (res.data !== null) (proc ??= spawn(m)).setResource({ kind: res.kind, id: res.id, data: res.data });
+  };
 
   const texts: Record<string, () => string> = { [PENDING]: () => codeText(PENDING) };
   for (const c of ['plugin-timeout', 'plugin-memory', 'plugin-crash', 'plugin-bad-output', 'plugin-no-function']) texts[c] = () => codeText(c);
@@ -256,18 +277,41 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       const out: GenView = {};
       if (v?.autoText) out.autoText = Object.fromEntries(Object.entries(v.autoText).map(([k, x]) => [k, render(x)]));
       if (v?.rows) out.rows = Object.fromEntries(Object.entries(v.rows).map(([k, x]) => [k, x.map(render)]));
+      if (v?.rowAuto) out.rowAuto = Object.fromEntries(Object.entries(v.rowAuto).map(([k, x]) => [k, x.map(render)]));
       return out;
     },
     ...(lists ? { lists } : {}),
     ...(actions ? { actions } : {}),
     async onEvent(ev, p): Promise<GenEventResult | void> {
-      const r = await call('onEvent', { action: ev.action, params: { ...p }, inputs: eventInputs(ev.inputs) }, checkEvent);
+      sendResources(p);
+      const input = { action: ev.action, params: { ...p }, inputs: eventInputs(ev.inputs), ...(ev.row !== undefined ? { row: ev.row } : {}), ...(ev.surface ? { surface: ev.surface } : {}) };
+      const r = await call('onEvent', input, checkEvent);
       if (!('ok' in r)) return { message: codeText(r.error) };
-      const out: GenEventResult = {};
-      if (r.ok.patch) out.patch = r.ok.patch as Params;
-      if (r.ok.message !== undefined) out.message = render(r.ok.message);
-      return out;
+      return answer(r.ok);
     },
+    ...(surface
+      ? {
+          surface,
+          async draw(req, p): Promise<GenDrawing> {
+            sendResources(p);
+            const r = await call('draw', { ...req, params: { ...p } }, checkDrawing);
+            if (!('ok' in r)) throw new Error(r.error);
+            const d = r.ok;
+            return {
+              frame: d.frame,
+              items: d.items.map(item),
+              ...(d.track ? { track: true } : {}),
+              ...(d.layers ? { layers: d.layers.map(({ items, ...l }) => ({ ...l, ...(items ? { items: items.map(item) } : {}) })) } : {}),
+            };
+          },
+          async onSurface(ev, st, p): Promise<GenSurfaceResult | void> {
+            sendResources(p);
+            const r = await call('onSurface', { event: ev, surface: st, params: { ...p } }, checkEvent);
+            if (!('ok' in r)) return { message: codeText(r.error) };
+            return answer(r.ok);
+          },
+        } satisfies Partial<Generator>
+      : {}),
     async onChange(key, old, p): Promise<GenChange | void> {
       if (missing.has('onChange')) return;
       const r = await call('onChange', { key, old, params: { ...p } }, checkChange);

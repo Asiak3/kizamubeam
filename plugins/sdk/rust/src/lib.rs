@@ -225,6 +225,23 @@ pub trait Plugin {
     fn on_event(_action: &str, _inputs: &Value, _p: &Self::Params) -> Option<Value> {
         None
     }
+    /// Optional: like [`Plugin::on_event`] with the context of the click: `ctx` holds `row` (a button of a list
+    /// row) and `surface` (`{ "view", "state", "selected" }` when the dialog has a drawing surface). An answer may
+    /// also carry `"state"`, `"view"` and `"select"` for the surface. The default calls `on_event`.
+    fn on_event_with(action: &str, inputs: &Value, _ctx: &Value, p: &Self::Params) -> Option<Value> {
+        Self::on_event(action, inputs, p)
+    }
+    /// Optional: what the drawing surface shows (`dialog.surface`, dialog version 3). `req` is
+    /// `{ "view", "state", "selected", "have" }`; answer `json!({ "frame": { "x0", "y0", "x1", "y1" }, "items": [ … ],
+    /// "layers": [ … ] })`. `None` (the default) means no surface.
+    fn draw(_req: &Value, _p: &Self::Params) -> Option<Value> {
+        None
+    }
+    /// Optional: a pointer or key event on the surface (`{ "type", "x", "y", "hit", "from", "drag", "key" }`, or
+    /// `"select"` with `list` and `row`); `surface` is `{ "view", "state", "selected" }`. Answer like `on_event`.
+    fn on_surface(_event: &Value, _surface: &Value, _p: &Self::Params) -> Option<Value> {
+        None
+    }
     /// Optional: data a parameter with `"resource"` names (`kind` "model3d": a 3D model, see [`mesh`]). Called
     /// once before the first call that needs it and again after a restart; keep it by `id` (e.g. in a
     /// `thread_local!`). Return `false` for data the plugin cannot read. The default means no resources.
@@ -259,8 +276,19 @@ pub fn dispatch<P: Plugin>(name: &str, input: Value) -> Result<Value, String> {
         "onEvent" => {
             let action = input.get("action").and_then(Value::as_str).ok_or("bad-input")?.to_string();
             let inputs = input.get("inputs").cloned().unwrap_or(Value::Null);
+            let ctx = serde_json::json!({ "row": input.get("row").cloned().unwrap_or(Value::Null), "surface": input.get("surface").cloned().unwrap_or(Value::Null) });
             let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
-            P::on_event(&action, &inputs, &p).ok_or_else(missing)
+            P::on_event_with(&action, &inputs, &ctx, &p).ok_or_else(missing)
+        }
+        "draw" => {
+            let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
+            P::draw(&input, &p).ok_or_else(missing)
+        }
+        "onSurface" => {
+            let event = input.get("event").cloned().unwrap_or(Value::Null);
+            let surface = input.get("surface").cloned().unwrap_or(Value::Null);
+            let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
+            P::on_surface(&event, &surface, &p).ok_or_else(missing)
         }
         _ => Err(missing()),
     }
@@ -283,6 +311,47 @@ macro_rules! export_plugin {
             $crate::abi::call(fn_ptr, fn_len, in_ptr, in_len, $crate::dispatch::<$plugin>)
         }
     };
+}
+
+#[cfg(test)]
+mod surface_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[derive(serde::Deserialize)]
+    struct P {
+        n: f64,
+    }
+    struct Dot;
+    impl Plugin for Dot {
+        type Params = P;
+        fn validate(_p: &P) -> Vec<Issue> {
+            vec![]
+        }
+        fn generate(_p: &P) -> Result<GenResult, String> {
+            Err("none".into())
+        }
+        fn on_event_with(action: &str, _inputs: &Value, ctx: &Value, _p: &P) -> Option<Value> {
+            Some(json!({ "message": format!("{} {}", action, ctx["row"]) }))
+        }
+        fn draw(req: &Value, p: &P) -> Option<Value> {
+            Some(json!({ "frame": { "x0": 0, "y0": 0, "x1": p.n, "y1": p.n }, "items": [{ "type": "handle", "id": "a", "x": 1, "y": 1 }], "track": req["state"].is_object() }))
+        }
+        fn on_surface(event: &Value, surface: &Value, _p: &P) -> Option<Value> {
+            Some(json!({ "state": { "at": event["x"] }, "view": surface["view"] }))
+        }
+    }
+
+    #[test]
+    fn surface_calls() {
+        let d = dispatch::<Dot>("draw", json!({ "view": "top", "state": {}, "selected": {}, "have": [], "params": { "n": 5 } })).unwrap();
+        assert_eq!(d["frame"]["x1"], 5.0);
+        assert_eq!(d["track"], true);
+        let s = dispatch::<Dot>("onSurface", json!({ "event": { "type": "down", "x": 2, "y": 3 }, "surface": { "view": "side" }, "params": { "n": 1 } })).unwrap();
+        assert_eq!(s, json!({ "state": { "at": 2 }, "view": "side" }));
+        let e = dispatch::<Dot>("onEvent", json!({ "action": "del", "row": 3, "inputs": {}, "params": { "n": 1 } })).unwrap();
+        assert_eq!(e["message"], "del 3");
+    }
 }
 
 #[cfg(test)]

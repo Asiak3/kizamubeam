@@ -1,6 +1,6 @@
 // Turns a built-in generator (src/generators) into a plugin: validate and generate with JSON in and out, issue
 // texts, info rows and labels as text codes. Bundled together with the generator by scripts/build-core-plugins.mjs.
-import type { GenEvent, Generator, Params, ParamValue } from '../../src/generators/types';
+import type { GenDrawRequest, GenEvent, GenEventResult, Generator, GenItem, GenPointer, GenSurfaceState, Params, ParamValue } from '../../src/generators/types';
 import { fromBase64, type PluginImage, type PluginText } from '../../src/plugins/contract';
 import { pieces, type Piece } from './i18n-shim';
 import { codeOf } from './codes';
@@ -31,6 +31,19 @@ const toText = (s: string) => text(pieces(s));
 // QuickJS has no structuredClone; the generators only clone plain data
 const gt = globalThis as unknown as { structuredClone?: <T>(v: T) => T };
 gt.structuredClone ??= <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+/** An answer of onEvent or onSurface as JSON: texts as codes */
+function answer(r: GenEventResult | void | Promise<unknown>) {
+  if (!r || r instanceof Promise) return null;
+  return {
+    ...(r.patch ? { patch: r.patch } : {}),
+    ...(r.message !== undefined ? { message: toText(r.message) } : {}),
+    ...(r.state !== undefined ? { state: r.state } : {}),
+    ...(r.view !== undefined ? { view: r.view } : {}),
+    ...(r.select ? { select: r.select } : {}),
+  };
+}
+const item = (it: GenItem) => (it.type === 'text' ? { ...it, text: toText(it.text) } : it);
 
 export function wrap(g: Generator) {
   (globalThis as unknown as { plugin: unknown }).plugin = {
@@ -71,6 +84,7 @@ export function wrap(g: Generator) {
             return {
               ...(v.autoText ? { autoText: Object.fromEntries(Object.entries(v.autoText).map(([k, x]) => [k, toText(x)])) } : {}),
               ...(v.rows ? { rows: Object.fromEntries(Object.entries(v.rows).map(([k, x]) => [k, x.map(toText)])) } : {}),
+              ...(v.rowAuto ? { rowAuto: Object.fromEntries(Object.entries(v.rowAuto).map(([k, x]) => [k, x.map(toText)])) } : {}),
             };
           },
         }
@@ -78,10 +92,28 @@ export function wrap(g: Generator) {
     ...(g.onEvent
       ? {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onEvent(input: { action: string; params: Params; inputs: Record<string, any> }) {
-            const r = g.onEvent!({ action: input.action, inputs: appInputs(input.inputs ?? {}) }, input.params);
-            if (!r || r instanceof Promise) return null;
-            return { ...(r.patch ? { patch: r.patch } : {}), ...(r.message !== undefined ? { message: toText(r.message) } : {}) };
+          onEvent(input: { action: string; params: Params; inputs: Record<string, any>; row?: number; surface?: GenSurfaceState }) {
+            const ev: GenEvent = { action: input.action, inputs: appInputs(input.inputs ?? {}) };
+            if (input.row !== undefined) ev.row = input.row;
+            if (input.surface) ev.surface = input.surface;
+            return answer(g.onEvent!(ev, input.params));
+          },
+        }
+      : {}),
+    ...(g.draw
+      ? {
+          draw(input: GenDrawRequest & { params: Params }) {
+            const { params, ...req } = input;
+            const d = g.draw!(req, params);
+            if (d instanceof Promise) return null;
+            return { ...d, items: d.items.map(item), ...(d.layers ? { layers: d.layers.map((l) => (l.items ? { ...l, items: l.items.map(item) } : l)) } : {}) };
+          },
+        }
+      : {}),
+    ...(g.onSurface
+      ? {
+          onSurface(input: { event: GenPointer; surface: GenSurfaceState; params: Params }) {
+            return answer(g.onSurface!(input.event, input.surface, input.params));
           },
         }
       : {}),

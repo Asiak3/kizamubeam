@@ -16,8 +16,7 @@ import { genFitPatch } from '../fitcheck';
 import { genHost } from '../genHost';
 import { onPluginResult } from '../plugins/generator';
 import { listsArea } from './dialogLists';
-
-/** Generatoren mit eigener Zeichenfläche unter den Feldern */
+import { surfaceArea } from './dialogSurface';
 
 const LAST_KEY = (id: string) => `kizamubeam.gen.${id}`;
 
@@ -232,12 +231,10 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   const kerfNote = h('div', { class: 'note' });
   let built: BuildResult | null = null;
   const host = genHost(ed);
-  const panel = g.panel?.(p, (patch) => {
-    Object.assign(p, patch);
-    update();
-  }, host);
-  // Lists and action buttons the generator declares (#335 stage 3); a patch is checked like user input
-  const lists = listsArea(g, p, (patch) => patchFields('', patch), host, () => dlg.open, (key) => rows.get(key) ?? []);
+  // Drawing surface (#335 stage 4), lists and action buttons (stage 3) the generator declares; a patch is
+  // checked like user input
+  const surface = surfaceArea(g, p, (patch) => patchFields('', patch), () => dlg.open);
+  const lists = listsArea(g, p, (patch) => patchFields('', patch), host, () => dlg.open, (key) => rows.get(key) ?? [], surface);
 
   const render = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde
@@ -262,7 +259,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     }
     infoEl.replaceChildren(...r.info.map(([k, v]) => h('div', {}, h('span', { class: 'muted' }, k), ' ', v)));
     okBtn.disabled = addBtn.disabled = !built || asking;
-    panel?.refresh(np);
+    surface?.refresh(np);
     lists?.refresh(np);
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -480,8 +477,8 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
       ),
       h('div', {}, canvas, infoEl),
     ),
+    surface?.el ?? null,
     lists?.el ?? null,
-    panel?.el ?? null,
     askEl,
     issuesEl,
     calibNote,

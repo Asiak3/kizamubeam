@@ -114,27 +114,70 @@ export function mesh(data: string): Mesh | null {
   for (let i = 0; i < tri.length; i++) tri[i] = dv.getUint32(8 + nv * 12 + i * 4, true);
   return { pos, tri };
 }
-/** Answer of onEvent: parameters to change (e.g. new rows of a list) and a short message for the dialog */
+/** Answer of onEvent and onSurface: parameters to change (e.g. new rows of a list), a short message for the dialog,
+ * and for a drawing surface its new free state (null clears it), view and selected rows */
 export interface EventResult {
   patch?: Params;
   message?: Text;
+  state?: unknown;
+  view?: string;
+  select?: Record<string, number>;
+}
+/** The drawing surface as it is: view, the plugin's free state, selected row by list parameter (-1 = none) */
+export interface Surface {
+  view: string;
+  state: unknown;
+  selected: Record<string, number>;
+}
+export type Style = 'normal' | 'muted' | 'accent' | 'warn';
+/** A shape on the surface (mm, y down); handles and lines with an id can be hit by the pointer */
+export type Item =
+  | { type: 'line'; pts: [number, number][]; closed?: boolean; style?: Style; width?: number; dash?: boolean; alpha?: number; id?: string }
+  | { type: 'handle'; x: number; y: number; id: string; style?: Style; size?: number }
+  | { type: 'text'; x: number; y: number; text: Text; style?: Style };
+/** What draw() returns: the area to show, layers the app keeps by key (send their content only when not in have), shapes */
+export interface Drawing {
+  frame: { x0: number; y0: number; x1: number; y1: number };
+  layers?: { key: string; tris?: number[]; items?: Item[]; alpha?: number }[];
+  items: Item[];
+  /** Send pointer moves without a pressed button (e.g. while drawing a line) */
+  track?: boolean;
+}
+/** A pointer or key event on the surface; select: a row of a selectable list was clicked */
+export interface Pointer {
+  type: 'down' | 'move' | 'up' | 'dblclick' | 'context' | 'key' | 'select';
+  x: number;
+  y: number;
+  hit?: string;
+  from?: { x: number; y: number };
+  drag?: boolean;
+  key?: string;
+  list?: string;
+  row?: number;
 }
 export interface Plugin<P extends Params = Params> {
   validate(p: P): Issue[];
   /** Runs only when validate reported no error; throw new Error('code') to report a problem */
   generate(p: P): GenResult;
   /**
-   * Optional: suggestions the dialog shows in empty text fields (autoText), and a short text per row of a list
-   * (rows, by the list's data parameter), both by parameter key
+   * Optional: suggestions the dialog shows in empty text fields (autoText), a short text per row of a list
+   * (rows, by the list's data parameter) and a suggestion for each row's empty first text cell (rowAuto)
    */
-  view?(p: P): { autoText?: Record<string, Text>; rows?: Record<string, Text[]> };
+  view?(p: P): { autoText?: Record<string, Text>; rows?: Record<string, Text[]>; rowAuto?: Record<string, Text[]> };
   /**
    * Optional: called when the user commits a field, with its previous value. The patch is checked against the
    * schema like user input; a question is shown inside the dialog, Cancel restores the field.
    */
   onChange?(input: { key: string; old: Params[string]; params: P }): Change | null;
-  /** Optional: a button of the manifest's dialog.actions was pressed; inputs holds what the action declares */
-  onEvent?(input: { action: string; params: P; inputs: EventInputs }): EventResult | null;
+  /**
+   * Optional: a button of the manifest's dialog.actions (or a row button of a list, with its row) was pressed;
+   * inputs holds what the action declares, surface the drawing surface if the dialog has one
+   */
+  onEvent?(input: { action: string; params: P; inputs: EventInputs; row?: number; surface?: Surface }): EventResult | null;
+  /** Optional (dialog version 3, dialog.surface): what the drawing surface shows; have = layer keys the app keeps */
+  draw?(input: Surface & { have: string[]; params: P }): Drawing;
+  /** Optional: a pointer or key event on the drawing surface */
+  onSurface?(input: { event: Pointer; surface: Surface; params: P }): EventResult | null;
   /**
    * Optional: data a parameter with "resource" names (kind "model3d": a 3D model, decode it with mesh()). Called
    * once before the first call that needs it, and again after the plugin was restarted; keep it by id.

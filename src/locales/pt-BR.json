@@ -3643,7 +3643,6 @@
   "Einfache Achse über das ganze Modell. Für Kopf, Beine oder Schwanz eigene Abschnitte zeichnen.": "Um eixo simples pelo modelo inteiro. Desenhe seções próprias para cabeça, pernas ou cauda.",
   "Ebene bei": "Plano em",
   "Verlängern": "Estender",
-  "Lage der Ebene quer zur Ansicht {view} (mm)": "Posição do plano transversal à vista {view} (mm)",
   "Ebene in die Mitte des Materials an der Achse legen": "Colocar o plano no meio do material no eixo",
   "Mitte": "Centro",
   "Rippenabstand in diesem Abschnitt; leer = wie oben": "Espaçamento das nervuras nesta seção; vazio = como acima",
@@ -3655,7 +3654,6 @@
   "Klicken setzt Punkte der Achse, Doppelklick oder Enter beendet, Esc bricht ab.": "Clique para definir pontos do eixo, clique duplo ou Enter finaliza, Esc cancela.",
   "Punkte ziehen verschiebt die Achse, die Linie ziehen verschiebt den ganzen Abschnitt; in einer anderen Ansicht verschiebt Ziehen die Ebene. Rechtsklick auf einen Punkt löscht ihn.": "Arrastar pontos move o eixo, arrastar a linha move a seção inteira; em outra vista, arrastar move o plano. Clique com o botão direito em um ponto para excluí-lo.",
   "Rumpf, Beine und Schwanz im Modell suchen und als Abschnitte anlegen; danach von Hand korrigieren": "Localizar corpo, pernas e cauda no modelo e criar como seções; depois corrigir manualmente",
-  "Modell wird untersucht …": "Analisando modelo …",
   "Vorschlag: {found}. Achsen prüfen und bei Bedarf ziehen.": "Sugestão: {found}. Verifique os eixos e arraste se necessário.",
   "Vorschlagen": "Sugerir",
   "Im Modell wurde kein Körper gefunden.": "Nenhum corpo sólido foi encontrado no modelo.",
@@ -4912,5 +4910,9 @@
   "ungültige Angabe „inputs“": "“inputs” inválido",
   "{where}: unbekannte Ressource „{kind}“": "{where}: recurso desconhecido “{kind}”",
   "{where}: „name“ muss ein Text-Parameter sein": "{where}: “name” deve ser um parâmetro de texto",
-  "{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein": "{where}: “param” deve ser um parâmetro data com “resource”: “model3d”"
+  "{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein": "{where}: “param” deve ser um parâmetro data com “resource”: “model3d”",
+  "Lage der Ebene quer zur Ansicht (mm)": "Posição do plano transversal à vista (mm)",
+  "wie oben": "como acima",
+  "{ribs} von {count} Rippen": "{ribs} de {count} costelas",
+  "{where}: braucht „dialog“ Version 3": "{where}: precisa de “dialog” versão 3"
 }

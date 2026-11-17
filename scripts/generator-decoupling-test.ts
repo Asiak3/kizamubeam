@@ -117,9 +117,13 @@ test('inputs: selection and 3D model become parameters through fromInputs', () =
   assert.ok(String(p.shapes).includes('Tag'));
   assert.equal(jig.fromInputs!({ selection: [] }), undefined);
   for (const id of ['stack', 'ribs']) assert.deepEqual(getGenerator(id)!.fromInputs!({ model: { id: 'm1', name: 'cat' } }), { model: 'm1', name: 'cat' });
-  assert.equal(typeof getGenerator('ribs')!.panel, 'function');
-  // The jig needs no panel of its own: list, selection, image and camera are declared (#335 stage 3)
-  assert.equal(jig.panel, undefined);
+  // No generator has a panel of its own any more: lists, actions and the surface are declared (#335 stages 3 and 4)
+  const ribs = getGenerator('ribs')!;
+  assert.equal((ribs as { panel?: unknown }).panel, undefined);
+  assert.equal((jig as { panel?: unknown }).panel, undefined);
+  assert.deepEqual(ribs.surface!.views.map((v) => v.id), ['xz', 'yz', 'xy']);
+  assert.equal(typeof ribs.draw, 'function');
+  assert.equal(typeof ribs.onSurface, 'function');
   assert.deepEqual(jig.actions!.map((a) => [a.id, a.inputs]), [['fromSelection', ['selection']], ['fromImage', ['image']], ['fromCamera', ['camera']]]);
 });
 

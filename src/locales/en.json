@@ -3639,7 +3639,6 @@
   "Einfache Achse über das ganze Modell. Für Kopf, Beine oder Schwanz eigene Abschnitte zeichnen.": "One simple axis through the whole model. Draw sections of their own for head, legs or tail.",
   "Ebene bei": "Plane at",
   "Verlängern": "Extend",
-  "Lage der Ebene quer zur Ansicht {view} (mm)": "Position of the plane across the view {view} (mm)",
   "Ebene in die Mitte des Materials an der Achse legen": "Put the plane in the middle of the material at the axis",
   "Mitte": "Center",
   "Rippenabstand in diesem Abschnitt; leer = wie oben": "Rib spacing in this section; empty = as above",
@@ -3651,7 +3650,6 @@
   "Klicken setzt Punkte der Achse, Doppelklick oder Enter beendet, Esc bricht ab.": "Click to set axis points, double-click or Enter to finish, Esc to cancel.",
   "Punkte ziehen verschiebt die Achse, die Linie ziehen verschiebt den ganzen Abschnitt; in einer anderen Ansicht verschiebt Ziehen die Ebene. Rechtsklick auf einen Punkt löscht ihn.": "Drag points to move the axis, drag the line to move the whole section; in another view dragging moves the plane. Right-click a point to delete it.",
   "Rumpf, Beine und Schwanz im Modell suchen und als Abschnitte anlegen; danach von Hand korrigieren": "Find body, legs and tail in the model and create them as sections; then correct by hand",
-  "Modell wird untersucht …": "Analyzing model …",
   "Vorschlag: {found}. Achsen prüfen und bei Bedarf ziehen.": "Suggestion: {found}. Check the axes and drag them if needed.",
   "Vorschlagen": "Suggest",
   "Im Modell wurde kein Körper gefunden.": "No solid body was found in the model.",
@@ -4912,5 +4910,9 @@
   "ungültige Angabe „inputs“": "invalid “inputs”",
   "{where}: unbekannte Ressource „{kind}“": "{where}: unknown resource “{kind}”",
   "{where}: „name“ muss ein Text-Parameter sein": "{where}: “name” must be a text parameter",
-  "{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein": "{where}: “param” must be a data parameter with “resource”: “model3d”"
+  "{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein": "{where}: “param” must be a data parameter with “resource”: “model3d”",
+  "Lage der Ebene quer zur Ansicht (mm)": "Position of the plane across the view (mm)",
+  "wie oben": "as above",
+  "{ribs} von {count} Rippen": "{ribs} of {count} ribs",
+  "{where}: braucht „dialog“ Version 3": "{where}: needs “dialog” version 3"
 }

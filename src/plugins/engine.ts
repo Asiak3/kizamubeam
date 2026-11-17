@@ -70,6 +70,15 @@ export async function createJsEngine(source: string): Promise<Engine> {
     r.value.dispose();
     return out;
   };
+  // QuickJS seeds Math.random from a clock with millisecond steps, so engines started in the same millisecond
+  // would give the same numbers; seed every engine from the host's random source instead (xorshift128+)
+  const seed = crypto.getRandomValues(new Uint32Array(4));
+  run(
+    `(() => { let a = ${seed[0] | 1}, b = ${seed[1]}, c = ${seed[2]}, d = ${seed[3]};
+      Math.random = () => { let t = a ^ (a << 11); a = b; b = c; c = d; d = (d ^ (d >>> 19) ^ t ^ (t >>> 8)) | 0;
+        return ((d >>> 0) + ((c >>> 0) & 0x1fffff) * 4294967296) / 9007199254740992; }; })();`,
+    'seed.js',
+  );
   // The envelope wrapper is fixed app code; the plugin only provides globalThis.plugin
   run(source, 'plugin.js');
   run(
