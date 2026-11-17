@@ -67,6 +67,26 @@ await test('edge: finger joints and tenons like the Joint tool', () => {
   assert.equal((w.ok!.added as SubPath[]).length, 1);
 });
 
+await test('edge: slotClearance sets the play across the slot on its own (#402)', () => {
+  const a = rectSub(0, 0, 100, 50), b = rectSub(0, 60, 100, 50);
+  const slots = (opt: Record<string, unknown>) => {
+    const r = call({ op: 'edge', options: { kind: 'tenon', thickness: 3, tenonCount: 1, tenonWidth: 20, slotOffset: 10, ...opt }, parts: { a: [a], b: [b] }, edges: [{ part: 'a', seg: 2 }, { part: 'b', seg: 0 }] });
+    const s = (r.ok!.parts as Record<string, SubPath[]>).b[1].nodes;
+    const xs = s.map((p) => p.x), ys = s.map((p) => p.y);
+    return { r, len: Math.max(...xs) - Math.min(...xs), width: Math.max(...ys) - Math.min(...ys) };
+  };
+  // Without it nothing changes: play along the slot is clearance per side, across it clearance
+  const plain = slots({ clearance: 0.1, kerf: 0.2 });
+  assert.deepEqual(round(slots({ clearance: 0.1, kerf: 0.2, slotClearance: 0.1 }).r), round(plain.r));
+  assert.ok(Math.abs(plain.len - 19.9) < 1e-9 && Math.abs(plain.width - 2.9) < 1e-9, `${plain.len} × ${plain.width}`);
+  // 0.1 total play in both directions: half the clearance along the slot, slotClearance across it
+  const total = slots({ clearance: 0.05, slotClearance: 0.1 });
+  assert.ok(Math.abs(total.len - 20.05) < 1e-9 && Math.abs(total.width - 3.1) < 1e-9, `${total.len} × ${total.width}`);
+  assert.deepEqual(round((total.r.ok!.parts as Record<string, SubPath[]>).a), round((slots({ clearance: 0.05 }).r.ok!.parts as Record<string, SubPath[]>).a), 'tenons unchanged');
+  // Out of range is refused
+  assert.deepEqual(call({ op: 'edge', options: { kind: 'tenon', slotClearance: 9 }, parts: { a: [a] }, edges: [{ part: 'a', seg: 2 }] }), { error: 'host-bad-input' });
+});
+
 await test('edge: a joint that does not fit answers with an error code; the app writes the text', () => {
   const r = call({ op: 'edge', options: { kind: 'finger', thickness: 3, fingerWidth: 0.5, kerf: 1 }, parts: { a: [rectSub(0, 0, 20, 20)] }, edges: [{ part: 'a', seg: 0 }] });
   assert.deepEqual(r.ok, { v: 1, error: { code: 'joint-fingers-narrow' } });

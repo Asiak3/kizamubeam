@@ -348,6 +348,8 @@ export interface JointOptions {
   hingeWall?: number;
   kerf?: number;
   clearance?: number;
+  /** Tenon family: play across the slot (slot width over the thickness); default clearance */
+  slotClearance?: number;
 }
 /** A joint message: code joint-… with its numbers, translated by the app */
 export interface JointMessage {

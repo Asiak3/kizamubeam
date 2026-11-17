@@ -22,7 +22,7 @@ const NUM_OPTS: Record<string, [number, number]> = {
   thickness: [0.1, 100], fingerWidth: [0.5, 1000], tenonCount: [1, 100], tenonWidth: [0.1, 1000], slotOffset: [-1000, 1000],
   lapCount: [1, 100], lapDepth: [1, 99], snapLip: [0, 50], snapLength: [0, 100], snapRelief: [0, 1000], hookLength: [0, 1000],
   wedgeWidth: [0, 100], wedgePull: [-50, 50], boltDia: [0, 50], nutWidth: [0, 100], nutHeight: [0, 100], boltLength: [0, 1000],
-  hingeCount: [1, 99], pinDia: [0, 50], pinPlay: [-5, 5], hingeWall: [0, 50], kerf: [0, 5], clearance: [-5, 5],
+  hingeCount: [1, 99], pinDia: [0, 50], pinPlay: [-5, 5], hingeWall: [0, 50], kerf: [0, 5], clearance: [-5, 5], slotClearance: [-5, 5],
 };
 /** Most cells of a panel's finger grid (the generators allow 3 m panels with 0.5 mm fingers; keeps larger requests from taking the Worker's time) */
 const MAX_FIELDS = 20000;

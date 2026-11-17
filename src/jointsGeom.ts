@@ -61,6 +61,11 @@ export interface JointOptions {
   kerf: number;
   /** Spiel in mm: positiv = lockerer, negativ = strammer (Press-Fit) */
   clearance: number;
+  /**
+   * Tenon family: play across the slot (slot width over the thickness) in mm. Not set = clearance, as before. Lets a
+   * caller set the play along and across the slot separately (#402), like slotClearance of the box with dividers.
+   */
+  slotClearance?: number;
 }
 
 export const DEFAULT_JOINT: JointOptions = {
@@ -572,7 +577,7 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
       // Schlitzmitte: um slotOffset von der Linie versetzt, bei Kanten geschlossener Formen ins Material hinein
       const sideIn = s.closed ? -1 : 1;
       const sl = o.tenonWidth - adj,
-        sw = th - adj;
+        sw = th - o.kerf + (o.slotClearance ?? o.clearance);
       if (sl <= 0 || sw <= 0) return fail('slots-small');
       const mid = s.len / 2;
       // Hakenzapfen: Schlitz um die Hakenlänge verlängert, auf der dem Haken abgewandten Seite (einstecken, dann schieben)
