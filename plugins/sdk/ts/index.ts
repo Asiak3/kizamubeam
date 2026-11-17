@@ -303,9 +303,60 @@ export interface Host {
    */
   context(what: 'material'): MaterialContext | null;
   context(what: 'workArea'): WorkArea | null;
+  /**
+   * The app's wood joints (#398). panel: the outline of a box panel (width × height, centred, y down) with finger
+   * joints on its edges top, right, bottom, left (A starts with a finger, B with a gap, flat = none), like the box
+   * generators. edge: a joint of the Joint tool on one or two straight edges (segment seg of sub-path sub) of the
+   * outlines in parts; answers the changed outlines, added parts (wedges, hinge knuckles), info codes and, when the
+   * joint does not fit, an error code instead. v is the version of the joint geometry (1): the same input and version
+   * always give the same shapes. Info and error codes (joint-…) have their texts in the app: pass them on as issue
+   * codes or info texts with their values.
+   */
+  joints(input: { op: 'panel'; v?: 1; width: number; height: number; thickness: number; finger: number; clearance?: number; kerf?: number; edges: [JointPattern, JointPattern, JointPattern, JointPattern]; corners?: boolean }): { v: 1; outline: SubPath };
+  joints(input: { op: 'edge'; v?: 1; options: JointOptions; parts: Record<string, SubPath[]>; edges: { part: string; sub?: number; seg: number }[] }): JointAnswer;
   /** Report progress 0 … 1 of a long computation, optionally with a short text */
   progress(done: number, text?: string): void;
 }
+export type JointPattern = 'A' | 'B' | 'flat';
+/** Options of a joint, as in the Joint tool (mm unless noted); only kind is required */
+export interface JointOptions {
+  kind: 'finger' | 'tenon' | 'lap' | 'snap' | 'hook' | 'wedge' | 'tslot' | 'lidhinge';
+  thickness?: number;
+  fingerWidth?: number;
+  direction?: 'in' | 'out';
+  swap?: boolean;
+  tenonCount?: number;
+  tenonWidth?: number;
+  slotOffset?: number;
+  lapCount?: number;
+  /** % of the panel width */
+  lapDepth?: number;
+  snapLip?: number;
+  snapLength?: number;
+  snapRelief?: number;
+  hookLength?: number;
+  hookFlip?: boolean;
+  wedgeWidth?: number;
+  wedgePull?: number;
+  boltDia?: number;
+  nutWidth?: number;
+  nutHeight?: number;
+  boltLength?: number;
+  hingeCount?: number;
+  pinDia?: number;
+  pinPlay?: number;
+  hingeWall?: number;
+  kerf?: number;
+  clearance?: number;
+}
+/** A joint message: code joint-… with its numbers, translated by the app */
+export interface JointMessage {
+  code: string;
+  values?: Record<string, number | string>;
+}
+export type JointAnswer =
+  | { v: 1; parts: Record<string, SubPath[]>; added: SubPath[]; info: JointMessage[]; error?: undefined }
+  | { v: 1; error: JointMessage };
 /** host.context("material"): values from the material library entry on the layer, each null when unknown (mm) */
 export interface MaterialContext {
   name: string | null;

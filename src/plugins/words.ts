@@ -5,6 +5,7 @@ import type { PluginIssue, PluginText } from './contract';
 import { pluginText, type PluginManifest } from './manifest';
 import { lang, t } from '../i18n';
 import { checkCodeText } from '../checkText';
+import { jointText } from '../jointText';
 
 /** Issue code while a plugin is still computing these parameters */
 export const PENDING = 'plugin-pending';
@@ -66,6 +67,14 @@ export function localNumbers(s: string): string {
 /** Number values: whole numbers as they are (like t() in the app: „z=1000“), decimals in the user's format */
 const localNumber = (x: number) => (Number.isInteger(x) ? String(x) : x.toLocaleString(undefined, { maximumFractionDigits: 6 }));
 
+/** Text of a message of host.joints (code joint-…, #398) with its raw values; undefined for other codes */
+function jointCode(code: string, v?: Record<string, unknown>): string | undefined {
+  if (!code.startsWith('joint-')) return undefined;
+  const values: Record<string, number | string> = {};
+  for (const [k, x] of Object.entries(v ?? {})) if ((typeof x === 'number' && Number.isFinite(x)) || typeof x === 'string') values[k] = x;
+  return jointText({ code: code.slice(6), values });
+}
+
 /** Texts of one plugin in the interface language */
 export function pluginWords(m: PluginManifest) {
   const text = (key: string, values?: Record<string, string | number>) => pluginText(m.texts, lang, key, values);
@@ -76,7 +85,7 @@ export function pluginWords(m: PluginManifest) {
   /** A plugin text in the interface language */
   const render = (x: PluginText): string => (typeof x === 'string' ? localNumbers(x) : Array.isArray(x) ? x.map(render).join('') : coded(x.code, x.values));
   /** A code with its values: findings of host.check (#388) have their text in the app and take the raw numbers */
-  const coded = (code: string, v?: Record<string, PluginText | number>) => checkCodeText(code, v) ?? codeText(code, values(v));
+  const coded = (code: string, v?: Record<string, PluginText | number>) => checkCodeText(code, v) ?? jointCode(code, v) ?? codeText(code, values(v));
   /** A plain text that names a code (info labels of older plugins) is shown as that text */
   const label = (x: PluginText) => (typeof x === 'string' ? (text(x) ?? x) : render(x));
   const issue = (i: PluginIssue): Issue => ({

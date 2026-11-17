@@ -23,9 +23,10 @@ import { worldOf } from '../model3d/world';
 import { deepestPoint } from '../model3d/polys';
 import { nestParts } from '../generators/build';
 import { checkFn } from './hostCheck';
+import { jointsFn } from './hostJoints';
 
 /** Host functions a manifest may ask for */
-export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest', 'fetch', 'context', 'check'] as const;
+export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest', 'fetch', 'context', 'check', 'joints'] as const;
 export type HostFn = (typeof HOST_FNS)[number];
 
 /** A host function got input it cannot use; the plugin call fails with this code unless the plugin catches it */
@@ -342,7 +343,7 @@ export function hostCaller(allowed: readonly string[], onProgress?: (done: numbe
   const st: SliceState = { meshes: new Map(), prepared: new Map() };
   const net = new Map<string, NetResponse>();
   const ctx = new Map<string, unknown>();
-  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest, fetch: (x) => fetchFn(net, x, onWant), context: (x) => contextFn(ctx, x), check: (x) => checkFn(x, subsOf, num, bad) };
+  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest, fetch: (x) => fetchFn(net, x, onWant), context: (x) => contextFn(ctx, x), check: (x) => checkFn(x, subsOf, num, bad), joints: (x) => jointsFn(x, subsOf, num, bad) };
   const call = (name: string, json: string): string => {
     try {
       if (name === 'progress') {
