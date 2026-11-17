@@ -82,3 +82,9 @@ export function restoreMeshes(ids: Iterable<string>) {
       /* nicht verfügbar */
     });
 }
+
+/** Kennung eines eingetragenen Netzes (dasselbe Objekt wie von getMesh) */
+export function meshIdOf(mesh: Mesh): string | null {
+  for (const [id, e] of meshes) if (e.mesh === mesh) return id;
+  return null;
+}

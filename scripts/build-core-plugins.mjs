@@ -19,6 +19,9 @@ const SHIM = join(ROOT, 'plugins/core/i18n-shim.ts');
 const LANGS = ['de', 'en', 'it', 'es', 'pt-BR'];
 const dicts = Object.fromEntries(LANGS.filter((l) => l !== 'de').map((l) => [l, JSON.parse(readFileSync(join(ROOT, `src/locales/${l}.json`), 'utf8'))]));
 
+const SLICE_HOST = "export * from './plugins/core/slice-host';";
+const FIT_HOST = "export * from './plugins/core/fit-host';";
+
 /**
  * Generators built as plugins. label: text for the Objects window with placeholders mapped to parameters
  * (the plugin fills placeholders with parameter values; generators whose label needs computed values leave it out).
@@ -36,8 +39,9 @@ export const CORE = {
   discsphere: { file: 'src/generators/discsphere', name: 'DISCSPHERE' },
   fingerbox: { file: 'src/generators/fingerbox', name: 'FINGERBOX' },
   // Print-and-cut marks pull in geom (with fonts); the jig never uses its boundsOf
-  stack: { file: 'src/generators/stack', name: 'STACK' },
-  ribs: { file: 'src/generators/ribs', name: 'RIBS' },
+  // Slicing and area operations through the app (host functions), at the speed of the built-in generators
+  stack: { file: 'src/generators/stack', name: 'STACK', host: ['slice', 'region', 'fit'], stub: { slice: SLICE_HOST, fit: FIT_HOST } },
+  ribs: { file: 'src/generators/ribs', name: 'RIBS', host: ['slice', 'region', 'fit'], stub: { slice: SLICE_HOST, fit: FIT_HOST } },
   jig: { file: 'src/generators/jig', name: 'JIG', stub: { geom: 'export const boundsOf = () => { throw new Error("not in plugins"); };' } },
 };
 
@@ -105,7 +109,7 @@ const stubs = (map = {}) => ({
     const names = Object.keys(map);
     if (!names.length) return;
     b.onResolve({ filter: new RegExp(`/(${names.join('|')})$`) }, (a) => ({ path: a.path.split('/').pop(), namespace: 'stub' }));
-    b.onLoad({ filter: /.*/, namespace: 'stub' }, (a) => ({ contents: map[a.path], loader: 'ts' }));
+    b.onLoad({ filter: /.*/, namespace: 'stub' }, (a) => ({ contents: map[a.path], loader: 'ts', resolveDir: ROOT }));
   },
 });
 
@@ -222,7 +226,7 @@ export async function corePlugin(id) {
   const sha256 = createHash('sha256').update(code).digest('hex');
   return {
     id: g.id, type: 'generator', api: 1, version: g.version, kind: g.kind, runtime: 'js', code, sha256,
-    icon: g.icon,
+    icon: g.icon, ...(c.host ? { host: c.host } : {}),
     dialog: lists || actions || surface ? { version: v3 ? 3 : 2, ...(lists ? { lists } : {}), ...(actions ? { actions } : {}), ...(surface ? { surface } : {}) } : { version: 1 },
     ...(g.preview?.center ? { preview: { center: true } } : {}), ...(inputs ? { inputs } : {}), params, texts,
   };

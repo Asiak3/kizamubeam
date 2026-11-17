@@ -202,9 +202,26 @@ export interface Host {
   fit(input: { pts: [number, number][]; closed?: boolean; tolerance?: number }): SubPath;
   /** Outlines of the dark areas of a grayscale image (one byte per pixel, base64), in mm from the top left */
   trace(input: { width: number; height: number; data: string; threshold?: number; smooth?: number; ignoreLess?: number; scale?: number }): SubPath[];
+  /**
+   * Cross-sections of a 3D model the plugin got as a resource (by its id), at heights along frame.w. With size the
+   * model is placed upright, scaled to that longest side and centred over the origin, like the built-in 3D-model
+   * generators. Each layer is an area (Region) plus the number of chains that stayed open (holes in the mesh).
+   */
+  slice(input: { model: string; up?: 'z' | 'y'; size?: number; frame?: { u: V3; v: V3; w: V3 }; heights: number[]; gap?: number }): { min: V3; max: V3; layers: { region: Region; open: number }[] };
+  /** Operations on areas (nonzero fill, points on a 1 µm grid) */
+  region(input: { op: 'union' | 'intersection' | 'difference'; a: Region; b?: Region }): Region;
+  region(input: { op: 'offset'; a: Region; delta: number }): Region;
+  region(input: { op: 'loops'; loops: number[][] }): Region;
+  region(input: { op: 'band'; line: number[]; radius: number }): Region;
+  region(input: { op: 'clean'; a: Region; minArea?: number }): { polys: number[][]; islands: number };
+  region(input: { op: 'islands'; a: Region; minArea?: number }): number[][][];
+  region(input: { op: 'deepest'; polys: number[][] }): { p: [number, number]; r: number } | null;
   /** Report progress 0 … 1 of a long computation, optionally with a short text */
   progress(done: number, text?: string): void;
 }
+export type V3 = [number, number, number];
+/** An area: closed polygons, each [x0, y0, x1, y1, …] in mm */
+export type Region = number[][];
 export const host: Host = (globalThis as unknown as { host: Host }).host;
 
 /** Register the plugin's functions with the app */

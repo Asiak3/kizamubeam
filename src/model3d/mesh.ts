@@ -1,7 +1,8 @@
 // Dreiecksnetze (3D-Modelle) lesen, verschweißen, prüfen und kompakt speichern. Ohne DOM, damit es auch in den
 // Node-Tests läuft. Einheiten wie in der Datei (STL kennt keine; meist mm).
 import { t } from '../i18n';
-import { fromBase64, toBase64 } from '../base64';
+import { toBase64 } from '../base64';
+import { readMeshData } from './meshData';
 
 export interface Mesh {
   /** Eckpunkte x, y, z hintereinander */
@@ -162,19 +163,10 @@ export function encodeMesh(m: Mesh): string {
 }
 
 export function decodeMesh(s: string): Mesh {
-  if (!s.startsWith('kzm1:')) throw new MeshError(t('Unbekanntes Modellformat.'));
-  const bytes = fromBase64(s.slice(5));
-  const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const nv = dv.getUint32(0, true),
-    nt = dv.getUint32(4, true);
-  if (8 + nv * 12 + nt * 12 !== bytes.length) throw new MeshError(t('Die Modelldaten sind beschädigt.'));
-  const pos = new Float32Array(nv * 3);
-  const tri = new Uint32Array(nt * 3);
-  let o = 8;
-  for (let i = 0; i < pos.length; i++, o += 4) pos[i] = dv.getFloat32(o, true);
-  for (let i = 0; i < tri.length; i++, o += 4) tri[i] = dv.getUint32(o, true);
-  if (tri.some((i) => i >= nv)) throw new MeshError(t('Die Modelldaten sind beschädigt.'));
-  return { pos, tri };
+  const m = readMeshData(s);
+  if (m === 'format') throw new MeshError(t('Unbekanntes Modellformat.'));
+  if (m === 'damaged') throw new MeshError(t('Die Modelldaten sind beschädigt.'));
+  return m;
 }
 
 /** Kurze Kennung aus den Daten (FNV-1a, zwei Läufe), gleiche Modelle ergeben dieselbe */

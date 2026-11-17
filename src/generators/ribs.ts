@@ -24,7 +24,7 @@ import type { GenAction, Generator, GenList, GenPart, Issue, Params, PlanSheet, 
 import { getMesh } from '../model3d/store';
 import type { Mesh } from '../model3d/mesh';
 import {
-  capsuleRegion, circleRegion, cleanRegion, region, inside, intersect, intervalsAtX, intervalsInBand, offsetRegion, polyRegion, prepare, Prepared, regionArea,
+  capsuleRegion, circleRegion, cleanRegion, region, inside, intersect, intervalsAtX, intervalsInBand, offsetRegion, polyRegion, prepareFit, Prepared, regionArea,
   regionIslands, sliceAt, sliceRegion, subtractRegions, unionRegions, V3,
 } from '../model3d/slice';
 import { numberStrokes, numberWidth, placeNumber, worldOf } from './stack';
@@ -304,13 +304,12 @@ function compute(p: RibsParams, rawMesh: Mesh, skip = new Set<number>()): RibsLa
 
   // Vorbereitete Netze je Schnittrichtung (gerade Abschnitte teilen sich eines)
   const preps = new Map<string, Prepared>();
-  const ident = (x: number, y: number, z: number): V3 => [x, y, z];
   const prep = (f: { u: V3; v: V3; w: V3 }) => {
     const k = [...f.u, ...f.v, ...f.w].map((v) => v.toFixed(6)).join(',');
     let q = preps.get(k);
     if (!q) {
       if (preps.size > 64) preps.clear();
-      q = prepare(mesh, ident, f);
+      q = prepareFit(rawMesh, p.up, p.size, f);
       preps.set(k, q);
     }
     return q;

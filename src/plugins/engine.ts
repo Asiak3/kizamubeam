@@ -121,6 +121,7 @@ export async function createJsEngine(source: string, opts: EngineOptions = {}): 
     call(fn, input, timeoutMs) {
       if (!FN.test(fn)) throw new EngineError('plugin-no-function');
       deadline = Date.now() + timeoutMs;
+      if (fn === 'resource') caller.resource(input);
       const s = ctx.newString(input);
       ctx.setProp(ctx.global, '__kzbIn', s);
       s.dispose();
@@ -175,6 +176,7 @@ export async function createWasmEngine(bytes: Uint8Array, opts: EngineOptions = 
   return {
     call(fn, input) {
       if (!FN.test(fn)) throw new EngineError('plugin-no-function');
+      if (fn === 'resource') caller.resource(input);
       const f = enc.encode(fn), i = enc.encode(input);
       let packed: bigint;
       try {

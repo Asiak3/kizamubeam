@@ -141,6 +141,58 @@ await test('host functions the manifest does not name are refused', async () => 
   assert.deepEqual(checkGenResult(await q.call('generate', {})).parts, [], 'progress needs no entry');
 });
 
+await test('host functions slice and region: a 3D model the plugin got as a resource, cut like in the app', async () => {
+  const { encodeMesh, meshId } = await import('../src/model3d/mesh');
+  // Cube 0 … 10 mm, outward-facing triangles
+  const pos = Float32Array.from([0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0, 0, 0, 10, 10, 0, 10, 10, 10, 10, 0, 10, 10]);
+  const tri = Uint32Array.from([0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7]);
+  const data = encodeMesh({ pos, tri });
+  const id = meshId(data);
+  const src = `globalThis.plugin = { resource: () => null, generate: (p) => {
+    const raw = host.slice({ model: p.id, heights: [5, 20] });
+    const fit = host.slice({ model: p.id, size: 20, up: 'y', frame: { u: [1, 0, 0], v: [0, 0, 1], w: [0, 1, 0] }, heights: [1] });
+    const sq = (x, y, s) => [x, y, x + s, y, x + s, y + s, x, y + s];
+    const u = host.region({ op: 'union', a: [sq(0, 0, 10)], b: [sq(5, 5, 10)] });
+    const d = host.region({ op: 'difference', a: [sq(0, 0, 10)], b: [sq(2, 2, 2)] });
+    const c = host.region({ op: 'clean', a: d, minArea: 1 });
+    const c2 = host.region({ op: 'clean', a: d, minArea: 5 });
+    const isl = host.region({ op: 'islands', a: [sq(0, 0, 1), sq(5, 0, 1)], minArea: 0 });
+    const o = host.region({ op: 'offset', a: [sq(0, 0, 10)], delta: -1 });
+    const b = host.region({ op: 'band', line: [0, 0, 10, 0], radius: 1 });
+    const l = host.region({ op: 'loops', loops: [sq(0, 0, 10), sq(2, 2, 2)] });
+    const deep = host.region({ op: 'deepest', polys: [sq(0, 0, 10)] });
+    let err = ''; try { host.slice({ model: 'nope', heights: [1] }); } catch (e) { err = e.message; }
+    return { raw, fit, u, c, c2, isl, o, b, l, deep, err };
+  } };`;
+  const p = inProcess('js', src, ['slice', 'region']);
+  p.setResource({ kind: 'model3d', id, data });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = (await p.call('generate', { id })) as any;
+  const area = (polys: number[][]) => Math.abs(polys.reduce((a, q) => { let s = 0; for (let i = 0; i < q.length; i += 2) { const j = (i + 2) % q.length; s += q[i] * q[j + 1] - q[j] * q[i + 1]; } return a + s / 2; }, 0));
+  const xs = (polys: number[][]) => polys.flatMap((q) => q.filter((_, i) => i % 2 === 0));
+  assert.deepEqual(r.raw.min, [0, 0, 0]);
+  assert.deepEqual(r.raw.max, [10, 10, 10]);
+  assert.equal(r.raw.layers.length, 2);
+  assert.equal(area(r.raw.layers[0].region), 100, 'square cross-section');
+  assert.equal(r.raw.layers[0].open, 0);
+  assert.deepEqual(r.raw.layers[1].region, [], 'above the model');
+  assert.deepEqual([Math.min(...xs(r.fit.layers[0].region)), Math.max(...xs(r.fit.layers[0].region))], [-10, 10], 'scaled to 20 mm and centred');
+  assert.equal(area(r.u), 175);
+  assert.equal(r.c.polys.length, 2, 'outline and hole');
+  assert.equal(r.c.islands, 1);
+  assert.equal(r.c2.polys.length, 1, 'small hole filled');
+  assert.equal(r.isl.length, 2);
+  assert.equal(area(r.o), 64);
+  assert.ok(Math.abs(area(r.b) - (20 + Math.PI)) < 0.05, 'band around a line');
+  assert.equal(area(r.l), 96, 'even-odd loops');
+  assert.deepEqual(r.deep.p, [5, 5]);
+  assert.equal(r.err, 'host-bad-input');
+  // Without the entry in the manifest the plugin may neither slice nor keep the model
+  const q = inProcess('js', src, ['region']);
+  q.setResource({ kind: 'model3d', id, data });
+  assert.equal(await code(q.call('generate', { id })), 'host-not-allowed');
+});
+
 // A Rust module (no_std) whose kzb_call hands its input to host "fit" and returns the answer envelope
 const hostWasm = Uint8Array.from(atob('AGFzbQEAAAABEgNgBH9/f38BfmABfwF/YAABfwIRAQNremIJaG9zdF9jYWxsAAADBAMBAgAFAwEAEgYJAX8BQYCAwAALBysEBm1lbW9yeQIACWt6Yl9hbGxvYwABB2t6Yl9hcGkAAghremJfY2FsbAADCk8DMwEBf0EAQQBBACgChIDEgAAiASABIABqQYCABEsbIgEgAGo2AoSAxIAAIAFBhIDAgABqCwQAQQELFABBgIDAgABBAyACIAMQgICAgAALCwwBAEGAgMAACwNmaXQAbwRuYW1lAAcGdC53YXNtAT8EAB5fUk52Q3NlNG1wNlhMTWg5UV8xdDlob3N0X2NhbGwBCWt6Yl9hbGxvYwIHa3piX2FwaQMIa3piX2NhbGwHEgEAD19fc3RhY2tfcG9pbnRlcgkKAQAHLnJvZGF0YQA9CXByb2R1Y2VycwEMcHJvY2Vzc2VkLWJ5AQVydXN0Yx0xLjk3LjAgKDJkODE0NGI3OCAyMDI2LTA3LTA3KQCUAQ90YXJnZXRfZmVhdHVyZXMIKwtidWxrLW1lbW9yeSsPYnVsay1tZW1vcnktb3B0KxZjYWxsLWluZGlyZWN0LW92ZXJsb25nKwptdWx0aXZhbHVlKw9tdXRhYmxlLWdsb2JhbHMrE25vbnRyYXBwaW5nLWZwdG9pbnQrD3JlZmVyZW5jZS10eXBlcysIc2lnbi1leHQ='), (c) => c.charCodeAt(0));
 

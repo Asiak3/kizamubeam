@@ -1,6 +1,7 @@
 // Host functions (#211 stage 5): building blocks of the app a plugin may call while it computes, instead of
 // bundling its own: boolean operations and offsets of outlines (Clipper), fitting Bézier curves through points and
-// tracing a grayscale image. Pure computation on the data the plugin hands over; no editor, files or network.
+// tracing a grayscale image, slicing a 3D model and area operations on slices. Pure computation on the data the
+// plugin hands over (and the 3D models the app gave it as resources); no editor, files or network.
 // A plugin names the ones it uses in its manifest (`host`); `progress` is always there.
 // Runs inside the plugin Worker (and in Node tests); each call counts toward the time limit of the plugin call.
 import ClipperLib from 'clipper-lib';
@@ -10,9 +11,17 @@ import { execute, FLATTEN_TOL, flattenSub, pathsToSubs, SCALE, type Paths } from
 import { fitPolyline } from '../fit';
 import { traceGray } from '../trace';
 import { checkSubPaths, fromBase64, LIMITS } from './contract';
+import type { Mesh } from '../model3d/mesh';
+import { readMeshData } from '../model3d/meshData';
+import {
+  capsuleRegion, cleanRegion, intersectRegions, offsetRegion, prepare, region, regionIslands, sliceAt, sliceRegion, subtractRegions, unionRegions,
+  type Prepared, type V3,
+} from '../model3d/slice';
+import { worldOf } from '../model3d/world';
+import { deepestPoint } from '../model3d/polys';
 
 /** Host functions a manifest may ask for */
-export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace'] as const;
+export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region'] as const;
 export type HostFn = (typeof HOST_FNS)[number];
 
 /** A host function got input it cannot use; the plugin call fails with this code unless the plugin catches it */
@@ -99,15 +108,144 @@ function trace(input: unknown): SubPath[] {
   return out.map((sp) => ({ ...sp, nodes: sp.nodes.map((n) => ({ ...n, ...s(n), ...(n.cin ? { cin: s(n.cin) } : {}), ...(n.cout ? { cout: s(n.cout) } : {}) })) }));
 }
 
-const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace };
+// ---------- Slicing 3D models and areas (the 3D-model generators: stack, ribs) ----------
+// An area ("region") is a list of closed polygons, each [x0, y0, x1, y1, …] in mm, filled by the nonzero rule.
+// Points are kept on a 1 µm grid, as the app's own slicing does, so plugin and app give the same results.
+
+type IntPath = { X: number; Y: number }[];
+const MAX_COORDS = 4_000_000;
+const regionIn = (v: unknown, what: string): IntPath[] => {
+  if (!Array.isArray(v)) return bad(what);
+  let n = 0;
+  return v.map((poly) => {
+    if (!Array.isArray(poly) || poly.length % 2) return bad(what);
+    if ((n += poly.length) > MAX_COORDS) return bad(`${what}: too many points`);
+    const out: IntPath = [];
+    for (let i = 0; i < poly.length; i += 2) out.push({ X: Math.round(num(poly[i], what) * 1000), Y: Math.round(num(poly[i + 1], what) * 1000) });
+    return out;
+  });
+};
+const flatOf = (pts: { x: number; y: number }[]) => pts.flatMap((q) => [q.x, q.y]);
+const regionOut = (paths: IntPath[]): number[][] => paths.map((p) => p.flatMap((q) => [q.X / 1000, q.Y / 1000]));
+const ptsIn = (v: unknown, what: string): Pt[] => {
+  if (!Array.isArray(v) || v.length % 2 || v.length > MAX_COORDS) return bad(what);
+  const out: Pt[] = [];
+  for (let i = 0; i < v.length; i += 2) out.push({ x: num(v[i], what), y: num(v[i + 1], what) });
+  return out;
+};
+const v3 = (v: unknown, what: string): V3 => (Array.isArray(v) && v.length === 3 ? [num(v[0], what, -1e6, 1e6), num(v[1], what, -1e6, 1e6), num(v[2], what, -1e6, 1e6)] : bad(what));
+const FRAME_Z = { u: [1, 0, 0] as V3, v: [0, 1, 0] as V3, w: [0, 0, 1] as V3 };
+
+/** 3D models the app handed to the plugin (resources) and slicing prepared on them, per engine */
+interface SliceState {
+  meshes: Map<string, Mesh>;
+  prepared: Map<string, Prepared>;
+}
+const MAX_MESHES = 8;
+
+/**
+ * { model (id of a 3D model the plugin got as a resource), up?: z | y, size? (mm of the longest side: upright,
+ * scaled and centred over the origin with the bottom at 0, as the 3D-model generators place it; left out: model
+ * units as they are), frame?: { u, v, w } (w = slicing direction, default x, y, z), heights: [h, …] (along w),
+ * gap? (mm, 0.5: open chains with ends closer than this are closed) } → { min, max (bounds in the frame),
+ * layers: [{ region, open (chains that stayed open: holes in the mesh) }] }
+ */
+function slice(st: SliceState, input: unknown) {
+  if (!isObj(input)) return bad('slice');
+  const mesh = st.meshes.get(String(input.model)) ?? bad('model: not a 3D model given to this plugin');
+  const up = input.up === undefined ? 'z' : input.up === 'y' || input.up === 'z' ? input.up : bad('up');
+  const size = input.size === undefined ? null : num(input.size, 'size', 1e-3, LIMITS.range);
+  const f = input.frame === undefined ? FRAME_Z : isObj(input.frame) ? { u: v3(input.frame.u, 'frame.u'), v: v3(input.frame.v, 'frame.v'), w: v3(input.frame.w, 'frame.w') } : bad('frame');
+  const heights = Array.isArray(input.heights) && input.heights.length <= 10_000 ? input.heights.map((h) => num(h, 'heights')) : bad('heights');
+  const gap = input.gap === undefined ? 0.5 : num(input.gap, 'gap', 0, 1000);
+  const key = [input.model, up, size, ...f.u, ...f.v, ...f.w].join('|');
+  let P = st.prepared.get(key);
+  if (!P) {
+    if (st.prepared.size >= 64) st.prepared.clear();
+    const world = size === null ? (x: number, y: number, z: number): V3 => [x, y, z] : worldOf(mesh, up, size).world;
+    P = prepare(mesh, world, f);
+    st.prepared.set(key, P);
+  }
+  return {
+    min: P.min,
+    max: P.max,
+    layers: heights.map((h) => {
+      const s = sliceAt(P, h, gap);
+      return { region: regionOut(sliceRegion(s)), open: s.open };
+    }),
+  };
+}
+
+/**
+ * Area operations: { op, … } with
+ * union { a, b? } · intersection { a, b } · difference { a, b } (a without b) · offset { a, delta (mm, round
+ * corners, negative = inward) } · loops { loops: [[x0, y0, …], …] } (closed loops to an area by the even-odd rule) ·
+ * band { line: [x0, y0, …], radius } (around an open line, round ends) → region;
+ * clean { a, minArea } → { polys (outlines and holes), islands (count) } and islands { a, minArea } →
+ * [[outline, hole, …], …], both without islands and holes smaller than minArea (mm²);
+ * deepest { polys: [[x0, y0, …], …] } → { p: [x, y], r } (the inner point farthest from the edge, e.g. for a
+ * label, even-odd) or null.
+ */
+function regionFn(input: unknown): unknown {
+  if (!isObj(input)) return bad('region');
+  const a = () => regionIn(input.a, 'a');
+  const b = () => regionIn(input.b ?? [], 'b');
+  const minArea = () => (input.minArea === undefined ? 0 : num(input.minArea, 'minArea', 0, 1e12));
+  switch (input.op) {
+    case 'union':
+      return regionOut(unionRegions(a(), b()));
+    case 'intersection':
+      return regionOut(intersectRegions(a(), b()));
+    case 'difference':
+      return regionOut(subtractRegions(a(), b()));
+    case 'offset':
+      return regionOut(offsetRegion(a(), num(input.delta, 'delta', -1000, 1000)));
+    case 'loops':
+      return Array.isArray(input.loops) ? regionOut(region(input.loops.map((l) => ptsIn(l, 'loops')))) : bad('loops');
+    case 'band':
+      return regionOut(capsuleRegion(ptsIn(input.line, 'line'), num(input.radius, 'radius', 0, 1000)));
+    case 'clean': {
+      const r = cleanRegion(a(), minArea());
+      return { polys: r.polys.map(flatOf), islands: r.islands };
+    }
+    case 'islands':
+      return regionIslands(a(), minArea()).map((isl) => isl.map(flatOf));
+    case 'deepest': {
+      if (!Array.isArray(input.polys)) return bad('polys');
+      const d = deepestPoint(input.polys.map((l) => ptsIn(l, 'polys')));
+      return d && { p: [d.p.x, d.p.y], r: d.r };
+    }
+    default:
+      return bad('op');
+  }
+}
+
+/** Hand a resource to the host functions (a 3D model for slice); called before the plugin gets it */
+function takeResource(st: SliceState, json: string) {
+  let r: unknown;
+  try {
+    r = JSON.parse(json);
+  } catch {
+    return;
+  }
+  if (!isObj(r) || r.kind !== 'model3d' || typeof r.id !== 'string' || typeof r.data !== 'string' || st.meshes.has(r.id)) return;
+  const m = readMeshData(r.data);
+  if (typeof m === 'string') return;
+  if (st.meshes.size >= MAX_MESHES) st.meshes.delete(st.meshes.keys().next().value!);
+  st.meshes.set(r.id, m);
+  for (const k of st.prepared.keys()) if (k.startsWith(r.id + '|')) st.prepared.delete(k);
+}
 
 /**
  * Calls of one engine: the functions its manifest allows, and progress reports (a number 0 … 1, optionally with a
- * short text) passed to `onProgress`. Answers are JSON envelopes like plugin calls.
+ * short text) passed to `onProgress`. Answers are JSON envelopes like plugin calls. `resource` takes the resources
+ * the app hands to the plugin (only kept when the plugin may slice).
  */
 export function hostCaller(allowed: readonly string[], onProgress?: (done: number, text?: string) => void) {
   const ok = new Set(allowed.filter((x): x is HostFn => (HOST_FNS as readonly string[]).includes(x)));
-  return (name: string, json: string): string => {
+  const st: SliceState = { meshes: new Map(), prepared: new Map() };
+  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn };
+  const call = (name: string, json: string): string => {
     try {
       if (name === 'progress') {
         const v = JSON.parse(json) as unknown;
@@ -122,4 +260,5 @@ export function hostCaller(allowed: readonly string[], onProgress?: (done: numbe
       return JSON.stringify({ error: e instanceof HostError || e instanceof SyntaxError ? 'host-bad-input' : 'host-failed' });
     }
   };
+  return Object.assign(call, { resource: (json: string) => (ok.has('slice') ? takeResource(st, json) : undefined) });
 }
