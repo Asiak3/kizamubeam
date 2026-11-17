@@ -66,6 +66,36 @@ export interface Selected {
   name: string;
   polys: Pt[][];
 }
+/** An image handed to an action: RGBA pixels as base64, at most 1200 pixels on the longer side (see pixels()) */
+export interface Image {
+  width: number;
+  height: number;
+  data: string;
+}
+/** Inputs of an action, as declared in its `inputs` */
+export interface EventInputs {
+  selection?: Selected[];
+  /** The image file the user picked, name without extension */
+  image?: Image & { name: string };
+  /** The calibrated camera image; it covers the bed (0 … bed.w × 0 … bed.h mm); empty = photo of the empty bed */
+  camera?: Image & { bed: { w: number; h: number }; empty?: Image };
+}
+/** RGBA bytes of an image (4 per pixel, row by row) */
+export function pixels(img: Image): Uint8Array {
+  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const map = new Uint8Array(128);
+  for (let i = 0; i < 64; i++) map[abc.charCodeAt(i)] = i;
+  const s = img.data.replace(/=+$/, '');
+  const out = new Uint8Array(Math.floor((s.length * 3) / 4));
+  let j = 0;
+  for (let i = 0; i < s.length; i += 4) {
+    const v = (map[s.charCodeAt(i)] << 18) | (map[s.charCodeAt(i + 1)] << 12) | (map[s.charCodeAt(i + 2)] << 6) | map[s.charCodeAt(i + 3)];
+    out[j++] = v >> 16;
+    if (j < out.length) out[j++] = (v >> 8) & 255;
+    if (j < out.length) out[j++] = v & 255;
+  }
+  return out;
+}
 /** Answer of onEvent: parameters to change (e.g. new rows of a list) and a short message for the dialog */
 export interface EventResult {
   patch?: Params;
@@ -86,7 +116,7 @@ export interface Plugin<P extends Params = Params> {
    */
   onChange?(input: { key: string; old: Params[string]; params: P }): Change | null;
   /** Optional: a button of the manifest's dialog.actions was pressed; inputs holds what the action declares */
-  onEvent?(input: { action: string; params: P; inputs: { selection?: Selected[] } }): EventResult | null;
+  onEvent?(input: { action: string; params: P; inputs: EventInputs }): EventResult | null;
 }
 
 /** Register the plugin's functions with the app */

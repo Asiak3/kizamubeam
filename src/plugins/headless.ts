@@ -3,7 +3,8 @@
 // would show after each step: parameters, visible fields, issues, info rows and the parts. Plugin authors use it
 // in their tests; `npm run plugin:check` uses it to check a pack before it goes into the catalogue.
 import type { Pt } from '../model';
-import type { Params } from '../generators/types';
+import type { GenEvent, GenImage, Params } from '../generators/types';
+import { fromBase64 } from './contract';
 import type { GenSelected } from '../generators/host';
 import { buildGen, checkInput, defaultParams, fieldActive, normalizeParams } from '../generators/index';
 import { pluginGenerator } from './generator';
@@ -49,7 +50,7 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
       let ask: DialogState['ask'];
       let message: string | undefined;
       if (i > 0) {
-        const { $answer, $action, $selection, ...step } = steps[i - 1];
+        const { $answer, $action, $selection, $image, $camera, ...step } = steps[i - 1];
         if ($answer !== undefined && !(Number.isInteger($answer) && ($answer as number) >= 0)) throw new ScriptError(`step ${i}: $answer must be an option number`);
         const bad = checkInput(g, step).filter((x) => x.level === 'error');
         if (bad.length) throw new ScriptError(`step ${i}: ${bad.map((x) => x.msg).join('; ')}`);
@@ -78,7 +79,14 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
           const a = g.actions?.find((x) => x.id === $action);
           if (!a) throw new ScriptError(`step ${i}: no action "${String($action)}"`);
           if ($selection !== undefined && !Array.isArray($selection)) throw new ScriptError(`step ${i}: $selection must be a list`);
-          const inputs = a.inputs?.includes('selection') ? { selection: ($selection ?? []) as GenSelected[] } : {};
+          const inputs: GenEvent['inputs'] = {};
+          if (a.inputs?.includes('selection')) inputs.selection = ($selection ?? []) as GenSelected[];
+          if (a.inputs?.includes('image') && $image !== undefined) inputs.image = { ...scriptImage($image, i), name: String(($image as { name?: unknown }).name ?? '') };
+          if (a.inputs?.includes('camera') && $camera !== undefined) {
+            const c = $camera as { bed?: { w: number; h: number }; empty?: unknown };
+            if (!c.bed || !(c.bed.w > 0 && c.bed.h > 0)) throw new ScriptError(`step ${i}: $camera needs bed: { w, h }`);
+            inputs.camera = { ...scriptImage($camera, i), bed: { w: c.bed.w, h: c.bed.h }, ...(c.empty ? { empty: scriptImage(c.empty, i) } : {}) };
+          }
           const r = await g.onEvent!({ action: a.id, inputs }, p);
           if (r?.message !== undefined) message = r.message;
           if (r?.patch) {
@@ -129,6 +137,16 @@ const SAMPLE_SELECTION: GenSelected[] = [{
     Array.from({ length: 16 }, (_, k) => ({ x: 20 + 5 * Math.cos((k * Math.PI) / 8), y: 15 + 5 * Math.sin((k * Math.PI) / 8) })),
   ],
 }];
+
+/** An image of a script step: { width, height, data } with RGBA pixels as base64, like a plugin gets it */
+function scriptImage(v: unknown, i: number): GenImage {
+  const o = v as { width?: unknown; height?: unknown; data?: unknown };
+  const w = Number(o?.width), h = Number(o?.height);
+  if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || w > 1200 || h > 1200 || typeof o.data !== 'string') throw new ScriptError(`step ${i}: an image needs width and height (1 … 1200) and data (RGBA as base64)`);
+  const data = fromBase64(o.data);
+  if (data.length !== w * h * 4) throw new ScriptError(`step ${i}: image data must have width × height × 4 bytes`);
+  return { width: w, height: h, data };
+}
 
 export interface CheckReport {
   id: string;

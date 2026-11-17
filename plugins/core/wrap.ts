@@ -1,9 +1,21 @@
 // Turns a built-in generator (src/generators) into a plugin: validate and generate with JSON in and out, issue
 // texts, info rows and labels as text codes. Bundled together with the generator by scripts/build-core-plugins.mjs.
 import type { GenEvent, Generator, Params, ParamValue } from '../../src/generators/types';
-import type { PluginText } from '../../src/plugins/contract';
+import { fromBase64, type PluginImage, type PluginText } from '../../src/plugins/contract';
 import { pieces, type Piece } from './i18n-shim';
 import { codeOf } from './codes';
+
+const image = (im: PluginImage) => ({ width: im.width, height: im.height, data: fromBase64(im.data) });
+
+/** Action inputs as the generator gets them in the app: images as bytes again */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function appInputs(inp: Record<string, any>): GenEvent['inputs'] {
+  const out: GenEvent['inputs'] = {};
+  if (inp.selection) out.selection = inp.selection;
+  if (inp.image) out.image = { ...image(inp.image), name: String(inp.image.name ?? '') };
+  if (inp.camera) out.camera = { ...image(inp.camera), bed: inp.camera.bed, ...(inp.camera.empty ? { empty: image(inp.camera.empty) } : {}) };
+  return out;
+}
 
 const piece = (p: Piece): PluginText => {
   if (typeof p === 'string') return p;
@@ -55,8 +67,9 @@ export function wrap(g: Generator) {
       : {}),
     ...(g.onEvent
       ? {
-          onEvent(input: { action: string; params: Params; inputs: GenEvent['inputs'] }) {
-            const r = g.onEvent!({ action: input.action, inputs: input.inputs ?? {} }, input.params);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onEvent(input: { action: string; params: Params; inputs: Record<string, any> }) {
+            const r = g.onEvent!({ action: input.action, inputs: appInputs(input.inputs ?? {}) }, input.params);
             if (!r || r instanceof Promise) return null;
             return { ...(r.patch ? { patch: r.patch } : {}), ...(r.message !== undefined ? { message: toText(r.message) } : {}) };
           },

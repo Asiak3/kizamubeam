@@ -35,9 +35,8 @@ export const CORE = {
   shelf: { file: 'src/generators/shelf', name: 'SHELF' },
   discsphere: { file: 'src/generators/discsphere', name: 'DISCSPHERE' },
   fingerbox: { file: 'src/generators/fingerbox', name: 'FINGERBOX' },
-  // The jig's panel (image and camera sources) needs the DOM, and print-and-cut marks pull in geom with fonts; the
-  // plugin gets an empty panel until image and camera inputs exist (#335 stage 3) and never uses boundsOf
-  jig: { file: 'src/generators/jig', name: 'JIG', stub: { jigPanel: 'export const jigPanel = () => undefined;', geom: 'export const boundsOf = () => { throw new Error("not in plugins"); };' } },
+  // Print-and-cut marks pull in geom (with fonts); the jig never uses its boundsOf
+  jig: { file: 'src/generators/jig', name: 'JIG', stub: { geom: 'export const boundsOf = () => { throw new Error("not in plugins"); };' } },
 };
 
 const i18nShim = {
@@ -179,6 +178,7 @@ export async function corePlugin(id) {
       const col = { key: c.key, type: c.type, label: ck };
       if (c.title) (put(`${ck}.title`, c.title), (col.title = `${ck}.title`));
       if (c.type === 'text' && c.max) col.max = c.max;
+      if (c.type === 'text' && c.placeholder) (put(`${ck}.placeholder`, c.placeholder), (col.placeholder = `${ck}.placeholder`));
       if ('min' in c) Object.assign(col, { min: c.min, max: c.max });
       if (c.type === 'enum') col.options = c.options.map(([v, label], i) => (put(`${ck}.${i}`, label), [v, `${ck}.${i}`]));
       return col;
@@ -191,6 +191,7 @@ export async function corePlugin(id) {
     const out = { id: a.id, label: k };
     if (a.title) (put(`${k}.title`, a.title), (out.title = `${k}.title`));
     if (a.inputs) out.inputs = a.inputs;
+    if (a.field) out.field = a.field;
     return out;
   });
   const sha256 = createHash('sha256').update(code).digest('hex');

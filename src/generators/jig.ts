@@ -13,8 +13,8 @@ import { fitPolyline } from '../fit';
 import { IDENT } from '../model';
 import { markSubs } from '../printcut';
 import { numberStrokes } from './stack';
-import type { Generator, GenPart, Issue, Params } from './types';
-import { jigPanel } from './jigPanel';
+import type { GenEvent, GenImage, Generator, GenPart, Issue, Params } from './types';
+import { DEFAULT_DETECT, detectPieces, type Piece } from '../workpieces';
 import type { GenSelected } from './host';
 
 /** Eine Werkstückart: Name, Anzahl, Drehung im Jig (0/90°) und Außenumriss (Mitte im Ursprung) */
@@ -27,6 +27,8 @@ export interface JigShape {
 
 export interface JigParams {
   shapes: string;
+  /** Real width of the workpiece in an image („From image“) */
+  imageWidth: number;
   plate: string;
   width: number;
   height: number;
@@ -269,9 +271,43 @@ const moveSub = (sp: SubPath, c: Pt): SubPath => ({
   }),
 });
 
-/** Je gewähltem Objekt (oberste Ebene) eine Werkstückart: Außenumriss aller geschlossenen Konturen */
+/**
+ * Je gewähltem Objekt (oberste Ebene) eine Werkstückart: Außenumriss aller geschlossenen Konturen. Unbenannte
+ * Objekte bekommen keinen Namen; die Liste zeigt dann „Werkstück n“ (in der Sprache der Oberfläche)
+ */
 export function shapesFromSelection(sel: GenSelected[]): JigShape[] {
-  return sel.map((o, i) => ({ n: o.name || t('Werkstück {n}', { n: i + 1 }), c: 1, r: 0, s: outlineFromPolys(o.polys) })).filter((s) => s.s.length);
+  return sel.map((o) => ({ n: o.name, c: 1, r: 0, s: outlineFromPolys(o.polys) })).filter((s) => s.s.length);
+}
+
+/** Außenkontur eines erkannten Teils (Pixel-Treppen werden beim Einpassen geglättet) */
+const pieceShape = (pc: Piece, name: string, k = 1): JigShape => ({
+  n: name,
+  c: 1,
+  r: 0,
+  s: outlineFromPolys(pc.outline.map((pl) => pl.map((q) => ({ x: q.x * k, y: q.y * k }))), 0.15),
+});
+
+const biggest = (ps: Piece[]) => ps.filter((p) => !p.cut).sort((a, b) => b.area - a.area)[0] ?? ps.sort((a, b) => b.area - a.area)[0];
+
+/** Foto oder Scan eines Werkstücks nachzeichnen; widthMm ist seine echte Breite (Maßstab) */
+export function shapeFromImage(img: GenImage & { name: string }, widthMm: number): JigShape | null {
+  const pc = biggest(detectPieces(img, 1, 1, { ...DEFAULT_DETECT, minArea: (img.width * img.height) / 400 }));
+  if (!pc) return null;
+  const ext = pc.outline.flat();
+  const wPx = Math.max(...ext.map((q) => q.x)) - Math.min(...ext.map((q) => q.x));
+  return pieceShape(pc, img.name, widthMm / Math.max(1e-6, wPx));
+}
+
+/** Werkstücke auf dem Bett im Kamerabild; gleich große (Fläche ±8 %) werden eine Art mit Anzahl */
+export function shapesFromCamera(cam: NonNullable<GenEvent['inputs']['camera']>): { shapes: JigShape[]; found: number } {
+  const ps = detectPieces(cam, cam.bed.w / cam.width, cam.bed.h / cam.height, DEFAULT_DETECT, cam.empty ?? null).filter((pc) => !pc.cut);
+  const kinds: { pc: Piece; n: number }[] = [];
+  for (const pc of ps) {
+    const same = kinds.find((k) => Math.abs(k.pc.area - pc.area) / k.pc.area < 0.08);
+    if (same) same.n++;
+    else kinds.push({ pc, n: 1 });
+  }
+  return { shapes: kinds.map((k) => ({ ...pieceShape(k.pc, ''), c: k.n })), found: ps.length };
 }
 
 /** Width × height of a workpiece's outline, for its row in the dialog */
@@ -303,7 +339,7 @@ export const JIG: Generator = {
       empty: t('Noch kein Werkstück.'),
       shape: { key: 's', rotate: 'r' },
       columns: [
-        { key: 'n', type: 'text', label: t('Name'), max: 120 },
+        { key: 'n', type: 'text', label: t('Name'), max: 120, placeholder: t('Werkstück {n}') },
         { key: 'c', type: 'int', label: t('Anzahl'), min: 0, max: 500, title: t('Anzahl Fächer für dieses Werkstück') },
         { key: 'r', type: 'enum', label: t('Drehung'), options: [[0, '0°'], [90, '90°']], title: t('Werkstück im Jig drehen') },
       ],
@@ -318,15 +354,42 @@ export const JIG: Generator = {
       title: t('Gewählte Objekte als Werkstücke übernehmen (Vektorgrafik, Formen, Text); je Objekt eine Art, Löcher zählen nicht'),
       inputs: ['selection'],
     },
+    {
+      id: 'fromImage',
+      label: t('Aus Bild …'),
+      title: t('Foto oder Scan eines Werkstücks nachzeichnen; die Breite legt den Maßstab fest'),
+      inputs: ['image'],
+      field: 'imageWidth',
+    },
+    {
+      id: 'fromCamera',
+      label: t('Aus Kamera'),
+      title: t('Werkstücke auf dem Bett im Kamerabild erkennen; Maße kommen aus der Kalibrierung'),
+      inputs: ['camera'],
+    },
   ],
   onEvent(ev, raw) {
-    if (ev.action !== 'fromSelection') return;
-    const add = shapesFromSelection(ev.inputs.selection ?? []);
-    if (!add.length) return { message: t('Erst auf der Arbeitsfläche die Werkstückform auswählen (z. B. eine importierte SVG-, DXF- oder PDF-Datei).') };
-    return { patch: { shapes: encodeShapes([...decodeShapes(String(raw.shapes ?? '[]')), ...add]) }, message: '' };
+    const p = P(raw);
+    const add = (list: JigShape[], message = '') => ({ patch: { shapes: encodeShapes([...decodeShapes(p.shapes), ...list]) }, message });
+    if (ev.action === 'fromSelection') {
+      const list = shapesFromSelection(ev.inputs.selection ?? []);
+      if (!list.length) return { message: t('Erst auf der Arbeitsfläche die Werkstückform auswählen (z. B. eine importierte SVG-, DXF- oder PDF-Datei).') };
+      return add(list);
+    }
+    if (ev.action === 'fromImage') {
+      if (!ev.inputs.image) return { message: t('Das Bild ließ sich nicht lesen.') };
+      const sh = shapeFromImage(ev.inputs.image, p.imageWidth);
+      if (!sh) return { message: t('Im Bild wurde kein Werkstück erkannt. Am besten ein Foto von oben auf einfarbigem Hintergrund.') };
+      return add([sh]);
+    }
+    if (ev.action === 'fromCamera') {
+      if (!ev.inputs.camera) return { message: t('Kein Kamerabild. Im Fenster „Kamera“ verbinden und das Bild aktualisieren.') };
+      const r = shapesFromCamera(ev.inputs.camera);
+      if (!r.found) return { message: t('Kein Werkstück im Kamerabild erkannt.') };
+      return add(r.shapes, tn('{n} Werkstück erkannt.', '{n} Werkstücke erkannt.', r.found));
+    }
   },
   view: (raw) => ({ rows: { shapes: decodeShapes(String(raw.shapes ?? '[]')).map(shapeSize) } }),
-  panel: (p, set, host) => jigPanel(p, set, host),
   tile: {
     group: 'arrange',
     before: 'jigfill',
@@ -340,6 +403,7 @@ export const JIG: Generator = {
   },
   schema: [
     { key: 'shapes', type: 'data', label: t('Werkstücke'), def: '[]' },
+    { key: 'imageWidth', type: 'length', label: t('Breite'), min: 1, max: 1000, def: 20, title: t('Echte Breite des Werkstücks im Bild, damit die Form die richtige Größe bekommt') },
     {
       key: 'plate', type: 'enum', label: t('Platte'), def: 'fit',
       options: [['fit', t('Passend zu den Fächern')], ['size', t('Feste Größe')]],

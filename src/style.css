@@ -4270,6 +4270,10 @@ input.bound {
 input.jig-count {
   width: 60px;
 }
+/* A number field an action shows next to its button (generator dialogs, #335) */
+.gen-lists .conn-row input {
+  width: 70px;
+}
 
 /* Skizzenmodus: Leiste oben über der Arbeitsfläche */
 .sketch-bar {

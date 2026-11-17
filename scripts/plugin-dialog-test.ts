@@ -194,7 +194,53 @@ await test('stage 3: lists of rows and actions with the selection', async () => 
   assert.throws(() => manifest(code, { params: [{ key: 'items', type: 'text', def: '' }], texts, dialog }), /data/);
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, lists: [{ param: 'items', columns: [{ key: 'x', type: 'int', min: 5, max: 1 }] }] } }), /min/);
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, lists: [{ param: 'items', columns: [{ key: 'x', type: 'color' }] }] } }), /color/);
-  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'a', inputs: ['camera'] }] } }), /Eingabe|input/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'a', inputs: ['video'] }] } }), /Eingabe|input/);
+});
+
+await test('stage 3: image and camera inputs, a field next to a button, placeholders', async () => {
+  const { toBase64, fromBase64 } = await import('../src/plugins/contract');
+  const { pixels: sdkPixels } = await import('../plugins/sdk/ts/index');
+  for (const n of [0, 1, 2, 3, 4, 5, 1000]) {
+    const b = Uint8ClampedArray.from({ length: n }, (_, i) => (i * 37) & 255);
+    assert.deepEqual(fromBase64(toBase64(b)), b, `base64 of ${n} bytes`);
+    assert.equal(toBase64(b), Buffer.from(b).toString('base64'));
+    assert.deepEqual([...sdkPixels({ width: 1, height: 1, data: toBase64(b) })], [...b], `SDK pixels() of ${n} bytes`);
+  }
+  const code = `globalThis.plugin = {
+    validate: () => [],
+    generate: (p) => ({ parts: [{ key: 'a', subs: [{ closed: true, nodes: [{x:0,y:0},{x:p.scale,y:0},{x:0,y:1}] }], at: { x: 0, y: 0 } }], info: [] }),
+    onEvent: ({ action, inputs, params }) => {
+      const im = action === 'pic' ? inputs.image : inputs.camera;
+      if (!im) return { message: 'none' };
+      return { message: [im.name ?? 'cam', ' ', String(im.width), 'x', String(im.height), ' ', String(im.data.length), ' ', String(params.scale), ' ', im.bed ? String(im.bed.w) : '-', im.empty ? '+' : ''] };
+    },
+  };`;
+  const params = [{ key: 'items', type: 'data', def: '[]' }, { key: 'scale', type: 'length', min: 1, max: 100, def: 20 }];
+  const dialog = {
+    version: 2,
+    lists: [{ param: 'items', columns: [{ key: 'n', type: 'text', placeholder: 'rowName' }] }],
+    actions: [{ id: 'pic', inputs: ['image'], field: 'scale' }, { id: 'cam', inputs: ['camera'] }],
+  };
+  const texts = { en: { name: 'Pics', desc: 'Pics', rowName: 'Piece {n}' } };
+  const m = manifest(code, { params, dialog, texts });
+  const g = pluginGenerator(m, { id: 'p', name: 'P' });
+  assert.equal((g.lists![0].columns[0] as { placeholder?: string }).placeholder, 'Piece {n}');
+  assert.equal(g.actions![0].field, 'scale');
+  g.dispose();
+  const px = (w: number, h: number) => ({ width: w, height: h, data: Buffer.alloc(w * h * 4, 7).toString('base64') });
+  const s = await runDialog(m, [
+    { scale: 30, $action: 'pic', $image: { ...px(3, 2), name: 'tag' } },
+    { $action: 'cam', $camera: { ...px(4, 4), bed: { w: 365, h: 305 }, empty: px(4, 4) } },
+    { $action: 'cam' },
+  ]);
+  assert.equal(s[1].message, 'tag 3x2 32 30 -', 'the plugin gets RGBA as base64');
+  assert.equal(s[2].message, 'cam 4x4 88 30 365+');
+  assert.equal(s[3].message, 'none');
+  await assert.rejects(runDialog(m, [{ $action: 'pic', $image: { width: 3, height: 2, data: 'AAAA' } }]), ScriptError);
+  await assert.rejects(runDialog(m, [{ $action: 'cam', $camera: px(2, 2) }]), ScriptError);
+  // field must be a number parameter, inputs must be known
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'pic', inputs: ['image'], field: 'items' }] } }), /field/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'pic', inputs: ['video'] }] } }), /Eingabe|input/);
 });
 
 await test('check: a good plugin passes, randomness, crashes and missing texts are found', async () => {

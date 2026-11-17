@@ -125,7 +125,8 @@ export interface GenTile {
 
 /** An editable column of a dialog list; values are checked like fields (range, options, length) */
 export type GenColumn = { key: string; label: string; title?: string } & (
-  | { type: 'text'; max?: number }
+  /** placeholder: shown in an empty field, {n} = row number */
+  | { type: 'text'; max?: number; placeholder?: string }
   | { type: 'int' | 'number' | 'length'; min: number; max: number }
   | { type: 'enum'; options: [string | number, string][] }
 );
@@ -149,18 +150,39 @@ export interface GenList {
   removeTitle?: string;
 }
 
+/**
+ * What an action asks the app for: the selected objects, an image file the user picks (the dialog opens a file
+ * picker first) or the calibrated camera image (the button is hidden while there is none)
+ */
+export type GenActionInput = 'selection' | 'image' | 'camera';
+
 /** A button in the dialog that sends an event to the generator (onEvent) with the inputs it declares */
 export interface GenAction {
   id: string;
   label: string;
   title?: string;
-  inputs?: 'selection'[];
+  inputs?: GenActionInput[];
+  /** A number parameter shown next to the button instead of among the fields (e.g. the real width of an image) */
+  field?: string;
+}
+
+/** An RGBA image, at most 1200 pixels on its longer side */
+export interface GenImage {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
 }
 
 /** Data an action hands to Generator.onEvent */
 export interface GenEvent {
   action: string;
-  inputs: { selection?: GenSelected[] };
+  inputs: {
+    selection?: GenSelected[];
+    /** The picked image file and its name without extension */
+    image?: GenImage & { name: string };
+    /** The camera image in bed size (it covers 0 … bed.w × 0 … bed.h mm) and the photo of the empty bed, if taken */
+    camera?: GenImage & { bed: { w: number; h: number }; empty?: GenImage };
+  };
 }
 
 /** Answer of onEvent: parameters to change, and a short message for the dialog */

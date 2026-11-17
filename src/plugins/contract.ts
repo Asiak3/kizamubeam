@@ -4,7 +4,7 @@
 // question; (#335 stage 3) onEvent({ action, params, inputs }) → patch and a message.
 // No DOM, no Editor, so the same checks run in the Worker, in the app and in Node tests.
 import type { Node, Pt, SubPath } from '../model';
-import type { Params, PlanSheet } from '../generators/types';
+import type { GenEvent, Params, PlanSheet } from '../generators/types';
 import type { AsmPoses, Pose, V3 } from '../generators/pose';
 
 /** Version of the call protocol; a plugin built for a newer one is refused with an update hint */
@@ -15,8 +15,12 @@ export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent'
 
 /** Limits for one plugin (#205: time, memory, output size) */
 export const LIMITS = {
-  /** Time per call in ms; the Worker is terminated after it. generate runs in a Worker (the editor stays usable), and nesting many parts in QuickJS takes a while (a 400-tooth gear pair: about 20 s) */
-  callMs: { validate: 2000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000 } as Record<PluginFn, number>,
+  /**
+   * Time per call in ms; the Worker is terminated after it. Everything runs in a Worker (the editor stays usable).
+   * Nesting many parts in QuickJS takes a while (a 400-tooth gear pair: about 20 s); validate may need the whole
+   * layout too (a disc sphere checks that its discs fit, which took over 2 s on a CI runner)
+   */
+  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000 } as Record<PluginFn, number>,
   /** Options of a question (ask) */
   askOptions: 3,
   /** Memory of the JavaScript engine or the WebAssembly instance */
@@ -191,6 +195,55 @@ export interface PluginView {
   autoText?: Record<string, PluginText>;
   /** A text per row of a list, by list parameter */
   rows?: Record<string, PluginText[]>;
+}
+
+/** An image as handed to a plugin: RGBA pixels as base64 (JSON has no bytes) */
+export interface PluginImage {
+  width: number;
+  height: number;
+  data: string;
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Bytes as base64; written out here because the same code runs in Node, browsers and QuickJS */
+export function toBase64(b: Uint8Array | Uint8ClampedArray): string {
+  const out: string[] = [];
+  let line = '';
+  for (let i = 0; i < b.length; i += 3) {
+    const n = (b[i] << 16) | ((b[i + 1] ?? 0) << 8) | (b[i + 2] ?? 0);
+    line += B64[n >> 18] + B64[(n >> 12) & 63] + (i + 1 < b.length ? B64[(n >> 6) & 63] : '=') + (i + 2 < b.length ? B64[n & 63] : '=');
+    if (line.length >= 8192) (out.push(line), (line = ''));
+  }
+  out.push(line);
+  return out.join('');
+}
+
+/** Base64 as bytes */
+export function fromBase64(s: string): Uint8ClampedArray {
+  const map = new Uint8Array(128);
+  for (let i = 0; i < 64; i++) map[B64.charCodeAt(i)] = i;
+  const n = s.replace(/=+$/, '').length;
+  const out = new Uint8ClampedArray(Math.floor((n * 3) / 4));
+  let j = 0;
+  for (let i = 0; i < n; i += 4) {
+    const v = (map[s.charCodeAt(i)] << 18) | (map[s.charCodeAt(i + 1)] << 12) | ((i + 2 < n ? map[s.charCodeAt(i + 2)] : 0) << 6) | (i + 3 < n ? map[s.charCodeAt(i + 3)] : 0);
+    out[j++] = v >> 16;
+    if (j < out.length) out[j++] = (v >> 8) & 255;
+    if (j < out.length) out[j++] = v & 255;
+  }
+  return out;
+}
+
+const pluginImage = (im: { width: number; height: number; data: Uint8ClampedArray }): PluginImage => ({ width: im.width, height: im.height, data: toBase64(im.data) });
+
+/** Inputs of an action as JSON for a plugin: images as base64 */
+export function eventInputs(inp: GenEvent['inputs']): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (inp.selection) out.selection = inp.selection;
+  if (inp.image) out.image = { ...pluginImage(inp.image), name: inp.image.name };
+  if (inp.camera) out.camera = { ...pluginImage(inp.camera), bed: inp.camera.bed, ...(inp.camera.empty ? { empty: pluginImage(inp.camera.empty) } : {}) };
+  return out;
 }
 
 /** Answer of onEvent(): parameters to change and a short message for the dialog */

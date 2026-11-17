@@ -155,6 +155,36 @@ impl GenResult {
     }
 }
 
+/// RGBA bytes of an image input (`{ "width", "height", "data": base64 }`), 4 per pixel, row by row
+pub fn pixels(image: &Value) -> Option<Vec<u8>> {
+    let s = image.get("data")?.as_str()?.trim_end_matches('=');
+    let val = |c: u8| -> Option<u32> {
+        Some(match c {
+            b'A'..=b'Z' => c - b'A',
+            b'a'..=b'z' => c - b'a' + 26,
+            b'0'..=b'9' => c - b'0' + 52,
+            b'+' => 62,
+            b'/' => 63,
+            _ => return None,
+        } as u32)
+    };
+    let mut out = Vec::with_capacity(s.len() * 3 / 4);
+    for chunk in s.as_bytes().chunks(4) {
+        let mut v = 0u32;
+        for (i, &c) in chunk.iter().enumerate() {
+            v |= val(c)? << (18 - 6 * i);
+        }
+        out.push((v >> 16) as u8);
+        if chunk.len() > 2 {
+            out.push((v >> 8) as u8);
+        }
+        if chunk.len() > 3 {
+            out.push(v as u8);
+        }
+    }
+    Some(out)
+}
+
 /// A generator plugin. `validate` runs first; `generate` only when it reported no error.
 pub trait Plugin {
     type Params: serde::de::DeserializeOwned;
@@ -173,7 +203,8 @@ pub trait Plugin {
         None
     }
     /// Optional: button `action` of the manifest's `dialog.actions` was pressed; `inputs` holds what it declares
-    /// (`{ "selection": [{ "name": …, "polys": [[{ "x": …, "y": … }, …], …] }] }`). Answer
+    /// (`{ "selection": [{ "name": …, "polys": [[{ "x": …, "y": … }, …], …] }] }`; `image` and `camera` are
+    /// `{ "width", "height", "data" }` with RGBA pixels as base64, see [`pixels`]). Answer
     /// `json!({ "patch": { … }, "message": … })` or `Some(Value::Null)`; `None` (the default) means no onEvent.
     fn on_event(_action: &str, _inputs: &Value, _p: &Self::Params) -> Option<Value> {
         None
@@ -222,4 +253,15 @@ macro_rules! export_plugin {
             $crate::abi::call(fn_ptr, fn_len, in_ptr, in_len, $crate::dispatch::<$plugin>)
         }
     };
+}
+
+#[cfg(test)]
+mod pixel_tests {
+    #[test]
+    fn decodes_base64() {
+        for (b64, bytes) in [("", vec![]), ("AQ==", vec![1]), ("AQI=", vec![1, 2]), ("AQID", vec![1, 2, 3]), ("/wD/AA==", vec![255, 0, 255, 0])] {
+            assert_eq!(super::pixels(&serde_json::json!({ "data": b64 })), Some(bytes));
+        }
+        assert_eq!(super::pixels(&serde_json::json!({ "data": "A*" })), None);
+    }
 }

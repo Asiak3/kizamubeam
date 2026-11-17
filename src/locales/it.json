@@ -3509,7 +3509,6 @@
   "Aus Kamera": "Dalla fotocamera",
   "Kein Kamerabild. Im Fenster „Kamera“ verbinden und das Bild aktualisieren.": "Nessuna immagine della fotocamera. Connettiti nella finestra “Fotocamera” e aggiorna l'immagine.",
   "Kein Werkstück im Kamerabild erkannt.": "Nessun pezzo rilevato nell'immagine della fotocamera.",
-  "Kamera {n}": "Fotocamera {n}",
   "{n} Werkstück erkannt.": "Rilevato {n} pezzo.",
   "{n} Werkstücke erkannt.": "Rilevati {n} pezzi.",
   "Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken": "Dima: piastra di supporto con ritagli per pezzi, numeri e marcatori di registro",
@@ -4908,5 +4907,6 @@
   "{where}: „param“ muss ein data-Parameter sein": "{where}: «param» deve essere un parametro data",
   "{where}: ungültige Spalten": "{where}: colonne non valide",
   "{where}: unbekannte Eingabe": "{where}: input sconosciuto",
-  "Listen und Aktionen brauchen „dialog“ Version 2": "Elenchi e azioni richiedono «dialog» versione 2"
+  "Listen und Aktionen brauchen „dialog“ Version 2": "Elenchi e azioni richiedono «dialog» versione 2",
+  "{where}: „field“ muss ein Zahlen-Parameter sein": "{where}: «field» deve essere un parametro numerico"
 }

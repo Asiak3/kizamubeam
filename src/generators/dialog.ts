@@ -209,9 +209,12 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
   const main: HTMLElement[] = [],
     adv: HTMLElement[] = [];
   const sections = new Map<string, HTMLElement[]>();
+  // Fields an action shows next to its button (e.g. the real width of an image)
+  const actionFields = new Set((g.actions ?? []).map((a) => a.field).filter((k): k is string => !!k));
   for (const s of g.schema) {
     const els = field(s);
     rows.set(s.key, els);
+    if (actionFields.has(s.key)) continue;
     if (s.advanced) adv.push(...els);
     else if (s.section) {
       if (!sections.has(s.section)) sections.set(s.section, []);
@@ -234,7 +237,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params)
     update();
   }, host);
   // Lists and action buttons the generator declares (#335 stage 3); a patch is checked like user input
-  const lists = listsArea(g, p, (patch) => patchFields('', patch), host, () => dlg.open);
+  const lists = listsArea(g, p, (patch) => patchFields('', patch), host, () => dlg.open, (key) => rows.get(key) ?? []);
 
   const render = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde

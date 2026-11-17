@@ -3778,7 +3778,6 @@
   "Aus Kamera": "From camera",
   "Kein Kamerabild. Im Fenster „Kamera“ verbinden und das Bild aktualisieren.": "No camera image. Connect in the “Camera” window and refresh the image.",
   "Kein Werkstück im Kamerabild erkannt.": "No workpiece detected in the camera image.",
-  "Kamera {n}": "Camera {n}",
   "{n} Werkstück erkannt.": "{n} workpiece detected.",
   "{n} Werkstücke erkannt.": "{n} workpieces detected.",
   "Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken": "Jig: holding plate with cut-outs for workpieces, numbers and registration marks",
@@ -4908,5 +4907,6 @@
   "{where}: „param“ muss ein data-Parameter sein": "{where}: “param” must be a data parameter",
   "{where}: ungültige Spalten": "{where}: invalid columns",
   "{where}: unbekannte Eingabe": "{where}: unknown input",
-  "Listen und Aktionen brauchen „dialog“ Version 2": "Lists and actions need “dialog” version 2"
+  "Listen und Aktionen brauchen „dialog“ Version 2": "Lists and actions need “dialog” version 2",
+  "{where}: „field“ muss ein Zahlen-Parameter sein": "{where}: “field” must be a number parameter"
 }

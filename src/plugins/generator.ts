@@ -5,7 +5,7 @@
 // a result (the dialog, formula recomputation) listens to onPluginResult and asks again.
 import type { GenAction, GenChange, GenEventResult, GenList, GenResult, Generator, GenView, Issue, Params, ParamSpec } from '../generators/types';
 import type { AsmPoses } from '../generators/pose';
-import { checkChange, checkEvent, checkGenResult, checkIssues, checkView, ContractError, type PluginFn, type PluginGenResult, type PluginIssue, type PluginText, type PluginView } from './contract';
+import { checkChange, checkEvent, eventInputs, checkGenResult, checkIssues, checkView, ContractError, type PluginFn, type PluginGenResult, type PluginIssue, type PluginText, type PluginView } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
 import { pluginText, type PluginManifest } from './manifest';
@@ -188,6 +188,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     ...(l.removeTitle ? { removeTitle: text(l.removeTitle) ?? l.removeTitle } : {}),
     columns: l.columns.map((c) => {
       const out = { ...c, label: text(c.label) ?? c.label, ...(c.title ? { title: text(c.title) ?? c.title } : {}) };
+      if (out.type === 'text' && out.placeholder) out.placeholder = text(out.placeholder) ?? '';
       if (out.type === 'enum') out.options = out.options.map(([v, k]) => [v, text(k) ?? String(v)]);
       return out;
     }),
@@ -233,7 +234,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     ...(lists ? { lists } : {}),
     ...(actions ? { actions } : {}),
     async onEvent(ev, p): Promise<GenEventResult | void> {
-      const r = await call('onEvent', { action: ev.action, params: { ...p }, inputs: ev.inputs }, checkEvent);
+      const r = await call('onEvent', { action: ev.action, params: { ...p }, inputs: eventInputs(ev.inputs) }, checkEvent);
       if (!('ok' in r)) return { message: codeText(r.error) };
       const out: GenEventResult = {};
       if (r.ok.patch) out.patch = r.ok.patch as Params;

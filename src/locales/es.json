@@ -1723,7 +1723,6 @@
   "Aus Kamera": "Desde cámara",
   "Kein Kamerabild. Im Fenster „Kamera“ verbinden und das Bild aktualisieren.": "Sin imagen de cámara. Conecta en la ventana «Cámara» y actualiza la imagen.",
   "Kein Werkstück im Kamerabild erkannt.": "No se detectó ninguna pieza en la imagen de la cámara.",
-  "Kamera {n}": "Cámara {n}",
   "{n} Werkstück erkannt.": "{n} pieza detectada.",
   "{n} Werkstücke erkannt.": "{n} piezas detectadas.",
   "Riemenprofil": "Perfil de correa",
@@ -4908,5 +4907,6 @@
   "{where}: „param“ muss ein data-Parameter sein": "{where}: «param» debe ser un parámetro data",
   "{where}: ungültige Spalten": "{where}: columnas no válidas",
   "{where}: unbekannte Eingabe": "{where}: entrada desconocida",
-  "Listen und Aktionen brauchen „dialog“ Version 2": "Las listas y acciones necesitan «dialog» versión 2"
+  "Listen und Aktionen brauchen „dialog“ Version 2": "Las listas y acciones necesitan «dialog» versión 2",
+  "{where}: „field“ muss ein Zahlen-Parameter sein": "{where}: «field» debe ser un parámetro numérico"
 }

@@ -1,7 +1,7 @@
 // Plugin entry of an extension pack (`plugins` in .kzp format version 2, issue #205): what the plugin is, its
 // parameters and texts, and its code. Everything is checked here before a plugin is registered; a mistake refuses
 // the whole pack. No DOM, no editor: the same checks run in the app and in the tests.
-import type { GenAction, GenColumn, GenList, ParamSpec, ParamValue, Rule } from '../generators/types';
+import type { GenAction, GenActionInput, GenColumn, GenList, ParamSpec, ParamValue, Rule } from '../generators/types';
 import { LIMITS, PLUGIN_API } from './contract';
 import { base64ToBytes, type Runtime } from './engine';
 import { sha256 } from '../pdfcrypt';
@@ -43,13 +43,13 @@ export class ManifestError extends Error {}
  * Version of the dialog schema (#335). Version 1: fields with labels, tooltips, options, the main area, named
  * sections and „Advanced“, showIf rules, preview, info table and issue list. Version 2: lists of rows in a data
  * parameter (text, number and choice columns, an outline picture, remove) and action buttons with inputs
- * (selection). A plugin that needs a newer schema is refused with an update hint instead of being shown half-broken.
+ * (selection, an image file, the camera image) and a number field next to a button. A plugin that needs a newer schema is refused with an update hint instead of being shown half-broken.
  */
 export const DIALOG_VERSION = 2;
 const MAX_LISTS = 4;
 const MAX_COLUMNS = 8;
 const MAX_ACTIONS = 8;
-const INPUTS = ['selection'] as const;
+const INPUTS = ['selection', 'image', 'camera'] as const;
 
 const ID_RE = /^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$/;
 const KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/;
@@ -168,7 +168,9 @@ function column(v: unknown, at: string): GenColumn {
   if (v.type === 'text') {
     const max = v.max ?? 200;
     if (!isNum(max) || !Number.isInteger(max) || max < 1 || max > 2000) throw new ManifestError(t('{where}: ungültige Länge', { where: at }));
-    return { ...base, type: 'text', max };
+    const out: GenColumn = { ...base, type: 'text', max };
+    if (v.placeholder !== undefined) out.placeholder = textKey(v.placeholder, at);
+    return out;
   }
   if (v.type === 'int' || v.type === 'number' || v.type === 'length') {
     const { min, max } = v;
@@ -215,7 +217,12 @@ function dialogParts(d: Record<string, unknown>, schema: ParamSpec[]): { lists?:
       if (a.title !== undefined) act.title = textKey(a.title, at);
       if (a.inputs !== undefined) {
         if (!Array.isArray(a.inputs) || !a.inputs.every((x) => (INPUTS as readonly unknown[]).includes(x))) throw new ManifestError(t('{where}: unbekannte Eingabe', { where: at }));
-        act.inputs = [...new Set(a.inputs as 'selection'[])];
+        act.inputs = [...new Set(a.inputs as GenActionInput[])];
+      }
+      if (a.field !== undefined) {
+        const f = schema.find((s) => s.key === a.field);
+        if (!f || !(f.type === 'number' || f.type === 'length' || f.type === 'int' || f.type === 'angle')) throw new ManifestError(t('{where}: „field“ muss ein Zahlen-Parameter sein', { where: at }));
+        act.field = f.key;
       }
       return act;
     });

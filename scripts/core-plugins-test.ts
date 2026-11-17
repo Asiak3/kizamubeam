@@ -169,7 +169,22 @@ const selected = [
   { name: 'Tag', polys: [square(10, 10, 60, 25), square(15, 15, 5, 5)] },
 ];
 
-await test('jig as a plugin: same dialog, geometry and rows; adding the selection with an action', async () => {
+const decodeLen = (s: unknown) => JSON.parse(String(s)).length;
+
+/** A dark picture with light rectangles and discs ([x, y, w, h, kind] in pixels) */
+function picture(width: number, height: number, items: [number, number, number, number, string][]) {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const on = items.some(([x0, y0, w, h, kind]) => kind === 'rect' ? x >= x0 && x < x0 + w && y >= y0 && y < y0 + h : ((x - x0 - w / 2) / (w / 2)) ** 2 + ((y - y0 - h / 2) / (h / 2)) ** 2 <= 1);
+      const k = (y * width + x) * 4;
+      data[k] = data[k + 1] = data[k + 2] = on ? 230 : 30;
+      data[k + 3] = 255;
+    }
+  return { width, height, data };
+}
+
+await test('jig as a plugin: same dialog, geometry and rows; adding from the selection, an image and the camera', async () => {
   const core = G.getGenerator('jig')!;
   const shapes = (await core.onEvent!({ action: 'fromSelection', inputs: { selection: selected } }, G.normalizeParams(core, {})))!.patch!.shapes;
   await same('jig', [...sweep('jig'), { shapes }, { shapes, plate: 'size', width: 60, height: 40 }, { shapes, notch: 'two', numbers: false }]);
@@ -182,6 +197,29 @@ await test('jig as a plugin: same dialog, geometry and rows; adding the selectio
       for (const selection of [selected, []])
         assert.deepEqual(await plug.onEvent!({ action: 'fromSelection', inputs: { selection } }, p), await core.onEvent!({ action: 'fromSelection', inputs: { selection } }, p));
     }
+    // Image and camera inputs: bytes go to the plugin as base64 and come back as the same outlines
+    const p = G.normalizeParams(core, { shapes, imageWidth: 30 });
+    const events = [
+      { action: 'fromImage', inputs: { image: { ...picture(300, 200, [[60, 40, 180, 120, 'disc']]), name: 'tag' } } },
+      { action: 'fromImage', inputs: { image: { ...picture(100, 100, []), name: 'empty' } } },
+      { action: 'fromImage', inputs: {} },
+      { action: 'fromCamera', inputs: { camera: { ...picture(400, 300, [[40, 40, 80, 60, 'rect'], [200, 50, 80, 60, 'rect'], [100, 180, 70, 70, 'disc']]), bed: { w: 365, h: 305 } } } },
+      { action: 'fromCamera', inputs: { camera: { ...picture(400, 300, []), bed: { w: 365, h: 305 } } } },
+      { action: 'fromCamera', inputs: {} },
+    ];
+    for (const ev of events) {
+      const a = await core.onEvent!(ev, p);
+      const b = await plug.onEvent!(ev, p);
+      assert.equal(b?.message, a?.message, ev.action);
+      if (a?.patch) close(JSON.parse(String(b!.patch!.shapes)), JSON.parse(String(a.patch.shapes)), ev.action);
+      else assert.equal(b?.patch, undefined);
+    }
+    // The test pictures are found: one disc in the image, three pieces of two kinds on the camera image
+    const img = await core.onEvent!(events[0], p);
+    assert.equal(JSON.parse(String(img!.patch!.shapes)).length, decodeLen(shapes) + 1);
+    const cam = await core.onEvent!(events[3], p);
+    assert.equal(cam!.message, '3 Werkstücke erkannt.');
+    assert.deepEqual(JSON.parse(String(cam!.patch!.shapes)).slice(decodeLen(shapes)).map((x: { c: number; n: string }) => [x.c, x.n]), [[2, ''], [1, '']]);
   } finally {
     plug.dispose();
   }

@@ -3782,7 +3782,6 @@
   "Aus Kamera": "Da câmera",
   "Kein Kamerabild. Im Fenster „Kamera“ verbinden und das Bild aktualisieren.": "Nenhuma imagem da câmera. Conecte na janela “Câmera” e atualize a imagem.",
   "Kein Werkstück im Kamerabild erkannt.": "Nenhuma peça detectada na imagem da câmera.",
-  "Kamera {n}": "Câmera {n}",
   "{n} Werkstück erkannt.": "{n} peça detectada.",
   "{n} Werkstücke erkannt.": "{n} peças detectadas.",
   "Jig: Halteplatte mit Aussparungen für Werkstücke, Nummern und Passermarken": "Jig: placa de suporte com rebaixos para peças, números e marcas de registro",
@@ -4908,5 +4907,6 @@
   "{where}: „param“ muss ein data-Parameter sein": "{where}: “param” deve ser um parâmetro data",
   "{where}: ungültige Spalten": "{where}: colunas inválidas",
   "{where}: unbekannte Eingabe": "{where}: entrada desconhecida",
-  "Listen und Aktionen brauchen „dialog“ Version 2": "Listas e ações exigem “dialog” versão 2"
+  "Listen und Aktionen brauchen „dialog“ Version 2": "Listas e ações exigem “dialog” versão 2",
+  "{where}: „field“ muss ein Zahlen-Parameter sein": "{where}: “field” deve ser um parâmetro numérico"
 }
