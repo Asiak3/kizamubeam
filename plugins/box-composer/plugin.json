@@ -3,6 +3,7 @@
   "formatVersion": 2,
   "id": "org.kizamubeam.box-composer",
   "version": "0.1.0",
+  "minApp": "2.9.0-rc.3",
   "name": {
     "en": "Box composer",
     "de": "Box-Composer",
