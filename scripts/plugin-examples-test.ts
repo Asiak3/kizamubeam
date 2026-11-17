@@ -140,6 +140,67 @@ await test('game board (#309): dark squares like a chessboard, styles, coordinat
   g.dispose();
 });
 
+await test('stencil bridges (#311): counters and nested islands get bridges, the result is closed paths', async () => {
+  const { pluginTool } = await import('../src/plugins/tool');
+  execFileSync('node', ['scripts/plugin-pack.mjs', '--build', 'plugins/stencil-bridges'], { stdio: 'ignore' });
+  const m = parsePack(buildPluginPack('plugins/stencil-bridges')).plugins[0];
+  const check = await checkPlugin(m);
+  assert.deepEqual(check.errors, [], 'catalogue check');
+  assert.deepEqual(check.warnings, [], 'catalogue check warnings');
+  const tool = pluginTool(m, { id: 'stencil', name: 'stencil' });
+  const params = (p: Record<string, unknown>) => G.normalizeParams(tool, { ...G.defaultParams(tool), ...p });
+  const sq = (x: number, y: number, w: number, h = w) => ({ closed: true, nodes: [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }] });
+  const circle = (cx: number, cy: number, r: number) => {
+    const k = 0.5523 * r;
+    return { closed: true, nodes: [
+      { x: cx + r, y: cy, cin: { x: cx + r, y: cy - k }, cout: { x: cx + r, y: cy + k } },
+      { x: cx, y: cy + r, cin: { x: cx + k, y: cy + r }, cout: { x: cx - k, y: cy + r } },
+      { x: cx - r, y: cy, cin: { x: cx - r, y: cy + k }, cout: { x: cx - r, y: cy - k } },
+      { x: cx, y: cy - r, cin: { x: cx - k, y: cy - r }, cout: { x: cx + k, y: cy - r } },
+    ] };
+  };
+  // An "O" (ring), an "8"-like block with two counters, a ring inside a ring, and a plain bar
+  const objects = [
+    { id: 'o', subs: [circle(0, 0, 20), circle(0, 0, 12)] },
+    { id: 'eight', subs: [sq(50, -20, 20, 40), sq(54, -16, 12, 12), sq(54, 4, 12, 12)] },
+    { id: 'rings', subs: [circle(120, 0, 30), circle(120, 0, 24), circle(120, 0, 14), circle(120, 0, 8)] },
+    { id: 'bar', subs: [sq(170, -5, 40, 10)] },
+  ];
+  const ys = (subs: { nodes: { y: number }[] }[]) => subs.flatMap((s) => s.nodes.map((n) => n.y));
+  const r = await tool.run(params({ width: 2, count: '1', direction: 'vertical' }), { objects });
+  const by = (id: string) => r.objects!.find((o) => o.from === id)!;
+  assert.deepEqual(r.info, [['Islands', '5'], ['Bridges', '5']]);
+  assert.deepEqual(r.issues, []);
+  // The O is cut through above its counter: one closed outline (a "C" shape) instead of two
+  assert.equal(by('o').subs.length, 1);
+  assert.ok(by('o').subs.every((s) => s.closed));
+  assert.equal(by('eight').subs.length, 1, 'both counters bridged upwards: one outline');
+  assert.equal(by('rings').subs.length, 2, 'outer and inner ring each opened once');
+  assert.deepEqual(by('bar').subs, objects[3].subs, 'nothing to bridge: unchanged');
+  // Two bridges per island: the O falls into two halves
+  const two = await tool.run(params({ width: 2, count: '2', direction: 'vertical' }), { objects: [objects[0]] });
+  assert.equal(two.objects![0].subs.length, 2);
+  assert.deepEqual(two.info[1], ['Bridges', '2']);
+  // Horizontal bridges on the O leave the top and bottom of the ring whole
+  const h = await tool.run(params({ width: 2, count: '1', direction: 'horizontal' }), { objects: [objects[0]] });
+  assert.ok(Math.min(...ys(h.objects![0].subs)) < -19.9 && Math.max(...ys(h.objects![0].subs)) > 19.9);
+  // Shortest: a wide frame with a thin top bar is bridged through the thin bar
+  const frame = { id: 'f', subs: [sq(0, 0, 60, 40), sq(4, 1, 52, 30)] };
+  const s = await tool.run(params({ width: 2, count: '1', direction: 'shortest' }), { objects: [frame] });
+  const cut = s.objects![0].subs[0].nodes;
+  assert.ok(cut.some((n) => n.y < 1e-6) && !cut.some((n) => Math.abs(n.y - 40) < 1e-6 && n.x > 29 && n.x < 31), 'cut at the top (1 mm), not the bottom (9 mm)');
+  // Nested islands left out, auto count by size, nothing closed
+  const nested = await tool.run(params({ width: 2, count: 'auto', autoSize: 25, nested: false }), { objects: [objects[2]] });
+  assert.deepEqual(nested.info, [['Islands', '1'], ['Bridges', '2']]);
+  assert.equal(nested.issues[0].msg, '1 nested islands stay without a bridge.');
+  const none = await tool.run(params({}), { objects: [{ id: 'l', subs: [{ closed: false, nodes: [{ x: 0, y: 0 }, { x: 5, y: 5 }] }] }] });
+  assert.equal(none.objects, undefined);
+  assert.equal(none.issues[0].msg, 'Select closed shapes or text.');
+  const wide = await tool.run(params({ width: 15, count: '1' }), { objects: [objects[1]] });
+  assert.equal(wide.issues[0].msg, '2 bridges are wider than their island.');
+  tool.dispose();
+});
+
 if (failed) {
   console.log(`${failed} failed`);
   process.exit(1);
