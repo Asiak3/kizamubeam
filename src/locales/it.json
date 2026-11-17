@@ -4922,5 +4922,8 @@
   "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "funzione host sconosciuta in «host» (consentite: {list})",
   "Listen, Aktionen, Zeichenfläche und Eingaben gibt es nur bei Generatoren": "liste, azioni, superficie di disegno e input esistono solo nei generatori",
   "„{name}“ angewendet (Ctrl+Z macht es rückgängig).": "«{name}» applicato (Ctrl+Z lo annulla).",
-  "„{name}“ hat keine Formen geliefert; die Auswahl wurde entfernt (Ctrl+Z macht es rückgängig).": "«{name}» non ha restituito forme; la selezione è stata rimossa (Ctrl+Z lo annulla)."
+  "„{name}“ hat keine Formen geliefert; die Auswahl wurde entfernt (Ctrl+Z macht es rückgängig).": "«{name}» non ha restituito forme; la selezione è stata rimossa (Ctrl+Z lo annulla).",
+  "Erst ein Bild in der Zeichnung auswählen.": "Seleziona prima un’immagine nel disegno.",
+  "{where}: braucht „dialog“ Version {n}": "{where}: richiede la versione {n} di “dialog”",
+  "{where}: „store“ muss ein data-Parameter mit „resource“: „image“ sein, und die Aktion braucht ein Bild": "{where}: “store” deve essere un parametro data con “resource”: “image” e l’azione richiede un’immagine"
 }

@@ -8,6 +8,7 @@ import { initPlugins, PENDING } from './plugins/registry';
 import { workerProcess } from './plugins/client';
 import { setResourceSource } from './plugins/generator';
 import { meshData } from './model3d/store';
+import { imageResource } from './plugins/imageResource';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 canvas.tabIndex = 0;
@@ -20,7 +21,7 @@ initPlugins(
   },
 );
 // Plugins get the 3D models their parameters name (an object of a stack model plugin) from the model store
-setResourceSource((kind, id) => (kind === 'model3d' ? meshData(id) : null));
+setResourceSource((kind, id) => (kind === 'model3d' ? meshData(id) : kind === 'image' ? imageResource(id) : null));
 // Erweiterungen im Hintergrund lesen; Dialoge warten bei Bedarf darauf
 void ensurePacks();
 buildUI(editor);

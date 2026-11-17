@@ -70,13 +70,13 @@ export class ManifestError extends Error {}
  * conditions on action buttons. A plugin that needs a newer schema is refused with an update hint instead of being
  * shown half-broken.
  */
-export const DIALOG_VERSION = 3;
+export const DIALOG_VERSION = 4;
 const MAX_VIEWS = 6;
 const MAX_ROW_ACTIONS = 4;
 const MAX_LISTS = 4;
 const MAX_COLUMNS = 8;
 const MAX_ACTIONS = 8;
-const INPUTS = ['selection', 'image', 'camera'] as const;
+const INPUTS = ['selection', 'image', 'selectedImage', 'camera'] as const;
 
 const ID_RE = /^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$/;
 const KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/;
@@ -162,8 +162,8 @@ function param(v: unknown, i: number): ParamSpec {
   if (type === 'text' || type === 'data') {
     if (typeof v.def !== 'string' || v.def.length > 10_000) throw new ManifestError(t('{where}: def muss ein Text sein', { where: at }));
     if (type === 'data' && v.resource !== undefined) {
-      if (v.resource !== 'model3d') throw new ManifestError(t('{where}: unbekannte Ressource „{kind}“', { where: at, kind: String(v.resource) }));
-      return { ...base, type, def: v.def, resource: 'model3d' };
+      if (v.resource !== 'model3d' && v.resource !== 'image') throw new ManifestError(t('{where}: unbekannte Ressource „{kind}“', { where: at, kind: String(v.resource) }));
+      return { ...base, type, def: v.def, resource: v.resource };
     }
     return { ...base, type, def: v.def };
   }
@@ -221,12 +221,15 @@ function column(v: unknown, at: string): GenColumn {
   throw new ManifestError(t('{where}: unbekannter Typ „{type}“', { where: at, type: String(v.type) }));
 }
 
-/** Lists, actions (schema version 2) and the surface (version 3) of a dialog */
+/** Lists, actions (schema version 2), the surface (version 3) and images kept with the project (version 4) of a dialog */
 function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<string>): { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface } {
   const out: { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface } = {};
   const v3 = (d.version as number) >= 3;
   const needs3 = (at: string) => {
     if (!v3) throw new ManifestError(t('{where}: braucht „dialog“ Version 3', { where: at }));
+  };
+  const needs4 = (at: string) => {
+    if ((d.version as number) < 4) throw new ManifestError(t('{where}: braucht „dialog“ Version {n}', { where: at, n: 4 }));
   };
   if (d.lists !== undefined) {
     if (!Array.isArray(d.lists) || d.lists.length > MAX_LISTS) throw new ManifestError(t('ungültige Angabe „dialog“'));
@@ -266,6 +269,14 @@ function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<
       if (a.inputs !== undefined) {
         if (!Array.isArray(a.inputs) || !a.inputs.every((x) => (INPUTS as readonly unknown[]).includes(x))) throw new ManifestError(t('{where}: unbekannte Eingabe', { where: at }));
         act.inputs = [...new Set(a.inputs as GenActionInput[])];
+        if (act.inputs.includes('selectedImage')) needs4(at);
+      }
+      if (a.store !== undefined) {
+        needs4(at);
+        const f = schema.find((s) => s.key === a.store);
+        if (!f || f.type !== 'data' || f.resource !== 'image' || !act.inputs?.some((x) => x === 'image' || x === 'selectedImage'))
+          throw new ManifestError(t('{where}: „store“ muss ein data-Parameter mit „resource“: „image“ sein, und die Aktion braucht ein Bild', { where: at }));
+        act.store = f.key;
       }
       if (a.field !== undefined) {
         const f = schema.find((s) => s.key === a.field);

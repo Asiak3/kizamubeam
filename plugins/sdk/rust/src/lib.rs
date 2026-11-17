@@ -187,6 +187,20 @@ pub fn pixels(image: &Value) -> Option<Vec<u8>> {
 }
 
 /// A 3D model handed to `resource` (`kzm1:` + base64): positions (x, y, z per vertex, mm) and triangles
+/// An image the app keeps with the project (resource `"image"`: `rgba1:<width>,<height>,<base64 RGBA>`) as
+/// `(width, height, rgba bytes)`, or `None` for other data.
+pub fn stored_image(data: &str) -> Option<(u32, u32, Vec<u8>)> {
+    let rest = data.strip_prefix("rgba1:")?;
+    let mut it = rest.splitn(3, ',');
+    let w: u32 = it.next()?.parse().ok()?;
+    let h: u32 = it.next()?.parse().ok()?;
+    let px = pixels(&serde_json::json!({ "data": it.next()? }))?;
+    if px.len() != (w as usize) * (h as usize) * 4 {
+        return None;
+    }
+    Some((w, h, px))
+}
+
 pub fn mesh(data: &str) -> Option<(Vec<f32>, Vec<u32>)> {
     let b = pixels(&serde_json::json!({ "data": data.strip_prefix("kzm1:")? }))?;
     let u32_at = |o: usize| u32::from_le_bytes([b[o], b[o + 1], b[o + 2], b[o + 3]]);

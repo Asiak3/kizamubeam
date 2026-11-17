@@ -18,6 +18,10 @@ export interface GenHost {
   selection(): GenSelected[];
   bed(): { w: number; h: number };
   cameraImages(): GenCameraImage[];
+  /** The selected image of the drawing (the first one): its decoded picture, its id in the image store and name */
+  selectedImage?(): { image: CanvasImageSource; width: number; height: number; asset: string; name: string } | null;
+  /** Keep an image file with the project (image store); its id, or null when it cannot be read */
+  keepImage?(file: Blob): Promise<string | null>;
 }
 
 /** What the app hands to Generator.fromInputs for the inputs a generator declares */

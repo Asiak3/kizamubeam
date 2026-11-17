@@ -5,6 +5,7 @@ import { flattenSub, SCALE } from './clip';
 import { shapeSubs } from './geom';
 import { Obj, Pt, visibleLeaves } from './model';
 import type { GenHost, GenSelected } from './generators/host';
+import { addAsset, assetImage } from './images';
 
 const polysOfObj = (o: Obj): Pt[][] => {
   const out: Pt[][] = [];
@@ -23,5 +24,26 @@ export function genHost(ed: Editor): GenHost {
     selection: () => selectedForGen(ed),
     bed: () => ({ w: ed.doc.bed.w, h: ed.doc.bed.h }),
     cameraImages: () => cameraViews(ed).map((v) => ({ image: v.image, empty: v.empty })),
+    selectedImage: () => {
+      for (const o of ed.sel) {
+        if (o.shape.kind !== 'image') continue;
+        const img = assetImage(o.shape.asset);
+        if (img) return { image: img, width: img.naturalWidth, height: img.naturalHeight, asset: o.shape.asset, name: o.name ?? '' };
+      }
+      return null;
+    },
+    keepImage: async (file) => {
+      try {
+        const url = await new Promise<string>((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(String(r.result));
+          r.onerror = () => rej(r.error);
+          r.readAsDataURL(file);
+        });
+        return (await addAsset(url)).id;
+      } catch {
+        return null;
+      }
+    },
   };
 }

@@ -56,8 +56,11 @@ export type ParamSpec =
   /** Empty text fields show the suggestion from Generator.view().autoText */
   | (SpecBase & { type: 'text'; def: string })
   /** Text, der nicht im Dialog erscheint (z. B. Kennung eines eingelesenen 3D-Modells) */
-  /** resource: the value is the id of data the app keeps (a 3D model); plugins get that data before they compute */
-  | (SpecBase & { type: 'data'; def: string; resource?: 'model3d' });
+  /**
+   * resource: the value is the id of data the app keeps (a 3D model, or an image kept with the project); plugins get
+   * that data before they compute
+   */
+  | (SpecBase & { type: 'data'; def: string; resource?: 'model3d' | 'image' });
 
 export interface Issue {
   /** Betroffenes Feld (fehlt bei Problemen, die mehrere Felder betreffen) */
@@ -160,7 +163,7 @@ export interface GenList {
  * What an action asks the app for: the selected objects, an image file the user picks (the dialog opens a file
  * picker first) or the calibrated camera image (the button is hidden while there is none)
  */
-export type GenActionInput = 'selection' | 'image' | 'camera';
+export type GenActionInput = 'selection' | 'image' | 'selectedImage' | 'camera';
 
 /** A button in the dialog that sends an event to the generator (onEvent) with the inputs it declares */
 export interface GenAction {
@@ -172,6 +175,11 @@ export interface GenAction {
   field?: string;
   /** Show the button only while this condition holds */
   showIf?: Rule;
+  /**
+   * A data parameter with resource "image": the picked or selected image is kept with the project and its id goes
+   * into this parameter (before onEvent), so the generator can compute from it again later
+   */
+  store?: string;
 }
 
 /** An RGBA image, at most 1200 pixels on its longer side */
@@ -190,7 +198,7 @@ export interface GenEvent {
   surface?: GenSurfaceState;
   inputs: {
     selection?: GenSelected[];
-    /** The picked image file and its name without extension */
+    /** The picked image file (or the selected image of the drawing) and its name without extension */
     image?: GenImage & { name: string };
     /** The camera image in bed size (it covers 0 … bed.w × 0 … bed.h mm) and the photo of the empty bed, if taken */
     camera?: GenImage & { bed: { w: number; h: number }; empty?: GenImage };

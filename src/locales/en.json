@@ -4922,5 +4922,8 @@
   "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "unknown host function in “host” (allowed: {list})",
   "Listen, Aktionen, Zeichenfläche und Eingaben gibt es nur bei Generatoren": "lists, actions, a drawing surface and inputs are for generators only",
   "„{name}“ angewendet (Ctrl+Z macht es rückgängig).": "“{name}” applied (Ctrl+Z undoes it).",
-  "„{name}“ hat keine Formen geliefert; die Auswahl wurde entfernt (Ctrl+Z macht es rückgängig).": "“{name}” returned no shapes; the selection was removed (Ctrl+Z undoes it)."
+  "„{name}“ hat keine Formen geliefert; die Auswahl wurde entfernt (Ctrl+Z macht es rückgängig).": "“{name}” returned no shapes; the selection was removed (Ctrl+Z undoes it).",
+  "Erst ein Bild in der Zeichnung auswählen.": "Select an image in the drawing first.",
+  "{where}: braucht „dialog“ Version {n}": "{where}: needs “dialog” version {n}",
+  "{where}: „store“ muss ein data-Parameter mit „resource“: „image“ sein, und die Aktion braucht ein Bild": "{where}: “store” must be a data parameter with “resource”: “image”, and the action needs an image"
 }

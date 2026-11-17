@@ -5,6 +5,7 @@
 import type { Pt } from '../model';
 import type { GenEvent, GenImage, GenPointer, GenSurfaceResult, GenSurfaceState, Params } from '../generators/types';
 import { fromBase64 } from './contract';
+import { toBase64 } from '../base64';
 import type { GenSelected } from '../generators/host';
 import { buildGen, checkInput, defaultParams, fieldActive, normalizeParams } from '../generators/index';
 import { pluginGenerator } from './generator';
@@ -45,12 +46,14 @@ export class ScriptError extends Error {}
  * field gets its previous value back. `$action` clicks an action button after the fields, with `$selection` (a list
  * of { name, polys }) as the selection it hands over. `$model` opens a 3D model like the user importing one:
  * `{ name, data }` with data in the app's `kzm1:` format (see encodeMesh); it fills the parameters the manifest's
- * `inputs` name. `$row` with `$action` clicks a button of that list row. `$view` switches the drawing surface to a
+ * `inputs` name. `$image` is the picked (or selected) image of an action, { name?, width, height, data } with RGBA as
+ * base64; an action with `store` keeps it in that parameter like the app does. `$row` with `$action` clicks a button of that list row. `$view` switches the drawing surface to a
  * view, `$surface` sends it a list of pointer events ({ type, x, y, hit?, from?, drag?, key? }, mm in the view).
  */
 export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = []): Promise<DialogState[]> {
   const models = new Map<string, string>();
-  const g = pluginGenerator(m, { id: 'headless', name: m.id }, { resource: (kind, id) => (kind === 'model3d' ? models.get(id) ?? null : null) });
+  const images = new Map<string, string>();
+  const g = pluginGenerator(m, { id: 'headless', name: m.id }, { resource: (kind, id) => (kind === 'model3d' ? models.get(id) : kind === 'image' ? images.get(id) : undefined) ?? null });
   try {
     const out: DialogState[] = [];
     let p = defaultParams(g);
@@ -116,7 +119,16 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
           if ($selection !== undefined && !Array.isArray($selection)) throw new ScriptError(`step ${i}: $selection must be a list`);
           const inputs: GenEvent['inputs'] = {};
           if (a.inputs?.includes('selection')) inputs.selection = ($selection ?? []) as GenSelected[];
-          if (a.inputs?.includes('image') && $image !== undefined) inputs.image = { ...scriptImage($image, i), name: String(($image as { name?: unknown }).name ?? '') };
+          if ((a.inputs?.includes('image') || a.inputs?.includes('selectedImage')) && $image !== undefined) {
+            inputs.image = { ...scriptImage($image, i), name: String(($image as { name?: unknown }).name ?? '') };
+            const store = 'store' in a ? a.store : undefined;
+            if (store) {
+              // Kept like the app keeps the picked file: an image id in the store parameter, the pixels as resource
+              const id = hex(sha256(new Uint8Array(inputs.image.data.buffer, inputs.image.data.byteOffset, inputs.image.data.length))).slice(0, 16);
+              images.set(id, `rgba1:${inputs.image.width},${inputs.image.height},${toBase64(inputs.image.data)}`);
+              p = { ...p, [store]: id };
+            }
+          }
           if (a.inputs?.includes('camera') && $camera !== undefined) {
             const c = $camera as { bed?: { w: number; h: number }; empty?: unknown };
             if (!c.bed || !(c.bed.w > 0 && c.bed.h > 0)) throw new ScriptError(`step ${i}: $camera needs bed: { w, h }`);

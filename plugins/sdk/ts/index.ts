@@ -114,6 +114,15 @@ export function mesh(data: string): Mesh | null {
   for (let i = 0; i < tri.length; i++) tri[i] = dv.getUint32(8 + nv * 12 + i * 4, true);
   return { pos, tri };
 }
+/**
+ * An image the app keeps with the project (resource "image": "rgba1:<width>,<height>,<base64 RGBA>") as an Image,
+ * or null for other data. pixels() turns its data into bytes.
+ */
+export function storedImage(data: string): Image | null {
+  const m = /^rgba1:(\d+),(\d+),/.exec(data);
+  if (!m) return null;
+  return { width: Number(m[1]), height: Number(m[2]), data: data.slice(m[0].length) };
+}
 /** Answer of onEvent and onSurface: parameters to change (e.g. new rows of a list), a short message for the dialog,
  * and for a drawing surface its new free state (null clears it), view and selected rows */
 export interface EventResult {

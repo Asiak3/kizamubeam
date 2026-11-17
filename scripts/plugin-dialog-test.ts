@@ -66,7 +66,7 @@ await test('schema v1: sections are translated, advanced wins, a newer dialog sc
   assert.equal(g.schema[4].advanced, true);
   assert.equal(g.schema[2].options[1][1], 'Sliding');
   g.dispose();
-  assert.throws(() => manifest(TRAY, { dialog: { version: 4 } }), /neuere Version|newer version/);
+  assert.throws(() => manifest(TRAY, { dialog: { version: 5 } }), /neuere Version|newer version/);
   assert.throws(() => manifest(TRAY, { dialog: 'big' }), /dialog/);
   assert.throws(() => manifest(TRAY, { params: [{ key: 'a', type: 'bool', def: true, section: '<b>' }] }), /Abschnitt|section/);
 });
@@ -378,6 +378,38 @@ await test('3D model input: resource sent once per engine, opened through inputs
   assert.throws(() => manifest(code, { params: [{ key: 'model', type: 'data', def: '', resource: 'video' }], texts }), /video/);
   assert.throws(() => manifest(code, { params: [{ key: 'model', type: 'data', def: '' }], texts, inputs: [{ kind: 'model3d', param: 'model' }] }), /resource/);
   assert.throws(() => manifest(code, { params, texts, inputs: [{ kind: 'model3d', param: 'model', name: 'size' }] }), /name/);
+});
+
+await test('stage 6: images kept as resources, selectedImage and store need dialog version 4', async () => {
+  const { storedImage } = await import('../plugins/sdk/ts/index');
+  assert.deepEqual(storedImage('rgba1:2,1,AAAAAAAAAAA='), { width: 2, height: 1, data: 'AAAAAAAAAAA=' });
+  assert.equal(storedImage('kzm1:AAAA'), null);
+  const code = `let calls = 0; const imgs = {};
+  globalThis.plugin = {
+    resource: ({ kind, id, data }) => { calls++; if (kind === 'image') imgs[id] = data; return null; },
+    validate: (p) => !p.photo || imgs[p.photo] ? [] : [{ level: 'error', code: 'noImage' }],
+    generate: (p) => {
+      const m = p.photo ? /^rgba1:([0-9]+),([0-9]+),/.exec(imgs[p.photo]) : null;
+      const w = m ? Number(m[1]) : 1;
+      return { parts: [{ key: 'a', subs: [{ closed: true, nodes: [{x:0,y:0},{x:w,y:0},{x:0,y:1}] }], at: { x: 0, y: 0 } }], info: [['calls', String(calls)]] };
+    },
+    onEvent: ({ action, inputs, params }) => ({ message: [action, ' ', inputs.image ? inputs.image.name : '-', ' ', params.photo ? 'kept' : 'none'] }),
+  };`;
+  const params = [{ key: 'photo', type: 'data', def: '', resource: 'image' }];
+  const texts = { en: { name: 'Photo', desc: 'Photo', noImage: 'No image', calls: 'Calls' } };
+  const dialog = { version: 4, actions: [{ id: 'pick', inputs: ['image'], store: 'photo' }, { id: 'sel', inputs: ['selectedImage'], store: 'photo' }] };
+  const m = manifest(code, { params, texts, dialog });
+  const px = (w: number, h: number) => ({ width: w, height: h, data: Buffer.alloc(w * h * 4, 9).toString('base64') });
+  const s = await runDialog(m, [{ $action: 'pick', $image: { ...px(5, 3), name: 'cat' } }, { $action: 'sel', $image: { ...px(7, 2), name: 'dog' } }]);
+  assert.equal(s[1].message, 'pick cat kept', 'the id is stored before onEvent');
+  assert.match(String(s[1].params.photo), /^[0-9a-f]{16}$/);
+  assert.equal(s[1].parts[0].box.maxX, 5, 'generate sees the pixels through the resource');
+  assert.equal(s[2].message, 'sel dog kept');
+  assert.equal(s[2].parts[0].box.maxX, 7);
+  // Version, resource kind and image input are checked
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, version: 3 } }), /4/);
+  assert.throws(() => manifest(code, { params: [{ key: 'photo', type: 'data', def: '' }], texts, dialog }), /store/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { version: 4, actions: [{ id: 'x', inputs: ['camera'], store: 'photo' }] } }), /store/);
 });
 
 await test('check: a good plugin passes, randomness, crashes and missing texts are found', async () => {

@@ -122,10 +122,15 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
   };
   surface?.onSelect(mark);
 
-  const run = async (a: GenAction, extra: GenEvent['inputs'] = {}, row?: number) => {
+  const run = async (a: GenAction, extra: GenEvent['inputs'] = {}, row?: number, kept?: string) => {
     if (!g.onEvent) return;
     const token = ++seq;
     note.textContent = '';
+    // An image the action keeps with the project: its id goes into the parameter first, like user input
+    if (a.store && kept) {
+      set({ [a.store]: kept });
+      current = { ...current, [a.store]: kept };
+    }
     const inputs: GenEvent['inputs'] = { ...extra };
     if (a.inputs?.includes('selection')) inputs.selection = host.selection();
     if (a.inputs?.includes('camera')) {
@@ -160,6 +165,21 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
   const plainButton = (a: GenAction): HTMLElement[] => {
     if (a.inputs?.includes('camera') && !hasCamera) return [];
     const extra = a.field ? fieldEls(a.field) : [];
+    if (a.inputs?.includes('selectedImage'))
+      return [
+        h('button', {
+          class: 'btn small', title: a.title ?? '',
+          onclick: () => {
+            const sel = host.selectedImage?.();
+            if (!sel) {
+              note.textContent = t('Erst ein Bild in der Zeichnung auswählen.');
+              return;
+            }
+            void run(a, { image: { ...readImage(sel.image, sel.width, sel.height, 1000), name: sel.name } }, undefined, sel.asset);
+          },
+        }, a.label),
+        ...extra,
+      ];
     if (!a.inputs?.includes('image')) return [h('button', { class: 'btn small', title: a.title ?? '', onclick: () => void run(a) }, a.label), ...extra];
     const file = h('input', { type: 'file', accept: 'image/*', hidden: true }) as HTMLInputElement;
     file.addEventListener('change', async () => {
@@ -173,7 +193,8 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
       } catch {
         // The generator reports an image it did not get
       }
-      void run(a, image ? { image } : {});
+      const kept = image && a.store ? ((await host.keepImage?.(f)) ?? undefined) : undefined;
+      void run(a, image ? { image } : {}, undefined, kept);
     });
     return [h('button', { class: 'btn small', title: a.title ?? '', onclick: () => file.click() }, a.label), ...extra, file];
   };

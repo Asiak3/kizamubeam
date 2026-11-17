@@ -11,6 +11,7 @@ import { deletePreset, loadPresets, presetOutput, savePreset } from './imagePres
 import { openFillDialog, openSaveTemplateDialog, openSeriesDialog, openTemplateLibrary } from './templateDialogs';
 import { exportDxf, exportPdf, exportSvg, importFile, installDropAndPaste, openProject, saveProcessedBitmap, saveProject } from './files';
 import { onMeshReady } from './model3d/store';
+import { onImageResourceReady } from './plugins/imageResource';
 import { assetImage, displayCanvas, onImageReady, outputGrid } from './images';
 import { onFontListChanged, refreshFonts, requestLocalFonts, systemFonts } from './fonts';
 import { openFontManager } from './fontManager';
@@ -202,6 +203,7 @@ export function buildUI(ed: Editor) {
   ed.onImport = () => importFile(ed);
   // 3D-Modelle aus der automatischen Sicherung kommen etwas später: 3D-Ansicht und Prüfung neu zeichnen
   onMeshReady(() => ed.emit('doc'));
+  onImageResourceReady(() => ed.emit('doc'));
   ed.onGridArray = () => openGridArrayDialog(ed);
   ed.onBarcodeEdit = (o) => editBarcode(ed, o);
   ed.onGenEdit = (o) => (o.shape.kind === 'gen' && o.shape.gen === PATTERN_GEN_ID ? openPatternDialog(ed, { edit: o }) : o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
