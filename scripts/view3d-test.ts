@@ -2,6 +2,7 @@
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import type { Params } from '../src/generators';
+import './builtin-generators';
 import type { Solid } from '../src/view3d/solids';
 const { asmSolids, findOverlaps, solidBounds } = await import('../src/view3d/solids');
 const { rotatePose } = await import('../src/view3d/poses');

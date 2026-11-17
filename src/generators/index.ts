@@ -1,20 +1,6 @@
 // Verzeichnis der Generatoren und gemeinsame Abläufe: Parameter prüfen, normalisieren und Geometrie erzeugen.
 import type { GenShape, Pt, SubPath } from '../model';
 import { t } from '../i18n';
-import { BOX } from './box';
-import { FINGERBOX } from './fingerbox';
-import { CAM } from './cam';
-import { DRAWER } from './drawer';
-import { INSERT } from './insert';
-import { SHELF } from './shelf';
-import { GEAR } from './gear';
-import { GEARPAIR } from './gearpair';
-import { PULLEY } from './pulley';
-import { RACK } from './rack';
-import { DISCSPHERE } from './discsphere';
-import { STACK } from './stack';
-import { RIBS } from './ribs';
-import { JIG } from './jig';
 import { SKETCH } from '../sketch/generator';
 import { SLOT_PLACEMENT, SLOT_GENERATOR, isSlotGenerator } from '../slotPlacement';
 import { CONTOUR_OFFSET, CONTOUR_OFFSET_ID, LEGACY_CONTOUR_OFFSET_ID } from '../contourOffset';
@@ -24,7 +10,11 @@ import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
 export type { GenAsk, GenChange, Rule, GenInput, GenPart, GenTile, Generator, Issue, Params, ParamSpec } from './types';
 
-/** Registered generators in toolbox order. Use register() to add one; the built-in generators register below. */
+/**
+ * Registered generators in toolbox order. Use register() to add one. The generators that come with the app are
+ * plugins of the core pack (src/plugins/core.ts); their source in this folder is built into that pack and is not
+ * part of the app. Node tests that need them without a plugin register the source (scripts/builtin-generators.ts).
+ */
 export const GENERATORS: Generator[] = [];
 
 /** Add a generator (or replace one with the same id). Its id must stay stable: saved projects refer to it. */
@@ -40,7 +30,6 @@ export function unregister(id: string) {
   if (i >= 0) GENERATORS.splice(i, 1);
 }
 
-for (const g of [GEAR, RACK, PULLEY, CAM, GEARPAIR, BOX, FINGERBOX, DRAWER, INSERT, SHELF, STACK, RIBS, DISCSPHERE, JIG]) register(g);
 
 export const getGenerator = (id: string): Generator | undefined => (id === PATTERN_GEN_ID ? PATTERN_GEN : id === CONTOUR_OFFSET_ID ? CONTOUR_OFFSET : id === LEGACY_CONTOUR_OFFSET_ID ? { ...CONTOUR_OFFSET, id, version: 1 } : id === SLOT_GENERATOR ? SLOT_PLACEMENT : isSlotGenerator(id) ? { ...SLOT_PLACEMENT, id } : id === 'sketch' ? SKETCH : GENERATORS.find((g) => g.id === id));
 

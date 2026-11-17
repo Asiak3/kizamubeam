@@ -2,6 +2,7 @@
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
+await import('./builtin-generators');
 const { appGroups, appList, fold, isNewIn, pushRecent, searchApps } = await import('../src/apps');
 const { ICONS } = await import('../src/icons');
 const { GENERATORS } = await import('../src/generators/index');

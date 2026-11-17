@@ -3,6 +3,7 @@ import { strict as assert } from 'node:assert';
 import Clipper from 'clipper-lib';
 import { initialDialogParams } from '../src/generators/dialog';
 import { buildGen, defaultParams, getGenerator } from '../src/generators';
+import './builtin-generators';
 import type { GenShape, Pt } from '../src/model';
 
 const box = getGenerator('box')!;

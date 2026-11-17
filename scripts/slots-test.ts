@@ -5,6 +5,7 @@ import type { Mat, Obj, Shape, SubPath } from '../src/model';
 const { IDENT, translate, rotate, mul, visibleLeaves } = await import('../src/model');
 const { findSlots, resizeSlots, slotWidths } = await import('../src/slots');
 const { buildGen, defaultParams, getGenerator } = await import('../src/generators/index');
+await import('./builtin-generators');
 const { shapeSubs } = await import('../src/geom');
 
 let failed = 0;

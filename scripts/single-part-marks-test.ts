@@ -3,6 +3,7 @@ import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { EditorGenerators, isMarkGroup } from '../src/editor/generators';
 import { buildGen, defaultParams, getGenerator } from '../src/generators/index';
+import './builtin-generators';
 import { defaultLayer, loadDoc } from '../src/model';
 import type { Obj, SubPath } from '../src/model';
 

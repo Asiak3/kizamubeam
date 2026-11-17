@@ -23,6 +23,7 @@ const { inProcess } = await import('../src/plugins/client');
 // Endless loops below should not wait for the full generate limit
 (await import('../src/plugins/contract')).LIMITS.callMs.generate = 3000;
 const G = await import('../src/generators/index');
+await import('./builtin-generators');
 
 let failed = 0;
 async function test(name: string, fn: () => Promise<void> | void) {

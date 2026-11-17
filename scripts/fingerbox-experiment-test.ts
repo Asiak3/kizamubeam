@@ -2,6 +2,7 @@
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fingerboxParts, fingerboxSegments, type FingerboxParams } from '../src/generators/fingerbox-experiment';
+import './builtin-generators';
 
 type Fixture = { params: FingerboxParams; outlines: number[][][] };
 const fixtures = JSON.parse(readFileSync('scripts/fingerbox-reference.json', 'utf8')) as Fixture[];

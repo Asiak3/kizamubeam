@@ -6,6 +6,7 @@ import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { readdirSync, readFileSync } from 'node:fs';
 const { GENERATORS, register, getGenerator, ruleHolds, fieldActive, autoText, buildGen, defaultParams } = await import('../src/generators/index');
+await import('./builtin-generators');
 const { appList } = await import('../src/apps');
 const { genFit } = await import('../src/fitcheck');
 

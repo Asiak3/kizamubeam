@@ -9,6 +9,7 @@ const { addMesh } = await import('../src/model3d/store');
 const { STACK, stackLayout, numberStrokes, FRAMES } = await import('../src/generators/stack');
 const { RIBS, ribsLayout, worldMesh, materialAlong, ranges, splitPlate } = await import('../src/generators/ribs');
 const { buildGen, defaultParams, fieldActive, normalizeParams } = await import('../src/generators/index');
+await import('./builtin-generators');
 const RIBS_SURFACE = await import('../src/generators/ribsSurface');
 const { asmSolids, findOverlaps, solidBounds } = await import('../src/view3d/solids');
 const { suggestSections, voxelize } = await import('../src/model3d/suggest');

@@ -22,6 +22,7 @@ const { INSERT, dividerCenters } = await import('../src/generators/insert');
 const { SHELF, shelfHeights, sideCenters } = await import('../src/generators/shelf');
 const { DISCSPHERE, sphereLayout, sphereNormals } = await import('../src/generators/discsphere');
 const { buildGen, checkInput, defaultParams, normalizeParams } = await import('../src/generators/index');
+await import('./builtin-generators');
 const { bezierPt, segments } = await import('../src/curves');
 const ClipperLib = (await import('clipper-lib')).default;
 

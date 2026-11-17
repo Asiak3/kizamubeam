@@ -2,6 +2,7 @@
 // give the same dialog, geometry, issues, info, names and poses as the built-in generators.
 // Aufruf: npm run test:core-plugins (builds plugins/core/dist first)
 import './core-fixtures-env';
+import './builtin-generators';
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 const gl = globalThis as Record<string, unknown>;

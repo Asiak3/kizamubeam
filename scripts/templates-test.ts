@@ -10,6 +10,7 @@ g.localStorage = {
   removeItem: (k: string) => void mem.delete(k),
 };
 const T = await import('../src/templates');
+await import('./builtin-generators');
 const P = await import('../src/params');
 const vt = await import('../src/vartext');
 const { loadDoc, newDoc } = await import('../src/model');

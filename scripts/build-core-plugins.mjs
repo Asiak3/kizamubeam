@@ -27,23 +27,24 @@ const BUILD_HOST = "export * from './plugins/core/build-host';";
 /**
  * Generators built as plugins. label: text for the Objects window with placeholders mapped to parameters
  * (the plugin fills placeholders with parameter values; generators whose label needs computed values leave it out).
+ * In toolbox order (BUILTIN_GENERATORS in src/generators/builtin.ts): the app registers them in this order.
  */
 export const CORE = {
   gear: { file: 'src/generators/gear', name: 'GEAR', label: { text: 'Zahnrad z={z} m={m}', values: { z: 'teeth', m: 'module' } } },
-  box: { file: 'src/generators/box', name: 'BOX' },
   rack: { file: 'src/generators/rack', name: 'RACK' },
   pulley: { file: 'src/generators/pulley', name: 'PULLEY' },
   cam: { file: 'src/generators/cam', name: 'CAM' },
   gearpair: { file: 'src/generators/gearpair', name: 'GEARPAIR' },
+  box: { file: 'src/generators/box', name: 'BOX' },
+  fingerbox: { file: 'src/generators/fingerbox', name: 'FINGERBOX' },
   drawer: { file: 'src/generators/drawer', name: 'DRAWER' },
   insert: { file: 'src/generators/insert', name: 'INSERT' },
   shelf: { file: 'src/generators/shelf', name: 'SHELF' },
-  discsphere: { file: 'src/generators/discsphere', name: 'DISCSPHERE' },
-  fingerbox: { file: 'src/generators/fingerbox', name: 'FINGERBOX' },
-  // Print-and-cut marks pull in geom (with fonts); the jig never uses its boundsOf
   // Slicing and area operations through the app (host functions), at the speed of the built-in generators
   stack: { file: 'src/generators/stack', name: 'STACK', host: ['slice', 'region', 'fit'], stub: { slice: SLICE_HOST, fit: FIT_HOST } },
   ribs: { file: 'src/generators/ribs', name: 'RIBS', host: ['slice', 'region', 'fit'], stub: { slice: SLICE_HOST, fit: FIT_HOST } },
+  discsphere: { file: 'src/generators/discsphere', name: 'DISCSPHERE' },
+  // Print-and-cut marks pull in geom (with fonts); the jig never uses its boundsOf
   jig: { file: 'src/generators/jig', name: 'JIG', stub: { geom: 'export const boundsOf = () => { throw new Error("not in plugins"); };' } },
 };
 
