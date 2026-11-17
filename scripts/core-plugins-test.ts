@@ -163,6 +163,30 @@ await test('box-divided as a plugin: same dialog, geometry, suggestions; onChang
   }
 });
 
+const square = (x: number, y: number, w: number, h: number) => [{ x, y }, { x: x + w, y }, { x: x + w, y: y + h }, { x, y: y + h }];
+const selected = [
+  { name: 'Coaster', polys: [square(0, 0, 40, 40)] },
+  { name: 'Tag', polys: [square(10, 10, 60, 25), square(15, 15, 5, 5)] },
+];
+
+await test('jig as a plugin: same dialog, geometry and rows; adding the selection with an action', async () => {
+  const core = G.getGenerator('jig')!;
+  const shapes = (await core.onEvent!({ action: 'fromSelection', inputs: { selection: selected } }, G.normalizeParams(core, {})))!.patch!.shapes;
+  await same('jig', [...sweep('jig'), { shapes }, { shapes, plate: 'size', width: 60, height: 40 }, { shapes, notch: 'two', numbers: false }]);
+  const plug = pluginGenerator(pack.plugins.find((x) => x.id === 'jig')!, { id: pack.id, name: 'core' });
+  try {
+    assert.deepEqual(plug.lists, core.lists);
+    assert.deepEqual(plug.actions, core.actions);
+    for (const raw of [{}, { shapes }]) {
+      const p = G.normalizeParams(core, raw);
+      for (const selection of [selected, []])
+        assert.deepEqual(await plug.onEvent!({ action: 'fromSelection', inputs: { selection } }, p), await core.onEvent!({ action: 'fromSelection', inputs: { selection } }, p));
+    }
+  } finally {
+    plug.dispose();
+  }
+});
+
 await test('all pass the catalogue check', async () => {
   for (const m of pack.plugins) {
     const r = await checkPlugin(m);

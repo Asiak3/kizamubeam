@@ -3,7 +3,7 @@
 // Damit lässt er sich testen, über MCP aufrufen und später auch als Community-Generator laden.
 import type { Pt, SubPath } from '../model';
 import type { AsmPoses } from './pose';
-import type { GenHost, GenInputs, GenPanel } from './host';
+import type { GenHost, GenInputs, GenPanel, GenSelected } from './host';
 
 export type ParamValue = number | string | boolean;
 export type Params = Record<string, ParamValue>;
@@ -123,6 +123,52 @@ export interface GenTile {
   };
 }
 
+/** An editable column of a dialog list; values are checked like fields (range, options, length) */
+export type GenColumn = { key: string; label: string; title?: string } & (
+  | { type: 'text'; max?: number }
+  | { type: 'int' | 'number' | 'length'; min: number; max: number }
+  | { type: 'enum'; options: [string | number, string][] }
+);
+
+/**
+ * A list in the dialog (#335 stage 3): its rows are a JSON array in a data parameter. The app draws the rows,
+ * their fields, a thumbnail of the row's outline and the row actions; the generator only reads the parameter.
+ */
+export interface GenList {
+  /** Data parameter that holds the rows */
+  param: string;
+  label: string;
+  /** Shown when there are no rows */
+  empty?: string;
+  columns: GenColumn[];
+  /** Row key holding sub-paths (mm): drawn as a small picture; `rotate` names a column with a turn in degrees */
+  shape?: { key: string; rotate?: string };
+  /** Rows can be removed */
+  remove?: boolean;
+  /** Tooltip of the remove button */
+  removeTitle?: string;
+}
+
+/** A button in the dialog that sends an event to the generator (onEvent) with the inputs it declares */
+export interface GenAction {
+  id: string;
+  label: string;
+  title?: string;
+  inputs?: 'selection'[];
+}
+
+/** Data an action hands to Generator.onEvent */
+export interface GenEvent {
+  action: string;
+  inputs: { selection?: GenSelected[] };
+}
+
+/** Answer of onEvent: parameters to change, and a short message for the dialog */
+export interface GenEventResult {
+  patch?: Params;
+  message?: string;
+}
+
 /** What a generator needs before its dialog opens */
 export type GenInput =
   /** A 3D model (STL, OBJ) picked by the user; offered when a model is imported, see GenInputs.model */
@@ -138,6 +184,14 @@ export type GenInput =
 export interface GenAsk {
   question: string;
   options: { label: string; patch: Params }[];
+}
+
+/** Values the dialog shows that depend on the parameters */
+export interface GenView {
+  /** Suggestions for empty text fields, by key */
+  autoText?: Record<string, string>;
+  /** A short text per row of a list (e.g. its size), by list parameter */
+  rows?: Record<string, string[]>;
 }
 
 /** Answer of Generator.onChange: parameters to change as well, or a question first */
@@ -163,7 +217,7 @@ export interface Generator {
   label(p: Params, part?: string): string;
   migrate?(p: Params, from: number): Params;
   /** Values the dialog shows that depend on the parameters: suggestions for empty text fields (by key) */
-  view?(p: Params): { autoText?: Record<string, string> };
+  view?(p: Params): GenView;
   /**
    * Called when the user commits a field (number fields on leaving them, choices at once) with its previous value.
    * The returned patch is checked against the schema like user input. Plugins answer asynchronously (a Promise);
@@ -192,6 +246,12 @@ export interface Generator {
   prepare?(p: Params): Promise<void>;
   /** Name of the extension that provides the generator; saved with its parts (GenShape.ext) for when it is missing */
   ext?: string;
+  /** Lists in the dialog, each bound to a data parameter (#335 stage 3) */
+  lists?: GenList[];
+  /** Buttons in the dialog; a click calls onEvent with the declared inputs */
+  actions?: GenAction[];
+  /** An action was clicked; plugins answer asynchronously */
+  onEvent?(ev: GenEvent, p: Params): GenEventResult | void | Promise<GenEventResult | void>;
   /** Extra area in the dialog; it reads the app only through the host and writes only parameters */
   panel?(p: Params, set: (patch: Params) => void, host?: GenHost): GenPanel;
 }

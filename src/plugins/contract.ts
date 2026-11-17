@@ -1,6 +1,7 @@
 // Plugin contract (issue #205, stage 1): what a plugin may return, checked before anything reaches the editor.
 // Plugins exchange JSON only. Calls: validate(params) → issues, generate(params) → parts, info, labels, poses, plan;
-// optional (#335 stage 2): view(params) → suggested texts, onChange({ key, old, params }) → patch or a question.
+// optional (#335 stage 2): view(params) → suggested texts and row texts, onChange({ key, old, params }) → patch or a
+// question; (#335 stage 3) onEvent({ action, params, inputs }) → patch and a message.
 // No DOM, no Editor, so the same checks run in the Worker, in the app and in Node tests.
 import type { Node, Pt, SubPath } from '../model';
 import type { Params, PlanSheet } from '../generators/types';
@@ -10,12 +11,12 @@ import type { AsmPoses, Pose, V3 } from '../generators/pose';
 export const PLUGIN_API = 1;
 
 /** Plugin functions the app calls */
-export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange';
+export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent';
 
 /** Limits for one plugin (#205: time, memory, output size) */
 export const LIMITS = {
   /** Time per call in ms; the Worker is terminated after it. generate runs in a Worker (the editor stays usable), and nesting many parts in QuickJS takes a while (a 400-tooth gear pair: about 20 s) */
-  callMs: { validate: 2000, generate: 30000, view: 2000, onChange: 2000 } as Record<PluginFn, number>,
+  callMs: { validate: 2000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000 } as Record<PluginFn, number>,
   /** Options of a question (ask) */
   askOptions: 3,
   /** Memory of the JavaScript engine or the WebAssembly instance */
@@ -92,7 +93,7 @@ function subs(v: unknown, what: string, count: { nodes: number }): SubPath[] {
     const nodes = s.nodes.map((n): Node => {
       const p = pt(n, what);
       const o = n as Record<string, unknown>;
-      return { ...p, ...(o.cin !== undefined ? { cin: pt(o.cin, what) } : {}), ...(o.cout !== undefined ? { cout: pt(o.cout, what) } : {}) };
+      return { ...p, ...(o.cin !== undefined ? { cin: pt(o.cin, what) } : {}), ...(o.cout !== undefined ? { cout: pt(o.cout, what) } : {}), ...(o.smooth === true ? { smooth: true } : {}) };
     });
     return { nodes, closed: s.closed === true };
   });
@@ -188,6 +189,14 @@ export const callInput = (p: Params): Params => JSON.parse(JSON.stringify(p));
 /** Answer of view(): suggestions for empty text fields by parameter key */
 export interface PluginView {
   autoText?: Record<string, PluginText>;
+  /** A text per row of a list, by list parameter */
+  rows?: Record<string, PluginText[]>;
+}
+
+/** Answer of onEvent(): parameters to change and a short message for the dialog */
+export interface PluginEventResult {
+  patch?: Record<string, unknown>;
+  message?: PluginText;
 }
 
 /** Answer of onChange(): parameters to change as well, or a question whose options each carry a patch */
@@ -201,7 +210,7 @@ function checkPatch(v: unknown): Record<string, unknown> {
   if (!isObj(v)) return fail('patch');
   const out: Record<string, unknown> = {};
   for (const [k, x] of Object.entries(v).slice(0, 200)) {
-    if (typeof x === 'number' ? !Number.isFinite(x) : typeof x === 'string' ? x.length > 100_000 : typeof x !== 'boolean') fail(`patch value ${k}`);
+    if (typeof x === 'number' ? !Number.isFinite(x) : typeof x === 'string' ? x.length > 4_000_000 : typeof x !== 'boolean') fail(`patch value ${k}`);
     out[str(k, 'patch key', 80)] = x;
   }
   return out;
@@ -216,6 +225,22 @@ export function checkView(v: unknown): PluginView {
     if (!isObj(v.autoText)) fail('autoText');
     out.autoText = Object.fromEntries(Object.entries(v.autoText as Record<string, unknown>).slice(0, 200).map(([k, x]) => [str(k, 'autoText key', 80), checkText(x)]));
   }
+  if (v.rows !== undefined) {
+    if (!isObj(v.rows)) fail('rows');
+    out.rows = Object.fromEntries(
+      Object.entries(v.rows as Record<string, unknown>).slice(0, 8).map(([k, x]) => [str(k, 'rows key', 80), Array.isArray(x) && x.length <= 2000 ? x.map((r) => checkText(r)) : fail('rows')]),
+    );
+  }
+  return out;
+}
+
+/** Check and copy the answer of onEvent(); null means nothing to do */
+export function checkEvent(v: unknown): PluginEventResult {
+  if (v === null || v === undefined) return {};
+  if (!isObj(v)) return fail('event');
+  const out: PluginEventResult = {};
+  if (v.patch !== undefined) out.patch = checkPatch(v.patch);
+  if (v.message !== undefined) out.message = checkText(v.message);
   return out;
 }
 

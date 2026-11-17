@@ -4,6 +4,7 @@
 // in their tests; `npm run plugin:check` uses it to check a pack before it goes into the catalogue.
 import type { Pt } from '../model';
 import type { Params } from '../generators/types';
+import type { GenSelected } from '../generators/host';
 import { buildGen, checkInput, defaultParams, fieldActive, normalizeParams } from '../generators/index';
 import { pluginGenerator } from './generator';
 import { pluginText, type PluginManifest } from './manifest';
@@ -23,6 +24,10 @@ export interface DialogState {
   autoText: Record<string, string>;
   /** Question the plugin asked in this step (onChange), with the option labels */
   ask?: { question: string; options: string[] };
+  /** Text per row of each list (view) */
+  rows: Record<string, string[]>;
+  /** Message of an action in this step (onEvent) */
+  message?: string;
 }
 
 /** Thrown when a script step does not fit the schema (unknown key, wrong type, out of range) */
@@ -32,7 +37,8 @@ export class ScriptError extends Error {}
  * Run the dialog of a plugin generator: the default parameters first, then one state per step. A step is the
  * set of fields the user commits, one after the other; each goes through onChange like in the dialog. When the
  * plugin asks a question, `$answer` in the step picks the option (0, 1, 2); without it the user cancels and the
- * field gets its previous value back.
+ * field gets its previous value back. `$action` clicks an action button after the fields, with `$selection` (a list
+ * of { name, polys }) as the selection it hands over.
  */
 export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = []): Promise<DialogState[]> {
   const g = pluginGenerator(m, { id: 'headless', name: m.id });
@@ -41,8 +47,9 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
     let p = defaultParams(g);
     for (let i = 0; i <= steps.length; i++) {
       let ask: DialogState['ask'];
+      let message: string | undefined;
       if (i > 0) {
-        const { $answer, ...step } = steps[i - 1];
+        const { $answer, $action, $selection, ...step } = steps[i - 1];
         if ($answer !== undefined && !(Number.isInteger($answer) && ($answer as number) >= 0)) throw new ScriptError(`step ${i}: $answer must be an option number`);
         const bad = checkInput(g, step).filter((x) => x.level === 'error');
         if (bad.length) throw new ScriptError(`step ${i}: ${bad.map((x) => x.msg).join('; ')}`);
@@ -67,6 +74,19 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
           const np = normalizeParams(g, { ...p, ...patch }, p);
           for (const k of keys) p[k] = np[k];
         }
+        if ($action !== undefined) {
+          const a = g.actions?.find((x) => x.id === $action);
+          if (!a) throw new ScriptError(`step ${i}: no action "${String($action)}"`);
+          if ($selection !== undefined && !Array.isArray($selection)) throw new ScriptError(`step ${i}: $selection must be a list`);
+          const inputs = a.inputs?.includes('selection') ? { selection: ($selection ?? []) as GenSelected[] } : {};
+          const r = await g.onEvent!({ action: a.id, inputs }, p);
+          if (r?.message !== undefined) message = r.message;
+          if (r?.patch) {
+            const keys = Object.keys(r.patch).filter((k) => g.schema.some((s) => s.key === k));
+            const np = normalizeParams(g, { ...p, ...r.patch }, p);
+            for (const k of keys) p[k] = np[k];
+          }
+        }
       }
       await g.prepare(p);
       const r = buildGen(g, p);
@@ -90,7 +110,9 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
         parts,
         geometry: hex(sha256(new TextEncoder().encode(JSON.stringify(r.parts.map((x) => [x.shape.part, x.at, x.shape.subs, x.marks ?? null]))))),
         autoText: g.view?.(p).autoText ?? {},
+        rows: g.view?.(p).rows ?? {},
         ...(ask ? { ask } : {}),
+        ...(message !== undefined ? { message } : {}),
       });
     }
     return out;
@@ -98,6 +120,15 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
     g.dispose();
   }
 }
+
+/** Selection the check hands to an action that fills an empty dialog: a 40 × 30 mm rectangle with a round hole */
+const SAMPLE_SELECTION: GenSelected[] = [{
+  name: 'Sample',
+  polys: [
+    [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: 40, y: 30 }, { x: 0, y: 30 }],
+    Array.from({ length: 16 }, (_, k) => ({ x: 20 + 5 * Math.cos((k * Math.PI) / 8), y: 15 + 5 * Math.sin((k * Math.PI) / 8) })),
+  ],
+}];
 
 export interface CheckReport {
   id: string;
@@ -108,7 +139,8 @@ export interface CheckReport {
 }
 
 /**
- * Check a plugin like the catalogue does: the default parameters must give parts without errors, every enum option
+ * Check a plugin like the catalogue does: the default parameters must give parts without errors (a dialog that
+ * starts empty is first filled by its selection action with a sample selection), every enum option
  * and both values of every switch must run without a crash, two runs must give the same geometry, and the issue codes
  * the plugin reports should have an English text.
  */
@@ -126,20 +158,27 @@ export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
     }
   };
   try {
-    const first = await runDialog(m);
+    // A dialog that starts empty (a list filled from the selection) is filled once with a sample selection
+    let start: Record<string, unknown>[] = [];
+    let first = await runDialog(m);
+    const fill = m.actions?.find((a) => a.inputs?.includes('selection'));
+    if (!first[0].parts.length && fill) {
+      start = [{ $action: fill.id, $selection: SAMPLE_SELECTION }];
+      first = await runDialog(m, start);
+    }
     note(first, 'defaults');
-    const d = first[0];
+    const d = first[first.length - 1];
     if (d.issues.some((i) => i.level === 'error')) errors.push(`defaults: ${d.issues.filter((i) => i.level === 'error').map((i) => i.code ?? i.msg).join(', ')}`);
-    if (!d.parts.length) errors.push('defaults: no parts');
-    const again = await runDialog(m);
-    if (again[0].geometry !== d.geometry || JSON.stringify(again[0].info) !== JSON.stringify(d.info)) errors.push('defaults: two runs give different results (use a seed parameter instead of randomness or time)');
+    if (!d.parts.length) errors.push(fill ? `defaults: no parts, even after action "${fill.id}" with a sample selection` : 'defaults: no parts');
+    const again = (await runDialog(m, start)).pop()!;
+    if (again.geometry !== d.geometry || JSON.stringify(again.info) !== JSON.stringify(d.info)) errors.push('defaults: two runs give different results (use a seed parameter instead of randomness or time)');
     // Every choice once, starting from the defaults
     const steps: Record<string, unknown>[] = [];
     for (const s of m.schema) {
       if (s.type === 'enum') for (const [v] of s.options) if (v !== s.def) steps.push({ [s.key]: v });
       if (s.type === 'bool') steps.push({ [s.key]: !s.def });
     }
-    for (const step of steps) note(await runDialog(m, [step]), JSON.stringify(step));
+    for (const step of steps) note(await runDialog(m, [...start, step]), JSON.stringify(step));
   } catch (e) {
     errors.push(e instanceof Error ? e.message : String(e));
   }

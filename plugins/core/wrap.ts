@@ -1,6 +1,6 @@
 // Turns a built-in generator (src/generators) into a plugin: validate and generate with JSON in and out, issue
 // texts, info rows and labels as text codes. Bundled together with the generator by scripts/build-core-plugins.mjs.
-import type { Generator, Params, ParamValue } from '../../src/generators/types';
+import type { GenEvent, Generator, Params, ParamValue } from '../../src/generators/types';
 import type { PluginText } from '../../src/plugins/contract';
 import { pieces, type Piece } from './i18n-shim';
 import { codeOf } from './codes';
@@ -46,7 +46,19 @@ export function wrap(g: Generator) {
       ? {
           view(p: Params) {
             const v = g.view!(p);
-            return v.autoText ? { autoText: Object.fromEntries(Object.entries(v.autoText).map(([k, x]) => [k, toText(x)])) } : {};
+            return {
+              ...(v.autoText ? { autoText: Object.fromEntries(Object.entries(v.autoText).map(([k, x]) => [k, toText(x)])) } : {}),
+              ...(v.rows ? { rows: Object.fromEntries(Object.entries(v.rows).map(([k, x]) => [k, x.map(toText)])) } : {}),
+            };
+          },
+        }
+      : {}),
+    ...(g.onEvent
+      ? {
+          onEvent(input: { action: string; params: Params; inputs: GenEvent['inputs'] }) {
+            const r = g.onEvent!({ action: input.action, inputs: input.inputs ?? {} }, input.params);
+            if (!r || r instanceof Promise) return null;
+            return { ...(r.patch ? { patch: r.patch } : {}), ...(r.message !== undefined ? { message: toText(r.message) } : {}) };
           },
         }
       : {}),

@@ -20,6 +20,8 @@ export interface Pt {
 export interface Node extends Pt {
   cin?: Pt;
   cout?: Pt;
+  /** Handles stay in line when the user edits the node */
+  smooth?: boolean;
 }
 export interface SubPath {
   nodes: Node[];
@@ -59,17 +61,32 @@ export interface Change {
   patch?: Params;
   ask?: { question: Text; options: { label: Text; patch: Params }[] };
 }
+/** A selected object handed to an action with the input "selection": closed outlines in mm, holes included */
+export interface Selected {
+  name: string;
+  polys: Pt[][];
+}
+/** Answer of onEvent: parameters to change (e.g. new rows of a list) and a short message for the dialog */
+export interface EventResult {
+  patch?: Params;
+  message?: Text;
+}
 export interface Plugin<P extends Params = Params> {
   validate(p: P): Issue[];
   /** Runs only when validate reported no error; throw new Error('code') to report a problem */
   generate(p: P): GenResult;
-  /** Optional: suggestions the dialog shows in empty text fields, by parameter key */
-  view?(p: P): { autoText?: Record<string, Text> };
+  /**
+   * Optional: suggestions the dialog shows in empty text fields (autoText), and a short text per row of a list
+   * (rows, by the list's data parameter), both by parameter key
+   */
+  view?(p: P): { autoText?: Record<string, Text>; rows?: Record<string, Text[]> };
   /**
    * Optional: called when the user commits a field, with its previous value. The patch is checked against the
    * schema like user input; a question is shown inside the dialog, Cancel restores the field.
    */
   onChange?(input: { key: string; old: Params[string]; params: P }): Change | null;
+  /** Optional: a button of the manifest's dialog.actions was pressed; inputs holds what the action declares */
+  onEvent?(input: { action: string; params: P; inputs: { selection?: Selected[] } }): EventResult | null;
 }
 
 /** Register the plugin's functions with the app */

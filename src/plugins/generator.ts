@@ -3,9 +3,9 @@
 // Worker. The bridge is a small cache per plugin: prepare(params) computes validate and generate once, the
 // synchronous functions read from the cache and report „being computed“ until the answer is there. Whoever shows
 // a result (the dialog, formula recomputation) listens to onPluginResult and asks again.
-import type { GenChange, GenResult, Generator, Issue, Params, ParamSpec } from '../generators/types';
+import type { GenAction, GenChange, GenEventResult, GenList, GenResult, Generator, GenView, Issue, Params, ParamSpec } from '../generators/types';
 import type { AsmPoses } from '../generators/pose';
-import { checkChange, checkGenResult, checkIssues, checkView, ContractError, type PluginFn, type PluginGenResult, type PluginIssue, type PluginText, type PluginView } from './contract';
+import { checkChange, checkEvent, checkGenResult, checkIssues, checkView, ContractError, type PluginFn, type PluginGenResult, type PluginIssue, type PluginText, type PluginView } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
 import { pluginText, type PluginManifest } from './manifest';
@@ -180,6 +180,20 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     return out;
   });
 
+  // Lists and actions (dialog schema 2): text keys become texts in the interface language
+  const lists: GenList[] | undefined = m.lists?.map((l) => ({
+    ...l,
+    label: text(l.label) ?? l.label,
+    ...(l.empty ? { empty: text(l.empty) ?? l.empty } : {}),
+    ...(l.removeTitle ? { removeTitle: text(l.removeTitle) ?? l.removeTitle } : {}),
+    columns: l.columns.map((c) => {
+      const out = { ...c, label: text(c.label) ?? c.label, ...(c.title ? { title: text(c.title) ?? c.title } : {}) };
+      if (out.type === 'enum') out.options = out.options.map(([v, k]) => [v, text(k) ?? String(v)]);
+      return out;
+    }),
+  }));
+  const actions: GenAction[] | undefined = m.actions?.map((a) => ({ ...a, label: text(a.label) ?? a.label, ...(a.title ? { title: text(a.title) ?? a.title } : {}) }));
+
   const texts: Record<string, () => string> = { [PENDING]: () => codeText(PENDING) };
   for (const c of ['plugin-timeout', 'plugin-memory', 'plugin-crash', 'plugin-bad-output', 'plugin-no-function']) texts[c] = () => codeText(c);
 
@@ -209,9 +223,22 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       if (r.ok.plan) out.plan = r.ok.plan;
       return out;
     },
-    view(p) {
+    view(p): GenView {
       const v = entry(p)?.view;
-      return v?.autoText ? { autoText: Object.fromEntries(Object.entries(v.autoText).map(([k, x]) => [k, render(x)])) } : {};
+      const out: GenView = {};
+      if (v?.autoText) out.autoText = Object.fromEntries(Object.entries(v.autoText).map(([k, x]) => [k, render(x)]));
+      if (v?.rows) out.rows = Object.fromEntries(Object.entries(v.rows).map(([k, x]) => [k, x.map(render)]));
+      return out;
+    },
+    ...(lists ? { lists } : {}),
+    ...(actions ? { actions } : {}),
+    async onEvent(ev, p): Promise<GenEventResult | void> {
+      const r = await call('onEvent', { action: ev.action, params: { ...p }, inputs: ev.inputs }, checkEvent);
+      if (!('ok' in r)) return { message: codeText(r.error) };
+      const out: GenEventResult = {};
+      if (r.ok.patch) out.patch = r.ok.patch as Params;
+      if (r.ok.message !== undefined) out.message = render(r.ok.message);
+      return out;
     },
     async onChange(key, old, p): Promise<GenChange | void> {
       if (missing.has('onChange')) return;

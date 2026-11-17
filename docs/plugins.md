@@ -1,6 +1,6 @@
 # Plugins (developer notes)
 
-Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205) and of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335): runtime, plugins in extension packs (format version 2), generator plugins in the toolbox, dialog schema version 1 and the headless runner. Stage 2 of #335 adds `view` (suggested texts) and `onChange` with in-dialog questions. Lists, inputs and surfaces follow in the next stages.
+Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205) and of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335): runtime, plugins in extension packs (format version 2), generator plugins in the toolbox, dialog schema version 1 and the headless runner. Stage 2 of #335 adds `view` (suggested texts) and `onChange` with in-dialog questions, stage 3 lists of rows and action buttons with the selection as input (dialog schema version 2). Image, camera and 3D model inputs and surfaces follow.
 
 A plugin computes geometry from parameters. It gets JSON in and gives JSON out. It cannot reach files, the network, the DOM, Tauri or the editor. Every plugin runs in its own Web Worker, and the app checks every answer before anything reaches the drawing.
 
@@ -27,7 +27,7 @@ A plugin is an entry of `plugins` in an extension pack ([docs/packs.md](packs.md
   "sha256": "9f2c…",                // SHA-256 of the code bytes (hex), checked on every load
   "icon": "pattern",                // optional, a name from src/icons.ts
   "preview": { "center": true },    // optional, centre the dialog preview on the parts
-  "dialog": { "version": 1 },       // optional, dialog schema the plugin needs (see below)
+  "dialog": { "version": 1 },       // optional, dialog schema the plugin needs (see below); 2 adds lists and actions
   "params": [
     { "key": "width", "type": "length", "min": 10, "max": 2000, "def": 120 },
     { "key": "pattern", "type": "enum", "options": ["hex", "square"], "def": "hex" },
@@ -51,6 +51,13 @@ Plugins describe what the dialog contains; the app draws it, with its own contro
 - **Layout**: the main area, named sections (`"section": "<text key>"` on each field; a section appears below the main fields in the order of its first field, and disappears when all its fields are hidden) and the collapsed “Advanced” section (`"advanced": true`, which wins over `section`).
 - **Rules**: `showIf` per field, evaluated by the app.
 - **Preview** of the generated parts (centred with `"preview": { "center": true }`), the **info table** from `generate` and the **issue list** from `validate`; errors disable OK.
+
+**Version 2** adds, under `dialog`:
+
+- **Lists** (`"lists": [{ "param", "label", "empty", "columns", "shape", "remove", "removeTitle" }]`): rows kept as a JSON array in a `data` parameter. Columns are `text` (with `max` length), `int`, `number` or `length` (with `min` and `max`) and `enum` (`options` as `[value, text key]`). The app draws one row per entry with a field per column, checks every edit like a field (clamped, rounded, options checked, text cut) and can remove rows (`"remove": true`). `"shape": { "key", "rotate" }` shows a small picture of the sub-paths in that row key, turned by the degrees in `rotate`. A short text per row (e.g. its size) comes from `view` as `rows: { <param>: [text, …] }`; `empty` is shown when the list has no rows.
+- **Actions** (`"actions": [{ "id", "label", "title", "inputs" }]`): buttons below the lists. Pressing one calls `onEvent` with the inputs it declares; so far `"selection"`: the selected objects of the drawing as `{ name, polys }` (closed outlines in mm, holes included). The answer may change parameters (`patch`, checked like user input, e.g. new rows) and show a `message`. An answer that arrives after the dialog was closed or another action was started is dropped.
+
+Labels, titles, `empty` and option labels are text keys. A list must name a `data` parameter; lists and actions in a version 1 dialog refuse the plugin.
 
 `"dialog": { "version": N }` names the schema a plugin needs. A plugin that needs a newer one than the app knows is refused at install with an update hint. Without `dialog`, version 1 is assumed.
 
@@ -83,10 +90,11 @@ A missing text falls back to its key. The app checks everything before it regist
 | --- | --- | --- |
 | `validate` | parameters (object) | list of issues `{ key?, level: "error" \| "warn", code, values? }` |
 | `generate` | parameters (object) | `{ parts, info, label?, labels?, poses?, plan? }` |
-| `view` (optional) | parameters | `{ autoText? }`: suggestions for empty text fields by key (texts) |
+| `view` (optional) | parameters | `{ autoText?, rows? }`: suggestions for empty text fields and a text per list row, by key (texts) |
 | `onChange` (optional) | `{ key, old, params }` | `null`, `{ patch }` or `{ ask: { question, options: [{ label, patch }] } }` |
+| `onEvent` (optional) | `{ action, params, inputs }` | `null` or `{ patch?, message? }` (an action button of dialog version 2) |
 
-A part is `{ key, subs, at, marks? }`; a plugin with `"kind": "part"` returns exactly one, an assembly any number. `subs` uses the same sub-path format as the editor (`{ nodes: [{ x, y, … }], closed }`). `info` is a list of `[label, value]` rows for the dialog. Issue and info codes are translated through the plugin's texts, so a plugin never builds user-facing sentences.
+A part is `{ key, subs, at, marks? }`; a plugin with `"kind": "part"` returns exactly one, an assembly any number. `subs` uses the same sub-path format as the editor (`{ nodes: [{ x, y, cin?, cout?, smooth? }], closed }`). `info` is a list of `[label, value]` rows for the dialog. Issue and info codes are translated through the plugin's texts, so a plugin never builds user-facing sentences.
 
 **Dynamic dialogs (#335 stage 2).** `view` is called with every new set of parameters; the dialog shows its `autoText` in empty text fields (a field left at its suggestion stays empty, so the suggestion follows other fields). `onChange` is called when the user commits a field (number fields on leaving them, choices at once) with the previous value. A `patch` is checked against the schema like user input and never changes the committed field itself. An `ask` (question and up to three options, each with a patch) is shown inside the dialog; OK stays off until it is answered, Cancel restores the field. An answer that arrives after the user changed the field again is dropped. A plugin without these functions is asked once and then left alone. `runDialog` in the headless runner calls `onChange` for every field of a step; `$answer` in a step picks an option, without it the question is cancelled; each state has `autoText` and the `ask` of that step.
 
@@ -160,11 +168,11 @@ Install the `.kzp` in the app under Extensions to try it. `build` in `plugin.jso
 
 ## Headless runner and check
 
-`src/plugins/headless.ts` runs a plugin's dialog without the app: `runDialog(manifest, steps)` starts with the default parameters, applies each step (a set of field changes, checked against the schema like user input) and returns after each one what the dialog would show: parameters, visible fields, issues with codes, info rows, the parts (key, position, size) and a SHA-256 of the geometry. Use it in plugin tests.
+`src/plugins/headless.ts` runs a plugin's dialog without the app: `runDialog(manifest, steps)` starts with the default parameters, applies each step (a set of field changes, checked against the schema like user input) and returns after each one what the dialog would show: parameters, visible fields, issues with codes, info rows, the parts (key, position, size) and a SHA-256 of the geometry. A step may also press a button: `{ "$action": "<id>", "$selection": [{ name, polys }] }`; the state then has the `message`, and every state has the `rows` from `view`. Use it in plugin tests.
 
 `npm run plugin:check <folder | file.kzp>` checks every plugin of a pack the way the catalogue will:
 
-- the default parameters generate parts without errors,
+- the default parameters generate parts without errors (a dialog that starts with an empty list is first filled by its first action with the selection as input, with a sample selection: a 40 × 30 mm rectangle with a hole),
 - every option of every choice and both values of every switch run without a crash, timeout or broken output,
 - two runs give the same geometry (no randomness or clock; use a seed parameter),
 - issue codes, parameter labels and `desc` have English texts (warnings).
@@ -179,7 +187,7 @@ The built-in generators move to the plugin system (#205, #327). `npm run plugin:
 
 - Texts the generator composes (a field label with `t('Rad 1')` inside, an info value made of several texts) keep their parts: markers are closed, the wrapper turns them into lists of codes and plain strings, the build script renders static ones (field labels) into every language. The name in the Objects window comes from the generator's own `label()` through `label` and `labels`.
 
-Built so far (`plugins/core/dist/org.kizamubeam.core-generators.kzp`): gear, box, rack, pulley, cam, gear pair, drawer, insert, shelf, disc sphere and box with dividers (`box-divided`, with `view` and `onChange`; its error codes come from `Generator.texts`). `npm run test:core-plugins` checks that they give the same dialog, geometry, issues, info, names and 3D poses as the built-in generators for the defaults, every option, every switch and every number at its minimum and maximum, and reports the time. QuickJS is about 10 to 20 times slower than the built-in code: most cases take well under a second, nesting many parts takes longer (a gear pair with 400 teeth about 20 s, which is why `generate` may run 30 s). Not yet: stack (3D model input), ribs and jig. Generators without a thickness parameter (gear pair) compute their 3D poses for 3 mm. The built-in versions stay active until the switch-over: callers that need results synchronously (built-in templates, 3D view, design check) need their own solution first.
+Built so far (`plugins/core/dist/org.kizamubeam.core-generators.kzp`): gear, box, rack, pulley, cam, gear pair, drawer, insert, shelf, disc sphere box with dividers (`box-divided`, with `view` and `onChange`; its error codes come from `Generator.texts`) and the jig (`jig`, a list of workpieces filled from the selection; its image and camera sources stay in the built-in dialog until those inputs exist, the build replaces that panel and print-and-cut's `geom` import by stubs). `npm run test:core-plugins` checks that they give the same dialog, geometry, issues, info, names and 3D poses as the built-in generators for the defaults, every option, every switch and every number at its minimum and maximum, and reports the time. QuickJS is about 10 to 20 times slower than the built-in code: most cases take well under a second, nesting many parts takes longer (a gear pair with 400 teeth about 20 s, which is why `generate` may run 30 s). Not yet: stack (3D model input) and ribs (drawing surface). `tn()` texts are collected in both forms; the plugin picks the German plural form by number. Generators without a thickness parameter (gear pair) compute their 3D poses for 3 mm. The built-in versions stay active until the switch-over: callers that need results synchronously (built-in templates, 3D view, design check) need their own solution first.
 
 ## Tests
 

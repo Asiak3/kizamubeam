@@ -14,7 +14,8 @@ import { IDENT } from '../model';
 import { markSubs } from '../printcut';
 import { numberStrokes } from './stack';
 import type { Generator, GenPart, Issue, Params } from './types';
-import { jigPanel, shapesFromSelection } from './jigPanel';
+import { jigPanel } from './jigPanel';
+import type { GenSelected } from './host';
 
 /** Eine Werkstückart: Name, Anzahl, Drehung im Jig (0/90°) und Außenumriss (Mitte im Ursprung) */
 export interface JigShape {
@@ -268,6 +269,22 @@ const moveSub = (sp: SubPath, c: Pt): SubPath => ({
   }),
 });
 
+/** Je gewähltem Objekt (oberste Ebene) eine Werkstückart: Außenumriss aller geschlossenen Konturen */
+export function shapesFromSelection(sel: GenSelected[]): JigShape[] {
+  return sel.map((o, i) => ({ n: o.name || t('Werkstück {n}', { n: i + 1 }), c: 1, r: 0, s: outlineFromPolys(o.polys) })).filter((s) => s.s.length);
+}
+
+/** Width × height of a workpiece's outline, for its row in the dialog */
+export function shapeSize(sh: JigShape): string {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const sp of sh.s)
+    for (const f of flattenSub(sp, IDENT)) {
+      const x = f.X / SCALE, y = f.Y / SCALE;
+      ((x0 = Math.min(x0, x)), (x1 = Math.max(x1, x)), (y0 = Math.min(y0, y)), (y1 = Math.max(y1, y)));
+    }
+  return x0 <= x1 ? `${fmt(x1 - x0)} × ${fmt(y1 - y0)} mm` : '';
+}
+
 // ---------- Generator ----------
 
 export const JIG: Generator = {
@@ -278,6 +295,37 @@ export const JIG: Generator = {
   icon: 'jig',
   inputs: [{ kind: 'selection' }],
   fromInputs: (inp) => (inp.selection?.length ? { shapes: encodeShapes(shapesFromSelection(inp.selection)) } : undefined),
+  // The workpiece list and „From selection“ are drawn by the app (#335 stage 3); the panel adds image and camera
+  lists: [
+    {
+      param: 'shapes',
+      label: t('Werkstücke'),
+      empty: t('Noch kein Werkstück.'),
+      shape: { key: 's', rotate: 'r' },
+      columns: [
+        { key: 'n', type: 'text', label: t('Name'), max: 120 },
+        { key: 'c', type: 'int', label: t('Anzahl'), min: 0, max: 500, title: t('Anzahl Fächer für dieses Werkstück') },
+        { key: 'r', type: 'enum', label: t('Drehung'), options: [[0, '0°'], [90, '90°']], title: t('Werkstück im Jig drehen') },
+      ],
+      remove: true,
+      removeTitle: t('Werkstück entfernen'),
+    },
+  ],
+  actions: [
+    {
+      id: 'fromSelection',
+      label: t('Aus Auswahl'),
+      title: t('Gewählte Objekte als Werkstücke übernehmen (Vektorgrafik, Formen, Text); je Objekt eine Art, Löcher zählen nicht'),
+      inputs: ['selection'],
+    },
+  ],
+  onEvent(ev, raw) {
+    if (ev.action !== 'fromSelection') return;
+    const add = shapesFromSelection(ev.inputs.selection ?? []);
+    if (!add.length) return { message: t('Erst auf der Arbeitsfläche die Werkstückform auswählen (z. B. eine importierte SVG-, DXF- oder PDF-Datei).') };
+    return { patch: { shapes: encodeShapes([...decodeShapes(String(raw.shapes ?? '[]')), ...add]) }, message: '' };
+  },
+  view: (raw) => ({ rows: { shapes: decodeShapes(String(raw.shapes ?? '[]')).map(shapeSize) } }),
   panel: (p, set, host) => jigPanel(p, set, host),
   tile: {
     group: 'arrange',

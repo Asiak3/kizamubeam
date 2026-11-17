@@ -4902,5 +4902,11 @@
   "Alle aktualisieren ({n})": "Actualizar todas ({n})",
   "Braucht eine neuere Version von KizamuBeam": "Necesita una versión más reciente de KizamuBeam",
   "Quellcode: {url}": "Código fuente: {url}",
-  "Keine frühere Version vorhanden.": "No hay ninguna versión anterior."
+  "Keine frühere Version vorhanden.": "No hay ninguna versión anterior.",
+  "{where}: ungültiger Textschlüssel": "{where}: clave de texto no válida",
+  "{where}: ungültige Länge": "{where}: longitud no válida",
+  "{where}: „param“ muss ein data-Parameter sein": "{where}: «param» debe ser un parámetro data",
+  "{where}: ungültige Spalten": "{where}: columnas no válidas",
+  "{where}: unbekannte Eingabe": "{where}: entrada desconocida",
+  "Listen und Aktionen brauchen „dialog“ Version 2": "Las listas y acciones necesitan «dialog» versión 2"
 }

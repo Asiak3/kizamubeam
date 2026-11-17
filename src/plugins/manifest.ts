@@ -1,7 +1,7 @@
 // Plugin entry of an extension pack (`plugins` in .kzp format version 2, issue #205): what the plugin is, its
 // parameters and texts, and its code. Everything is checked here before a plugin is registered; a mistake refuses
 // the whole pack. No DOM, no editor: the same checks run in the app and in the tests.
-import type { ParamSpec, ParamValue, Rule } from '../generators/types';
+import type { GenAction, GenColumn, GenList, ParamSpec, ParamValue, Rule } from '../generators/types';
 import { LIMITS, PLUGIN_API } from './contract';
 import { base64ToBytes, type Runtime } from './engine';
 import { sha256 } from '../pdfcrypt';
@@ -32,16 +32,24 @@ export interface PluginManifest {
   schema: ParamSpec[];
   texts: PluginTexts;
   preview?: { center?: boolean };
+  /** Lists and actions of the dialog (schema version 2); labels are text keys */
+  lists?: GenList[];
+  actions?: GenAction[];
 }
 
 export class ManifestError extends Error {}
 
 /**
  * Version of the dialog schema (#335). Version 1: fields with labels, tooltips, options, the main area, named
- * sections and „Advanced“, showIf rules, preview, info table and issue list. A plugin that needs a newer schema
- * is refused with an update hint instead of being shown half-broken.
+ * sections and „Advanced“, showIf rules, preview, info table and issue list. Version 2: lists of rows in a data
+ * parameter (text, number and choice columns, an outline picture, remove) and action buttons with inputs
+ * (selection). A plugin that needs a newer schema is refused with an update hint instead of being shown half-broken.
  */
-export const DIALOG_VERSION = 1;
+export const DIALOG_VERSION = 2;
+const MAX_LISTS = 4;
+const MAX_COLUMNS = 8;
+const MAX_ACTIONS = 8;
+const INPUTS = ['selection'] as const;
 
 const ID_RE = /^[a-z0-9](?:[a-z0-9.-]{0,62}[a-z0-9])?$/;
 const KEY_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/;
@@ -149,6 +157,72 @@ function texts(v: unknown): PluginTexts {
   return out;
 }
 
+const textKey = (v: unknown, at: string): string => {
+  if (typeof v !== 'string' || !TEXT_KEY_RE.test(v)) throw new ManifestError(t('{where}: ungültiger Textschlüssel', { where: at }));
+  return v;
+};
+
+function column(v: unknown, at: string): GenColumn {
+  if (!isObj(v) || typeof v.key !== 'string' || !KEY_RE.test(v.key)) throw new ManifestError(t('{where}: Kennung fehlt oder ist ungültig', { where: at }));
+  const base = { key: v.key, label: textKey(v.label ?? v.key, at), ...(v.title !== undefined ? { title: textKey(v.title, at) } : {}) };
+  if (v.type === 'text') {
+    const max = v.max ?? 200;
+    if (!isNum(max) || !Number.isInteger(max) || max < 1 || max > 2000) throw new ManifestError(t('{where}: ungültige Länge', { where: at }));
+    return { ...base, type: 'text', max };
+  }
+  if (v.type === 'int' || v.type === 'number' || v.type === 'length') {
+    const { min, max } = v;
+    if (!isNum(min) || !isNum(max) || min > max || Math.abs(min) > LIMITS.range || Math.abs(max) > LIMITS.range) throw new ManifestError(t('{where}: min, max und def müssen Zahlen mit min ≤ def ≤ max sein', { where: at }));
+    return { ...base, type: v.type, min, max };
+  }
+  if (v.type === 'enum') {
+    if (!Array.isArray(v.options) || !v.options.length || v.options.length > MAX_OPTIONS) throw new ManifestError(t('{where}: „options“ muss 1 bis {n} Einträge haben', { where: at, n: MAX_OPTIONS }));
+    const options = v.options.map((o): [string | number, string] => {
+      if (!Array.isArray(o) || o.length !== 2 || !(typeof o[0] === 'string' || isNum(o[0]))) throw new ManifestError(t('{where}: ungültige Auswahl', { where: at }));
+      return [o[0], textKey(o[1], at)];
+    });
+    return { ...base, type: 'enum', options };
+  }
+  throw new ManifestError(t('{where}: unbekannter Typ „{type}“', { where: at, type: String(v.type) }));
+}
+
+/** Lists and actions of a dialog with schema version 2 */
+function dialogParts(d: Record<string, unknown>, schema: ParamSpec[]): { lists?: GenList[]; actions?: GenAction[] } {
+  const out: { lists?: GenList[]; actions?: GenAction[] } = {};
+  if (d.lists !== undefined) {
+    if (!Array.isArray(d.lists) || d.lists.length > MAX_LISTS) throw new ManifestError(t('ungültige Angabe „dialog“'));
+    out.lists = d.lists.map((l, i) => {
+      const at = `lists[${i}]`;
+      if (!isObj(l) || !schema.some((s) => s.key === l.param && s.type === 'data')) throw new ManifestError(t('{where}: „param“ muss ein data-Parameter sein', { where: at }));
+      if (!Array.isArray(l.columns) || l.columns.length > MAX_COLUMNS) throw new ManifestError(t('{where}: ungültige Spalten', { where: at }));
+      const list: GenList = { param: l.param as string, label: textKey(l.label ?? l.param, at), columns: l.columns.map((c, k) => column(c, `${at}.columns[${k}]`)) };
+      if (l.empty !== undefined) list.empty = textKey(l.empty, at);
+      if (isObj(l.shape) && typeof l.shape.key === 'string' && KEY_RE.test(l.shape.key)) {
+        list.shape = { key: l.shape.key };
+        if (typeof l.shape.rotate === 'string' && KEY_RE.test(l.shape.rotate)) list.shape.rotate = l.shape.rotate;
+      }
+      if (l.remove === true) list.remove = true;
+      if (l.removeTitle !== undefined) list.removeTitle = textKey(l.removeTitle, at);
+      return list;
+    });
+  }
+  if (d.actions !== undefined) {
+    if (!Array.isArray(d.actions) || d.actions.length > MAX_ACTIONS) throw new ManifestError(t('ungültige Angabe „dialog“'));
+    out.actions = d.actions.map((a, i) => {
+      const at = `actions[${i}]`;
+      if (!isObj(a) || typeof a.id !== 'string' || !KEY_RE.test(a.id)) throw new ManifestError(t('{where}: Kennung fehlt oder ist ungültig', { where: at }));
+      const act: GenAction = { id: a.id, label: textKey(a.label ?? a.id, at) };
+      if (a.title !== undefined) act.title = textKey(a.title, at);
+      if (a.inputs !== undefined) {
+        if (!Array.isArray(a.inputs) || !a.inputs.every((x) => (INPUTS as readonly unknown[]).includes(x))) throw new ManifestError(t('{where}: unbekannte Eingabe', { where: at }));
+        act.inputs = [...new Set(a.inputs as 'selection'[])];
+      }
+      return act;
+    });
+  }
+  return out;
+}
+
 /** Check one entry of `plugins`; `where` names it in error messages */
 export function parsePlugin(raw: unknown, where: string): PluginManifest {
   const fail = (msg: string): never => {
@@ -201,6 +275,10 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
     const m: PluginManifest = { id, version: version as number, api: api as number, type: 'generator', kind: kind as 'part' | 'assembly', runtime: runtime as Runtime, code, sha256: sum, schema, texts: tx };
     if (typeof raw.icon === 'string' && /^[a-zA-Z][a-zA-Z0-9-]{0,40}$/.test(raw.icon)) m.icon = raw.icon;
     if (isObj(raw.preview) && raw.preview.center === true) m.preview = { center: true };
+    if (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined)) {
+      if ((raw.dialog.version as number) < 2) fail(t('Listen und Aktionen brauchen „dialog“ Version 2'));
+      Object.assign(m, dialogParts(raw.dialog, schema));
+    }
     return m;
   } catch (e) {
     if (e instanceof ManifestError && e.message.startsWith(where)) throw e;

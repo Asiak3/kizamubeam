@@ -1,19 +1,11 @@
 // Bereich „Werkstücke“ im Dialog des Jig-Generators: Werkstückformen aus der Auswahl (Vektorgrafik, Text, Formen),
 // aus einem Bild (Foto oder Scan, nachgezeichnet) oder aus dem Kamerabild holen; je Art Name, Anzahl und Drehung.
-import { flattenSub, SCALE } from '../clip';
 import { h } from '../dom';
-import { subsToPath2D } from '../geom';
-import { dec, t, tn } from '../i18n';
-import { IDENT } from '../model';
+import { t, tn } from '../i18n';
 import { DEFAULT_DETECT, detectPieces, Piece, RGBAImage } from '../workpieces';
 import { decodeShapes, encodeShapes, JigShape, outlineFromPolys } from './jig';
-import type { GenHost, GenPanel, GenSelected } from './host';
+import type { GenHost, GenPanel } from './host';
 import type { Params } from './types';
-
-/** Je gewähltem Objekt (oberste Ebene) eine Werkstückart: Außenumriss aller geschlossenen Konturen */
-export function shapesFromSelection(sel: GenSelected[]): JigShape[] {
-  return sel.map((o, i) => ({ n: o.name || t('Werkstück {n}', { n: i + 1 }), c: 1, r: 0, s: outlineFromPolys(o.polys) })).filter((s) => s.s.length);
-}
 
 /** Außenkontur eines erkannten Teils (Pixel-Treppen werden beim Einpassen geglättet) */
 const pieceShape = (pc: Piece, name: string, k = 1): JigShape => ({
@@ -35,65 +27,19 @@ function readImage(src: CanvasImageSource, w: number, h: number, maxPx = 1000): 
 
 const biggest = (ps: Piece[]) => ps.filter((p) => !p.cut).sort((a, b) => b.area - a.area)[0] ?? ps.sort((a, b) => b.area - a.area)[0];
 
+/**
+ * Image and camera sources for the jig's workpieces. The list itself and „From selection“ are drawn by the app
+ * from the generator's declaration (lists, actions).
+ */
 export function jigPanel(p: Params, set: (patch: Params) => void, host?: GenHost): GenPanel {
   let shapes = decodeShapes(String(p.shapes ?? '[]'));
-  const list = h('div', { class: 'jig-list' });
   const note = h('div', { class: 'note' });
-  const commit = () => (set({ shapes: encodeShapes(shapes) }), render());
   const add = (list: JigShape[], msg: string) => {
     if (!list.length) return void (note.textContent = msg);
-    shapes.push(...list);
+    shapes = [...shapes, ...list];
     note.textContent = '';
-    commit();
+    set({ shapes: encodeShapes(shapes) });
   };
-
-  const render = () => {
-    list.textContent = '';
-    if (!shapes.length) list.append(h('div', { class: 'muted' }, t('Noch kein Werkstück.')));
-    shapes.forEach((sh, i) => {
-      const cv = h('canvas', { class: 'jig-thumb', width: 64, height: 64 }) as HTMLCanvasElement;
-      const pts = sh.s.flatMap((sp) => sp.nodes);
-      const ext = Math.max(1e-6, ...pts.map((q) => Math.max(Math.abs(q.x), Math.abs(q.y))));
-      const ctx = cv.getContext('2d')!;
-      const k = 28 / ext;
-      ctx.setTransform(k, 0, 0, k, 32, 32);
-      if (sh.r === 90) ctx.rotate(Math.PI / 2);
-      ctx.lineWidth = 1.5 / k;
-      ctx.strokeStyle = getComputedStyle(document.body).color || '#333';
-      ctx.stroke(subsToPath2D(sh.s));
-      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-      for (const sp of sh.s)
-        for (const f of flattenSub(sp, IDENT)) {
-          const q = { x: f.X / SCALE, y: f.Y / SCALE };
-          ((x0 = Math.min(x0, q.x)), (x1 = Math.max(x1, q.x)), (y0 = Math.min(y0, q.y)), (y1 = Math.max(y1, q.y)));
-        }
-      const name = h('input', { type: 'text', value: sh.n, class: 'jig-name' }) as HTMLInputElement;
-      name.addEventListener('change', () => ((sh.n = name.value.trim()), commit()));
-      const count = h('input', { type: 'number', min: '0', max: '500', step: '1', value: String(sh.c), class: 'jig-count', title: t('Anzahl Fächer für dieses Werkstück') }) as HTMLInputElement;
-      count.addEventListener('change', () => ((sh.c = Math.max(0, Math.min(500, Math.round(Number(count.value) || 0)))), commit()));
-      const rot = h('select', { title: t('Werkstück im Jig drehen') },
-        h('option', { value: '0', selected: sh.r === 0 }, '0°'),
-        h('option', { value: '90', selected: sh.r === 90 }, '90°'),
-      ) as HTMLSelectElement;
-      rot.addEventListener('change', () => ((sh.r = Number(rot.value)), commit()));
-      list.append(
-        h('div', { class: 'jig-row' },
-          cv,
-          h('div', { class: 'jig-col' }, name, h('span', { class: 'muted' }, `${dec((x1 - x0).toFixed(1))} × ${dec((y1 - y0).toFixed(1))} mm`)),
-          h('label', {}, t('Anzahl'), ' ', count),
-          rot,
-          h('button', { class: 'btn small', title: t('Werkstück entfernen'), onclick: () => (shapes.splice(i, 1), commit()) }, '×'),
-        ),
-      );
-    });
-  };
-
-  // ----- Quellen -----
-  const fromSel = h('button', { class: 'btn small', title: t('Gewählte Objekte als Werkstücke übernehmen (Vektorgrafik, Formen, Text); je Objekt eine Art, Löcher zählen nicht') }, t('Aus Auswahl')) as HTMLButtonElement;
-  fromSel.addEventListener('click', () => {
-    if (!host) return;
-    add(shapesFromSelection(host.selection()), t('Erst auf der Arbeitsfläche die Werkstückform auswählen (z. B. eine importierte SVG-, DXF- oder PDF-Datei).'));
-  });
 
   const imgWidth = h('input', { type: 'number', min: '1', max: '1000', step: '0.1', value: '20', class: 'jig-count', title: t('Echte Breite des Werkstücks im Bild, damit die Form die richtige Größe bekommt') }) as HTMLInputElement;
   const file = h('input', { type: 'file', accept: 'image/*', hidden: true }) as HTMLInputElement;
@@ -140,20 +86,13 @@ export function jigPanel(p: Params, set: (patch: Params) => void, host?: GenHost
   });
 
   const el = h('div', { class: 'jig-panel' },
-    h('h4', {}, t('Werkstücke')),
-    list,
-    h('div', { class: 'conn-row' }, fromSel, fromImg, h('span', { class: 'muted' }, t('Breite (mm)')), imgWidth, fromCam, file),
+    h('div', { class: 'conn-row' }, fromImg, h('span', { class: 'muted' }, t('Breite (mm)')), imgWidth, fromCam, file),
     note,
   );
-  render();
   return {
     el,
     refresh(np: Params) {
-      const s = String(np.shapes ?? '[]');
-      if (s !== encodeShapes(shapes)) {
-        shapes = decodeShapes(s);
-        render();
-      }
+      shapes = decodeShapes(String(np.shapes ?? '[]'));
     },
   };
 }

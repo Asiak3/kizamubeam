@@ -66,7 +66,7 @@ await test('schema v1: sections are translated, advanced wins, a newer dialog sc
   assert.equal(g.schema[4].advanced, true);
   assert.equal(g.schema[2].options[1][1], 'Sliding');
   g.dispose();
-  assert.throws(() => manifest(TRAY, { dialog: { version: 2 } }), /neuere Version|newer version/);
+  assert.throws(() => manifest(TRAY, { dialog: { version: 3 } }), /neuere Version|newer version/);
   assert.throws(() => manifest(TRAY, { dialog: 'big' }), /dialog/);
   assert.throws(() => manifest(TRAY, { params: [{ key: 'a', type: 'bool', def: true, section: '<b>' }] }), /Abschnitt|section/);
 });
@@ -128,6 +128,73 @@ await test('stage 2: view suggests texts, onChange patches fields or asks inside
   const r = await runDialog(plain, [{ width: 50 }, { width: 60 }]);
   assert.deepEqual(r[2].autoText, {});
   assert.equal(r[2].params.width, 60);
+});
+
+await test('stage 3: lists of rows and actions with the selection', async () => {
+  const code = `globalThis.plugin = {
+    validate: (p) => JSON.parse(p.items).length ? [] : [{ level: 'error', code: 'empty' }],
+    generate: (p) => ({
+      parts: JSON.parse(p.items).flatMap((r, i) => Array.from({ length: r.count }, (_, k) => ({ key: 'p' + i + '-' + k, subs: [{ closed: true, nodes: [{x:0,y:0},{x:r.w,y:0},{x:0,y:r.w}] }], at: { x: 0, y: 0 } }))),
+      info: [],
+    }),
+    view: (p) => ({ rows: { items: JSON.parse(p.items).map((r) => ({ code: 'size', values: { w: r.w } })) } }),
+    onEvent: ({ action, params, inputs }) => {
+      if (action === 'clear') return { patch: { items: '[]' }, message: { code: 'cleared' } };
+      if (!inputs.selection.length) return { message: 'Nothing selected' };
+      const add = inputs.selection.map((s) => ({ name: s.name, count: 1, w: Math.max(...s.polys[0].map((q) => q.x)) }));
+      return { patch: { items: JSON.stringify([...JSON.parse(params.items), ...add]) } };
+    },
+  };`;
+  const dialog = {
+    version: 2,
+    lists: [{ param: 'items', label: 'itemsLabel', empty: 'none', remove: true, columns: [
+      { key: 'what', type: 'text', max: 40 },
+      { key: 'count', type: 'int', min: 0, max: 9, label: 'countLabel' },
+      { key: 'side', type: 'enum', options: [['l', 'left'], ['r', 'right']] },
+    ] }],
+    actions: [{ id: 'add', label: 'addLabel', inputs: ['selection'] }, { id: 'clear' }],
+  };
+  const params = [{ key: 'items', type: 'data', def: '[]' }];
+  const texts = { en: { name: 'Plates', desc: 'Plates', items: 'Items', itemsLabel: 'Workpieces', none: 'No workpieces yet', count: 'c', countLabel: 'Count', side: 'Side', left: 'Left', right: 'Right', addLabel: 'Add selection', clear: 'Clear', size: '{w} mm', cleared: 'List cleared', empty: 'Add a workpiece' } };
+  const m = manifest(code, { params, dialog, texts });
+  const g = pluginGenerator(m, { id: 'p', name: 'P' });
+  assert.deepEqual(g.lists, [{ param: 'items', label: 'Workpieces', empty: 'No workpieces yet', remove: true, columns: [
+    { key: 'what', type: 'text', max: 40, label: 'what' },
+    { key: 'count', type: 'int', min: 0, max: 9, label: 'Count' },
+    { key: 'side', type: 'enum', options: [['l', 'Left'], ['r', 'Right']], label: 'Side' },
+  ] }]);
+  assert.deepEqual(g.actions, [{ id: 'add', label: 'Add selection', inputs: ['selection'] }, { id: 'clear', label: 'Clear' }]);
+  g.dispose();
+  const sel = [{ name: 'A', polys: [[{ x: 0, y: 0 }, { x: 25, y: 0 }, { x: 0, y: 25 }]] }];
+  const s = await runDialog(m, [{ $action: 'add', $selection: sel }, { $action: 'add', $selection: [] }, { $action: 'add', $selection: sel }, { $action: 'clear' }]);
+  assert.equal(s[0].parts.length, 0);
+  assert.deepEqual(s[1].rows, { items: ['25 mm'] });
+  assert.equal(s[1].parts.length, 1);
+  assert.equal(s[2].message, 'Nothing selected');
+  assert.deepEqual(s[3].rows, { items: ['25 mm', '25 mm'] });
+  assert.equal(s[4].message, 'List cleared');
+  assert.equal(s[4].params.items, '[]');
+  await assert.rejects(runDialog(m, [{ $action: 'nope' }]), ScriptError);
+  // Edits in the dialog are checked like fields: numbers clamped and rounded, options checked, text cut
+  const { setCell, removeRow, readRows } = await import('../src/generators/lists');
+  const list = m.lists![0];
+  const p0 = { items: JSON.stringify([{ what: 'A', count: 1, side: 'l' }, { what: 'B', count: 2, side: 'r' }]) };
+  assert.deepEqual(JSON.parse(setCell(p0, list, 0, 'count', '12.7'))[0].count, 9);
+  assert.deepEqual(JSON.parse(setCell(p0, list, 0, 'count', '3.4'))[0].count, 3);
+  assert.deepEqual(JSON.parse(setCell(p0, list, 1, 'side', 'x'))[1].side, 'l');
+  assert.equal(JSON.parse(setCell(p0, list, 0, 'what', 'x'.repeat(99)))[0].what.length, 40);
+  assert.equal(setCell(p0, list, 5, 'count', 1), p0.items, 'no such row');
+  assert.deepEqual(JSON.parse(removeRow(p0, list, 0)).map((r: { what: string }) => r.what), ['B']);
+  assert.deepEqual(readRows({ items: '{"a":1}' }, list), []);
+  assert.deepEqual(readRows({ items: '[1, null, {"a":1}]' }, list), [{ a: 1 }]);
+  // The check fills an empty list through the selection action
+  assert.deepEqual((await checkPlugin(m)).errors, []);
+  // Lists and actions need dialog version 2, a data parameter, valid columns and known inputs
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, version: 1 } }), /Version 2|version 2/);
+  assert.throws(() => manifest(code, { params: [{ key: 'items', type: 'text', def: '' }], texts, dialog }), /data/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, lists: [{ param: 'items', columns: [{ key: 'x', type: 'int', min: 5, max: 1 }] }] } }), /min/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, lists: [{ param: 'items', columns: [{ key: 'x', type: 'color' }] }] } }), /color/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, actions: [{ id: 'a', inputs: ['camera'] }] } }), /Eingabe|input/);
 });
 
 await test('check: a good plugin passes, randomness, crashes and missing texts are found', async () => {

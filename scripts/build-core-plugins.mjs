@@ -35,6 +35,9 @@ export const CORE = {
   shelf: { file: 'src/generators/shelf', name: 'SHELF' },
   discsphere: { file: 'src/generators/discsphere', name: 'DISCSPHERE' },
   fingerbox: { file: 'src/generators/fingerbox', name: 'FINGERBOX' },
+  // The jig's panel (image and camera sources) needs the DOM, and print-and-cut marks pull in geom with fonts; the
+  // plugin gets an empty panel until image and camera inputs exist (#335 stage 3) and never uses boundsOf
+  jig: { file: 'src/generators/jig', name: 'JIG', stub: { jigPanel: 'export const jigPanel = () => undefined;', geom: 'export const boundsOf = () => { throw new Error("not in plugins"); };' } },
 };
 
 const i18nShim = {
@@ -84,18 +87,32 @@ function render(s, lang) {
 function sourceTexts(files) {
   const out = new Set();
   const re = /\bt\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g;
+  const rn = /\btn\(\s*(['"`])((?:\\.|(?!\1).)*)\1\s*,\s*(['"`])((?:\\.|(?!\3).)*)\3/g;
   for (const f of files) {
     const text = readFileSync(join(ROOT, f), 'utf8');
     for (const m of text.matchAll(re)) if (!m[2].includes('${')) out.add(m[2].replace(/\\(['"`\\])/g, '$1'));
+    // tn('one', 'other', n): both forms (the shim picks the German form by n)
+    for (const m of text.matchAll(rn)) for (const x of [m[2], m[4]]) if (!x.includes('${')) out.add(x.replace(/\\(['"`\\])/g, '$1'));
   }
   return [...out];
 }
 
-async function bundle(entry, format, platform) {
+/** Replace modules by name (`./jigPanel`) with the given source */
+const stubs = (map = {}) => ({
+  name: 'stubs',
+  setup(b) {
+    const names = Object.keys(map);
+    if (!names.length) return;
+    b.onResolve({ filter: new RegExp(`/(${names.join('|')})$`) }, (a) => ({ path: a.path.split('/').pop(), namespace: 'stub' }));
+    b.onLoad({ filter: /.*/, namespace: 'stub' }, (a) => ({ contents: map[a.path], loader: 'ts' }));
+  },
+});
+
+async function bundle(entry, format, platform, stub) {
   const r = await build({
     stdin: { contents: entry, resolveDir: ROOT, loader: 'ts' },
     bundle: true, format, platform, target: 'es2020', write: false, metafile: true, minify: format === 'iife',
-    mainFields: ['module', 'main'], plugins: [i18nShim], logLevel: 'error', legalComments: 'none',
+    mainFields: ['module', 'main'], plugins: [i18nShim, stubs(stub)], logLevel: 'error', legalComments: 'none',
   });
   const files = Object.keys(r.metafile.inputs).filter((x) => !x.includes('node_modules') && !x.startsWith('plugins/core') && x.endsWith('.ts'));
   return { js: r.outputFiles[0].text, files };
@@ -105,9 +122,9 @@ async function bundle(entry, format, platform) {
 export async function corePlugin(id) {
   const c = CORE[id];
   if (!c) throw new Error(`unknown core generator ${id}`);
-  const code = (await bundle(`import { ${c.name} } from './${c.file}'; import { wrap } from './plugins/core/wrap'; wrap(${c.name});`, 'iife', 'neutral')).js;
+  const code = (await bundle(`import { ${c.name} } from './${c.file}'; import { wrap } from './plugins/core/wrap'; wrap(${c.name});`, 'iife', 'neutral', c.stub)).js;
   // Read the generator definition in Node through the same shim: labels arrive as German source texts
-  const node = await bundle(`export { ${c.name} as default } from './${c.file}';`, 'esm', 'node');
+  const node = await bundle(`export { ${c.name} as default } from './${c.file}';`, 'esm', 'node', c.stub);
   const dir = mkdtempSync(join(tmpdir(), 'kzb-core-'));
   let g;
   try {
@@ -147,10 +164,40 @@ export async function corePlugin(id) {
   for (const de of sourceTexts(node.files)) put(codeOf(de), de);
   // Codes generate() throws (Generator.texts), e.g. „ratio-count“
   for (const [code, text] of Object.entries(g.texts ?? {})) put(code, text());
+  // Lists and actions (dialog schema 2): texts under fixed keys
+  const lists = g.lists?.map((l) => {
+    const k = `list.${l.param}`;
+    put(k, l.label);
+    const out = { param: l.param, label: k, columns: [] };
+    if (l.empty) (put(`${k}.empty`, l.empty), (out.empty = `${k}.empty`));
+    if (l.shape) out.shape = l.shape;
+    if (l.remove) out.remove = true;
+    if (l.removeTitle) (put(`${k}.remove`, l.removeTitle), (out.removeTitle = `${k}.remove`));
+    out.columns = l.columns.map((c) => {
+      const ck = `${k}.${c.key}`;
+      put(ck, c.label);
+      const col = { key: c.key, type: c.type, label: ck };
+      if (c.title) (put(`${ck}.title`, c.title), (col.title = `${ck}.title`));
+      if (c.type === 'text' && c.max) col.max = c.max;
+      if ('min' in c) Object.assign(col, { min: c.min, max: c.max });
+      if (c.type === 'enum') col.options = c.options.map(([v, label], i) => (put(`${ck}.${i}`, label), [v, `${ck}.${i}`]));
+      return col;
+    });
+    return out;
+  });
+  const actions = g.actions?.map((a) => {
+    const k = `action.${a.id}`;
+    put(k, a.label);
+    const out = { id: a.id, label: k };
+    if (a.title) (put(`${k}.title`, a.title), (out.title = `${k}.title`));
+    if (a.inputs) out.inputs = a.inputs;
+    return out;
+  });
   const sha256 = createHash('sha256').update(code).digest('hex');
   return {
     id: g.id, type: 'generator', api: 1, version: g.version, kind: g.kind, runtime: 'js', code, sha256,
-    icon: g.icon, dialog: { version: 1 }, ...(g.preview?.center ? { preview: { center: true } } : {}), params, texts,
+    icon: g.icon, dialog: lists || actions ? { version: 2, ...(lists ? { lists } : {}), ...(actions ? { actions } : {}) } : { version: 1 },
+    ...(g.preview?.center ? { preview: { center: true } } : {}), params, texts,
   };
 }
 

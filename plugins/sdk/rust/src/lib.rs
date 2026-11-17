@@ -161,7 +161,8 @@ pub trait Plugin {
     fn validate(p: &Self::Params) -> Vec<Issue>;
     /// An `Err(code)` is shown as an error with the text of that code
     fn generate(p: &Self::Params) -> Result<GenResult, String>;
-    /// Optional: suggestions for empty text fields, `json!({ "autoText": { "key": "…" } })`
+    /// Optional: suggestions for empty text fields and texts for the rows of a list,
+    /// `json!({ "autoText": { "key": "…" }, "rows": { "listParam": ["…", …] } })`
     fn view(_p: &Self::Params) -> Option<Value> {
         None
     }
@@ -169,6 +170,12 @@ pub trait Plugin {
     /// `json!({ "ask": { "question": …, "options": [{ "label": …, "patch": { … } }] } })`, `Some(Value::Null)` for
     /// nothing to do. `None` (the default) tells the app the plugin has no onChange.
     fn on_change(_key: &str, _old: &Value, _p: &Self::Params) -> Option<Value> {
+        None
+    }
+    /// Optional: button `action` of the manifest's `dialog.actions` was pressed; `inputs` holds what it declares
+    /// (`{ "selection": [{ "name": …, "polys": [[{ "x": …, "y": … }, …], …] }] }`). Answer
+    /// `json!({ "patch": { … }, "message": … })` or `Some(Value::Null)`; `None` (the default) means no onEvent.
+    fn on_event(_action: &str, _inputs: &Value, _p: &Self::Params) -> Option<Value> {
         None
     }
 }
@@ -187,6 +194,12 @@ pub fn dispatch<P: Plugin>(name: &str, input: Value) -> Result<Value, String> {
             let old = input.get("old").cloned().unwrap_or(Value::Null);
             let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
             P::on_change(&key, &old, &p).ok_or_else(missing)
+        }
+        "onEvent" => {
+            let action = input.get("action").and_then(Value::as_str).ok_or("bad-input")?.to_string();
+            let inputs = input.get("inputs").cloned().unwrap_or(Value::Null);
+            let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
+            P::on_event(&action, &inputs, &p).ok_or_else(missing)
         }
         _ => Err(missing()),
     }
