@@ -2,6 +2,7 @@
 // of lines, handles and texts in mm, plus layers the app keeps as pictures) and answers pointer events
 // (Generator.onSurface). The app scales, draws, hit-tests and keeps the surface state; the generator only ever
 // changes parameters. Answers of a plugin arrive later: events are sent one after the other, moves are merged.
+import { pointerMods } from './pointerMods';
 import { h } from '../dom';
 import type { GenDrawing, GenItem, GenLayer, Generator, GenPointer, GenStyle, GenSurfaceChange, GenSurfaceState, Params } from './types';
 
@@ -321,7 +322,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   let down: { x: number; y: number } | null = null;
   const ev = (type: GenPointer['type'], e: MouseEvent, extra: Partial<GenPointer> = {}): GenPointer => {
     const q = at(e);
-    return { type, x: round(q.x), y: round(q.y), ...extra };
+    return { type, x: round(q.x), y: round(q.y), ...extra, ...pointerMods(e) };
   };
   canvas.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
@@ -364,7 +365,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     if (e.key === 'Escape' && !drawing?.track) return;
     e.preventDefault();
     e.stopPropagation();
-    send({ type: 'key', x: 0, y: 0, key: e.key });
+    send({ type: 'key', x: 0, y: 0, key: e.key, ...pointerMods(e) });
   });
   // The width follows the dialog
   const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => paint()) : null;

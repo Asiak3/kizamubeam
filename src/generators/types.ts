@@ -321,6 +321,10 @@ export interface GenPointer {
   /** select: the list and row that was clicked */
   list?: string;
   row?: number;
+  /** Modifier keys held during the event (only present when held): Shift, Alt (Option), Ctrl (Cmd on macOS) */
+  shift?: true;
+  alt?: true;
+  ctrl?: true;
 }
 
 /** Changes of the surface an answer may ask for */

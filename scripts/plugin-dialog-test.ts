@@ -485,6 +485,24 @@ await test('check: the hole plate example passes without warnings', async () => 
   assert.deepEqual(r, { id: 'org.kizamubeam.hole-plate', errors: [], warnings: [] });
 });
 
+await test('surface events carry the held modifier keys (#385)', async () => {
+  const { pointerMods } = await import('../src/generators/pointerMods');
+  const k = (shiftKey: boolean, altKey: boolean, ctrlKey: boolean, metaKey: boolean) => pointerMods({ shiftKey, altKey, ctrlKey, metaKey });
+  assert.deepEqual(k(false, false, false, false), {}, 'keys not held are left out');
+  assert.deepEqual(k(true, false, false, false), { shift: true });
+  assert.deepEqual(k(false, true, true, false), { alt: true, ctrl: true });
+  assert.deepEqual(k(false, false, false, true), { ctrl: true }, 'Cmd counts as Ctrl');
+  const code = `globalThis.plugin = {
+    validate: () => [],
+    generate: () => ({ parts: [{ key: 'a', subs: [{ closed: true, nodes: [{x:0,y:0},{x:1,y:0},{x:0,y:1}] }], at: { x: 0, y: 0 } }], info: [] }),
+    draw: () => ({ frame: { x0: 0, y0: 0, x1: 10, y1: 10 }, items: [] }),
+    onSurface: ({ event }) => ({ message: [event.type, event.shift ? '+shift' : '', event.alt ? '+alt' : '', event.ctrl ? '+ctrl' : ''] }),
+  };`;
+  const m = manifest(code, { params: [], texts: { en: { name: 'Mods', desc: 'Mods' } }, dialog: { version: 3, surface: { views: [{ id: 'v' }] } } });
+  const s = await runDialog(m, [{ $surface: [{ type: 'down', x: 1, y: 1, shift: true }] }, { $surface: [{ type: 'key', x: 0, y: 0, key: 'Delete', alt: true, ctrl: true }] }, { $surface: [{ type: 'dblclick', x: 1, y: 1 }] }]);
+  assert.deepEqual(s.slice(1).map((x) => x.message), ['down+shift', 'key+alt+ctrl', 'dblclick']);
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

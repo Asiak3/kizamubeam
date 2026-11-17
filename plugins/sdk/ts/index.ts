@@ -202,6 +202,10 @@ export interface Pointer {
   key?: string;
   list?: string;
   row?: number;
+  /** Modifier keys held during the event (only present when held); ctrl is Cmd on macOS */
+  shift?: true;
+  alt?: true;
+  ctrl?: true;
 }
 export interface Plugin<P extends Params = Params> {
   validate(p: P): Issue[];
