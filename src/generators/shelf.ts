@@ -4,7 +4,7 @@
 import type { Pt } from '../model';
 import { t } from '../i18n';
 import { arrangeParts, polySub } from './build';
-import { cleanup, offsetOrtho } from './box';
+import { cleanup, offsetOrtho } from './panelJoints';
 import type { Generator, Issue, Params } from './types';
 import { pose, neg, X, Y, Z, type AsmPoses, type Pose } from './pose';
 

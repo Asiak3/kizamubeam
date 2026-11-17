@@ -23,6 +23,8 @@ const SLICE_HOST = "export * from './plugins/core/slice-host';";
 const FIT_HOST = "export * from './plugins/core/fit-host';";
 // Every generator: the nested part layout through the app (host function nest)
 const BUILD_HOST = "export * from './plugins/core/build-host';";
+// Box panels with finger joints: through the app (host function joints, #398) instead of a bundled copy
+const JOINTS_HOST = "export * from './plugins/core/joints-host';";
 
 /**
  * Generators built as plugins. label: text for the Objects window with placeholders mapped to parameters
@@ -123,17 +125,19 @@ async function bundle(entry, format, platform, stub) {
     mainFields: ['module', 'main'], plugins: [i18nShim, stubs(stub)], logLevel: 'error', legalComments: 'none',
   });
   const files = Object.keys(r.metafile.inputs).filter((x) => !x.includes('node_modules') && !x.startsWith('plugins/core') && x.endsWith('.ts'));
-  return { js: r.outputFiles[0].text, files, nests: 'plugins/core/build-host.ts' in r.metafile.inputs };
+  const js = r.outputFiles[0].text;
+  // Host functions the bundle calls (the stand-ins are only kept where a generator uses them)
+  return { js, files, nests: 'plugins/core/build-host.ts' in r.metafile.inputs, joints: /\bhost\.joints\(/.test(js) };
 }
 
 /** One plugin entry for the pack */
 export async function corePlugin(id) {
   const c = CORE[id];
   if (!c) throw new Error(`unknown core generator ${id}`);
-  const stub = { build: BUILD_HOST, ...c.stub };
+  const stub = { build: BUILD_HOST, panelJoints: JOINTS_HOST, ...c.stub };
   const main = await bundle(`import { ${c.name} } from './${c.file}'; import { wrap } from './plugins/core/wrap'; wrap(${c.name});`, 'iife', 'neutral', stub);
   const code = main.js;
-  const host = [...(c.host ?? []), ...(main.nests ? ['nest'] : [])];
+  const host = [...(c.host ?? []), ...(main.nests ? ['nest'] : []), ...(main.joints ? ['joints'] : [])];
   // Read the generator definition in Node through the same shim: labels arrive as German source texts
   const node = await bundle(`export { ${c.name} as default } from './${c.file}';`, 'esm', 'node', stub);
   const dir = mkdtempSync(join(tmpdir(), 'kzb-core-'));
