@@ -87,7 +87,7 @@ Drehe die Ansicht mit der Maus oder nutze die festen Ansichten (3D, oben, vorn).
 
 Jeder Schnitt-Layer kann im Layer-Dialog unter **Aussehen in 3D** sein eigenes Aussehen bekommen: 21 Vorgaben wie Pappel- und Birkensperrholz, Buche, Eiche, Nussbaum, Bambus, MDF, Karton, Kork, Leder, Schiefer, Granit, klares, farbiges und deckendes Acryl, Glas, eloxiertes Aluminium und Edelstahl, jeweils mit optionaler eigener Farbe. Gravuren sehen je Material anders aus: dunkel gebrannt auf Holz, hellgrau auf Schiefer, mattweiß auf Acryl und Glas. Layer ohne eigenes Aussehen übernehmen es aus dem Namen ihres Eintrags in der [Material-Bibliothek](materials-tests.md#material-library).
 
-Um ein flaches Stück ohne Schnitt zu zeigen (etwa einen Schieferuntersetzer), zeichne seinen Umriss auf einen Layer mit ausgeschalteter Ausgabe: Er wird zur Platte.
+Um ein flaches Stück ohne Schnitt zu zeigen (etwa einen Schieferuntersetzer), zeichne seinen Umriss auf einen Layer mit ausgeschalteter Ausgabe: Er wird zur Platte. Ebenso für Rohmaterial: Zeichne ein Rechteck in der Größe der Platte auf so einen Layer, dann erscheinen die Gravuren und die Schnittteile darauf auf der Platte. Teile, die innerhalb der Platte liegen, bleiben Teile, und die Platte bekommt an ihrer Stelle Löcher. Das Kontrollkästchen „Rohplatte“ im 3D-Fenster blendet die Platten aus, wenn du nur die Teile ansehen willst.
 
 ### Mockups für Kunden
 

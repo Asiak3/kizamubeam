@@ -87,7 +87,7 @@ Turn the view with the mouse, or use the preset views (3D, top, front). The **Ex
 
 Each cut layer can get its own look in the layer dialog under **Appearance in 3D**: 21 presets such as poplar and birch plywood, beech, oak, walnut, bamboo, MDF, cardboard, cork, leather, slate, granite, clear, coloured and opaque acrylic, glass, anodized aluminium and stainless steel, each with an optional custom colour. Engravings look different per material: dark burn on wood, light grey on slate, frosted white on acrylic and glass. Layers without their own look take it from the name of their [material library](materials-tests.md#material-library) entry.
 
-To show a flat piece without a cut (a slate coaster, for example), draw its outline on a layer with output off: it becomes the plate.
+To show a flat piece without a cut (a slate coaster, for example), draw its outline on a layer with output off: it becomes the plate. The same works for raw stock: draw a rectangle of the sheet size on such a layer, and the engravings and the cut parts lying on it show up on the sheet. Parts that lie inside the sheet stay parts, and the sheet gets holes in their place. The checkbox “Stock” in the 3D window hides the sheets when you only want to look at the parts.
 
 ### Mockups for customers
 

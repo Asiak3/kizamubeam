@@ -3216,6 +3216,8 @@
   "Favoriten": "Favorites",
   "Zuletzt benutzt": "Recently Used",
   "Gravuren": "Engravings",
+  "Rohplatte": "Stock",
+  "Rohplatten zeigen: geschlossene Konturen auf einem Schnitt-Layer ohne Ausgabe. Teile darauf bleiben Teile, die Platte bekommt Löcher an ihrer Stelle.": "Show the stock sheets: closed outlines on a cut layer with output off. Parts on them stay parts, and the sheet gets holes in their place.",
   "Füllungen, gravierte Linien und Bilder auf den Teilen zeigen": "Show fills, engraved lines and images on the parts",
   "Automatisch ({name})": "Automatic ({name})",
   "Automatisch (Standard der 3D-Ansicht)": "Automatic (3D view default)",

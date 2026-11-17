@@ -49,16 +49,19 @@ interface Settings {
   /** Mockup-Modus: Schatten statt Raster, eigener Hintergrund */
   mockup: boolean;
   bg: MockupBg;
+  /** Rohplatte (geschlossene Kontur auf einem Schnitt-Layer ohne Ausgabe) zeigen */
+  stock: boolean;
 }
 
 function loadSettings(): Settings {
-  const d: Settings = { th: 3, overlaps: true, marks: true, look: DEFAULT_LOOK, mockup: false, bg: 'studio' };
+  const d: Settings = { th: 3, overlaps: true, marks: true, look: DEFAULT_LOOK, mockup: false, bg: 'studio', stock: true };
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || '{}');
     if (s.th > 0 && s.th <= 50) d.th = Number(s.th);
     if (typeof s.overlaps === 'boolean') d.overlaps = s.overlaps;
     if (typeof s.marks === 'boolean') d.marks = s.marks;
     d.look = cleanLook(s.look) ?? d.look;
+    if (typeof s.stock === 'boolean') d.stock = s.stock;
     if (typeof s.mockup === 'boolean') d.mockup = s.mockup;
     if (MOCKUP_BGS.includes(s.bg)) d.bg = s.bg;
   } catch {
@@ -134,19 +137,21 @@ function cutPlates(ed: Editor, targets: ViewSolid[], places: Map<string, CanvasP
 }
 
 /** Teile für die Ansicht sammeln; liefert auch einen Schlüssel, der sich nur ändert, wenn andere Objekte gezeigt werden */
-export function collectScene(ed: Editor, th: number, marks = true, fallback: MaterialLook = DEFAULT_LOOK): { scene: Scene3D; key: string; asms: number; loose: Obj[] } {
-  const roots = ed.sel.length ? ed.sel : ed.doc.objs.filter((o) => !o.hidden);
+export function collectScene(ed: Editor, th: number, marks = true, fallback: MaterialLook = DEFAULT_LOOK, showStock = true, wholePage?: Set<Obj>): { scene: Scene3D; key: string; asms: number; loose: Obj[] } {
+  // wholePage: Plattenlage der ganzen Seite, um die angegebenen Gravuren zu prüfen (ohne Auswahl)
+  const sel = wholePage ? [] : ed.sel;
+  const roots = sel.length ? sel : ed.doc.objs.filter((o) => !o.hidden);
   const solids: ViewSolid[] = [];
   const ids: (number | string)[] = [];
   const asmDone = new Set<string>();
   /** Lage jeder Platte auf der Arbeitsfläche (für die Gravuren) */
   const places = new Map<string, CanvasPlace>();
-  const multi = collectMultiLayers(ed, ed.sel.length ? roots : null, fallback, places);
+  const multi = collectMultiLayers(ed, sel.length ? roots : null, fallback, places);
   solids.push(...multi.solids);
   ids.push(...multi.ids);
   let asms = multi.count;
   // Flache Konturen je Dicke sammeln: Ineinanderliegende Konturen sind wie beim Lasern Löcher
-  const flats = new Map<number, { paths: Paths; names: { label: string; box: number[]; layer: number; id: number }[] }>();
+  const flats = new Map<number, { paths: Paths; sheet: Paths; names: { label: string; box: number[]; layer: number; id: number }[] }>();
   const flat = (o: Obj, m: Obj['m'], thick: number) => {
     const L = ed.layer(o.layer);
     if (!isCutLayer(L) || o.shape.kind === 'text' || o.shape.kind === 'image') return;
@@ -154,16 +159,17 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     if (o.shape.kind === 'path' && o.shape.mark) return;
     const paths = region({ ...o, m });
     if (!paths.length) return;
-    const f = flats.get(thick) ?? { paths: [], names: [] };
+    const f = flats.get(thick) ?? { paths: [], sheet: [], names: [] };
     flats.set(thick, f);
-    f.paths.push(...paths);
+    // Ohne Ausgabe = Rohplatte (Issue #326): Teile darauf bleiben Teile, die Platte bekommt Löcher an ihrer Stelle
+    (L.output ? f.paths : f.sheet).push(...paths);
     f.names.push({ label: o.shape.kind === 'gen' ? genLabel(o.shape) : objLabel(o), box: pathBox(paths), layer: o.layer, id: o.id });
     ids.push(o.id);
   };
   /** Lose Formen: erst nach den Baugruppen entscheiden, ob sie Platten schneiden (Loch, Kerbe) oder eigene Platten sind */
   const looseShapes: { o: Obj; m: Obj['m']; thick: number }[] = [];
   // Eine Auswahl zeigt auch ausgeblendete Objekte, die ganze Seite nur sichtbare
-  const shown = [...(ed.sel.length ? leaves(roots) : visibleLeaves(roots))];
+  const shown = [...(sel.length ? leaves(roots) : visibleLeaves(roots))];
   const all = shown.filter(([o]) => !multi.used.has(o.id));
   const mated = collectMates(ed, all, th, places);
   for (const g of mated.groups) {
@@ -217,9 +223,11 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     else flat(x.o, x.m, x.thick);
   for (const id of consumed) if (!ids.includes(id)) ids.push(id);
   const loose: Placement[] = [];
+  /** Rohplatten bleiben liegen; ausgeblendet zählen sie trotzdem als Fläche für Gravuren */
+  const stockSolids: ViewSolid[] = [];
   let n = 0;
   for (const [thick, f] of flats)
-    for (const { outer, holes } of islands(f.paths)) {
+    for (const { outer, holes, sheet } of [...islands(f.paths).map((i) => ({ ...i, sheet: false })), ...sheetIslands(f.sheet, f.paths).map((i) => ({ ...i, sheet: true }))]) {
       const box = pathBox([outer]);
       // Name des Objekts, dessen Umriss die Insel ist, sonst durchnummeriert
       const named = f.names.find((x) => x.box.every((v, i) => Math.abs(v - box[i]) < 10));
@@ -228,8 +236,9 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
       const polys = [outer, ...holes].map((p) => p.map((q) => ({ x: q.X / SCALE, y: q.Y / SCALE })));
       n++;
       const plate: ViewSolid = { key: `f${n}`, label: named?.label ?? t('Teil {n}', { n }), polys, pose: flatPose(), th: thick, group: `f${n}`, layer };
-      solids.push(plate);
-      loose.push({ parts: [plate], order: named?.id ?? 1e9 + n });
+      if (sheet) stockSolids.push(plate);
+      else loose.push({ parts: [plate], order: named?.id ?? 1e9 + n });
+      if (!sheet || showStock) solids.push(plate);
       places.set(`f${n}`, { page: ed.doc.page, toLocal: IDENT });
     }
   // Blöcke, die sich überdecken (z. B. Baugruppen nach dem Verschachteln), nebeneinanderlegen; lose Platten weichen aus
@@ -248,7 +257,9 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
     for (const s of solids) s.engraving = eng.get(s.key);
   }
   // Gravuren ohne Platte fehlen in der Ansicht: nur die gezeigten Objekte prüfen (eine Auswahl, sonst die sichtbaren der Seite)
-  const bare = looseMarks(ed, solids, places, new Set(shown.map(([o]) => o)));
+  let bare = looseMarks(ed, showStock ? solids : [...solids, ...stockSolids], places, wholePage ?? new Set(shown.map(([o]) => o)));
+  // Eine Auswahl zeigt nur ihre Platten: Liegt die Gravur auf einer anderen Platte der Seite, ist sie nicht lose
+  if (bare.length && sel.length) bare = collectScene(ed, th, false, fallback, true, new Set(bare)).loose;
   const overlaps = findOverlaps(solids);
   return { scene: { solids, overlaps }, key: `${th}|${ids.join(',')}`, asms, loose: bare };
 }
@@ -345,12 +356,18 @@ function collectMates(ed: Editor, shown: [Obj, Mat][], th: number, places: Map<s
   return { groups, orders: groups.map((g) => Math.min(...g.map((x) => Number(x.key.slice(1))))), used };
 }
 
-/** Konturen nach Gerade-Ungerade-Regel in zusammenhängende Flächen mit ihren Löchern zerlegen */
-function islands(paths: Paths): { outer: Path; holes: Path[] }[] {
+/** Rohplatten: Fläche der Platten ohne die Teile, die darauf liegen (diese bleiben eigene Platten) */
+function sheetIslands(sheet: Paths, parts: Paths): { outer: Path; holes: Path[] }[] {
+  return sheet.length ? islands(sheet, parts) : [];
+}
+
+/** Konturen nach Gerade-Ungerade-Regel in zusammenhängende Flächen mit ihren Löchern zerlegen; `minus` wird abgezogen */
+function islands(paths: Paths, minus: Paths = []): { outer: Path; holes: Path[] }[] {
   const c = new ClipperLib.Clipper();
   c.AddPaths(paths, ClipperLib.PolyType.ptSubject, true);
+  if (minus.length) c.AddPaths(minus, ClipperLib.PolyType.ptClip, true);
   const tree = new ClipperLib.PolyTree();
-  c.Execute(ClipperLib.ClipType.ctUnion, tree, ClipperLib.PolyFillType.pftEvenOdd, ClipperLib.PolyFillType.pftEvenOdd);
+  c.Execute(minus.length ? ClipperLib.ClipType.ctDifference : ClipperLib.ClipType.ctUnion, tree, ClipperLib.PolyFillType.pftEvenOdd, ClipperLib.PolyFillType.pftEvenOdd);
   const out: { outer: Path; holes: Path[] }[] = [];
   const walk = (node: ClipperLib.PolyNode) => {
     for (const ch of node.Childs()) {
@@ -428,6 +445,7 @@ export function buildView3dPanel(ed: Editor) {
   const spinLbl = h('label', { class: 'v3d-check', title: t('Zahnräder drehen') }, spinBox, t('Drehen'));
   const ovBox = h('input', { type: 'checkbox', checked: set.overlaps }) as HTMLInputElement;
   const markBox = h('input', { type: 'checkbox', checked: set.marks }) as HTMLInputElement;
+  const stockBox = h('input', { type: 'checkbox', checked: set.stock }) as HTMLInputElement;
   const mockBox = h('input', { type: 'checkbox', checked: set.mockup }) as HTMLInputElement;
   const bgSel = h(
     'select',
@@ -454,6 +472,7 @@ export function buildView3dPanel(ed: Editor) {
     spinLbl,
     h('label', { class: 'v3d-check', title: t('Bereiche, in denen sich Teile durchdringen, rot zeigen') }, ovBox, t('Überschneidungen')),
     h('label', { class: 'v3d-check', title: t('Füllungen, gravierte Linien und Bilder auf den Teilen zeigen') }, markBox, t('Gravuren')),
+    h('label', { class: 'v3d-check', title: t('Rohplatten zeigen: geschlossene Konturen auf einem Schnitt-Layer ohne Ausgabe. Teile darauf bleiben Teile, die Platte bekommt Löcher an ihrer Stelle.') }, stockBox, t('Rohplatte')),
     h('label', { class: 'v3d-th-lbl', title: t('Für Teile ohne eigene Materialdicke (z. B. Zahnräder und gezeichnete Formen)') }, t('Dicke'), thIn, 'mm'),
     h('label', { class: 'v3d-look', title: t('Aussehen für Layer ohne eigenes Material. Eigenes Aussehen je Schnitt-Layer im Layer-Dialog (Doppelklick auf den Layer).') },
       t('Material'),
@@ -485,7 +504,7 @@ export function buildView3dPanel(ed: Editor) {
       queued = window.setTimeout(update, 150);
       return;
     }
-    const { scene, key, asms, loose: lone } = collectScene(ed, set.th, set.marks, set.look);
+    const { scene, key, asms, loose: lone } = collectScene(ed, set.th, set.marks, set.look, set.stock);
     loose = lone;
     hint.hidden = scene.solids.length > 0;
     viewer.setScene(scene, key !== lastKey);
@@ -549,6 +568,11 @@ export function buildView3dPanel(ed: Editor) {
     set.overlaps = ovBox.checked;
     save();
     viewer?.setShowOverlaps(set.overlaps);
+    update();
+  });
+  stockBox.addEventListener('change', () => {
+    set.stock = stockBox.checked;
+    save();
     update();
   });
   markBox.addEventListener('change', () => {
