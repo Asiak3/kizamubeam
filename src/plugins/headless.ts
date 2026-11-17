@@ -12,6 +12,7 @@ import { pluginText, type PluginManifest } from './manifest';
 import { sha256 } from '../pdfcrypt';
 import { hex } from './manifest';
 import { encodeMesh, meshId, weld } from '../model3d/mesh';
+import { isToolType, pluginTool, sampleInput, type ToolInput, type ToolResult } from './tool';
 
 export interface DialogState {
   params: Params;
@@ -212,6 +213,94 @@ export interface CheckReport {
  * and both values of every switch must run without a crash, every view of a drawing surface must draw, two runs must give the same geometry, and the issue codes
  * the plugin reports should have an English text.
  */
+/** What a path tool or image filter returned for one set of parameters */
+export interface ToolState {
+  params: Params;
+  issues: { key?: string; level: 'error' | 'warn'; code?: string; msg: string }[];
+  info: [string, string][];
+  /** Path tool: the objects that would replace the selection (input id, counts) */
+  objects?: { from?: string; subs: number; nodes: number }[];
+  /** Image filter: size of the new image */
+  image?: { width: number; height: number };
+  /** SHA-256 of the result, to compare runs */
+  geometry: string;
+  /** The full answer, to look at the paths or pixels */
+  result: ToolResult;
+}
+
+/**
+ * Run a path tool or image filter once (#205 stage 3): params are checked against the schema like the dialog
+ * does, input defaults to a small sample (a square with a hole and a line, or a gray ramp).
+ */
+export async function runTool(m: PluginManifest, params: Record<string, unknown> = {}, input?: ToolInput): Promise<ToolState> {
+  const x = pluginTool(m, { id: 'headless', name: 'headless' });
+  try {
+    const bad = checkInput(x, params);
+    if (bad.length) throw new ScriptError(bad.map((i) => i.msg).join('; '));
+    const p = normalizeParams(x, params);
+    const r = await x.run(p, input ?? sampleInput(x.type));
+    const out: ToolState = {
+      params: p,
+      issues: r.issues.map((i) => ({ ...(i.key ? { key: i.key } : {}), level: i.level, ...(i.code ? { code: i.code } : {}), msg: i.msg })),
+      info: r.info,
+      geometry: hex(sha256(new TextEncoder().encode(JSON.stringify(r.objects ?? (r.image ? [r.image.width, r.image.height, Array.from(r.image.data)] : null))))),
+      result: r,
+    };
+    if (r.objects) out.objects = r.objects.map((o) => ({ ...(o.from ? { from: o.from } : {}), subs: o.subs.length, nodes: o.subs.reduce((n, sp) => n + sp.nodes.length, 0) }));
+    if (r.image) out.image = { width: r.image.width, height: r.image.height };
+    return out;
+  } finally {
+    x.dispose();
+  }
+}
+
+/** Check a path tool or image filter: the defaults give a result on the sample, every choice runs, runs repeat */
+async function checkTool(m: PluginManifest, errors: string[], codes: Set<string>) {
+  const note = (st: ToolState, what: string) => {
+    for (const i of st.issues) {
+      if (i.code && /^plugin-/.test(i.code)) errors.push(`${what}: ${i.code} (${i.msg})`);
+      else if (i.code) codes.add(i.code);
+    }
+  };
+  const d = await runTool(m);
+  note(d, 'defaults');
+  if (d.issues.some((i) => i.level === 'error')) errors.push(`defaults: ${d.issues.filter((i) => i.level === 'error').map((i) => i.code ?? i.msg).join(', ')}`);
+  else if (!d.objects && !d.image) errors.push('defaults: no result on the sample input');
+  if ((await runTool(m)).geometry !== d.geometry) errors.push('defaults: two runs give different results (use a seed parameter instead of randomness or time)');
+  for (const s of m.schema) {
+    const steps = s.type === 'enum' ? s.options.filter(([v]) => v !== s.def).map(([v]) => ({ [s.key]: v })) : s.type === 'bool' ? [{ [s.key]: !s.def }] : [];
+    for (const step of steps) note(await runTool(m, step), JSON.stringify(step));
+  }
+}
+
+/** Check a generator plugin: defaults (with a sample model or selection when it needs one), every choice and view */
+async function checkGenerator(m: PluginManifest, errors: string[], note: (states: DialogState[], what: string) => void) {
+  // A plugin that is opened with a 3D model gets a sample model; a dialog that starts empty (a list filled from
+  // the selection) is filled once with a sample selection
+  let start: Record<string, unknown>[] = m.inputs?.some((x) => x.kind === 'model3d') ? [{ $model: SAMPLE_MODEL }] : [];
+  let first = (await runDialog(m, start)).slice(start.length ? 1 : 0);
+  const fill = m.actions?.find((a) => a.inputs?.includes('selection'));
+  if (!first[0].parts.length && fill) {
+    start = [...start, { $action: fill.id, $selection: SAMPLE_SELECTION }];
+    first = await runDialog(m, start);
+  }
+  note(first, 'defaults');
+  const d = first[first.length - 1];
+  if (d.issues.some((i) => i.level === 'error')) errors.push(`defaults: ${d.issues.filter((i) => i.level === 'error').map((i) => i.code ?? i.msg).join(', ')}`);
+  if (!d.parts.length) errors.push(fill ? `defaults: no parts, even after action "${fill.id}" with a sample selection` : 'defaults: no parts');
+  const again = (await runDialog(m, start)).pop()!;
+  if (again.geometry !== d.geometry || JSON.stringify(again.info) !== JSON.stringify(d.info)) errors.push('defaults: two runs give different results (use a seed parameter instead of randomness or time)');
+  // Every choice once, starting from the defaults
+  const steps: Record<string, unknown>[] = [];
+  for (const s of m.schema) {
+    if (s.type === 'enum') for (const [v] of s.options) if (v !== s.def) steps.push({ [s.key]: v });
+    if (s.type === 'bool') steps.push({ [s.key]: !s.def });
+  }
+  // Every view of the drawing surface once (other than the first, which every run draws)
+  for (const v of m.surface?.views.slice(1) ?? []) steps.push({ $view: v.id });
+  for (const step of steps) note(await runDialog(m, [...start, step]), JSON.stringify(step));
+}
+
 export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
   const errors: string[] = [];
   const warnings: string[] = [];
@@ -226,30 +315,8 @@ export async function checkPlugin(m: PluginManifest): Promise<CheckReport> {
     }
   };
   try {
-    // A plugin that is opened with a 3D model gets a sample model; a dialog that starts empty (a list filled from
-    // the selection) is filled once with a sample selection
-    let start: Record<string, unknown>[] = m.inputs?.some((x) => x.kind === 'model3d') ? [{ $model: SAMPLE_MODEL }] : [];
-    let first = (await runDialog(m, start)).slice(start.length ? 1 : 0);
-    const fill = m.actions?.find((a) => a.inputs?.includes('selection'));
-    if (!first[0].parts.length && fill) {
-      start = [...start, { $action: fill.id, $selection: SAMPLE_SELECTION }];
-      first = await runDialog(m, start);
-    }
-    note(first, 'defaults');
-    const d = first[first.length - 1];
-    if (d.issues.some((i) => i.level === 'error')) errors.push(`defaults: ${d.issues.filter((i) => i.level === 'error').map((i) => i.code ?? i.msg).join(', ')}`);
-    if (!d.parts.length) errors.push(fill ? `defaults: no parts, even after action "${fill.id}" with a sample selection` : 'defaults: no parts');
-    const again = (await runDialog(m, start)).pop()!;
-    if (again.geometry !== d.geometry || JSON.stringify(again.info) !== JSON.stringify(d.info)) errors.push('defaults: two runs give different results (use a seed parameter instead of randomness or time)');
-    // Every choice once, starting from the defaults
-    const steps: Record<string, unknown>[] = [];
-    for (const s of m.schema) {
-      if (s.type === 'enum') for (const [v] of s.options) if (v !== s.def) steps.push({ [s.key]: v });
-      if (s.type === 'bool') steps.push({ [s.key]: !s.def });
-    }
-    // Every view of the drawing surface once (other than the first, which every run draws)
-    for (const v of m.surface?.views.slice(1) ?? []) steps.push({ $view: v.id });
-    for (const step of steps) note(await runDialog(m, [...start, step]), JSON.stringify(step));
+    if (isToolType(m.type)) await checkTool(m, errors, codes);
+    else await checkGenerator(m, errors, note);
   } catch (e) {
     errors.push(e instanceof Error ? e.message : String(e));
   }

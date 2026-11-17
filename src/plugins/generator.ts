@@ -3,22 +3,23 @@
 // Worker. The bridge is a small cache per plugin: prepare(params) computes validate and generate once, the
 // synchronous functions read from the cache and report „being computed“ until the answer is there. Whoever shows
 // a result (the dialog, formula recomputation) listens to onPluginResult and asks again.
-import type { GenAction, GenChange, GenDrawing, GenEventResult, GenItem, GenList, GenResult, Generator, GenSurface, GenSurfaceResult, GenView, Issue, Params, ParamSpec } from '../generators/types';
+import type { GenAction, GenChange, GenDrawing, GenEventResult, GenItem, GenList, GenResult, Generator, GenSurface, GenSurfaceResult, GenView, Params } from '../generators/types';
 import type { AsmPoses } from '../generators/pose';
 import { checkChange, checkDrawing, checkEvent, eventInputs, checkGenResult, checkIssues, checkView, ContractError, type PluginEventResult, type PluginFn, type PluginGenResult, type PluginIssue, type PluginItem, type PluginText, type PluginView } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
-import { pluginText, type PluginManifest } from './manifest';
-import { lang, t } from '../i18n';
+import type { PluginManifest } from './manifest';
+import { appCodeText, localNumbers, PENDING, pluginWords } from './words';
 import { ICONS } from '../icons';
 
-/** Issue code while a plugin is still computing these parameters */
-export const PENDING = 'plugin-pending';
+export { appCodeText, localNumbers, PENDING };
 
 /** Starts the process of a plugin: a Worker in the app, the current thread in Node */
 export type Spawn = (m: PluginManifest) => PluginProcess;
 let spawn: Spawn = (m) => inProcess(m.runtime, m.code, m.host ?? []);
 export const setPluginSpawn = (s: Spawn) => void (spawn = s);
+/** Start a plugin's process the way the app does (generators and tools) */
+export const spawnPlugin = (m: PluginManifest) => spawn(m);
 
 /** Data of a resource the app keeps (a 3D model as `kzm1:` text), or null while it is not loaded */
 export type ResourceSource = (kind: string, id: string) => string | null;
@@ -57,46 +58,6 @@ export interface PluginGenerator extends Generator {
   dispose(): void;
 }
 
-/** Messages for the codes the app itself reports about a plugin */
-export function appCodeText(code: string, name: string): string | undefined {
-  switch (code) {
-    case PENDING:
-      return t('Wird berechnet …');
-    case 'plugin-cancelled':
-      return t('Die Berechnung wurde abgebrochen.');
-    case 'host-bad-input':
-    case 'host-failed':
-    case 'host-not-allowed':
-      return t('Die Erweiterung „{name}“ hat eine Funktion von KizamuBeam falsch aufgerufen ({code}).', { name, code });
-    case 'plugin-timeout':
-      return t('Die Erweiterung „{name}“ hat zu lange gerechnet.', { name });
-    case 'plugin-memory':
-      return t('Die Erweiterung „{name}“ hat zu viel Speicher gebraucht.', { name });
-    case 'plugin-crash':
-    case 'plugin-bad-code':
-    case 'plugin-imports':
-    case 'plugin-too-large':
-    case 'plugin-newer-api':
-      return t('Die Erweiterung „{name}“ lässt sich nicht ausführen ({code}).', { name, code });
-    case 'plugin-bad-output':
-      return t('Die Erweiterung „{name}“ hat ungültige Geometrie geliefert.', { name });
-    case 'plugin-no-function':
-      return t('Der Erweiterung „{name}“ fehlt eine Funktion.', { name });
-  }
-  return undefined;
-}
-
-/**
- * Numbers in texts from a plugin in the number format of the interface: plugins have no locale (QuickJS writes
- * 1234.5), the built-in generators use toLocaleString. Decimal numbers inside a text („⌀ 12.5 mm“) are converted.
- */
-export function localNumbers(s: string): string {
-  // Decimal numbers, and whole numbers from 1000 (digit grouping); not inside words or codes like „M3000“
-  return s.replace(/(?<![\w.,])-?(?:\d+\.\d+|\d{4,})(?![\w.,]?\w)/g, (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 6 }));
-}
-/** Number values: whole numbers as they are (like t() in the app: „z=1000“), decimals in the user's format */
-const localNumber = (x: number) => (Number.isInteger(x) ? String(x) : x.toLocaleString(undefined, { maximumFractionDigits: 6 }));
-
 export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }, opts: { resource?: ResourceSource } = {}): PluginGenerator {
   const source: ResourceSource = (kind, id) => opts.resource?.(kind, id) ?? resourceSource(kind, id);
   let proc: PluginProcess | null = null;
@@ -104,8 +65,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
   const running = new Map<string, Promise<void>>();
   /** Names computed by the plugin, kept longer than the results (the Objects window lists every part) */
   const labels = new Map<string, { label?: PluginText; parts?: Record<string, PluginText> }>();
-  const text = (key: string, values?: Record<string, string | number>) => pluginText(m.texts, lang, key, values);
-  const name = text('name') ?? m.id;
+  const { text, name, codeText, render, label, issue, schema } = pluginWords(m);
   // Parameters that name a resource (a 3D model): the plugin gets its data before it computes
   const resourceParams = m.schema.filter((s) => s.type === 'data' && s.resource);
   /** Resources these parameters need and their data (null while the app has not loaded it) */
@@ -117,19 +77,6 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     });
   // A result computed while a model was missing is not the result once it has loaded
   const keyOf = (p: Params) => JSON.stringify([...m.schema.map((s) => p[s.key] ?? null), ...resourcesOf(p).map((r) => r.data !== null)]);
-  const codeText = (code: string, values?: Record<string, string | number>) =>
-    appCodeText(code, name) ?? text(code, values) ?? t('Fehler in der Erweiterung „{name}“: {code}', { name, code });
-  const values = (v?: Record<string, PluginText | number>) => v && Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'number' ? localNumber(x) : render(x)]));
-  /** A plugin text in the interface language */
-  const render = (x: PluginText): string => (typeof x === 'string' ? localNumbers(x) : Array.isArray(x) ? x.map(render).join('') : codeText(x.code, values(x.values)));
-  /** A plain text that names a code (info labels of older plugins) is shown as that text */
-  const label = (x: PluginText) => (typeof x === 'string' ? (text(x) ?? x) : render(x));
-  const issue = (i: PluginIssue): Issue => ({
-    ...(i.key ? { key: i.key } : {}),
-    level: i.level,
-    code: i.code,
-    msg: i.code === 'plugin-text' && i.values?.text !== undefined && typeof i.values.text !== 'number' ? render(i.values.text) : codeText(i.code, values(i.values)),
-  });
   const errorOf = (e: unknown) => (e instanceof EngineError ? e.code : e instanceof Error && 'code' in e ? String((e as { code: unknown }).code) : 'plugin-crash');
 
   /** Optional functions (view, onChange) the plugin turned out not to have: not called again */
@@ -205,15 +152,6 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     if (!e) void prepare(p);
     return e;
   };
-
-  const schema: ParamSpec[] = m.schema.map((s) => {
-    const label = text(s.key) ?? s.key;
-    const title = text(`${s.key}.title`);
-    const out = { ...s, label, ...(title ? { title } : {}) } as ParamSpec;
-    if (out.section) out.section = text(out.section) ?? out.section;
-    if (out.type === 'enum') out.options = out.options.map(([v, k]) => [v, text(k) ?? v]);
-    return out;
-  });
 
   // Lists and actions (dialog schema 2): text keys become texts in the interface language
   const lists: GenList[] | undefined = m.lists?.map((l) => ({

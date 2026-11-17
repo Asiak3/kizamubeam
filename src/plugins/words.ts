@@ -1,0 +1,78 @@
+// Texts of a plugin in the interface language: its name, parameter labels, issue and info texts, and the
+// messages for codes the app itself reports about a plugin. Shared by generators and tools.
+import type { Issue, ParamSpec } from '../generators/types';
+import type { PluginIssue, PluginText } from './contract';
+import { pluginText, type PluginManifest } from './manifest';
+import { lang, t } from '../i18n';
+
+/** Issue code while a plugin is still computing these parameters */
+export const PENDING = 'plugin-pending';
+
+/** Messages for the codes the app itself reports about a plugin */
+export function appCodeText(code: string, name: string): string | undefined {
+  switch (code) {
+    case PENDING:
+      return t('Wird berechnet …');
+    case 'plugin-cancelled':
+      return t('Die Berechnung wurde abgebrochen.');
+    case 'host-bad-input':
+    case 'host-failed':
+    case 'host-not-allowed':
+      return t('Die Erweiterung „{name}“ hat eine Funktion von KizamuBeam falsch aufgerufen ({code}).', { name, code });
+    case 'plugin-timeout':
+      return t('Die Erweiterung „{name}“ hat zu lange gerechnet.', { name });
+    case 'plugin-memory':
+      return t('Die Erweiterung „{name}“ hat zu viel Speicher gebraucht.', { name });
+    case 'plugin-crash':
+    case 'plugin-bad-code':
+    case 'plugin-imports':
+    case 'plugin-too-large':
+    case 'plugin-newer-api':
+      return t('Die Erweiterung „{name}“ lässt sich nicht ausführen ({code}).', { name, code });
+    case 'plugin-bad-output':
+      return t('Die Erweiterung „{name}“ hat ungültige Geometrie geliefert.', { name });
+    case 'plugin-no-function':
+      return t('Der Erweiterung „{name}“ fehlt eine Funktion.', { name });
+  }
+  return undefined;
+}
+
+/**
+ * Numbers in texts from a plugin in the number format of the interface: plugins have no locale (QuickJS writes
+ * 1234.5), the built-in generators use toLocaleString. Decimal numbers inside a text („⌀ 12.5 mm“) are converted.
+ */
+export function localNumbers(s: string): string {
+  // Decimal numbers, and whole numbers from 1000 (digit grouping); not inside words or codes like „M3000“
+  return s.replace(/(?<![\w.,])-?(?:\d+\.\d+|\d{4,})(?![\w.,]?\w)/g, (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 6 }));
+}
+/** Number values: whole numbers as they are (like t() in the app: „z=1000“), decimals in the user's format */
+const localNumber = (x: number) => (Number.isInteger(x) ? String(x) : x.toLocaleString(undefined, { maximumFractionDigits: 6 }));
+
+/** Texts of one plugin in the interface language */
+export function pluginWords(m: PluginManifest) {
+  const text = (key: string, values?: Record<string, string | number>) => pluginText(m.texts, lang, key, values);
+  const name = text('name') ?? m.id;
+  const codeText = (code: string, values?: Record<string, string | number>) =>
+    appCodeText(code, name) ?? text(code, values) ?? t('Fehler in der Erweiterung „{name}“: {code}', { name, code });
+  const values = (v?: Record<string, PluginText | number>) => v && Object.fromEntries(Object.entries(v).map(([k, x]) => [k, typeof x === 'number' ? localNumber(x) : render(x)]));
+  /** A plugin text in the interface language */
+  const render = (x: PluginText): string => (typeof x === 'string' ? localNumbers(x) : Array.isArray(x) ? x.map(render).join('') : codeText(x.code, values(x.values)));
+  /** A plain text that names a code (info labels of older plugins) is shown as that text */
+  const label = (x: PluginText) => (typeof x === 'string' ? (text(x) ?? x) : render(x));
+  const issue = (i: PluginIssue): Issue => ({
+    ...(i.key ? { key: i.key } : {}),
+    level: i.level,
+    code: i.code,
+    msg: i.code === 'plugin-text' && i.values?.text !== undefined && typeof i.values.text !== 'number' ? render(i.values.text) : codeText(i.code, values(i.values)),
+  });
+  /** Parameters with labels, tooltips, sections and option labels in the interface language */
+  const schema: ParamSpec[] = m.schema.map((s) => {
+    const label = text(s.key) ?? s.key;
+    const title = text(`${s.key}.title`);
+    const out = { ...s, label, ...(title ? { title } : {}) } as ParamSpec;
+    if (out.section) out.section = text(out.section) ?? out.section;
+    if (out.type === 'enum') out.options = out.options.map(([v, k]) => [v, text(k) ?? v]);
+    return out;
+  });
+  return { text, name, codeText, render, label, issue, schema };
+}

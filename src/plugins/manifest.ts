@@ -18,9 +18,12 @@ export interface PluginManifest {
   version: number;
   /** Call protocol the plugin was built for (PLUGIN_API) */
   api: number;
-  /** Plugin kind; stage 1 knows generators only */
-  type: 'generator';
-  /** part = one part, assembly = several parts */
+  /**
+   * Plugin kind: a generator (parameters → parts), a path tool (parameters and the selected shapes → shapes that
+   * replace them) or an image filter (parameters and a grayscale image → a grayscale image), #205 stage 3
+   */
+  type: PluginType;
+  /** part = one part, assembly = several parts (generators only) */
   kind: 'part' | 'assembly';
   runtime: Runtime;
   /** JavaScript source or WebAssembly bytes */
@@ -46,6 +49,9 @@ export interface PluginManifest {
   /** Host functions the plugin calls (hostfns.ts: boolean, offset, fit, trace); progress needs no entry */
   host?: string[];
 }
+
+export const PLUGIN_TYPES = ['generator', 'pathtool', 'imagefilter'] as const;
+export type PluginType = (typeof PLUGIN_TYPES)[number];
 
 export interface PluginInput {
   kind: 'model3d';
@@ -300,7 +306,8 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
     if (!isObj(raw)) return fail(t('kein Plugin'));
     const id = typeof raw.id === 'string' ? raw.id : '';
     if (!ID_RE.test(id)) fail(t('ungültige Kennung „{id}“', { id }));
-    if (raw.type !== 'generator') fail(t('unbekannte Art „{type}“', { type: String(raw.type) }));
+    const type = raw.type as PluginType;
+    if (!(PLUGIN_TYPES as readonly unknown[]).includes(type)) fail(t('unbekannte Art „{type}“', { type: String(raw.type) }));
     const api = raw.api;
     if (!isNum(api) || !Number.isInteger(api) || api < 1) fail(t('Angabe „api“ fehlt'));
     if ((api as number) > PLUGIN_API) fail(t('braucht eine neuere Version von KizamuBeam'));
@@ -340,9 +347,12 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
       if (isObj(p) && p.showIf !== undefined) schema[i].showIf = rule(p.showIf, keys, `${t('Parameter {n}', { n: i + 1 })} (${schema[i].key})`);
     });
     const tx = texts(raw.texts);
-    const m: PluginManifest = { id, version: version as number, api: api as number, type: 'generator', kind: kind as 'part' | 'assembly', runtime: runtime as Runtime, code, sha256: sum, schema, texts: tx };
+    const m: PluginManifest = { id, version: version as number, api: api as number, type, kind: kind as 'part' | 'assembly', runtime: runtime as Runtime, code, sha256: sum, schema, texts: tx };
     if (typeof raw.icon === 'string' && /^[a-zA-Z][a-zA-Z0-9-]{0,40}$/.test(raw.icon)) m.icon = raw.icon;
     if (isObj(raw.preview) && raw.preview.center === true) m.preview = { center: true };
+    // Lists, actions, the surface and inputs belong to the generator dialog; a tool has fields only
+    if (type !== 'generator' && (raw.inputs !== undefined || (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined || raw.dialog.surface !== undefined))))
+      fail(t('Listen, Aktionen, Zeichenfläche und Eingaben gibt es nur bei Generatoren'));
     if (raw.inputs !== undefined) {
       if (!Array.isArray(raw.inputs) || raw.inputs.length > 4) fail(t('ungültige Angabe „inputs“'));
       m.inputs = (raw.inputs as unknown[]).map((x, i) => {

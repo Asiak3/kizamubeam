@@ -4919,5 +4919,8 @@
   "Neu berechnen": "Ricalcola",
   "Die Berechnung wurde abgebrochen.": "Il calcolo è stato annullato.",
   "Die Erweiterung „{name}“ hat eine Funktion von KizamuBeam falsch aufgerufen ({code}).": "L'estensione «{name}» ha chiamato in modo errato una funzione di KizamuBeam ({code}).",
-  "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "funzione host sconosciuta in «host» (consentite: {list})"
+  "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "funzione host sconosciuta in «host» (consentite: {list})",
+  "Listen, Aktionen, Zeichenfläche und Eingaben gibt es nur bei Generatoren": "liste, azioni, superficie di disegno e input esistono solo nei generatori",
+  "„{name}“ angewendet (Ctrl+Z macht es rückgängig).": "«{name}» applicato (Ctrl+Z lo annulla).",
+  "„{name}“ hat keine Formen geliefert; die Auswahl wurde entfernt (Ctrl+Z macht es rückgängig).": "«{name}» non ha restituito forme; la selezione è stata rimossa (Ctrl+Z lo annulla)."
 }

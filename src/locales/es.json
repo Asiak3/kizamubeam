@@ -4919,5 +4919,8 @@
   "Neu berechnen": "Volver a calcular",
   "Die Berechnung wurde abgebrochen.": "Se ha cancelado el cálculo.",
   "Die Erweiterung „{name}“ hat eine Funktion von KizamuBeam falsch aufgerufen ({code}).": "La extensión «{name}» llamó incorrectamente a una función de KizamuBeam ({code}).",
-  "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "función de host desconocida en «host» (permitidas: {list})"
+  "unbekannte Host-Funktion in „host“ (erlaubt: {list})": "función de host desconocida en «host» (permitidas: {list})",
+  "Listen, Aktionen, Zeichenfläche und Eingaben gibt es nur bei Generatoren": "listas, acciones, superficie de dibujo y entradas solo existen en los generadores",
+  "„{name}“ angewendet (Ctrl+Z macht es rückgängig).": "«{name}» aplicado (Ctrl+Z lo deshace).",
+  "„{name}“ hat keine Formen geliefert; die Auswahl wurde entfernt (Ctrl+Z macht es rückgängig).": "«{name}» no devolvió ninguna forma; se eliminó la selección (Ctrl+Z lo deshace)."
 }

@@ -17,7 +17,8 @@ export const PLUGIN_API = 1;
 /** resource: data a parameter refers to (e.g. a 3D model), sent once per process before it is needed */
 /** draw, onSurface: the drawing surface of the dialog */
 /** open, close: a dialog with the plugin was opened or closed (a session: keep or drop expensive work) */
-export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent' | 'resource' | 'draw' | 'onSurface' | 'open' | 'close';
+/** apply: a path tool or image filter computes its result for the selection (#205 stage 3) */
+export type PluginFn = 'validate' | 'generate' | 'view' | 'onChange' | 'onEvent' | 'resource' | 'draw' | 'onSurface' | 'open' | 'close' | 'apply';
 
 /** Limits for one plugin (#205: time, memory, output size) */
 export const LIMITS = {
@@ -27,7 +28,7 @@ export const LIMITS = {
    * layout too (a stack model slices the model to count its layers), resource decodes a 3D model; draw may compute
    * the layout for new parameters, onSurface answers pointer events (finishing a line may look into the model)
    */
-  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000, resource: 20000, draw: 30000, onSurface: 5000, open: 30000, close: 2000 } as Record<PluginFn, number>,
+  callMs: { validate: 10000, generate: 30000, view: 2000, onChange: 2000, onEvent: 10000, resource: 20000, draw: 30000, onSurface: 5000, open: 30000, close: 2000, apply: 30000 } as Record<PluginFn, number>,
   /** Options of a question (ask) */
   askOptions: 3,
   /** Memory of the JavaScript engine or the WebAssembly instance */
@@ -50,6 +51,11 @@ export const LIMITS = {
   layers: 4,
   /** Size of the surface state as JSON */
   stateBytes: 1024 * 1024,
+  /** Pixels of an image a filter gets or returns, and the longest side */
+  imagePixels: 16_000_000,
+  imageSide: 8000,
+  /** Objects a path tool gets or returns */
+  objects: 5000,
 };
 
 /**
@@ -171,8 +177,7 @@ export function checkGenResult(v: unknown): PluginGenResult {
     if (p.marks !== undefined) part.marks = subs(p.marks, 'part marks', count);
     return part;
   });
-  const info = v.info === undefined ? [] : Array.isArray(v.info) && v.info.length <= LIMITS.info ? v.info.map((r): [PluginText, PluginText] => (Array.isArray(r) && r.length === 2 ? [checkText(r[0]), checkText(r[1])] : fail('info'))) : fail('info');
-  const out: PluginGenResult = { parts, info };
+  const out: PluginGenResult = { parts, info: checkInfo(v.info) };
   if (v.label !== undefined) out.label = checkText(v.label);
   if (v.labels !== undefined) {
     if (!isObj(v.labels)) fail('labels');
@@ -203,6 +208,72 @@ export function checkGenResult(v: unknown): PluginGenResult {
   return out;
 }
 
+
+/** Info rows of an answer: [label, value] texts */
+function checkInfo(v: unknown): [PluginText, PluginText][] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v) || v.length > LIMITS.info) return fail('info');
+  return v.map((r): [PluginText, PluginText] => (Array.isArray(r) && r.length === 2 ? [checkText(r[0]), checkText(r[1])] : fail('info')));
+}
+
+/** An object of the selection as a path tool gets it: its id and its paths in mm, page coordinates (y down) */
+export interface PluginToolObject {
+  id: string;
+  subs: SubPath[];
+}
+/** Answer of a path tool: the objects that replace the selection; `from` names the input whose layer it takes */
+export interface PluginPathResult {
+  objects: { from?: string; subs: SubPath[] }[];
+  issues: PluginIssue[];
+  info: [PluginText, PluginText][];
+}
+/** A grayscale image: one byte per pixel (0 black … 255 white), row by row from the top left, base64 */
+export interface PluginGray {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+}
+/** Answer of an image filter: the new image (any size within the limits) */
+export interface PluginFilterResult {
+  image?: PluginGray;
+  issues: PluginIssue[];
+  info: [PluginText, PluginText][];
+}
+
+/** Check the answer of a path tool's apply(); `from` must name an input object */
+export function checkPathResult(v: unknown, ids: ReadonlySet<string>): PluginPathResult {
+  if (!isObj(v)) return fail('result');
+  const issues = v.issues === undefined ? [] : checkIssues(v.issues);
+  const raw = v.objects === undefined ? [] : Array.isArray(v.objects) && v.objects.length <= LIMITS.objects ? v.objects : fail('objects');
+  const count = { nodes: 0 };
+  const objects = raw.map((o) => {
+    if (!isObj(o)) return fail('object');
+    const out: PluginPathResult['objects'][number] = { subs: subs(o.subs, 'object subs', count) };
+    if (o.from !== undefined) out.from = ids.has(String(o.from)) ? String(o.from) : fail('object from');
+    return out;
+  });
+  return { objects, issues, info: checkInfo(v.info) };
+}
+
+/** Check a grayscale image from a plugin */
+export function checkGray(v: unknown, what = 'image'): PluginGray {
+  if (!isObj(v)) return fail(what);
+  const side = (x: unknown) => (typeof x === 'number' && Number.isInteger(x) && x >= 1 && x <= LIMITS.imageSide ? x : fail(`${what} size`));
+  const width = side(v.width), height = side(v.height);
+  if (width * height > LIMITS.imagePixels) fail(`${what} too large`);
+  if (typeof v.data !== 'string' || v.data.length > Math.ceil((width * height) / 3) * 4 + 4) return fail(`${what} data`);
+  const data = fromBase64(v.data);
+  if (data.length !== width * height) fail(`${what} data must have width × height bytes`);
+  return { width, height, data };
+}
+
+/** Check the answer of an image filter's apply() */
+export function checkFilterResult(v: unknown): PluginFilterResult {
+  if (!isObj(v)) return fail('result');
+  const out: PluginFilterResult = { issues: v.issues === undefined ? [] : checkIssues(v.issues), info: checkInfo(v.info) };
+  if (v.image !== undefined) out.image = checkGray(v.image);
+  return out;
+}
 
 /** Parameters handed to a plugin: plain JSON copy */
 export const callInput = (p: Params): Params => JSON.parse(JSON.stringify(p));

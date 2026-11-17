@@ -10,8 +10,8 @@ export const SETTINGS_KEYS = [
   'nest', 'joints', 'hinges', 'slots', 'qr', 'barcode', 'printcut', 'jigfill', 'focustest', 'materialtest', 'warp', 'calib', 'view3d',
   'workpieces', 'overlap-picker', 'rightPan', 'patternfill',
 ].map((k) => PRE + k);
-/** Schlüssel mit diesem Anfang zählen auch zu den Einstellungen (letzte Werte der Generatoren) */
-export const SETTINGS_PREFIXES = [PRE + 'gen.'];
+/** Schlüssel mit diesem Anfang zählen auch zu den Einstellungen (letzte Werte der Generatoren und der Werkzeuge aus Erweiterungen) */
+export const SETTINGS_PREFIXES = [PRE + 'gen.', PRE + 'tool.'];
 /** Oberfläche: Fenster, Leisten, Werkzeugkasten */
 export const UI_KEYS = ['layout', 'toolbars', 'objectsPanel', 'apps'].map((k) => PRE + k);
 export const CAMERA_KEYS = [PRE + 'camera'];

@@ -80,7 +80,7 @@ export interface EventInputs {
   /** The calibrated camera image; it covers the bed (0 … bed.w × 0 … bed.h mm); empty = photo of the empty bed */
   camera?: Image & { bed: { w: number; h: number }; empty?: Image };
 }
-/** RGBA bytes of an image (4 per pixel, row by row) */
+/** Bytes of an image: RGBA (4 per pixel) for action inputs, one per pixel for Gray, row by row */
 export function pixels(img: Image): Uint8Array {
   const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
   const map = new Uint8Array(128);
@@ -210,6 +210,60 @@ export const host: Host = (globalThis as unknown as { host: Host }).host;
 /** Register the plugin's functions with the app */
 export function definePlugin<P extends Params = Params>(plugin: Plugin<P>) {
   (globalThis as unknown as { plugin: Plugin<P> }).plugin = plugin;
+}
+
+/** An object of the selection a path tool gets: paths in mm (page coordinates, y down), texts as outlines */
+export interface ToolObject {
+  id: string;
+  subs: SubPath[];
+}
+/** Answer of a path tool: the objects that replace the selection; `from` gives an object the layer of that input */
+export interface PathToolResult {
+  objects?: { from?: string; subs: SubPath[] }[];
+  issues?: Issue[];
+  info?: [Text, Text][];
+}
+/** A grayscale image: one byte per pixel (0 black … 255 white), row by row, base64 (decode with pixels()) */
+export interface Gray {
+  width: number;
+  height: number;
+  data: string;
+}
+/** Answer of an image filter: the new image (any size up to 8000 pixels a side and 16 million pixels) */
+export interface ImageFilterResult {
+  image?: Gray;
+  issues?: Issue[];
+  info?: [Text, Text][];
+}
+/** A path tool (#205 stage 3, "type": "pathtool"): parameters and the selected shapes → shapes that replace them */
+export interface PathTool<P extends Params = Params> {
+  apply(input: { params: P; objects: ToolObject[] }): PathToolResult;
+  open?(p: P): null;
+  close?(): null;
+}
+/** An image filter ("type": "imagefilter"): parameters and the selected image as grayscale → a new grayscale image */
+export interface ImageFilter<P extends Params = Params> {
+  apply(input: { params: P; image: Gray }): ImageFilterResult;
+  open?(p: P): null;
+  close?(): null;
+}
+/** Register a path tool's functions with the app */
+export function definePathTool<P extends Params = Params>(tool: PathTool<P>) {
+  (globalThis as unknown as { plugin: PathTool<P> }).plugin = tool;
+}
+/** Register an image filter's functions with the app */
+export function defineImageFilter<P extends Params = Params>(filter: ImageFilter<P>) {
+  (globalThis as unknown as { plugin: ImageFilter<P> }).plugin = filter;
+}
+/** Bytes as base64 (for Gray.data) */
+export function base64(b: Uint8Array): string {
+  const abc = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let out = '';
+  for (let i = 0; i < b.length; i += 3) {
+    const n = (b[i] << 16) | ((b[i + 1] ?? 0) << 8) | (b[i + 2] ?? 0);
+    out += abc[n >> 18] + abc[(n >> 12) & 63] + (i + 1 < b.length ? abc[(n >> 6) & 63] : '=') + (i + 2 < b.length ? abc[n & 63] : '=');
+  }
+  return out;
 }
 
 /** Handle length for a quarter circle */

@@ -155,7 +155,8 @@ impl GenResult {
     }
 }
 
-/// RGBA bytes of an image input (`{ "width", "height", "data": base64 }`), 4 per pixel, row by row
+/// Bytes of an image input (`{ "width", "height", "data": base64 }`), row by row: RGBA (4 per pixel) for
+/// action inputs, one gray byte per pixel for an image filter
 pub fn pixels(image: &Value) -> Option<Vec<u8>> {
     let s = image.get("data")?.as_str()?.trim_end_matches('=');
     let val = |c: u8| -> Option<u32> {
@@ -220,12 +221,39 @@ pub fn progress(done: f64) {
     let _ = host("progress", &serde_json::json!(done));
 }
 
-/// A generator plugin. `validate` runs first; `generate` only when it reported no error.
+/// Base64 of bytes, e.g. the `data` of the image an image filter returns (one gray byte per pixel)
+pub fn base64(b: &[u8]) -> String {
+    const ABC: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(b.len().div_ceil(3) * 4);
+    for c in b.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        out.push(ABC[(n >> 18) as usize] as char);
+        out.push(ABC[(n >> 12 & 63) as usize] as char);
+        out.push(if c.len() > 1 { ABC[(n >> 6 & 63) as usize] as char } else { '=' });
+        out.push(if c.len() > 2 { ABC[(n & 63) as usize] as char } else { '=' });
+    }
+    out
+}
+
+/// A plugin: a generator (`validate` runs first; `generate` only when it reported no error), or a path tool or
+/// image filter (`apply`; "type" in plugin.json)
 pub trait Plugin {
     type Params: serde::de::DeserializeOwned;
-    fn validate(p: &Self::Params) -> Vec<Issue>;
-    /// An `Err(code)` is shown as an error with the text of that code
-    fn generate(p: &Self::Params) -> Result<GenResult, String>;
+    fn validate(_p: &Self::Params) -> Vec<Issue> {
+        vec![]
+    }
+    /// An `Err(code)` is shown as an error with the text of that code. Tools do not need it.
+    fn generate(_p: &Self::Params) -> Result<GenResult, String> {
+        Err("plugin-no-function".into())
+    }
+    /// Path tools and image filters (#205 stage 3): `input` is `{ "objects": [{ "id", "subs" }] }` (the selection
+    /// as paths in mm, texts as outlines) or `{ "image": { "width", "height", "data" } }` (grayscale, one byte per
+    /// pixel, see [`pixels`]). Answer `json!({ "objects": [{ "from": id, "subs": [ … ] }], "info": [ … ] })` or
+    /// `json!({ "image": { "width", "height", "data": base64(&bytes) } })`, with optional `"issues"`. `None` (the
+    /// default) means the plugin is no tool.
+    fn apply(_input: &Value, _p: &Self::Params) -> Option<Value> {
+        None
+    }
     /// Optional: suggestions for empty text fields and texts for the rows of a list,
     /// `json!({ "autoText": { "key": "…" }, "rows": { "listParam": ["…", …] } })`
     fn view(_p: &Self::Params) -> Option<Value> {
@@ -313,6 +341,10 @@ pub fn dispatch<P: Plugin>(name: &str, input: Value) -> Result<Value, String> {
             P::open(&p).ok_or_else(missing)
         }
         "close" => P::close().ok_or_else(missing),
+        "apply" => {
+            let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
+            P::apply(&input, &p).ok_or_else(missing)
+        }
         "draw" => {
             let p = params(input.get("params").cloned().unwrap_or(Value::Null))?;
             P::draw(&input, &p).ok_or_else(missing)
@@ -415,5 +447,43 @@ mod pixel_tests {
         }
         assert_eq!(super::mesh(&s), Some((vec![1.0, 2.0, 3.0], vec![0, 0, 0])));
         assert_eq!(super::mesh("stl"), None);
+    }
+}
+
+#[cfg(test)]
+mod tool_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[derive(serde::Deserialize)]
+    struct P {
+        level: u8,
+    }
+    /// Image filter: every pixel darker than `level` becomes black, the rest white
+    struct Threshold;
+    impl Plugin for Threshold {
+        type Params = P;
+        fn apply(input: &Value, p: &P) -> Option<Value> {
+            let img = &input["image"];
+            let px: Vec<u8> = pixels(img)?.into_iter().map(|v| if v < p.level { 0 } else { 255 }).collect();
+            Some(json!({ "image": { "width": img["width"], "height": img["height"], "data": base64(&px) } }))
+        }
+    }
+
+    #[test]
+    fn image_filter_through_dispatch() {
+        let input = json!({ "params": { "level": 100 }, "image": { "width": 3, "height": 1, "data": base64(&[10, 150, 99]) } });
+        let r = dispatch::<Threshold>("apply", input).unwrap();
+        assert_eq!(pixels(&r["image"]).unwrap(), vec![0, 255, 0]);
+        assert_eq!(dispatch::<Threshold>("generate", json!({ "level": 1 })), Err("plugin-no-function".into()));
+        assert_eq!(dispatch::<Threshold>("validate", json!({ "level": 1 })), Ok(json!([])));
+    }
+
+    #[test]
+    fn base64_round_trip() {
+        for n in 0..7u8 {
+            let b: Vec<u8> = (0..n).map(|i| i * 37).collect();
+            assert_eq!(pixels(&json!({ "data": base64(&b) })).unwrap(), b);
+        }
     }
 }

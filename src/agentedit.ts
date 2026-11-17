@@ -26,6 +26,8 @@ import { buildGenAsync, checkInput, GENERATORS, getGenerator, normalizeParams, r
 import type { Generator, Params } from './generators';
 import { coerce, ParamType, ProjectParam } from './params';
 import { genLeaves } from './editor/generators';
+import { getPluginTool, pluginTools } from './plugins/registry';
+import { applyToolResult, toolTarget } from './plugins/toolDialog';
 import { builtinTemplates } from './builtinTemplates';
 import { packTemplates } from './packs';
 import { addToLibrary, libraryItems, loadLibraryAsset } from './assetLibrary';
@@ -1567,6 +1569,32 @@ export const EDIT_TOOLS: ToolDef[] = [
       const mode = bool(a, 'reset', false) ? 'reset' : bool(a, 'reverse', false) ? 'reverse' : 'set';
       if (!ed.startAtPoint(o, W(ed, num(a, 'x'), num(a, 'y')), mode, bool(a, 'on_edge', false))) throw new ToolError(ed.hint || 'Startpunkt nicht gesetzt');
       return result(ed, before, { object: describe(ed, o, IDENT, false) });
+    },
+  },
+  {
+    name: 'run_extension_tool',
+    title: 'Werkzeug aus Erweiterung anwenden',
+    description:
+      'Pfadwerkzeug oder Bildfilter aus einer installierten Erweiterung anwenden (Kennung tool und Parameter aus list_extensions, Feld tools). Pfadwerkzeug (pathtool): die Objekte ids werden durch das Ergebnis ersetzt (Texte über ihre Konturen, Bilder nehmen nicht teil, Ergebnis sind Pfade). Bildfilter (imagefilter): genau ein Bild in ids bekommt die gefilterten Bildpunkte (Graustufen, Größe in mm bleibt). Fehlende Parameter bekommen Standardwerte. Ein Undo-Schritt.',
+    tier: Tier.Edit,
+    inputSchema: obj({
+      tool: { type: 'string' }, ids: { ...IDS, minItems: 1 }, params: { type: 'object', description: 'Parameter nach Schlüssel, siehe list_extensions' },
+    }, ['tool', 'ids']),
+    run: async (ed, a) => {
+      const x = getPluginTool(String(a.tool));
+      if (!x) throw new ToolError(`Unbekanntes Werkzeug „${a.tool}“ (${pluginTools().map((y) => y.id).join(', ') || 'keine installiert'})`);
+      const raw = paramArg(a);
+      const bad = checkInput(x, raw);
+      if (bad.length) throw new ToolError(bad.map((i) => i.msg).join('; '));
+      const before = snapshotIds(ed);
+      ed.setSel(topObjs(ed, ids(a)));
+      const target = await toolTarget(ed, x);
+      if (!target) throw new ToolError(ed.hint);
+      const r = await x.run(normalizeParams(x, raw), target.input);
+      const errors = r.issues.filter((i) => i.level === 'error');
+      if (errors.length) throw new ToolError(errors.map((i) => i.msg).join('; '));
+      if (!(await applyToolResult(ed, x, target, r))) throw new ToolError(`„${x.name}“ hat kein Ergebnis geliefert`);
+      return result(ed, before, { info: Object.fromEntries(r.info), warnings: r.issues.map((i) => i.msg) });
     },
   },
   {

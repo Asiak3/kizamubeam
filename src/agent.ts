@@ -103,7 +103,7 @@ const READ_TOOLS: ToolDef[] = [
   {
     name: 'list_extensions',
     title: 'Erweiterungen auflisten',
-    description: 'Installierte Erweiterungen (Pakete .kzp): Kennung, Version, Name, ob eingeschaltet (enabled) und aus dem signierten Katalog (verified), und Inhalt (Gerätevorlagen, Vorlagen mit Datei „pack:…“ für new_from_template, Material-Einträge, Plugins mit der Generator-Kennung für generate_part). Installieren, Aktualisieren, Ein-/Ausschalten und Entfernen geht nur in der App (Datei → Erweiterungen …).',
+    description: 'Installierte Erweiterungen (Pakete .kzp): Kennung, Version, Name, ob eingeschaltet (enabled) und aus dem signierten Katalog (verified), und Inhalt (Gerätevorlagen, Vorlagen mit Datei „pack:…“ für new_from_template, Material-Einträge, Plugins mit der Generator-Kennung für generate_part, Werkzeuge aus Erweiterungen (Pfadwerkzeuge und Bildfilter) mit Kennung und Parametern für run_extension_tool). Installieren, Aktualisieren, Ein-/Ausschalten und Entfernen geht nur in der App (Datei → Erweiterungen …).',
     tier: Tier.Read,
     inputSchema: { type: 'object', properties: {} },
     run: async () => {
@@ -117,7 +117,14 @@ const READ_TOOLS: ToolDef[] = [
             devicePresets: p.devices.map((d) => ({ ...d.preset, source: d.source })),
             templates: p.templates.map((tp, i) => ({ file: `pack:${p.id}/${i + 1}`, title: tp.info.title })),
             materials: p.materials.map((m) => m.id),
-            plugins: p.plugins.map((m) => ({ generator: m.id, kind: m.kind, runtime: m.runtime, name: pluginText(m.texts, 'en', 'name') ?? m.id, version: m.version })),
+            plugins: p.plugins.filter((m) => m.type === 'generator').map((m) => ({ generator: m.id, kind: m.kind, runtime: m.runtime, name: pluginText(m.texts, 'en', 'name') ?? m.id, version: m.version })),
+            tools: p.plugins.filter((m) => m.type !== 'generator').map((m) => ({
+              tool: m.id, type: m.type, runtime: m.runtime, name: pluginText(m.texts, 'en', 'name') ?? m.id, version: m.version,
+              params: m.schema.filter((s) => s.type !== 'data').map((s) => ({
+                key: s.key, type: s.type, default: s.def, label: pluginText(m.texts, 'en', s.key) ?? s.key,
+                ...(s.type === 'enum' ? { options: s.options.map(([v]) => v) } : s.type === 'bool' || s.type === 'text' ? {} : { min: s.min, max: s.max }),
+              })),
+            })),
           };
         }),
         pluginProblems: pluginProblems(),

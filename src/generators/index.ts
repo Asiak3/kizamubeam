@@ -73,7 +73,7 @@ export const autoText = (g: Generator, key: string, p: Params): string => {
 };
 
 /** Standardwerte aller Felder */
-export function defaultParams(g: Generator): Params {
+export function defaultParams(g: Pick<Generator, 'schema'>): Params {
   const p: Params = {};
   for (const s of g.schema) p[s.key] = s.def;
   return p;
@@ -83,7 +83,7 @@ export function defaultParams(g: Generator): Params {
  * Beliebige Eingaben (Datei, Dialog, KI-Agent) auf das Schema bringen: fehlende Werte mit Standardwerten
  * füllen, Zahlen in den erlaubten Bereich holen, ganze Zahlen runden, unbekannte Schlüssel weglassen.
  */
-export function normalizeParams(g: Generator, raw: Record<string, unknown>, base: Params = defaultParams(g)): Params {
+export function normalizeParams(g: Pick<Generator, 'schema'>, raw: Record<string, unknown>, base: Params = defaultParams(g)): Params {
   const p: Params = {};
   for (const s of g.schema) {
     const v = raw[s.key] ?? base[s.key] ?? s.def;
@@ -101,7 +101,7 @@ export function normalizeParams(g: Generator, raw: Record<string, unknown>, base
 }
 
 /** Eingaben streng prüfen (für KI-Agenten): unbekannte Schlüssel und Werte außerhalb des Bereichs sind Fehler */
-export function checkInput(g: Generator, raw: Record<string, unknown>): Issue[] {
+export function checkInput(g: Pick<Generator, 'schema'>, raw: Record<string, unknown>): Issue[] {
   const out: Issue[] = [];
   for (const k of Object.keys(raw)) if (!g.schema.some((s) => s.key === k)) out.push({ key: k, level: 'error', msg: t('Unbekannter Parameter „{key}“', { key: k }) });
   for (const s of g.schema) {

@@ -1,6 +1,6 @@
 # Plugins (developer notes)
 
-Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205) and of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335): runtime, plugins in extension packs (format version 2), generator plugins in the toolbox, dialog schema version 1 and the headless runner. Stage 2 of #335 adds `view` (suggested texts) and `onChange` with in-dialog questions, stage 3 lists of rows and action buttons with the selection, an image file or the camera image as input (dialog schema version 2), stage 4 a drawing surface, selectable rows and row buttons (dialog schema version 3). 3D models reach plugins as resources. Stage 5 of [#211](https://github.com/KizamuBeam/kizamubeam/issues/211) adds host functions (boolean operations, offsets, curve fitting, tracing), progress reports, cancelling and sessions.
+Status: stage 1 of [#205](https://github.com/KizamuBeam/kizamubeam/issues/205) and of [#335](https://github.com/KizamuBeam/kizamubeam/issues/335): runtime, plugins in extension packs (format version 2), generator plugins in the toolbox, dialog schema version 1 and the headless runner. Stage 2 of #335 adds `view` (suggested texts) and `onChange` with in-dialog questions, stage 3 lists of rows and action buttons with the selection, an image file or the camera image as input (dialog schema version 2), stage 4 a drawing surface, selectable rows and row buttons (dialog schema version 3). 3D models reach plugins as resources. Stage 5 of [#211](https://github.com/KizamuBeam/kizamubeam/issues/211) adds host functions (boolean operations, offsets, curve fitting, tracing), progress reports, cancelling and sessions. Stage 3 of #205 adds two more kinds: path tools and image filters.
 
 A plugin computes geometry from parameters. It gets JSON in and gives JSON out. It cannot reach files, the network, the DOM, Tauri or the editor. Every plugin runs in its own Web Worker, and the app checks every answer before anything reaches the drawing.
 
@@ -18,7 +18,7 @@ A plugin is an entry of `plugins` in an extension pack ([docs/packs.md](packs.md
 ```jsonc
 {
   "id": "org.example.hole-plate",   // generator id, stored in projects; lowercase letters, digits, dots, hyphens
-  "type": "generator",              // the only kind in stage 1
+  "type": "generator",              // generator, pathtool or imagefilter (see "Path tools and image filters")
   "api": 1,                         // call protocol (PLUGIN_API); a newer one is refused with an update hint
   "version": 1,                     // version of the parameters (Generator.version)
   "kind": "part",                   // part or assembly
@@ -161,6 +161,21 @@ Limits (`LIMITS` in `contract.ts`): `validate` 10 s, `generate` 30 s, `view` and
 
 In JavaScript the functions are methods of `globalThis.host` (`host.boolean({ … })`, `host.progress(0.5)`); a failure throws an `Error` whose message is the code. In the TypeScript SDK they are typed (`host` from `plugins/sdk/ts`); in Rust `kzb_plugin::host("fit", &json!({ … }))` returns `Result<Value, String>` and `kzb_plugin::progress(0.5)` reports progress; the `Plugin` trait has `open` and `close`.
 
+## Path tools and image filters (#205 stage 3)
+
+Besides generators, a plugin can be a **path tool** (`"type": "pathtool"`: parameters and the selected shapes → shapes that replace them, for example stencil bridges) or an **image filter** (`"type": "imagefilter"`: parameters and the selected image as grayscale → a new grayscale image). Their manifest has `params`, `texts`, `icon`, `host` and dialog version 1 like a generator (fields, sections, „Advanced“, showIf); lists, actions, the drawing surface and `inputs` belong to generators and are refused, `kind` is ignored. Both appear in the toolbox under “From extensions” (the tile asks for a fitting selection first). The dialog shows the fields, a preview (the selection faint with the result on top, or the filtered image), info and issues, “Cancel computation” while it computes, and “Apply”, which changes the document in one undo step. The last values are kept per tool (`kizamubeam.tool.<id>`). AI agents list the tools and their parameters with `list_extensions` (field `tools`) and run them with `run_extension_tool { tool, ids, params }`.
+
+A tool has one function, `apply`, which may run 30 s:
+
+| Kind | Input | Answer |
+| --- | --- | --- |
+| `pathtool` | `{ params, objects: [{ id, subs }] }`: every selected object except images, its paths in mm in page coordinates (y down), texts as outlines | `{ objects?: [{ from?, subs }], issues?, info? }`: the objects that replace the whole selection; `from` names the input whose layer the object takes (otherwise the first input's) |
+| `imagefilter` | `{ params, image: { width, height, data } }`: the selected image in its own resolution (at most 16 million pixels), one gray byte per pixel (0 black … 255 white), row by row from the top left, base64; transparent pixels count as white | `{ image?: { width, height, data }, issues?, info? }`: the new image in the same format, any size up to 8000 pixels a side and 16 million pixels; the image keeps its size in mm, transparency is kept when the pixel size stays the same |
+
+An issue with level `error` means there is nothing to apply (the dialog shows it next to its field); warnings are shown with the result. An answer with `objects: []` removes the selection. `checkPathResult` and `checkFilterResult` in `contract.ts` refuse everything else (unknown `from`, NaN, too many nodes or objects, an image whose data does not have width × height bytes) with `plugin-bad-output`.
+
+In the TypeScript SDK, `definePathTool({ apply })` and `defineImageFilter({ apply })` register a tool, `pixels(image)` decodes the gray bytes and `base64(bytes)` encodes them. In Rust, implement `Plugin::apply(input, params)` (`validate` and `generate` have defaults for tools), with `kzb_plugin::pixels` and `kzb_plugin::base64`.
+
 ## JavaScript
 
 The script sets `globalThis.plugin`:
@@ -215,6 +230,8 @@ Install the `.kzp` in the app under Extensions to try it. `build` in `plugin.jso
 
 ## Headless runner and check
 
+`runTool(manifest, params, input?)` runs a path tool or image filter once (params checked like the dialog; the input defaults to a sample: a square with a round hole and an open line, or a gray ramp) and returns the issues, info, a summary of the result (objects with their node counts, or the image size), a SHA-256 of it and the full answer. `plugin:check` runs a tool with its defaults on the sample, twice (the results must match) and with every choice.
+
 `src/plugins/headless.ts` runs a plugin's dialog without the app: `runDialog(manifest, steps)` starts with the default parameters, applies each step (a set of field changes, checked against the schema like user input) and returns after each one what the dialog would show: parameters, visible fields, issues with codes, info rows, the parts (key, position, size) and a SHA-256 of the geometry. A step may also press a button: `{ "$action": "<id>", "$selection": [{ name, polys }], "$image": { name, width, height, data }, "$camera": { width, height, data, bed, empty? } }` (images as a plugin gets them), and `{ "$model": { name, data } }` opens a 3D model (`kzm1:` data) like an import; the state then has the `message`, and every state has the `rows` from `view`. With a drawing surface, `{ "$view": "<id>" }` switches the view, `{ "$surface": [{ type, x, y, hit?, … }, …] }` sends pointer events, `{ "$action": "<id>", "$row": n }` presses a row button, and every state has `surface` (view, state, selected rows and the number of shapes and layers `draw` returned). Use it in plugin tests.
 
 `npm run plugin:check <folder | file.kzp>` checks every plugin of a pack the way the catalogue will:
@@ -238,4 +255,4 @@ Built so far (`plugins/core/dist/org.kizamubeam.core-generators.kzp`): gear, box
 
 ## Tests
 
-`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output, host functions from both runtimes), plugins in packs (`scripts/plugin-packs-test.ts`) the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`) and both templates (`scripts/plugin-sdk-test.ts`, the Rust one only where the wasm32 target is installed).
+`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output, host functions from both runtimes), path tools and image filters (`scripts/plugin-tools-test.ts`: manifest, contract, registry, check, applying to the selection, `run_extension_tool`), plugins in packs (`scripts/plugin-packs-test.ts`) the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`) and both templates (`scripts/plugin-sdk-test.ts`, the Rust one only where the wasm32 target is installed).

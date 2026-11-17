@@ -12,7 +12,8 @@ import { getAction } from './toolbars';
 import { AppGroup, appGroups, appList, fold, isNewIn, pushRecent, searchApps } from './apps';
 import { ensurePacks, onPacksChanged, packTemplates } from './packs';
 import { startFromTemplate } from './templateDialogs';
-import { pluginGenerators } from './plugins/registry';
+import { pluginGenerators, pluginTools } from './plugins/registry';
+import { openPluginTool, toolNeeds } from './plugins/toolDialog';
 import { openGenerator } from './generators/run';
 import { version as APP_VERSION } from '../package.json';
 
@@ -125,6 +126,19 @@ export function buildAppsPanel(ed: Editor) {
       key: g.id, group: 'pack', name: g.name, desc: g.desc ? `${g.desc} (${g.pack.name})` : g.pack.name, icon: g.icon, isNew: false,
       text: fold(`${g.name} ${g.desc} ${g.keys} ${g.pack.name}`),
       run: () => openGenerator(ed, g),
+    })),
+    // Path tools and image filters from extension plugins; they work on the selection
+    ...pluginTools().map((x): Tile => ({
+      key: x.id, group: 'pack', name: x.name, desc: x.desc ? `${x.desc} (${x.pack.name})` : x.pack.name, icon: x.icon, isNew: false,
+      text: fold(`${x.name} ${x.desc} ${x.keys} ${x.pack.name}`),
+      run: () => {
+        const need = toolNeeds(ed, x);
+        if (need) {
+          hint(ed, need);
+          return false;
+        }
+        void openPluginTool(ed, x);
+      },
     })),
     ...packTemplates().map((p): Tile => ({
       key: `pack:${p.key}`, group: 'pack', name: p.info.title, desc: p.info.description ? `${p.info.description} (${p.pack})` : p.pack,

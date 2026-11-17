@@ -89,7 +89,7 @@ await test('pack format 2: refused manifests', () => {
   bad((x) => (x.plugins[0].sha256 = '0'.repeat(64)), /Prüfsumme/);
   bad((x) => delete x.plugins[0].sha256, /sha256/);
   bad((x) => (x.plugins[0].api = 2), /neuere Version/);
-  bad((x) => (x.plugins[0].type = 'pathtool'), /unbekannte Art/);
+  bad((x) => (x.plugins[0].type = 'exporter'), /unbekannte Art/);
   bad((x) => (x.plugins[0].runtime = 'python'), /runtime/);
   bad((x) => (x.plugins[0].code = 'AAAA'), /WebAssembly|Prüfsumme/);
   bad((x) => (x.plugins[0].params[0].def = 5000), /min ≤ def ≤ max/);
