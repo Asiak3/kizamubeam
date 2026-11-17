@@ -223,7 +223,9 @@ pub fn mesh(data: &str) -> Option<(Vec<f32>, Vec<u32>)> {
 /// "gap"? }`: cross-sections of a 3D model), `"region"` (`{ "op", … }`: operations on areas) or `"nest"` (`{ "parts": [{ "subs" }], "gap" }`: positions of a
 /// compact arrangement) or `"fetch"` (`{ "host", "path", "query"?, "method"?, "body"? }`: data from a server the
 /// manifest declares; `Err("net-pending")` the first time, which the plugin returns so the app fetches the data and
-/// calls again). See docs/plugins.md
+/// calls again), `"context"` (`"material"` or `"workArea"`: what the manifest declares under `"context"`, #386;
+/// `{ "name", "thickness", "kerf", "pairPlay", "slotPlay" }` or `{ "width", "height" }` in mm, `null` when the app
+/// does not know it). See docs/plugins.md
 /// for the details. The manifest must list it under `"host"`. `Err(code)` on failure, e.g.
 /// `host-not-allowed` or `host-bad-input`.
 pub fn host(name: &str, input: &Value) -> Result<Value, String> {

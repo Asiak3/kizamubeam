@@ -48,6 +48,8 @@ export interface PluginManifest {
    * resource model3d), its file name into `name`
    */
   inputs?: PluginInput[];
+  /** Context the generator reads with host.context (#386); declaring it allows the host function context */
+  context?: PluginContext[];
   /** Host functions the plugin calls (hostfns.ts: boolean, offset, fit, trace); progress needs no entry */
   host?: string[];
   /** Servers the app may fetch data from for the plugin (#280); needs the host function fetch */
@@ -128,11 +130,18 @@ function netHost(v: unknown, at: string): PluginNetHost {
 export const PLUGIN_TYPES = ['generator', 'pathtool', 'imagefilter'] as const;
 export type PluginType = (typeof PLUGIN_TYPES)[number];
 
-export interface PluginInput {
-  kind: 'model3d';
-  param: string;
-  name?: string;
-}
+/**
+ * What the plugin can be opened with: a 3D model the user imports (its id into `param`, its file name into `name`),
+ * or the current selection, handed to the action `action` (an action with the input selection) when the dialog opens
+ */
+export type PluginInput = { kind: 'model3d'; param: string; name?: string } | { kind: 'selection'; action: string };
+
+/**
+ * Context a generator may ask the app for with host.context (#386): the material of the layer the part goes on
+ * (name, thickness, kerf) and the work area of the machine (width and height in mm)
+ */
+export const PLUGIN_CONTEXTS = ['material', 'workArea'] as const;
+export type PluginContext = (typeof PLUGIN_CONTEXTS)[number];
 
 export class ManifestError extends Error {}
 
@@ -471,22 +480,6 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
     // Lists, actions, the surface and inputs belong to the generator dialog; a tool has fields only
     if (type !== 'generator' && (raw.inputs !== undefined || (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined || raw.dialog.surface !== undefined))))
       fail(t('Listen, Aktionen, Zeichenfläche und Eingaben gibt es nur bei Generatoren'));
-    if (raw.inputs !== undefined) {
-      if (!Array.isArray(raw.inputs) || raw.inputs.length > 4) fail(t('ungültige Angabe „inputs“'));
-      m.inputs = (raw.inputs as unknown[]).map((x, i) => {
-        const at = `inputs[${i}]`;
-        if (!isObj(x) || x.kind !== 'model3d') return fail(t('{where}: unbekannte Eingabe', { where: at }));
-        const param = schema.find((s) => s.key === x.param);
-        if (!param || param.type !== 'data' || param.resource !== 'model3d') return fail(t('{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein', { where: at }));
-        const out: PluginInput = { kind: 'model3d', param: param.key };
-        if (x.name !== undefined) {
-          const n = schema.find((s) => s.key === x.name);
-          if (!n || (n.type !== 'data' && n.type !== 'text')) return fail(t('{where}: „name“ muss ein Text-Parameter sein', { where: at }));
-          out.name = n.key;
-        }
-        return out;
-      });
-    }
     if (raw.host !== undefined) {
       if (!Array.isArray(raw.host) || !raw.host.every((x) => typeof x === 'string' && (HOST_FNS as readonly string[]).includes(x)))
         fail(t('unbekannte Host-Funktion in „host“ (erlaubt: {list})', { list: HOST_FNS.join(', ') }));
@@ -520,6 +513,38 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
       if ((raw.dialog.version as number) < 2) fail(t('Listen und Aktionen brauchen „dialog“ Version 2'));
       Object.assign(m, dialogParts(raw.dialog, schema, keys));
     }
+    if (raw.inputs !== undefined) {
+      if (!Array.isArray(raw.inputs) || raw.inputs.length > 4) fail(t('ungültige Angabe „inputs“'));
+      m.inputs = (raw.inputs as unknown[]).map((x, i): PluginInput => {
+        const at = `inputs[${i}]`;
+        // The selection goes to an action that takes it (the same answer as pressing its button)
+        if (isObj(x) && x.kind === 'selection') {
+          const a = m.actions?.find((y) => y.id === x.action);
+          if (!a?.inputs?.includes('selection')) return fail(t('{where}: „action“ muss eine Aktion mit der Eingabe „selection“ sein', { where: at }));
+          return { kind: 'selection', action: a.id };
+        }
+        if (!isObj(x) || x.kind !== 'model3d') return fail(t('{where}: unbekannte Eingabe', { where: at }));
+        const param = schema.find((s) => s.key === x.param);
+        if (!param || param.type !== 'data' || param.resource !== 'model3d') return fail(t('{where}: „param“ muss ein data-Parameter mit „resource“: „model3d“ sein', { where: at }));
+        const out: PluginInput = { kind: 'model3d', param: param.key };
+        if (x.name !== undefined) {
+          const n = schema.find((s) => s.key === x.name);
+          if (!n || (n.type !== 'data' && n.type !== 'text')) return fail(t('{where}: „name“ muss ein Text-Parameter sein', { where: at }));
+          out.name = n.key;
+        }
+        return out;
+      });
+    }
+    if (raw.context !== undefined) {
+      if (type !== 'generator' || !Array.isArray(raw.context) || !raw.context.every((x) => (PLUGIN_CONTEXTS as readonly unknown[]).includes(x)))
+        fail(t('unbekannter Kontext in „context“ (erlaubt: {list})', { list: PLUGIN_CONTEXTS.join(', ') }));
+      const ctx = [...new Set(raw.context as PluginContext[])];
+      if (ctx.length) {
+        m.context = ctx;
+        m.host = [...new Set([...(m.host ?? []), 'context'])];
+      }
+    }
+    if (m.host?.includes('context') && !m.context) fail(t('„context“ fehlt für die Host-Funktion „context“'));
     return m;
   } catch (e) {
     if (e instanceof ManifestError && e.message.startsWith(where)) throw e;

@@ -398,8 +398,8 @@ export interface Generator {
   /** Toolbox tile and action; generators without one are only reachable through files, MCP and code */
   tile?: GenTile;
   inputs?: GenInput[];
-  /** Parameters for a new object from the declared inputs (e.g. workpiece outlines from the selection) */
-  fromInputs?(inputs: GenInputs): Params | undefined;
+  /** Parameters for a new object from the declared inputs (e.g. workpiece outlines from the selection); plugins answer later */
+  fromInputs?(inputs: GenInputs): Params | undefined | Promise<Params | undefined>;
   /**
    * Generators that compute elsewhere (plugins in a Worker) compute these parameters here; until it resolves,
    * validate() reports „being computed“. Built-in generators compute synchronously and leave it out.

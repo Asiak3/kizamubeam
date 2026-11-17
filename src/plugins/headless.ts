@@ -10,7 +10,7 @@ import type { GenSelected } from '../generators/host';
 import { buildGen, checkInput, defaultParams, fieldActive, normalizeParams } from '../generators/index';
 import { moveRow } from '../generators/lists';
 import { pluginGenerator } from './generator';
-import { pluginText, type PluginManifest } from './manifest';
+import { pluginText, type PluginContext, type PluginManifest } from './manifest';
 import { sha256 } from '../pdfcrypt';
 import { hex } from './manifest';
 import { encodeMesh, meshId, weld } from '../model3d/mesh';
@@ -54,6 +54,14 @@ export function useNetAnswers(m: PluginManifest, answers: readonly NetAnswer[]) 
   });
 }
 
+/** Context a headless run hands to host.context (#386); null = the app has none (e.g. a layer without material) */
+export type HeadlessContext = Partial<Record<PluginContext, unknown>>;
+/** Context of headless runs unless a test gives its own: 3 mm plywood on a 400 × 300 mm machine */
+export const SAMPLE_CONTEXT: Record<PluginContext, unknown> = {
+  material: { name: 'Plywood 3 mm', thickness: 3, kerf: 0.1 },
+  workArea: { width: 400, height: 300 },
+};
+
 export interface DialogState {
   params: Params;
   /** Keys of the fields the dialog shows (showIf), in schema order */
@@ -90,10 +98,14 @@ export class ScriptError extends Error {}
  * row of a sortable list to another place. `$row` with `$action` clicks a button of that list row. `$view` switches the drawing surface to a
  * view, `$surface` sends it a list of pointer events ({ type, x, y, hit?, from?, drag?, key? }, mm in the view).
  */
-export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = []): Promise<DialogState[]> {
+export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = [], opts: { context?: HeadlessContext } = {}): Promise<DialogState[]> {
   const models = new Map<string, string>();
   const images = new Map<string, string>();
-  const g = pluginGenerator(m, { id: 'headless', name: m.id }, { resource: (kind, id) => (kind === 'model3d' ? models.get(id) : kind === 'image' ? images.get(id) : undefined) ?? null });
+  const ctx = { ...SAMPLE_CONTEXT, ...opts.context };
+  const g = pluginGenerator(m, { id: 'headless', name: m.id }, {
+    resource: (kind, id) => (kind === 'model3d' ? models.get(id) : kind === 'image' ? images.get(id) : undefined) ?? null,
+    context: (w) => ctx[w] ?? null,
+  });
   try {
     const out: DialogState[] = [];
     let p = defaultParams(g);
@@ -130,7 +142,7 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
           if (!g.fromInputs) throw new ScriptError(`step ${i}: the plugin does not take a 3D model`);
           const id = meshId(md.data);
           models.set(id, md.data);
-          p = normalizeParams(g, { ...p, ...g.fromInputs({ model: { id, name: String(md.name ?? '') } }) }, p);
+          p = normalizeParams(g, { ...p, ...(await g.fromInputs({ model: { id, name: String(md.name ?? '') } })) }, p);
         }
         if ($answer !== undefined && !(Number.isInteger($answer) && ($answer as number) >= 0)) throw new ScriptError(`step ${i}: $answer must be an option number`);
         const bad = checkInput(g, step).filter((x) => x.level === 'error');
@@ -381,6 +393,14 @@ async function checkGenerator(m: PluginManifest, errors: string[], note: (states
   // Every view of the drawing surface once (other than the first, which every run draws)
   for (const v of m.surface?.views.slice(1) ?? []) steps.push({ $view: v.id });
   for (const step of steps) note(await runDialog(m, [...start, step]), JSON.stringify(step));
+  // Declared context the app may not have (a layer without material): the plugin answers with an issue, not a crash
+  if (m.context?.length) {
+    const none = await runDialog(m, start, { context: Object.fromEntries(m.context.map((w) => [w, null])) });
+    note(none, 'without context');
+    // An error the plugin did not write a text for is a crash in its code (e.g. reading the thickness of null)
+    for (const i of none[none.length - 1].issues)
+      if (i.code && !/^(plugin|net|host)-/.test(i.code) && pluginText(m.texts, 'en', i.code) === undefined) errors.push(`without context: ${i.code} (report an issue when host.context answers null)`);
+  }
 }
 
 export async function checkPlugin(m: PluginManifest, opts: { net?: readonly NetAnswer[] } = {}): Promise<CheckReport> {

@@ -609,7 +609,7 @@ export async function openModel(ed: Editor, name: string, bytes: Uint8Array, gen
   const g = getGenerator(gen ?? (await askModelKind()) ?? '');
   if (!g) return;
   const id = addMesh(mesh);
-  openGenDialog(ed, g.id, undefined, g.fromInputs?.({ model: { id, name: name.replace(/\.[^.]*$/, '') } }));
+  openGenDialog(ed, g.id, undefined, await g.fromInputs?.({ model: { id, name: name.replace(/\.[^.]*$/, '') } }));
 }
 
 /** Tile of a generator with a 3D model input: offer only STL and OBJ */

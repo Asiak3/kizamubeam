@@ -8,7 +8,7 @@ import type { AsmPoses } from '../generators/pose';
 import { checkChange, checkDrawing, checkEvent, eventInputs, checkGenResult, checkMigrate, checkIssues, checkView, ContractError, type PluginEventResult, type PluginFn, type PluginGenResult, type PluginIssue, type PluginItem, type PluginText, type PluginView } from './contract';
 import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
-import type { PluginManifest } from './manifest';
+import type { PluginContext, PluginManifest } from './manifest';
 import { appCodeText, localNumbers, PENDING, pluginWords } from './words';
 import { netKey } from './hostfns';
 import { pluginFetch } from './net';
@@ -28,6 +28,14 @@ export const spawnPlugin = (m: PluginManifest) => spawn(m);
 export type ResourceSource = (kind: string, id: string) => string | null;
 let resourceSource: ResourceSource = () => null;
 export const setResourceSource = (s: ResourceSource) => void (resourceSource = s);
+
+/**
+ * Context a generator declared (#386): the material of the layer its part goes on, the machine's work area. The app
+ * answers from the editor (src/plugins/context.ts); null while it has no answer (the plugin gets null as well).
+ */
+export type ContextSource = (what: PluginContext) => unknown;
+let contextSource: ContextSource = () => null;
+export const setContextSource = (s: ContextSource) => void (contextSource = s);
 
 const listeners = new Set<(id: string) => void>();
 /** Called with the generator id whenever a plugin answer arrives; returns the function that stops listening */
@@ -67,8 +75,10 @@ export interface PluginGenerator extends Generator {
  * opts.core: a generator that comes with the app (plugins/core.ts): it takes its toolbox tile from the manifest
  * and saves no extension name with its parts
  */
-export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }, opts: { resource?: ResourceSource; noNet?: boolean; core?: boolean } = {}): PluginGenerator {
+export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }, opts: { resource?: ResourceSource; noNet?: boolean; core?: boolean; context?: ContextSource } = {}): PluginGenerator {
   const source: ResourceSource = (kind, id) => opts.resource?.(kind, id) ?? resourceSource(kind, id);
+  /** The declared context as JSON, by name (sent before every computation, part of the cache key) */
+  const contextOf = (): [PluginContext, string][] => (m.context ?? []).map((w) => [w, JSON.stringify((opts.context ?? contextSource)(w) ?? null)]);
   let proc: PluginProcess | null = null;
   const cache = new Map<string, Entry>();
   const running = new Map<string, Promise<void>>();
@@ -85,7 +95,19 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       return id ? [{ kind, id, data: source(kind, id) }] : [];
     });
   // A result computed while a model was missing is not the result once it has loaded
-  const keyOf = (p: Params) => JSON.stringify([...m.schema.map((s) => p[s.key] ?? null), ...resourcesOf(p).map((r) => r.data !== null)]);
+  // Another material or work area is another result too
+  const keyOf = (p: Params) => JSON.stringify([...m.schema.map((s) => p[s.key] ?? null), ...resourcesOf(p).map((r) => r.data !== null), ...contextOf().map(([, d]) => d)]);
+  /** The declared context, handed to the host function context (an unchanged one is not sent again) */
+  const sentContext = new Map<string, string>();
+  const sendContext = () => {
+    if (!m.context?.length) return;
+    const p = (proc ??= start());
+    for (const [w, d] of contextOf()) {
+      if (sentContext.get(w) === d) continue;
+      sentContext.set(w, d);
+      p.setResource({ kind: 'context', id: w, data: d });
+    }
+  };
   const errorOf = (e: unknown) => (e instanceof EngineError ? e.code : e instanceof Error && 'code' in e ? String((e as { code: unknown }).code) : 'plugin-crash');
 
   /** Optional functions (view, onChange) the plugin turned out not to have: not called again */
@@ -152,6 +174,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     if (r) return r;
     const input = { ...p };
     for (const res of resourcesOf(p)) if (res.data !== null) (proc ??= start()).setResource({ kind: res.kind, id: res.id, data: res.data });
+    sendContext();
     r = (async () => {
       progress = null;
       const entry: Entry = { validate: await call('validate', input, checkIssues) };
@@ -225,6 +248,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
   /** Resources the surface needs are sent like before computing */
   const sendResources = (p: Params) => {
     for (const res of resourcesOf(p)) if (res.data !== null) (proc ??= start()).setResource({ kind: res.kind, id: res.id, data: res.data });
+    sendContext();
   };
 
   const texts: Record<string, () => string> = { [PENDING]: () => codeText(PENDING) };
@@ -265,8 +289,14 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       ? {
           inputs: m.inputs.map((x) => ({ kind: x.kind })),
           fromInputs(inp) {
+            // The selection: the answer of the declared action, as if its button was pressed in a new dialog
+            const sel = m.inputs!.find((i) => i.kind === 'selection');
+            if (sel?.kind === 'selection' && inp.selection?.length) {
+              const p = Object.fromEntries(schema.map((s) => [s.key, s.def])) as Params;
+              return Promise.resolve(g.onEvent!({ action: sel.action, inputs: { selection: inp.selection } }, p)).then((r) => (r && r.patch && Object.keys(r.patch).length ? r.patch : undefined));
+            }
             const x = m.inputs!.find((i) => i.kind === 'model3d');
-            if (!x || !inp.model) return undefined;
+            if (x?.kind !== 'model3d' || !inp.model) return undefined;
             return { [x.param]: inp.model.id, ...(x.name ? { [x.name]: inp.model.name } : {}) };
           },
         }
@@ -373,6 +403,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
     dispose() {
       proc?.dispose();
       proc = null;
+      sentContext.clear();
       cache.clear();
       labels.clear();
     },

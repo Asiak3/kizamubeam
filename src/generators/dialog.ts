@@ -16,6 +16,7 @@ import { genFitPatch } from '../fitcheck';
 import { genHost } from '../genHost';
 import { onPluginResult, PENDING } from '../plugins/generator';
 import { listsArea } from './dialogLists';
+import { setContextLayer } from '../plugins/context';
 import { surfaceArea } from './dialogSurface';
 
 const LAST_KEY = (id: string) => `kizamubeam.gen.${id}`;
@@ -68,6 +69,8 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
   const binds: Record<string, string> = { ...(old?.bind ?? {}) };
   const hasParams = projectParams().length > 0;
   const layerKerf = ed.layer(o?.layer ?? ed.currentLayer).kerf;
+  // Plugins that ask for the material get the one of this layer (#386)
+  setContextLayer(o?.layer ?? ed.currentLayer);
   // Kalibrierte Passung des Materials am Layer: bei neuen Bauteilen gleich übernehmen, sonst per Knopf
   const matEntry = library.get(ed.layer(o?.layer ?? ed.currentLayer).material);
   const calibPatch = (): Partial<Params> | null => {
@@ -548,6 +551,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
     if (id === g.id && !pending) flush();
   });
   dlg.addEventListener('close', () => {
+    setContextLayer(null);
     if (pending) clearTimeout(pending);
     pending = 0;
     stopListening();

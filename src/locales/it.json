@@ -4961,5 +4961,8 @@
   "„{name}“ darf Daten laden von: {hosts}": "“{name}” può caricare dati da: {hosts}",
   "„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:": "“{name}” carica dati da internet. KizamuBeam chiede prima della prima richiesta e le effettua da sé, solo verso questi server:",
   "ungültige Angabe „{key}“": "«{key}» non valido",
+  "{where}: „action“ muss eine Aktion mit der Eingabe „selection“ sein": "{where}: «action» deve essere un'azione con l'input «selection»",
+  "unbekannter Kontext in „context“ (erlaubt: {list})": "contesto sconosciuto in «context» (consentiti: {list})",
+  "„context“ fehlt für die Host-Funktion „context“": "manca «context» per la funzione host «context»",
   "Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).": "Il server per «{name}» non è raggiungibile (nessuna connessione, risoluzione dei nomi, TLS o tempo scaduto)."
 }

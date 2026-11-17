@@ -226,6 +226,10 @@ export async function corePlugin(id) {
   const v3 = !!surface || !!actions?.some((a) => a.showIf) || !!lists?.some((l) => l.select || l.rowActions || l.columns.some((c) => c.type !== 'text' && c.type !== 'enum' && c.placeholder));
   // Opened with a 3D model: which parameters fromInputs fills with its id and file name
   let inputs;
+  // Opened with the selection: the plugin gets it through the action that takes the selection (#386)
+  const selAction = g.inputs?.some((x) => x.kind === 'selection') ? g.actions?.filter((a) => a.inputs?.includes('selection')) : undefined;
+  if (selAction?.length === 1) inputs = [{ kind: 'selection', action: selAction[0].id }];
+  else if (selAction) throw new Error(`${id}: opened with the selection needs exactly one action that takes it`);
   if (g.inputs?.some((x) => x.kind === 'model3d') && g.fromInputs) {
     const filled = g.fromInputs({ model: { id: '\u0000id', name: '\u0000name' } }) ?? {};
     const keyOf = (v) => Object.keys(filled).find((k) => filled[k] === v);

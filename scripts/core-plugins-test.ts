@@ -198,6 +198,9 @@ await test('jig as a plugin: same dialog, geometry and rows; adding from the sel
       for (const selection of [selected, []])
         assert.deepEqual(await plug.onEvent!({ action: 'fromSelection', inputs: { selection } }, p), await core.onEvent!({ action: 'fromSelection', inputs: { selection } }, p));
     }
+    // Opened with the selection (#386): the plugin fills the list through its action, like the built-in fromInputs
+    assert.deepEqual(plug.inputs, [{ kind: 'selection' }]);
+    assert.deepEqual(await plug.fromInputs!({ selection: selected }), await core.fromInputs!({ selection: selected }));
     // Image and camera inputs: bytes go to the plugin as base64 and come back as the same outlines
     const p = G.normalizeParams(core, { shapes, imageWidth: 30 });
     const events = [

@@ -266,8 +266,29 @@ export interface Host {
    * the call; the app fetches the data and calls again, then the answer is here.
    */
   fetch(input: { host: string; path: string; query?: Record<string, string | number>; method?: 'GET' | 'POST'; body?: string }): NetResponse;
+  /**
+   * Context the manifest declares under "context" (#386): the material of the layer the part goes on, or the
+   * machine's work area. null when the app does not know it (a layer without material): report an issue then.
+   * Another material or work area computes the part again.
+   */
+  context(what: 'material'): MaterialContext | null;
+  context(what: 'workArea'): WorkArea | null;
   /** Report progress 0 … 1 of a long computation, optionally with a short text */
   progress(done: number, text?: string): void;
+}
+/** host.context("material"): values from the material library entry on the layer, each null when unknown (mm) */
+export interface MaterialContext {
+  name: string | null;
+  thickness: number | null;
+  /** Calibrated kerf width, play per side for two parts fitted together, slot width over the thickness */
+  kerf: number | null;
+  pairPlay: number | null;
+  slotPlay: number | null;
+}
+/** host.context("workArea"): the machine's work area in mm */
+export interface WorkArea {
+  width: number;
+  height: number;
 }
 /** Answer of host.fetch: text for json, xml and text, base64 data for png and mvt, or an error code */
 export interface NetResponse {

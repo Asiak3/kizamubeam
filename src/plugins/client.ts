@@ -39,10 +39,13 @@ function resourceSet() {
   return {
     set(r: PluginResource) {
       const k = `${r.kind}:${r.id}`;
+      // New data under the same id (context, #386) goes to the engine again; the same data is not sent twice
+      if (all.get(k)?.data !== r.data) sent.delete(k);
       all.delete(k);
       all.set(k, r);
+      // Context (#386) is one entry per declared name and always kept
       for (const net of [false, true]) {
-        const keys = [...all.keys()].filter((x) => x.startsWith('net:') === net);
+        const keys = [...all.keys()].filter((x) => !x.startsWith('context:') && x.startsWith('net:') === net);
         for (const x of keys.slice(0, Math.max(0, keys.length - (net ? KEEP_NET : KEEP_RESOURCES)))) all.delete(x);
       }
     },

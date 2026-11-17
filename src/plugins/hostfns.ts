@@ -23,7 +23,7 @@ import { deepestPoint } from '../model3d/polys';
 import { nestParts } from '../generators/build';
 
 /** Host functions a manifest may ask for */
-export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest', 'fetch'] as const;
+export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest', 'fetch', 'context'] as const;
 export type HostFn = (typeof HOST_FNS)[number];
 
 /** A host function got input it cannot use; the plugin call fails with this code unless the plugin catches it */
@@ -314,6 +314,15 @@ function fetchFn(net: Map<string, NetResponse>, input: unknown, onWant?: (r: Net
   throw new NetPending();
 }
 
+/**
+ * host.context (#386): context the app handed over as a resource of kind context (only what the manifest declares,
+ * sent before every computation). Unknown or undeclared names are a bad input.
+ */
+function contextFn(ctx: Map<string, unknown>, input: unknown): unknown {
+  if (typeof input !== 'string' || !ctx.has(input)) throw new HostError('context');
+  return ctx.get(input);
+}
+
 /** The data is on its way: the plugin call fails with this code and is repeated when it arrived */
 export class NetPending extends Error {
   constructor() {
@@ -330,7 +339,8 @@ export function hostCaller(allowed: readonly string[], onProgress?: (done: numbe
   const ok = new Set(allowed.filter((x): x is HostFn => (HOST_FNS as readonly string[]).includes(x)));
   const st: SliceState = { meshes: new Map(), prepared: new Map() };
   const net = new Map<string, NetResponse>();
-  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest, fetch: (x) => fetchFn(net, x, onWant) };
+  const ctx = new Map<string, unknown>();
+  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest, fetch: (x) => fetchFn(net, x, onWant), context: (x) => contextFn(ctx, x) };
   const call = (name: string, json: string): string => {
     try {
       if (name === 'progress') {
@@ -362,6 +372,16 @@ export function hostCaller(allowed: readonly string[], onProgress?: (done: numbe
       } catch {
         // A broken response is the same as none: the plugin asks again
       }
+      return true;
+    }
+    if (json.startsWith('{"kind":"context"')) {
+      if (ok.has('context'))
+        try {
+          const r = JSON.parse(json) as { id?: unknown; data?: unknown };
+          if (typeof r.id === 'string' && typeof r.data === 'string') ctx.set(r.id, JSON.parse(r.data));
+        } catch {
+          // Broken context is the same as none
+        }
       return true;
     }
     if (ok.has('slice')) takeResource(st, json);

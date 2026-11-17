@@ -186,6 +186,22 @@ Limits (`LIMITS` in `contract.ts`): `validate` 10 s, `generate` 30 s, `view` and
 
 In JavaScript the functions are methods of `globalThis.host` (`host.boolean({ … })`, `host.progress(0.5)`); a failure throws an `Error` whose message is the code. In the TypeScript SDK they are typed (`host` from `plugins/sdk/ts`); in Rust `kzb_plugin::host("fit", &json!({ … }))` returns `Result<Value, String>` and `kzb_plugin::progress(0.5)` reports progress; the `Plugin` trait has `open` and `close`.
 
+## Material, work area and selection (#386)
+
+A generator may ask for context the app knows, declared in its manifest:
+
+```jsonc
+"context": ["material", "workArea"],                         // allows host.context; nothing else is reachable
+"inputs": [{ "kind": "selection", "action": "fromSelection" }] // optional: opened with the current selection
+```
+
+- `host.context("material")` answers `{ name, thickness, kerf, pairPlay, slotPlay }` (mm, each `null` when unknown) from the material library entry on the layer the part goes on: in the dialog the layer of the edited part, or the current layer while creating one. `null` for a layer without material.
+- `host.context("workArea")` answers `{ width, height }`: the machine's work area in mm.
+- Declaring `context` adds the host function `context`; listing it under `host` without `context` is refused. A name the manifest does not declare fails with `host-bad-input`. The app sends the declared context before every computation (as resources of kind `context`, which the plugin's own `resource` function does not see) and it is part of the cache key: another material or work area computes the part again. No editor, document, file or machine state reaches the plugin.
+- A plugin must cope with `null`: report an issue with a text (for example "Pick a layer with a material"). The catalogue check runs the defaults once without context and reports an error the plugin did not write a text for. Headless runs use 3 mm plywood on a 400 × 300 mm machine unless the test gives its own (`runDialog(m, steps, { context })`).
+- **Selection.** `inputs` with `"kind": "selection"` names an action whose inputs include `selection`. When the user opens the plugin from the toolbox with objects selected, the app runs that action with the selection (the same objects and format as pressing its button: `{ name, polys }` per top-level object) and opens the dialog with the parameters its patch sets. The built-in jig uses this.
+- TypeScript SDK: `host.context('material')` with the types `MaterialContext` and `WorkArea`. Rust SDK: `host("context", &json!("material"))`.
+
 ## Network access (#280 stage 9)
 
 A plugin never reaches the network itself: it only runs inside its engine in a Worker, which has no network functions, and the app's content security policy allows no plugin servers. A plugin that needs data from a server (a place search, map data, a weather service) declares the servers in its manifest and asks for data with the host function `fetch`; the app makes the request after its own checks and hands the answer back.

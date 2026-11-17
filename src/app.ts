@@ -6,7 +6,8 @@ import { initDialogDrag } from './dialogDrag';
 import { t } from './i18n';
 import { initPlugins, PENDING } from './plugins/registry';
 import { workerProcess } from './plugins/client';
-import { setPluginSpawn, setResourceSource } from './plugins/generator';
+import { setContextSource, setPluginSpawn, setResourceSource } from './plugins/generator';
+import { editorContext } from './plugins/context';
 import type { PluginManifest } from './plugins/manifest';
 import { useCoreGenerators } from './plugins/core';
 import { CORE_PACK_TEXT } from './plugins/corePack';
@@ -22,6 +23,8 @@ const spawn = (m: PluginManifest) => workerProcess(m.runtime, m.code, m.host ?? 
 setPluginSpawn(spawn);
 useCoreGenerators(CORE_PACK_TEXT);
 const editor = new Editor(canvas);
+// Material and work area for plugins that declare them (#386)
+setContextSource((what) => editorContext(editor, what));
 // Plugins of extensions. Parts whose formulas waited for a plugin are recomputed once it answers.
 initPlugins(
   spawn,
