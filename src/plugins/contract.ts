@@ -80,7 +80,12 @@ export interface PluginPart {
   subs: SubPath[];
   at: Pt;
   marks?: SubPath[];
+  /** Page group (#387): 0 … MAX_PAGE_GROUP */
+  page?: number;
 }
+
+/** Highest page group of a part */
+export const MAX_PAGE_GROUP = 49;
 
 export interface PluginGenResult {
   parts: PluginPart[];
@@ -93,6 +98,8 @@ export interface PluginGenResult {
   /** Position of every part in space (3D view, assembly check) */
   poses?: AsmPoses;
   plan?: PlanSheet;
+  /** Spread the parts over pages (#387) */
+  distribute?: { rotate: boolean };
 }
 
 /** Thrown when a plugin answer breaks the contract; the message is a code with details for the log */
@@ -178,10 +185,19 @@ export function checkGenResult(v: unknown): PluginGenResult {
     keys.add(key);
     const part: PluginPart = { key, subs: subs(p.subs, 'part subs', count), at: pt(p.at, 'part at') };
     if (p.marks !== undefined) part.marks = subs(p.marks, 'part marks', count);
+    if (p.page !== undefined) {
+      const g = num(p.page, 'part page');
+      if (!Number.isInteger(g) || g < 0 || g > MAX_PAGE_GROUP) fail('part page');
+      if (g) part.page = g;
+    }
     return part;
   });
   const out: PluginGenResult = { parts, info: checkInfo(v.info) };
   if (v.label !== undefined) out.label = checkText(v.label);
+  if (v.distribute !== undefined) {
+    if (!isObj(v.distribute) || (v.distribute.rotate !== undefined && typeof v.distribute.rotate !== 'boolean')) fail('distribute');
+    out.distribute = { rotate: (v.distribute as { rotate?: boolean }).rotate === true };
+  }
   if (v.labels !== undefined) {
     if (!isObj(v.labels)) fail('labels');
     out.labels = {};

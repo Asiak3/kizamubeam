@@ -4961,9 +4961,12 @@
   "„{name}“ darf Daten laden von: {hosts}": "“{name}” può caricare dati da: {hosts}",
   "„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:": "“{name}” carica dati da internet. KizamuBeam chiede prima della prima richiesta e le effettua da sé, solo verso questi server:",
   "ungültige Angabe „{key}“": "«{key}» non valido",
+  "Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).": "Il server per «{name}» non è raggiungibile (nessuna connessione, risoluzione dei nomi, TLS o tempo scaduto).",
+  "{name} eingefügt ({n} Teile auf {p} Seiten). Doppelklick auf ein Teil öffnet die Parameter der ganzen Baugruppe.": "{name} inserito ({n} pezzi su {p} pagine). Doppio clic su un pezzo apre i parametri dell'intero assieme.",
+  "{n} Teil ist größer als der Arbeitsbereich und liegt allein in der Mitte einer Seite.": "{n} pezzo è più grande dell'area di lavoro e sta da solo al centro di una pagina.",
+  "{n} Teile sind größer als der Arbeitsbereich und liegen je allein in der Mitte einer Seite.": "{n} pezzi sono più grandi dell'area di lavoro e ognuno sta da solo al centro di una pagina.",
   "Das Teil ({w} × {h} mm) passt nicht auf die Arbeitsfläche ({aw} × {ah} mm).": "Il pezzo ({w} × {h} mm) non entra nell'area di lavoro ({aw} × {ah} mm).",
   "{where}: „action“ muss eine Aktion mit der Eingabe „selection“ sein": "{where}: «action» deve essere un'azione con l'input «selection»",
   "unbekannter Kontext in „context“ (erlaubt: {list})": "contesto sconosciuto in «context» (consentiti: {list})",
-  "„context“ fehlt für die Host-Funktion „context“": "manca «context» per la funzione host «context»",
-  "Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).": "Il server per «{name}» non è raggiungibile (nessuna connessione, risoluzione dei nomi, TLS o tempo scaduto)."
+  "„context“ fehlt für die Host-Funktion „context“": "manca «context» per la funzione host «context»"
 }

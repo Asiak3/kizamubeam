@@ -34,6 +34,11 @@ export interface Part {
   at: Pt;
   /** Engraving on the part, same coordinates as subs */
   marks?: SubPath[];
+  /**
+   * Page group (#387, 0 … 49): parts with the same number go on the same page; 0 is the page the user inserts on,
+   * every further group gets new pages behind it. at is relative to the other parts of the group.
+   */
+  page?: number;
 }
 /**
  * A text for the app: plain (shown as it is, numbers in the user's format), a text key of the manifest with values
@@ -55,6 +60,11 @@ export interface GenResult {
   label?: Text;
   /** Names of the parts of an assembly by part key */
   labels?: Record<string, Text>;
+  /**
+   * Spread the parts over as many pages as the work area needs, with the app's nesting (#387); rotate allows turning
+   * parts by 90°, 180° and 270°. Each page group is spread on its own.
+   */
+  distribute?: { rotate?: boolean };
   /**
    * Where each part sits in space for the 3D view, by part key: a point (x, y) of the outline at height s lies at
    * o + x·u + y·v + s·n (mm; X right, Y back, Z up)

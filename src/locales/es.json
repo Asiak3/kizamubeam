@@ -4961,9 +4961,12 @@
   "„{name}“ darf Daten laden von: {hosts}": "“{name}” puede cargar datos de: {hosts}",
   "„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:": "“{name}” carga datos de internet. KizamuBeam pregunta antes de la primera solicitud y las hace por sí mismo, solo a estos servidores:",
   "ungültige Angabe „{key}“": "«{key}» no válido",
+  "Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).": "No se pudo acceder al servidor de «{name}» (sin conexión, resolución de nombres, TLS o tiempo de espera agotado).",
+  "{name} eingefügt ({n} Teile auf {p} Seiten). Doppelklick auf ein Teil öffnet die Parameter der ganzen Baugruppe.": "{name} insertado ({n} piezas en {p} páginas). Doble clic en una pieza abre los parámetros de todo el conjunto.",
+  "{n} Teil ist größer als der Arbeitsbereich und liegt allein in der Mitte einer Seite.": "{n} pieza es más grande que el área de trabajo y queda sola en el centro de una página.",
+  "{n} Teile sind größer als der Arbeitsbereich und liegen je allein in der Mitte einer Seite.": "{n} piezas son más grandes que el área de trabajo y cada una queda sola en el centro de una página.",
   "Das Teil ({w} × {h} mm) passt nicht auf die Arbeitsfläche ({aw} × {ah} mm).": "La pieza ({w} × {h} mm) no cabe en el área de trabajo ({aw} × {ah} mm).",
   "{where}: „action“ muss eine Aktion mit der Eingabe „selection“ sein": "{where}: «action» debe ser una acción con la entrada «selection»",
   "unbekannter Kontext in „context“ (erlaubt: {list})": "contexto desconocido en «context» (permitidos: {list})",
-  "„context“ fehlt für die Host-Funktion „context“": "falta «context» para la función de host «context»",
-  "Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).": "No se pudo acceder al servidor de «{name}» (sin conexión, resolución de nombres, TLS o tiempo de espera agotado)."
+  "„context“ fehlt für die Host-Funktion „context“": "falta «context» para la función de host «context»"
 }

@@ -315,6 +315,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       if ('error' in r) throw new Error(r.error);
       const out: GenResult = { parts: r.ok.parts.map((x) => ({ ...x })), info: [...r.ok.info.map(([k, v]): [string, string] => [label(k), render(v)]), ...attribution()] };
       if (r.ok.plan) out.plan = r.ok.plan;
+      if (r.ok.distribute) out.distribute = { ...r.ok.distribute };
       return out;
     },
     view(p): GenView {

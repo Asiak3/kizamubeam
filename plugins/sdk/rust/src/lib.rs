@@ -66,11 +66,18 @@ pub struct Part {
     pub at: Pt,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub marks: Vec<SubPath>,
+    /// Page group (#387): parts with the same number go on the same page; 0 is the page the user inserts on
+    #[serde(skip_serializing_if = "is_zero")]
+    pub page: u32,
+}
+
+fn is_zero(v: &u32) -> bool {
+    *v == 0
 }
 
 impl Part {
     pub fn new(key: &str, subs: Vec<SubPath>) -> Self {
-        Part { key: key.into(), subs, at: Pt { x: 0.0, y: 0.0 }, marks: vec![] }
+        Part { key: key.into(), subs, at: Pt { x: 0.0, y: 0.0 }, marks: vec![], page: 0 }
     }
     pub fn at(mut self, x: f64, y: f64) -> Self {
         self.at = Pt { x, y };
@@ -81,6 +88,18 @@ impl Part {
         self.marks = marks;
         self
     }
+    /// Page group (#387, 0 … 49): the app puts each group on its own page(s)
+    pub fn page(mut self, group: u32) -> Self {
+        self.page = group;
+        self
+    }
+}
+
+/// Spread the parts over as many pages as the work area needs (#387)
+#[derive(Clone, Copy, Debug, Default, Serialize)]
+pub struct Distribute {
+    /// Parts may be turned by 90°, 180° and 270° (off: keep the grain direction)
+    pub rotate: bool,
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
@@ -129,6 +148,8 @@ pub struct GenResult {
     pub label: Option<Value>,
     #[serde(skip_serializing_if = "serde_json::Map::is_empty")]
     pub labels: serde_json::Map<String, Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub distribute: Option<Distribute>,
 }
 
 impl GenResult {
@@ -146,6 +167,11 @@ impl GenResult {
     /// Name in the Objects window for these parameters (instead of the manifest text `label`)
     pub fn label(mut self, text: impl Into<Value>) -> Self {
         self.label = Some(text.into());
+        self
+    }
+    /// Spread the parts over pages of the work area with the app's nesting (#387)
+    pub fn distribute(mut self, rotate: bool) -> Self {
+        self.distribute = Some(Distribute { rotate });
         self
     }
     /// Name of one part of an assembly in the Objects window

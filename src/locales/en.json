@@ -4961,9 +4961,12 @@
   "„{name}“ darf Daten laden von: {hosts}": "“{name}” may load data from: {hosts}",
   "„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:": "“{name}” loads data from the internet. KizamuBeam asks before the first request and makes the requests itself, only to these servers:",
   "ungültige Angabe „{key}“": "invalid “{key}”",
+  "Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).": "The server for “{name}” could not be reached (no connection, name lookup, TLS or time-out).",
+  "{name} eingefügt ({n} Teile auf {p} Seiten). Doppelklick auf ein Teil öffnet die Parameter der ganzen Baugruppe.": "{name} inserted ({n} parts on {p} pages). Double-click a part to open the parameters of the whole assembly.",
+  "{n} Teil ist größer als der Arbeitsbereich und liegt allein in der Mitte einer Seite.": "{n} part is larger than the work area and lies alone in the middle of a page.",
+  "{n} Teile sind größer als der Arbeitsbereich und liegen je allein in der Mitte einer Seite.": "{n} parts are larger than the work area and each lies alone in the middle of a page.",
   "Das Teil ({w} × {h} mm) passt nicht auf die Arbeitsfläche ({aw} × {ah} mm).": "The part ({w} × {h} mm) does not fit on the work area ({aw} × {ah} mm).",
   "{where}: „action“ muss eine Aktion mit der Eingabe „selection“ sein": "{where}: “action” must be an action with the input “selection”",
   "unbekannter Kontext in „context“ (erlaubt: {list})": "unknown context in “context” (allowed: {list})",
-  "„context“ fehlt für die Host-Funktion „context“": "“context” is missing for the host function “context”",
-  "Der Server für „{name}“ war nicht erreichbar (keine Verbindung, Namensauflösung, TLS oder Zeitüberschreitung).": "The server for “{name}” could not be reached (no connection, name lookup, TLS or time-out)."
+  "„context“ fehlt für die Host-Funktion „context“": "“context” is missing for the host function “context”"
 }

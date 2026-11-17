@@ -103,6 +103,30 @@ await test('contract: bad output is refused', () => {
   assert.deepEqual(r.parts[0].subs[0].nodes[0], { x: 1, y: 2 });
 });
 
+await test('multi-page output (#387): page groups and distribute are checked and passed on', async () => {
+  const sub = [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }] }];
+  const r = checkGenResult({ parts: [{ key: 'a', at: { x: 0, y: 0 }, subs: sub, page: 0 }, { key: 'b', at: { x: 0, y: 0 }, subs: sub, page: 3 }], info: [], distribute: { rotate: true } });
+  assert.deepEqual(r.parts.map((p) => p.page), [undefined, 3], 'page 0 is the default');
+  assert.deepEqual(r.distribute, { rotate: true });
+  assert.deepEqual(checkGenResult({ parts: [], info: [], distribute: {} }).distribute, { rotate: false });
+  for (const page of [-1, 1.5, 50, '1']) assert.throws(() => checkGenResult({ parts: [{ key: 'a', at: { x: 0, y: 0 }, subs: sub, page }], info: [] }), ContractError, String(page));
+  for (const distribute of [true, { rotate: 1 }]) assert.throws(() => checkGenResult({ parts: [], info: [], distribute }), ContractError);
+  const { pluginGenerator } = await import('../src/plugins/generator');
+  const { parsePack } = await import('../src/packs');
+  const { createHash } = await import('node:crypto');
+  const code = `globalThis.plugin = { validate: () => [], generate: () => ({ parts: [
+    { key: 'a', at: { x: 0, y: 0 }, subs: [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 9 }] }] },
+    { key: 'b', at: { x: 0, y: 0 }, page: 1, subs: [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: 9, y: 0 }, { x: 0, y: 9 }] }] }], info: [], distribute: { rotate: false } }) };`;
+  const m = parsePack(JSON.stringify({ format: 'kizamubeam-pack', formatVersion: 2, id: 'com.example.pages', version: '1.0.0', name: 'Pages',
+    plugins: [{ id: 'com.example.paged', type: 'generator', api: 1, kind: 'assembly', runtime: 'js', code, sha256: createHash('sha256').update(code).digest('hex'), params: [], texts: { en: { name: 'Paged', desc: 'x' } } }] })).plugins[0];
+  const { buildGenAsync } = await import('../src/generators/index');
+  const g = pluginGenerator(m, { id: 'com.example.pages', name: 'Pages' });
+  const b = await buildGenAsync(g, {});
+  assert.deepEqual(b.parts.map((p) => [p.shape.part, p.page]), [['a', undefined], ['b', 1]]);
+  assert.deepEqual(b.distribute, { rotate: false });
+  g.dispose();
+});
+
 await test('host functions from JavaScript: boolean, offset, fit, trace, progress', async () => {
   const px = new Uint8Array(16).fill(255);
   px[5] = px[6] = px[9] = px[10] = 0;

@@ -53,7 +53,7 @@
     "plugin:check": "node scripts/run-ts.mjs scripts/plugin-check.ts",
     "plugin:core": "node scripts/build-core-plugins.mjs",
     "test:core-plugins": "node scripts/build-core-plugins.mjs && node scripts/run-ts.mjs scripts/core-plugins-test.ts",
-    "test:generators": "node scripts/run-ts.mjs scripts/generators-test.ts && node scripts/run-ts.mjs scripts/single-part-marks-test.ts && node scripts/run-ts.mjs scripts/box-corner-clearance-test.ts && node scripts/run-ts.mjs scripts/part-layout-test.ts && node scripts/vector-offline-test.mjs scripts/asm-select-test.ts",
+    "test:generators": "node scripts/run-ts.mjs scripts/generators-test.ts && node scripts/run-ts.mjs scripts/single-part-marks-test.ts && node scripts/run-ts.mjs scripts/box-corner-clearance-test.ts && node scripts/run-ts.mjs scripts/part-layout-test.ts && node scripts/vector-offline-test.mjs scripts/asm-select-test.ts && node scripts/vector-offline-test.mjs scripts/gen-pages-test.ts",
     "test:params": "node scripts/run-ts.mjs scripts/params-test.ts",
     "test:templates": "node scripts/run-ts.mjs scripts/templates-test.ts",
     "test:3d": "node scripts/run-ts.mjs scripts/view3d-test.ts",

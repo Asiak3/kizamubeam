@@ -89,6 +89,17 @@ export interface GenPart {
    * als eigenes Objekt auf einen Beschriftungs-Layer und gruppiert sie mit dem Teil.
    */
   marks?: SubPath[];
+  /**
+   * Page group (#387): parts with the same number go on the same page; 0 (or none) is the page the user inserts on,
+   * every further number gets new pages behind it. at is then relative to the other parts of the group.
+   */
+  page?: number;
+}
+
+/** Spread the parts over as many pages as the work area needs (#387), with the app's nesting */
+export interface GenDistribute {
+  /** Parts may be turned by 90°, 180° and 270° (off: keep the grain direction) */
+  rotate: boolean;
 }
 
 /** Bauplan für eine eigene Seite (mm, y nach unten): Zeichnung, Beschriftungen und Arbeitsschritte */
@@ -105,6 +116,8 @@ export interface GenResult {
   info: [string, string][];
   /** Bauplan (nur Baugruppen, die einen anbieten); der Editor legt ihn beim Erstellen auf eine eigene Seite */
   plan?: PlanSheet;
+  /** Spread the parts over pages instead of placing the arrangement as one block (#387); page groups stay apart */
+  distribute?: GenDistribute;
 }
 
 /** Toolbox tile and toolbar action of a generator (texts as German source strings, translated by the given t) */

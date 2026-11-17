@@ -5,7 +5,7 @@ import { SKETCH } from '../sketch/generator';
 import { SLOT_PLACEMENT, SLOT_GENERATOR, isSlotGenerator } from '../slotPlacement';
 import { CONTOUR_OFFSET, CONTOUR_OFFSET_ID, LEGACY_CONTOUR_OFFSET_ID } from '../contourOffset';
 import { PATTERN_GEN, PATTERN_GEN_ID } from '../pattern';
-import type { Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet, Rule } from './types';
+import type { GenDistribute, Generator, Issue, Params, ParamSpec, ParamValue, PlanSheet, Rule } from './types';
 import { evaluate, ExprError, scopeOf, type Scope } from '../params';
 
 export type { GenAsk, GenChange, Rule, GenInput, GenPart, GenTile, Generator, Issue, Params, ParamSpec } from './types';
@@ -116,6 +116,8 @@ export interface BuiltPart {
   at: Pt;
   /** Gravur auf dem Teil (siehe GenPart.marks) */
   marks?: SubPath[];
+  /** Page group (GenPart.page, #387) */
+  page?: number;
 }
 
 export interface BuildResult {
@@ -124,6 +126,7 @@ export interface BuildResult {
   issues: Issue[];
   info: [string, string][];
   plan?: PlanSheet;
+  distribute?: GenDistribute;
 }
 
 /**
@@ -150,9 +153,13 @@ export function buildGen(g: Generator, params: Params): BuildResult {
       const shape: GenShape = { kind: 'gen', gen: g.id, v: g.version, params: { ...params }, subs: p.subs };
       if (g.ext) shape.ext = g.ext;
       if (g.kind === 'assembly') shape.part = p.key;
-      return p.marks?.length ? { shape, at: p.at, marks: p.marks } : { shape, at: p.at };
+      const out: BuiltPart = p.marks?.length ? { shape, at: p.at, marks: p.marks } : { shape, at: p.at };
+      if (p.page) out.page = p.page;
+      return out;
     });
-    return r.plan ? { parts, issues, info: r.info, plan: r.plan } : { parts, issues, info: r.info };
+    const out: BuildResult = r.plan ? { parts, issues, info: r.info, plan: r.plan } : { parts, issues, info: r.info };
+    if (r.distribute) out.distribute = { rotate: !!r.distribute.rotate };
+    return out;
   } catch (e) {
     const code = String(e instanceof Error ? e.message : e);
     const text = g.texts?.[code];

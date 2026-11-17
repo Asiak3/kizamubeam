@@ -1,6 +1,6 @@
 // Editor: parametrische Bauteile und Baugruppen aus Generatoren (Zahnrad, Box …) einfügen, ändern und vor
 // ungewollter Umwandlung schützen.
-import { defaultCutSettings, GenShape, IDENT, leaves, mul, newAsmId, newId, Obj, SubPath, translate } from '../model';
+import { defaultCutSettings, GenShape, IDENT, leaves, type Mat, mul, newAsmId, newId, Obj, SubPath, translate } from '../model';
 import { boundsOf, type Box } from '../geom';
 import { BuildResult, GenPart, genLabel, getGenerator, normalizeParams } from '../generators';
 import type { PlanSheet } from '../generators/types';
@@ -8,6 +8,19 @@ import { t, tn } from '../i18n';
 import type { Editor } from '../editor';
 import { findFreeSpot, fitsArea } from '../placement';
 import { DEFAULT_NEST_SETTINGS } from './nest';
+import { autoCell, DEFAULT_NEST, nest, type Poly } from '../nest';
+import { SCALE } from '../clip';
+import type { Page } from '../model';
+
+/** Pages an insertion spread over (#387): where its parts went and what did not fit the work area */
+interface PagesOutcome {
+  /** Pages that got parts, in document order */
+  pages: Page[];
+  /** Parts larger than the work area (each alone in the middle of a page) */
+  tooBig: number;
+  /** Where the next new page goes (after the pages of this insertion) */
+  next: number;
+}
 
 /** Parametrische Bauteile unter den Objekten (auch in Gruppen) */
 export const genLeaves = (objs: Obj[]): Obj[] => [...leaves(objs)].map(([l]) => l).filter((l) => l.shape.kind === 'gen');
@@ -17,6 +30,16 @@ const groupLabel = (s: GenShape) => genLabel({ ...s, part: undefined });
 
 /** Kennung der Gravur eines Teils */
 const markId = (asm: string, part: string | undefined) => `${asm}/${part ?? ''}`;
+
+/** Indices of the parts of a result by page group (#387), lowest group first */
+export function pageGroups(r: { parts: { page?: number }[] }): Map<number, number[]> {
+  const by = new Map<number, number[]>();
+  r.parts.forEach((p, i) => {
+    const g = p.page ?? 0;
+    by.set(g, [...(by.get(g) ?? []), i]);
+  });
+  return new Map([...by].sort((a, b) => a[0] - b[0]));
+}
 
 /** Gruppe aus einem Generator-Teil und seiner Gravur (so legt addGen Teile mit Nummer an) */
 export function isMarkGroup(o: Obj): boolean {
@@ -258,7 +281,7 @@ export class EditorGenerators {
     } else if (marks?.length && list === this.doc.objs) list.splice(list.indexOf(o), 1, this.withMark(o, marks, this.markLayer(o.layer)));
   }
   /** Bauplan einer Baugruppe als neue Seite hinter der aktuellen (ohne Seitenwechsel), auf einem Layer, der nicht gelasert wird */
-  addPlanPage(this: Editor, plan: PlanSheet, name: string) {
+  addPlanPage(this: Editor, plan: PlanSheet, name: string, at = this.doc.page + 1) {
     let li = -1;
     for (let k = 0; k < 30 && li < 0; k++) if (this.doc.layers[k]?.name === t('Bauplan') && !this.doc.layers[k].output) li = k;
     if (li < 0) {
@@ -282,7 +305,6 @@ export class EditorGenerators {
       objs.push(text(st, 15, y, 4));
       y += 7;
     }
-    const at = this.doc.page + 1;
     const used = new Set(this.doc.pages.map((p) => p.name));
     let pn = name;
     for (let i = 2; used.has(pn); i++) pn = `${name} ${i}`;
@@ -290,8 +312,86 @@ export class EditorGenerators {
   }
   /** Passt das Ergebnis als Ganzes (Baugruppe samt Anordnung) mit Randabstand auf eine leere Seite? */
   genFitsPage(this: Editor, r: BuildResult): boolean {
-    const b = boundsOf(r.parts.map((p): Obj => ({ id: 0, m: translate(p.at.x, p.at.y), layer: 0, shape: p.shape })));
-    return !b || fitsArea(b, this.doc.bed, DEFAULT_NEST_SETTINGS.margin);
+    const box = (ps: BuildResult['parts']) => boundsOf(ps.map((p): Obj => ({ id: 0, m: translate(p.at.x, p.at.y), layer: 0, shape: p.shape })));
+    const fits = (ps: BuildResult['parts'], turn: boolean) => {
+      const b = box(ps);
+      return !b || fitsArea(b, this.doc.bed, DEFAULT_NEST_SETTINGS.margin) || (turn && fitsArea({ w: b.h, h: b.w }, this.doc.bed, DEFAULT_NEST_SETTINGS.margin));
+    };
+    // Spread over pages (#387): every part (distribute) or every page group has to fit on its own
+    if (r.distribute) return r.parts.every((p) => fits([p], r.distribute!.rotate));
+    return [...pageGroups(r).values()].every((ps) => fits(ps.map((i) => r.parts[i]), false));
+  }
+  /**
+   * Put the top objects of an insertion on pages (#387): page group by page group (GenPart.page), the lowest on the
+   * current page, every further one on new pages behind it. distribute nests each group over as many pages as the
+   * work area needs (the current page's objects stay where they are); otherwise each group is one block at the
+   * first free spot. A part or block larger than the work area goes alone into the middle of a page.
+   */
+  placeGenPages(this: Editor, groups: Obj[][], distribute: { rotate: boolean } | undefined): PagesOutcome {
+    const bed = this.doc.bed;
+    const { gap, margin } = DEFAULT_NEST_SETTINGS;
+    const out: PagesOutcome = { pages: [], tooBig: 0, next: this.doc.page + 1 };
+    const cur = this.doc.pages[this.doc.page];
+    const fresh = () => {
+      const pg: Page = { name: this.freePageName(), objs: [] };
+      this.doc.pages.splice(out.next++, 0, pg);
+      return pg;
+    };
+    const put = (pg: Page, objs: Obj[]) => {
+      pg.objs.push(...objs);
+      if (!out.pages.includes(pg)) out.pages.push(pg);
+    };
+    const centre = (objs: Obj[], pg: Page) => {
+      const b = boundsOf(objs);
+      if (b) for (const o of objs) o.m = mul(translate(bed.w / 2 - b.w / 2 - b.x, bed.h / 2 - b.h / 2 - b.y), o.m);
+      put(pg, objs);
+    };
+    const boxes = (pg: Page) => pg.objs.map((o) => boundsOf([o])).filter((x): x is Box => !!x);
+    const area: Poly[] = [[{ x: 0, y: 0 }, { x: bed.w, y: 0 }, { x: bed.w, y: bed.h }, { x: 0, y: bed.h }]];
+    const polys = (o: Obj): Poly[] => this.nestPaths([o], true).map((p) => p.map((q) => ({ x: q.X / SCALE, y: q.Y / SCALE })));
+    groups.forEach((objs, gi) => {
+      const first = gi === 0 ? cur : null;
+      if (distribute) {
+        const r = nest(
+          objs.map((o, key) => ({ key, region: polys(o) })),
+          { area, obstacles: first ? first.objs.filter((o) => !o.hidden).map(polys).filter((x) => x.length) : [] },
+          // One order only, so the same parts always land in the same places
+          { ...DEFAULT_NEST, gap, margin, rotations: distribute.rotate ? [0, 90, 180, 270] : [0], cell: autoCell(bed.w, bed.h, DEFAULT_NEST.cell), timeLimit: 0 },
+        );
+        const sheets: Page[] = [];
+        const sheet = (k: number) => {
+          while (sheets.length <= k) sheets.push(sheets.length === 0 && first ? first : fresh());
+          return sheets[k];
+        };
+        for (const p of [...r.placed].sort((a, b) => a.key - b.key)) {
+          const o = objs[p.key];
+          o.m = mul(p.m, o.m);
+          put(sheet(p.sheet), [o]);
+        }
+        for (const k of r.unplaced) {
+          out.tooBig++;
+          centre([objs[k]], fresh());
+        }
+        return;
+      }
+      const b = boundsOf(objs);
+      if (!b) return put(first ?? fresh(), objs);
+      const spot = first ? findFreeSpot(boxes(first), b, bed, gap, margin) : null;
+      if (spot) {
+        for (const o of objs) o.m = mul(translate(spot.x - b.x, spot.y - b.y), o.m);
+        return put(first!, objs);
+      }
+      if (!fitsArea(b, bed, margin)) {
+        out.tooBig++;
+        return centre(objs, first ?? fresh());
+      }
+      const pg = fresh();
+      const s = findFreeSpot([], b, bed, gap, margin)!;
+      for (const o of objs) o.m = mul(translate(s.x - b.x, s.y - b.y), o.m);
+      put(pg, objs);
+    });
+    out.pages.sort((a, b) => this.doc.pages.indexOf(a) - this.doc.pages.indexOf(b));
+    return out;
   }
   /**
    * Bauteil bzw. Baugruppe einfügen. Mit center (z. B. vom KI-Agenten) an genau diese Stelle; sonst auf den
@@ -309,6 +409,7 @@ export class EditorGenerators {
     const objs: Obj[] = r.parts.map((p) =>
       this.withMark({ id: newId(), m: translate(c.x + p.at.x, c.y + p.at.y), layer, shape: asm ? { ...p.shape, asm } : p.shape }, p.marks, markLayer),
     );
+    if (!center && (r.distribute || r.parts.some((p) => p.page))) return this.addGenPages(r, objs, layer);
     let placed: 'free' | 'page' | 'center' = 'free';
     const b = boundsOf(objs);
     if (!center && b) {
@@ -342,6 +443,31 @@ export class EditorGenerators {
         : done;
     this.emit('doc');
     if (placed === 'page') this.emit('sel');
+    return objs;
+  }
+  /** addGen for a result spread over pages (#387): page groups and distribute */
+  addGenPages(this: Editor, r: BuildResult, objs: Obj[], layer: number): Obj[] {
+    const groups = [...pageGroups(r).values()].map((ix) => ix.map((i) => objs[i]));
+    this.layer(layer);
+    const res = this.placeGenPages(groups, r.distribute);
+    if (r.plan) this.addPlanPage(r.plan, t('Bauplan'), res.next);
+    // Stay on the current page if parts landed there, else go to the first page with parts
+    const here = this.doc.pages[this.doc.page];
+    if (!res.pages.includes(here) && res.pages.length) {
+      this.clearPageState();
+      this.doc.page = this.doc.pages.indexOf(res.pages[0]);
+    }
+    if (!this.agentCall) this.setTool('select');
+    const shown = new Set(this.doc.objs);
+    this.setSel(objs.filter((o) => shown.has(o)));
+    const name = groupLabel(r.parts[0].shape);
+    let msg = res.pages.length > 1
+      ? t('{name} eingefügt ({n} Teile auf {p} Seiten). Doppelklick auf ein Teil öffnet die Parameter der ganzen Baugruppe.', { name, n: objs.length, p: res.pages.length })
+      : t('{name} eingefügt ({n} Teile). Doppelklick auf ein Teil öffnet die Parameter der ganzen Baugruppe.', { name, n: objs.length });
+    if (res.tooBig) msg += ' ' + tn('{n} Teil ist größer als der Arbeitsbereich und liegt allein in der Mitte einer Seite.', '{n} Teile sind größer als der Arbeitsbereich und liegen je allein in der Mitte einer Seite.', res.tooBig);
+    this.hint = msg;
+    this.emit('doc');
+    this.emit('sel');
     return objs;
   }
   /**
@@ -378,20 +504,36 @@ export class EditorGenerators {
       const origin = mul(worldOf(o) ?? o.m, translate(-at0.x, -at0.y));
       // Liegen noch alle Teile so, wie der Generator sie angeordnet hat? Dann wird die Anordnung mit den neuen
       // Maßen neu gelegt, damit größer gewordene Teile sich nicht überdecken. Sonst bleibt jedes Teil, wo es ist.
-      const placed = (x: Obj, at: { x: number; y: number }) => {
-        const want = mul(origin, translate(at.x, at.y));
+      const placed = (x: Obj, at: { x: number; y: number }, org = origin) => {
+        const want = mul(org, translate(at.x, at.y));
         return x.m.every((v, i) => Math.abs(v - want[i]) < 1e-6);
       };
-      // Teil oben auf der Seite oder in seiner Gruppe mit Gravur: dieses Objekt trägt die Lage
+      // Teil oben auf der Seite oder in seiner Gruppe mit Gravur: dieses Objekt trägt die Lage (auf jeder Seite)
       const holder = (m: Member): Obj | null => {
-        if (m.list === this.doc.objs) return m.o;
-        const g = this.doc.objs.find((x) => x.shape.kind === 'group' && x.shape.children === m.list);
-        return g && isMarkGroup(g) && m.o.m.every((v, i) => Math.abs(v - IDENT[i]) < 1e-9) ? g : null;
+        for (const pg of this.doc.pages) {
+          if (m.list === pg.objs) return m.o;
+          const g = pg.objs.find((x) => x.shape.kind === 'group' && x.shape.children === m.list);
+          if (g) return isMarkGroup(g) && m.o.m.every((v, i) => Math.abs(v - IDENT[i]) < 1e-9) ? g : null;
+        }
+        return null;
       };
-      const relayout = members.every((m) => {
-        const hd = holder(m);
-        return !!hd && placed(hd, oldAt.get((m.o.shape as GenShape).part!) ?? { x: NaN, y: NaN });
-      });
+      // Each page group (#387) is its own arrangement with its own origin; the edited part's group takes the origin
+      // above. Distributed parts were nested, not arranged: they stay where they are.
+      const keyOf = (m: Member) => (m.o.shape as GenShape).part!;
+      const groupOf = new Map(oldParts.map((p) => [p.key, p.page ?? 0]));
+      const origins = new Map<number, Mat>([[groupOf.get(old.part!) ?? 0, origin]]);
+      for (const m of members) {
+        const gr = groupOf.get(keyOf(m)) ?? 0, hd = holder(m), at = oldAt.get(keyOf(m));
+        if (!origins.has(gr) && hd && at) origins.set(gr, mul(hd.m, translate(-at.x, -at.y)));
+      }
+      const relayoutGroups = new Set<number>();
+      if (!r.distribute)
+        for (const [gr, org] of origins)
+          if (members.filter((m) => (groupOf.get(keyOf(m)) ?? 0) === gr).every((m) => {
+            const hd = holder(m);
+            return !!hd && placed(hd, oldAt.get(keyOf(m)) ?? { x: NaN, y: NaN }, org);
+          }))
+            relayoutGroups.add(gr);
       const needMarks = r.parts.some((p) => p.marks?.length);
       const markLayer = needMarks ? this.markLayer(o.layer) : o.layer;
       const present = new Set<string | undefined>();
@@ -405,7 +547,8 @@ export class EditorGenerators {
         if (np) {
           m.o.shape = { ...np.shape, asm };
           this.touch(m.o.shape);
-          if (relayout && hd) hd.m = mul(origin, translate(np.at.x, np.at.y));
+          const gr = groupOf.get(key!) ?? 0;
+          if (relayoutGroups.has(gr) && hd) hd.m = mul(origins.get(gr)!, translate(np.at.x, np.at.y));
           // Gravur nachführen: ändern, entfernen oder (oben auf der Seite) als Gruppe neu anlegen
           if (sib && np.marks?.length && sib.shape.kind === 'path') {
             sib.shape = { ...sib.shape, subs: np.marks };
@@ -427,7 +570,9 @@ export class EditorGenerators {
         if (present.has(p.shape.part) || oldKeys.has(p.shape.part!)) continue;
         added.push(this.withMark({ id: newId(), m: mul(origin, translate(p.at.x, p.at.y)), layer: o.layer, shape: { ...p.shape, asm } }, p.marks, markLayer));
       }
-      this.doc.objs.push(...added);
+      if (added.length && (r.distribute || r.parts.some((p) => p.page) || members.some((m) => !this.doc.objs.includes(holder(m) ?? m.o))))
+        this.placeAddedParts(asm, r, added);
+      else this.doc.objs.push(...added);
       const alive = new Set(this.doc.objs);
       if (silent) this.sel = this.sel.filter((x) => alive.has(x));
       else this.setSel([...this.sel.filter((x) => alive.has(x)), ...added]);
@@ -439,6 +584,39 @@ export class EditorGenerators {
       : t('{name}: Kontur neu berechnet.', { name: genLabel(r.parts[0].shape) });
     this.emit('doc');
     this.emit('sel');
+  }
+  /**
+   * New parts of an assembly spread over pages (#387): each goes to a free spot on the page that holds parts of its
+   * page group (else the current page), or onto a new page behind the assembly's last page. Nothing else moves.
+   */
+  placeAddedParts(this: Editor, asm: string, r: BuildResult, added: Obj[]) {
+    const bed = this.doc.bed;
+    const { gap, margin } = DEFAULT_NEST_SETTINGS;
+    const groupOf = new Map(r.parts.map((p) => [p.shape.part, p.page ?? 0]));
+    const pageOfGroup = new Map<number, number>();
+    let last = this.doc.page;
+    this.doc.pages.forEach((pg, i) => {
+      for (const [l] of leaves(pg.objs))
+        if (l.shape.kind === 'gen' && l.shape.asm === asm) {
+          const g = groupOf.get(l.shape.part);
+          if (g !== undefined && !pageOfGroup.has(g)) pageOfGroup.set(g, i);
+          last = Math.max(last, i);
+        }
+    });
+    for (const o of added) {
+      const part = [...leaves([o])].find(([l]) => l.shape.kind === 'gen')?.[0].shape as GenShape | undefined;
+      const b = boundsOf([o]);
+      let pg = this.doc.pages[pageOfGroup.get(groupOf.get(part?.part) ?? 0) ?? this.doc.page];
+      const obstacles = pg.objs.map((x) => boundsOf([x])).filter((x): x is Box => !!x);
+      let spot = b ? findFreeSpot(obstacles, b, bed, gap, margin) : null;
+      if (b && !spot) {
+        pg = { name: this.freePageName(), objs: [] };
+        this.doc.pages.splice(++last, 0, pg);
+        spot = findFreeSpot([], b, bed, gap, margin) ?? { x: bed.w / 2 - b.w / 2, y: bed.h / 2 - b.h / 2 };
+      }
+      if (b && spot) o.m = mul(translate(spot.x - b.x, spot.y - b.y), o.m);
+      pg.objs.push(o);
+    }
   }
   /** Fehlermeldung für KI-Agenten, die ein parametrisches Bauteil skalieren oder umbauen wollen */
   genChangeError(this: Editor, objs: Obj[]): string {
