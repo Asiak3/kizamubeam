@@ -10,6 +10,9 @@ import { EngineError } from './engine';
 import { inProcess, type PluginProcess } from './client';
 import type { PluginManifest } from './manifest';
 import { appCodeText, localNumbers, PENDING, pluginWords } from './words';
+import { netKey } from './hostfns';
+import { pluginFetch } from './net';
+import { t } from '../i18n';
 import { ICONS } from '../icons';
 
 export { appCodeText, localNumbers, PENDING };
@@ -58,7 +61,7 @@ export interface PluginGenerator extends Generator {
   dispose(): void;
 }
 
-export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }, opts: { resource?: ResourceSource } = {}): PluginGenerator {
+export function pluginGenerator(m: PluginManifest, pack: { id: string; name: string }, opts: { resource?: ResourceSource; noNet?: boolean } = {}): PluginGenerator {
   const source: ResourceSource = (kind, id) => opts.resource?.(kind, id) ?? resourceSource(kind, id);
   let proc: PluginProcess | null = null;
   const cache = new Map<string, Entry>();
@@ -83,23 +86,51 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
   const missing = new Set<PluginFn>();
   /** Progress of the running computation (host.progress), shown with „being computed“ */
   let progress: { done: number; text?: string } | null = null;
+  /** Data requests of host.fetch (#280) on their way, and the servers whose data the plugin got */
+  const inflight = new Set<Promise<void>>();
+  const usedHosts = new Set<string>();
   const start = (): PluginProcess => {
     const p = spawn(m);
     p.onProgress = (done, text) => {
       progress = { done, ...(text !== undefined ? { text } : {}) };
       listeners.forEach((f) => f(m.id));
     };
+    // Without noNet (the test load before installing, which must not ask the user or reach a server)
+    if (m.network?.length && !opts.noNet)
+      p.onWant = (req) => {
+        const f = pluginFetch(m, req).then((resp) => {
+          if (!resp.error) usedHosts.add(req.host);
+          // To this process only: a restarted one asks again and gets the answer from the app's cache
+          if (proc === p) p.setResource({ kind: 'net', id: netKey(req), data: JSON.stringify(resp) });
+        });
+        inflight.add(f);
+        void f.finally(() => inflight.delete(f));
+      };
     return p;
   };
+  /** Rounds of fetching a call may need (e.g. a place search, then the map data) */
+  const NET_ROUNDS = 6;
   const call = async <T>(fn: PluginFn, input: unknown, check: (v: unknown) => T): Promise<Outcome<T>> => {
     proc ??= start();
-    try {
-      return { ok: check(await proc.call(fn, input)) };
-    } catch (e) {
-      const code = errorOf(e);
-      if (code === 'plugin-no-function') missing.add(fn);
-      return { error: code };
+    for (let round = 0; ; round++) {
+      try {
+        return { ok: check(await proc.call(fn, input)) };
+      } catch (e) {
+        const code = errorOf(e);
+        if (code === 'plugin-no-function') missing.add(fn);
+        // The plugin asked for data: wait for it and call again with the answer in place
+        if (code === 'net-pending' && inflight.size && round < NET_ROUNDS) {
+          await Promise.all([...inflight]);
+          continue;
+        }
+        return { error: code };
+      }
     }
+  };
+  /** Info row naming the sources of fetched data (attribution from the manifest) */
+  const attribution = (): [string, string][] => {
+    const a = [...new Set((m.network ?? []).filter((h) => usedHosts.has(h.id) && h.attribution).map((h) => h.attribution!))];
+    return a.length ? [[t('Daten'), a.join(' · ')]] : [];
   };
 
   const remember = (k: string, e: Entry) => {
@@ -228,7 +259,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       const r = entry(p)?.generate;
       if (!r) throw new Error(PENDING);
       if ('error' in r) throw new Error(r.error);
-      const out: GenResult = { parts: r.ok.parts.map((x) => ({ ...x })), info: r.ok.info.map(([k, v]) => [label(k), render(v)]) };
+      const out: GenResult = { parts: r.ok.parts.map((x) => ({ ...x })), info: [...r.ok.info.map(([k, v]): [string, string] => [label(k), render(v)]), ...attribution()] };
       if (r.ok.plan) out.plan = r.ok.plan;
       return out;
     },

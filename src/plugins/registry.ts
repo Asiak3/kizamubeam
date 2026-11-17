@@ -92,7 +92,8 @@ export async function testLoadPlugins(pack: Pick<Pack, 'id' | 'name' | 'plugins'
       if (why) return t('Plugin „{id}“: {message}', { id: m.id, message: why });
       continue;
     }
-    const g = pluginGenerator(m, { id: pack.id, name: pack.name });
+    // No network here: a plugin that asks for data fails with net-pending, which counts as answered
+    const g = pluginGenerator(m, { id: pack.id, name: pack.name }, { noNet: true });
     try {
       const p = defaultParams(g);
       await g.prepare(p);
@@ -103,6 +104,7 @@ export async function testLoadPlugins(pack: Pick<Pack, 'id' | 'name' | 'plugins'
           g.generate(p);
         } catch (e) {
           const code = e instanceof Error ? e.message : String(e);
+          if (code === 'net-pending') continue;
           return t('Plugin „{id}“: {message}', { id: m.id, message: g.texts?.[code]?.() ?? code });
         }
       }

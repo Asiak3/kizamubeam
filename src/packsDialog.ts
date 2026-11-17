@@ -12,7 +12,9 @@ import {
 } from './packs';
 import { pluginConflict, pluginProblems, testLoadPlugins } from './plugins/registry';
 import { leaves, type Doc } from './model';
-import { pluginText } from './plugins/manifest';
+import { pluginText, type PluginManifest } from './plugins/manifest';
+import { clearNetCache, netAllowed, netLog, netOff, setNetAllowed, setNetOff } from './plugins/net';
+import { netHostList } from './plugins/netUi';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -162,6 +164,10 @@ export async function installPackFile(name: string, text: string, fromCatalog = 
         : h('p', { class: 'note' }, fromCatalog
           ? t('Aus dem signierten KizamuBeam-Katalog. Erweiterungen enthalten nur Daten, keinen Programmcode. Prüfe Maße und Laserwerte trotzdem vor dem ersten Job.')
           : t('Erweiterungen enthalten nur Daten, keinen Programmcode. Diese Datei ist nicht signiert: Installiere sie nur, wenn du der Quelle vertraust, und prüfe Maße und Laserwerte vor dem ersten Job.')),
+      ...p.plugins.filter((x) => x.network?.length).flatMap((x) => [
+        h('p', { class: 'warn' }, t('„{name}“ lädt Daten aus dem Internet. KizamuBeam fragt vor der ersten Anfrage und stellt sie selbst, nur an diese Server:', { name: pluginText(x.texts, lang, 'name') ?? x.id })),
+        netHostList(x),
+      ]),
       trust,
       err,
       h('div', { class: 'dialog-buttons' }, ok, h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen'))),
@@ -177,6 +183,13 @@ export function partsUsing(doc: Doc | undefined, pack: Pack): number {
   let n = 0;
   for (const page of doc.pages) for (const [o] of leaves(page.objs)) if (o.shape.kind === 'gen' && ids.has(o.shape.gen)) n++;
   return n;
+}
+
+/** All network access of plugins off (#280) */
+function netSwitch(): HTMLElement {
+  const box = h('input', { type: 'checkbox', checked: netOff() }) as HTMLInputElement;
+  box.onchange = () => setNetOff(box.checked);
+  return h('label', { class: 'check note' }, box, ' ', t('Erweiterungen dürfen keine Daten aus dem Internet laden (offline)'));
 }
 
 type Filter = 'all' | 'content' | 'plugins';
@@ -225,6 +238,9 @@ export async function openPacksDialog(doc?: Doc) {
           ? badge(t('Ungeprüft'), 'unverified', t('Nicht aus dem signierten Katalog installiert.'))
           : null,
       ip.disabled ? badge(t('Ausgeschaltet'), 'off') : null,
+      pack.plugins.some((x) => x.network?.length)
+        ? badge(t('Netzwerk'), 'network', [...new Set(pack.plugins.flatMap((x) => (x.network ?? []).map((n) => n.hostname)))].join(', '))
+        : null,
     ];
     const remove = async () => {
       const used = partsUsing(doc, pack);
@@ -239,6 +255,7 @@ export async function openPacksDialog(doc?: Doc) {
         h('div', { class: 'muted' }, packSummary(pack)),
         pack.description ? h('div', {}, pack.description) : null,
         pack.homepage ? h('div', { class: 'muted pack-url' }, pack.homepage) : null,
+        ...pack.plugins.filter((x) => x.network?.length).map(netRow),
       ),
       h('div', { class: 'pack-actions' },
         h('button', { class: 'btn small', onclick: act(() => setPackDisabled(pack.id, !ip.disabled)) }, ip.disabled ? t('Einschalten') : t('Ausschalten')),
@@ -247,6 +264,25 @@ export async function openPacksDialog(doc?: Doc) {
           : null,
         h('button', { class: 'btn small', onclick: act(remove) }, t('Entfernen')),
       ),
+    );
+  };
+  /** Network access of a plugin (#280): the switch, its servers and the requests of this session */
+  const netRow = (m: PluginManifest) => {
+    const box = h('input', { type: 'checkbox', checked: netAllowed(m) === true }) as HTMLInputElement;
+    box.onchange = () => {
+      setNetAllowed(m, box.checked);
+      if (!box.checked) clearNetCache();
+    };
+    const requests = netLog(m.id);
+    return h('div', { class: 'pack-net' },
+      h('label', { class: 'check' }, box, ' ', t('„{name}“ darf Daten laden von: {hosts}', { name: pluginText(m.texts, lang, 'name') ?? m.id, hosts: (m.network ?? []).map((x) => x.hostname).join(', ') })),
+      requests.length
+        ? h('details', {},
+            h('summary', {}, tn('{n} Anfrage in dieser Sitzung', '{n} Anfragen in dieser Sitzung', requests.length)),
+            h('ul', { class: 'pack-contents' },
+              ...requests.slice().reverse().map((r) => h('li', {}, `${new Date(r.time).toLocaleTimeString(lang)} ${r.method} ${r.host}${r.path} · ${r.error ?? r.status} · ${r.bytes.toLocaleString(lang)} B${r.cached ? ` · ${t('aus dem Zwischenspeicher')}` : ''}`)),
+            ))
+        : null,
     );
   };
   const fill = () => {
@@ -334,6 +370,7 @@ export async function openPacksDialog(doc?: Doc) {
       const btn = h('button', { class: 'btn small' + (st === 'install' || st === 'update' ? ' primary' : ''), disabled: st !== 'install' && st !== 'update' }, label) as HTMLButtonElement;
       btn.onclick = () => fromCatalog(e, btn);
       const kinds = e.plugins ? [badge(t('Plugins'), 'plugins', (e.runtimes ?? []).map((r) => (r === 'js' ? 'JavaScript' : 'WebAssembly')).join(', '))] : [];
+      if (e.network?.length) kinds.push(badge(t('Netzwerk'), 'network', e.network.join(', ')));
       catList.append(h('div', { class: 'pack-card' },
         h('div', { class: 'pack-text' },
           h('div', {}, h('b', {}, name), ` ${e.version}`, e.author ? h('span', { class: 'muted' }, ` · ${e.author}`) : null, ' ', ...kinds),
@@ -373,6 +410,7 @@ export async function openPacksDialog(doc?: Doc) {
     h('div', { class: 'pack-filter' }, search, filter),
     h('h4', {}, t('Installiert')),
     list,
+    netSwitch(),
     h('h4', {}, t('Katalog'), ' ', h('button', { class: 'btn small', onclick: loadCatalog }, t('Neu laden')), ' ', updateAll),
     catStatus,
     catList,

@@ -1,7 +1,8 @@
 // Host functions (#211 stage 5): building blocks of the app a plugin may call while it computes, instead of
 // bundling its own: boolean operations and offsets of outlines (Clipper), fitting Bézier curves through points and
 // tracing a grayscale image, slicing a 3D model and area operations on slices. Pure computation on the data the
-// plugin hands over (and the 3D models the app gave it as resources); no editor, files or network.
+// plugin hands over (and the 3D models the app gave it as resources); no editor or files. fetch (#280) answers only
+// with data the app fetched for the plugin from a server its manifest declares; the Worker itself has no network.
 // A plugin names the ones it uses in its manifest (`host`); `progress` is always there.
 // Runs inside the plugin Worker (and in Node tests); each call counts toward the time limit of the plugin call.
 import ClipperLib from 'clipper-lib';
@@ -22,7 +23,7 @@ import { deepestPoint } from '../model3d/polys';
 import { nestParts } from '../generators/build';
 
 /** Host functions a manifest may ask for */
-export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest'] as const;
+export const HOST_FNS = ['boolean', 'offset', 'fit', 'trace', 'slice', 'region', 'nest', 'fetch'] as const;
 export type HostFn = (typeof HOST_FNS)[number];
 
 /** A host function got input it cannot use; the plugin call fails with this code unless the plugin catches it */
@@ -250,14 +251,86 @@ function takeResource(st: SliceState, json: string) {
 }
 
 /**
+ * A data request of a plugin (#280): a server it declared (`network` in the manifest), a path below the server's
+ * base and query values. The app builds the URL from them; the plugin never passes a URL.
+ */
+export interface NetRequest {
+  host: string;
+  path: string;
+  query: Record<string, string>;
+  method: 'GET' | 'POST';
+  /** POST only: a form or query body as text (e.g. an Overpass query) */
+  body?: string;
+}
+
+/** What host.fetch answers: HTTP status, content type (json, xml, text, png, mvt), text or base64 data, or an error code */
+export interface NetResponse {
+  status: number;
+  type?: string;
+  text?: string;
+  data?: string;
+  error?: string;
+}
+
+/** Responses an engine keeps for host.fetch, by request key */
+const MAX_NET = 32;
+const NET_PATH = /^\/[A-Za-z0-9._~!$&'()*+,;=:@%\/-]{0,500}$/;
+
+/** Check a request of a plugin and give it a fixed shape (its key is the JSON of that shape) */
+export function netRequest(input: unknown): NetRequest {
+  if (!isObj(input)) return bad('fetch');
+  const host = typeof input.host === 'string' && /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/.test(input.host) ? input.host : bad('host');
+  const path = typeof input.path === 'string' && NET_PATH.test(input.path) && !/(^|\/)\.\.?(\/|$)|\/\/|%2e|%2f|%5c/i.test(input.path) ? input.path : bad('path');
+  const method = input.method === undefined || input.method === 'GET' ? 'GET' : input.method === 'POST' ? 'POST' : bad('method');
+  const query: Record<string, string> = {};
+  if (input.query !== undefined) {
+    if (!isObj(input.query)) return bad('query');
+    const keys = Object.keys(input.query).sort();
+    if (keys.length > 40) return bad('query');
+    for (const k of keys) {
+      const v = input.query[k];
+      if (!/^[A-Za-z0-9_.\-[\]]{1,60}$/.test(k) || !(typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v)))) return bad('query');
+      query[k] = String(v).slice(0, 2000);
+    }
+  }
+  const out: NetRequest = { host, path, query, method };
+  if (input.body !== undefined) {
+    if (method !== 'POST' || typeof input.body !== 'string' || input.body.length > 100_000) return bad('body');
+    out.body = input.body;
+  }
+  return out;
+}
+export const netKey = (r: NetRequest) => JSON.stringify([r.host, r.method, r.path, r.query, r.body ?? null]);
+
+/**
+ * host.fetch: the response if the app already fetched it for this engine; otherwise the request goes to the app
+ * (onWant) and the call fails with net-pending; the app fetches it and computes again.
+ */
+function fetchFn(net: Map<string, NetResponse>, input: unknown, onWant?: (r: NetRequest) => void): NetResponse {
+  const req = netRequest(input);
+  const hit = net.get(netKey(req));
+  if (hit) return hit;
+  onWant?.(req);
+  throw new NetPending();
+}
+
+/** The data is on its way: the plugin call fails with this code and is repeated when it arrived */
+export class NetPending extends Error {
+  constructor() {
+    super('net-pending');
+  }
+}
+
+/**
  * Calls of one engine: the functions its manifest allows, and progress reports (a number 0 … 1, optionally with a
  * short text) passed to `onProgress`. Answers are JSON envelopes like plugin calls. `resource` takes the resources
  * the app hands to the plugin (only kept when the plugin may slice).
  */
-export function hostCaller(allowed: readonly string[], onProgress?: (done: number, text?: string) => void) {
+export function hostCaller(allowed: readonly string[], onProgress?: (done: number, text?: string) => void, onWant?: (r: NetRequest) => void) {
   const ok = new Set(allowed.filter((x): x is HostFn => (HOST_FNS as readonly string[]).includes(x)));
   const st: SliceState = { meshes: new Map(), prepared: new Map() };
-  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest };
+  const net = new Map<string, NetResponse>();
+  const FNS: Record<HostFn, (input: unknown) => unknown> = { boolean, offset, fit, trace, slice: (x) => slice(st, x), region: regionFn, nest, fetch: (x) => fetchFn(net, x, onWant) };
   const call = (name: string, json: string): string => {
     try {
       if (name === 'progress') {
@@ -270,8 +343,29 @@ export function hostCaller(allowed: readonly string[], onProgress?: (done: numbe
       if (json.length > LIMITS.outputBytes) return JSON.stringify({ error: 'host-bad-input' });
       return JSON.stringify({ ok: FNS[name as HostFn](JSON.parse(json)) });
     } catch (e) {
-      return JSON.stringify({ error: e instanceof HostError || e instanceof SyntaxError ? 'host-bad-input' : 'host-failed' });
+      return JSON.stringify({ error: e instanceof NetPending ? 'net-pending' : e instanceof HostError || e instanceof SyntaxError ? 'host-bad-input' : 'host-failed' });
     }
   };
-  return Object.assign(call, { resource: (json: string) => (ok.has('slice') ? takeResource(st, json) : undefined) });
+  /**
+   * Hand a resource to the host functions: a 3D model for slice, a fetched response for fetch. Returns true for a
+   * response, which is for the host only (the plugin's resource function does not get it).
+   */
+  const resource = (json: string): boolean => {
+    if (ok.has('fetch') && json.startsWith('{"kind":"net"')) {
+      try {
+        const r = JSON.parse(json) as { id?: unknown; data?: unknown };
+        if (typeof r.id === 'string' && typeof r.data === 'string') {
+          net.delete(r.id);
+          net.set(r.id, JSON.parse(r.data) as NetResponse);
+          while (net.size > MAX_NET) net.delete(net.keys().next().value!);
+        }
+      } catch {
+        // A broken response is the same as none: the plugin asks again
+      }
+      return true;
+    }
+    if (ok.has('slice')) takeResource(st, json);
+    return false;
+  };
+  return Object.assign(call, { resource });
 }

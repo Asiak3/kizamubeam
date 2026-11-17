@@ -3478,6 +3478,18 @@ input.bound {
   border-color: var(--danger, #c0392b);
   color: var(--danger, #c0392b);
 }
+/* Plugins that fetch data from the internet (#280) */
+.pack-badge.network {
+  border-color: var(--warn, #d9822b);
+  color: var(--warn, #d9822b);
+}
+.pack-net {
+  margin-top: 4px;
+}
+.pack-net details ul {
+  font-size: 0.85em;
+  user-select: text;
+}
 .packs-dialog .error {
   white-space: pre-line;
 }

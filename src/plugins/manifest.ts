@@ -50,6 +50,70 @@ export interface PluginManifest {
   inputs?: PluginInput[];
   /** Host functions the plugin calls (hostfns.ts: boolean, offset, fit, trace); progress needs no entry */
   host?: string[];
+  /** Servers the app may fetch data from for the plugin (#280); needs the host function fetch */
+  network?: PluginNetHost[];
+}
+
+/**
+ * A server a plugin may get data from (#280). The app builds every URL itself from `base` and a path the plugin
+ * names; the plugin never passes a full URL and never sees the response headers, cookies or API keys.
+ */
+export interface PluginNetHost {
+  /** Name the plugin uses in host.fetch */
+  id: string;
+  /** https://host[:port][/prefix], no query, no user info */
+  base: string;
+  /** Host name of base (lower case), shown to the user */
+  hostname: string;
+  methods: ('GET' | 'POST')[];
+  /** Text key: what the plugin gets from this server, shown before the first request */
+  purpose: string;
+  /** Plain text the app shows with results that use the data, e.g. "© OpenStreetMap contributors" */
+  attribution?: string;
+  /** Requests per second at most (the app caps it further) */
+  rate: number;
+  /** Content types the plugin accepts: json, xml, text, png, mvt */
+  types: NetType[];
+}
+
+export const NET_TYPES = ['json', 'xml', 'text', 'png', 'mvt'] as const;
+export type NetType = (typeof NET_TYPES)[number];
+/** Servers per plugin, and the highest request rate the app allows */
+export const MAX_NET_HOSTS = 4;
+export const MAX_NET_RATE = 2;
+
+function netHost(v: unknown, at: string): PluginNetHost {
+  if (!isObj(v) || typeof v.id !== 'string' || !KEY_RE.test(v.id)) throw new ManifestError(t('{where}: Kennung fehlt oder ist ungültig', { where: at }));
+  let u: URL;
+  try {
+    u = new URL(String(v.base));
+  } catch {
+    throw new ManifestError(t('{where}: „base“ muss eine https-Adresse ohne Abfrage sein', { where: at }));
+  }
+  // HTTPS to a named host only: no user info, query, fragment or IP address (the app also refuses local networks)
+  const ipLike = /^[0-9.]+$|^\[|:/.test(u.hostname);
+  if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash || ipLike || !u.hostname.includes('.') || String(v.base).includes('*'))
+    throw new ManifestError(t('{where}: „base“ muss eine https-Adresse ohne Abfrage sein', { where: at }));
+  const methods = v.methods === undefined ? ['GET'] : v.methods;
+  if (!Array.isArray(methods) || !methods.length || !methods.every((x) => x === 'GET' || x === 'POST')) throw new ManifestError(t('{where}: „methods“ darf nur GET und POST enthalten', { where: at }));
+  const types = v.types === undefined ? ['json'] : v.types;
+  if (!Array.isArray(types) || !types.length || !types.every((x) => (NET_TYPES as readonly unknown[]).includes(x))) throw new ManifestError(t('{where}: unbekannter Inhaltstyp in „types“ (erlaubt: {list})', { where: at, list: NET_TYPES.join(', ') }));
+  const rate = v.rate === undefined ? 1 : v.rate;
+  if (!isNum(rate) || rate <= 0) throw new ManifestError(t('ungültige Angabe „network“'));
+  const out: PluginNetHost = {
+    id: v.id,
+    base: u.origin + u.pathname.replace(/\/+$/, ''),
+    hostname: u.hostname.toLowerCase(),
+    methods: [...new Set(methods as ('GET' | 'POST')[])],
+    purpose: textKey(v.purpose ?? `net.${v.id}`, at),
+    rate: Math.min(MAX_NET_RATE, rate as number),
+    types: [...new Set(types as NetType[])],
+  };
+  if (v.attribution !== undefined) {
+    if (typeof v.attribution !== 'string' || v.attribution.length > 200) throw new ManifestError(t('ungültige Angabe „network“'));
+    out.attribution = v.attribution;
+  }
+  return out;
 }
 
 export const PLUGIN_TYPES = ['generator', 'pathtool', 'imagefilter'] as const;
@@ -417,6 +481,12 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
         fail(t('unbekannte Host-Funktion in „host“ (erlaubt: {list})', { list: HOST_FNS.join(', ') }));
       if ((raw.host as string[]).length) m.host = [...new Set(raw.host as string[])];
     }
+    if (raw.network !== undefined) {
+      if (!Array.isArray(raw.network) || !raw.network.length || raw.network.length > MAX_NET_HOSTS) fail(t('ungültige Angabe „network“'));
+      m.network = (raw.network as unknown[]).map((x, i) => netHost(x, `network[${i}]`));
+      if (new Set(m.network.map((x) => x.id)).size !== m.network.length) fail(t('ungültige Angabe „network“'));
+      if (!m.host?.includes('fetch')) fail(t('„network“ braucht die Host-Funktion „fetch“'));
+    } else if (m.host?.includes('fetch')) fail(t('„network“ braucht die Host-Funktion „fetch“'));
     if (isObj(raw.dialog) && (raw.dialog.lists !== undefined || raw.dialog.actions !== undefined || raw.dialog.surface !== undefined)) {
       if ((raw.dialog.version as number) < 2) fail(t('Listen und Aktionen brauchen „dialog“ Version 2'));
       Object.assign(m, dialogParts(raw.dialog, schema, keys));

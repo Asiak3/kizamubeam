@@ -19,12 +19,14 @@
 // .progress(done, text); they throw an Error with the code on failure.
 import type { QuickJSContext, QuickJSRuntime, QuickJSWASMModule } from 'quickjs-emscripten-core';
 import { LIMITS, PLUGIN_API } from './contract';
-import { HOST_FNS, hostCaller } from './hostfns';
+import { HOST_FNS, hostCaller, type NetRequest } from './hostfns';
 
 /** What an engine may use besides the plugin code: host functions its manifest names, and where progress goes */
 export interface EngineOptions {
   host?: readonly string[];
   onProgress?: (done: number, text?: string) => void;
+  /** A data request of host.fetch the app has not answered yet (#280) */
+  onWant?: (r: NetRequest) => void;
 }
 
 export interface Engine {
@@ -91,7 +93,7 @@ export async function createJsEngine(source: string, opts: EngineOptions = {}): 
     'seed.js',
   );
   // Host functions before the plugin code, so it may keep a reference; the raw bridge is removed again
-  const caller = hostCaller(opts.host ?? [], opts.onProgress);
+  const caller = hostCaller(opts.host ?? [], opts.onProgress, opts.onWant);
   const bridge = ctx.newFunction('__kzbHost', (n, j) => ctx.newString(caller(ctx.getString(n), ctx.getString(j))));
   ctx.setProp(ctx.global, '__kzbHost', bridge);
   bridge.dispose();
@@ -121,7 +123,8 @@ export async function createJsEngine(source: string, opts: EngineOptions = {}): 
     call(fn, input, timeoutMs) {
       if (!FN.test(fn)) throw new EngineError('plugin-no-function');
       deadline = Date.now() + timeoutMs;
-      if (fn === 'resource') caller.resource(input);
+      // A fetched response is for host.fetch only
+      if (fn === 'resource' && caller.resource(input)) return JSON.stringify({ ok: null });
       const s = ctx.newString(input);
       ctx.setProp(ctx.global, '__kzbIn', s);
       s.dispose();
@@ -146,7 +149,7 @@ export async function createWasmEngine(bytes: Uint8Array, opts: EngineOptions = 
   const imports = WebAssembly.Module.imports(mod);
   const foreign = imports.filter((i) => !(i.module === 'kzb' && i.name === 'host_call' && i.kind === 'function'));
   if (foreign.length) throw new EngineError('plugin-imports', foreign.map((i) => `${i.module}.${i.name}`).join(', '));
-  const caller = hostCaller(opts.host ?? [], opts.onProgress);
+  const caller = hostCaller(opts.host ?? [], opts.onProgress, opts.onWant);
   const enc = new TextEncoder();
   const dec = new TextDecoder();
   const hostCall = (np: number, nl: number, ip: number, il: number): bigint => {
@@ -176,7 +179,7 @@ export async function createWasmEngine(bytes: Uint8Array, opts: EngineOptions = 
   return {
     call(fn, input) {
       if (!FN.test(fn)) throw new EngineError('plugin-no-function');
-      if (fn === 'resource') caller.resource(input);
+      if (fn === 'resource' && caller.resource(input)) return JSON.stringify({ ok: null });
       const f = enc.encode(fn), i = enc.encode(input);
       let packed: bigint;
       try {

@@ -55,6 +55,8 @@ export interface CatalogEntry {
   codeSize?: number;
   /** Where the source of the plugins is (https only) */
   source?: string;
+  /** Servers the plugins may fetch data from (#280), host names */
+  network?: string[];
   /** Paketdatei relativ zu catalog.json */
   file: string;
   sha256: string;
@@ -118,6 +120,7 @@ export function parseCatalog(text: string): Catalog {
       ...(n(p.pluginApi) ? { pluginApi: n(p.pluginApi) } : {}),
       ...(n(p.codeSize) ? { codeSize: n(p.codeSize) } : {}),
       ...(typeof p.source === 'string' && p.source.startsWith('https://') ? { source: p.source } : {}),
+      ...(Array.isArray(p.network) && p.network.length ? { network: p.network.filter((x): x is string => typeof x === 'string' && /^[a-z0-9.-]{1,253}$/.test(x)).slice(0, 16) } : {}),
       file: p.file, sha256: p.sha256, size: n(p.size),
     });
   }
@@ -200,6 +203,7 @@ export async function buildCatalog(files: [name: string, text: string][], genera
             codeSize: p.plugins.reduce((s, x) => s + codeBytes(x.code).length, 0),
           }
         : {}),
+      ...(p.plugins.some((x) => x.network?.length) ? { network: [...new Set(p.plugins.flatMap((x) => (x.network ?? []).map((h) => h.hostname)))].sort() } : {}),
       ...(sources[p.id] ? { source: sources[p.id] } : {}),
       file: name, sha256: await sha256Hex(text), size: new TextEncoder().encode(text).length,
     });

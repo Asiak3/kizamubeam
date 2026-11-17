@@ -7,6 +7,7 @@ import { t } from './i18n';
 import { initPlugins, PENDING } from './plugins/registry';
 import { workerProcess } from './plugins/client';
 import { setResourceSource } from './plugins/generator';
+import { initPluginNet } from './plugins/netUi';
 import { meshData } from './model3d/store';
 import { imageResource } from './plugins/imageResource';
 
@@ -22,6 +23,7 @@ initPlugins(
 );
 // Plugins get the 3D models their parameters name (an object of a stack model plugin) from the model store
 setResourceSource((kind, id) => (kind === 'model3d' ? meshData(id) : kind === 'image' ? imageResource(id) : null));
+initPluginNet();
 // Erweiterungen im Hintergrund lesen; Dialoge warten bei Bedarf darauf
 void ensurePacks();
 buildUI(editor);

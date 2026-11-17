@@ -256,8 +256,21 @@ export interface Host {
   region(input: { op: 'deepest'; polys: number[][] }): { p: [number, number]; r: number } | null;
   /** Where each part goes in a compact arrangement without rotation (outlines around each part's origin) */
   nest(input: { parts: { key?: string; subs: SubPath[] }[]; gap: number }): [number, number][];
+  /**
+   * Data from a server the manifest declares under "network" (#280). Throws net-pending the first time: let it end
+   * the call; the app fetches the data and calls again, then the answer is here.
+   */
+  fetch(input: { host: string; path: string; query?: Record<string, string | number>; method?: 'GET' | 'POST'; body?: string }): NetResponse;
   /** Report progress 0 … 1 of a long computation, optionally with a short text */
   progress(done: number, text?: string): void;
+}
+/** Answer of host.fetch: text for json, xml and text, base64 data for png and mvt, or an error code */
+export interface NetResponse {
+  status: number;
+  type?: 'json' | 'xml' | 'text' | 'png' | 'mvt';
+  text?: string;
+  data?: string;
+  error?: string;
 }
 export type V3 = [number, number, number];
 /** An area: closed polygons, each [x0, y0, x1, y1, …] in mm */

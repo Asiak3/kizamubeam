@@ -3,6 +3,7 @@
 import { createEngine, Engine, EngineError, unwrap, type EngineOptions, type Runtime } from './engine';
 import { LIMITS, type PluginFn } from './contract';
 import type { WorkerReply, WorkerRequest } from './worker';
+import type { NetRequest } from './hostfns';
 
 export interface PluginProcess {
   /** Call a plugin function; rejects with EngineError (code: plugin-timeout, plugin-crash, or the plugin's own code) */
@@ -14,6 +15,8 @@ export interface PluginProcess {
   setResource(r: PluginResource): void;
   /** Progress of the call running now (the plugin reports it with host.progress) */
   onProgress?: (done: number, text?: string) => void;
+  /** A data request of host.fetch (#280): the app fetches it and hands the answer over as a resource of kind net */
+  onWant?: (r: NetRequest) => void;
   /** Stop the running call (and those waiting): they fail with plugin-cancelled; the next call starts afresh */
   cancel(): void;
   dispose(): void;
@@ -25,8 +28,9 @@ export interface PluginResource {
   data: string;
 }
 
-/** Resources a process keeps for restarts; older ones are handed again only when set again */
+/** Resources a process keeps for restarts (fetched responses apart); older ones are handed again only when set again */
 const KEEP_RESOURCES = 4;
+const KEEP_NET = 24;
 
 /** The resources of one process and which of them the running engine already has */
 function resourceSet() {
@@ -37,7 +41,10 @@ function resourceSet() {
       const k = `${r.kind}:${r.id}`;
       all.delete(k);
       all.set(k, r);
-      while (all.size > KEEP_RESOURCES) all.delete(all.keys().next().value!);
+      for (const net of [false, true]) {
+        const keys = [...all.keys()].filter((x) => x.startsWith('net:') === net);
+        for (const x of keys.slice(0, Math.max(0, keys.length - (net ? KEEP_NET : KEEP_RESOURCES)))) all.delete(x);
+      }
     },
     /** Resources the engine does not have yet; marked as sent */
     pending(): PluginResource[] {
@@ -74,6 +81,10 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array, host:
     resources.reset();
     worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
     worker.onmessage = (ev: MessageEvent<WorkerReply>) => {
+      if (ev.data.want !== undefined) {
+        if (pending.has(ev.data.seq)) proc.onWant?.(ev.data.want);
+        return;
+      }
       if (ev.data.progress !== undefined) {
         if (pending.has(ev.data.seq)) proc.onProgress?.(ev.data.progress, ev.data.text);
         return;
@@ -142,7 +153,7 @@ export function workerProcess(runtime: Runtime, code: string | Uint8Array, host:
 export function inProcess(runtime: Runtime, code: string | Uint8Array, host: string[] = []): PluginProcess {
   let engine: Promise<Engine> | null = null;
   const resources = resourceSet();
-  const opts: EngineOptions = { host, onProgress: (done, text) => proc.onProgress?.(done, text) };
+  const opts: EngineOptions = { host, onProgress: (done, text) => proc.onProgress?.(done, text), onWant: (r) => proc.onWant?.(r) };
   const proc: PluginProcess = {
     async call(fn, input) {
       if (!engine) resources.reset();

@@ -6,6 +6,7 @@ mod machine;
 mod native;
 mod netcam;
 mod packs;
+mod plugin_net;
 mod remote;
 mod serial_transport;
 mod stream;
@@ -200,6 +201,7 @@ pub fn run() {
             pick_files,
             read_file,
             save_binary_file,
+            plugin_net::plugin_fetch,
             fonts::list_fonts,
             fonts::font_data,
             fonts::font_installed,

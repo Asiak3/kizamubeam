@@ -162,7 +162,7 @@ Limits (`LIMITS` in `contract.ts`): `validate` 10 s, `generate` 30 s, `view` and
 
 ## Host functions, progress, cancelling and sessions (#211 stage 5)
 
-**Host functions** are building blocks of the app a plugin may call while it computes, instead of bundling its own (`src/plugins/hostfns.ts`). They are pure computation on the data the plugin hands over; none reaches the editor, files or the network. A plugin names the ones it uses in its manifest, `"host": ["boolean", "fit"]`; calling another one fails with `host-not-allowed`. Their time counts toward the time limit of the plugin call. Input and answer are JSON, sub-paths in the editor's format:
+**Host functions** are building blocks of the app a plugin may call while it computes, instead of bundling its own (`src/plugins/hostfns.ts`). They are pure computation on the data the plugin hands over; none reaches the editor or files; `fetch` (below, “Network access”) only answers with data the app fetched for the plugin. A plugin names the ones it uses in its manifest, `"host": ["boolean", "fit"]`; calling another one fails with `host-not-allowed`. Their time counts toward the time limit of the plugin call. Input and answer are JSON, sub-paths in the editor's format:
 
 | Function | Input | Answer |
 | --- | --- | --- |
@@ -181,6 +181,41 @@ Limits (`LIMITS` in `contract.ts`): `validate` 10 s, `generate` 30 s, `view` and
 **Sessions.** `open` is called with the parameters when the plugin's dialog opens, `close` when it closes. A plugin may keep caches between them (for example a sliced model while the user changes other parameters); it must still give the same result for the same parameters without them, because the Worker can be restarted at any time.
 
 In JavaScript the functions are methods of `globalThis.host` (`host.boolean({ … })`, `host.progress(0.5)`); a failure throws an `Error` whose message is the code. In the TypeScript SDK they are typed (`host` from `plugins/sdk/ts`); in Rust `kzb_plugin::host("fit", &json!({ … }))` returns `Result<Value, String>` and `kzb_plugin::progress(0.5)` reports progress; the `Plugin` trait has `open` and `close`.
+
+## Network access (#280 stage 9)
+
+A plugin never reaches the network itself: it only runs inside its engine in a Worker, which has no network functions, and the app's content security policy allows no plugin servers. A plugin that needs data from a server (a place search, map data, a weather service) declares the servers in its manifest and asks for data with the host function `fetch`; the app makes the request after its own checks and hands the answer back.
+
+```jsonc
+"host": ["fetch"],
+"network": [{
+  "id": "osm",                                   // name used in host.fetch
+  "base": "https://nominatim.openstreetmap.org", // https, a host name (no IP address), optional path prefix, no query
+  "methods": ["GET"],                            // GET (default) and/or POST
+  "types": ["json"],                             // accepted answers: json, xml, text, png, mvt (default json)
+  "rate": 1,                                     // requests per second at most (the app allows 2 at most)
+  "purpose": "net.osm",                          // text key: what the plugin gets there, shown before the first request
+  "attribution": "© OpenStreetMap contributors"  // optional, shown with every result that used the data
+}]
+```
+
+At most 4 servers. `network` needs `fetch` in `host` and the other way round. The catalog shows the servers of a pack, the install dialog warns about them, and the Extensions window marks the plugin with **Network**.
+
+**Request.** `host.fetch({ host: "osm", path: "/search", query: { q: "Berlin", format: "json" }, method?: "GET" | "POST", body?: "…" })`. The app builds the URL from the server's `base`, the path (must start with `/`, no `..`, `//` or encoded slashes, and stays under the base path) and the query values (sorted, at most 40). `body` is for POST only (sent as `application/x-www-form-urlencoded`, at most 100 000 characters). The answer is `{ status, type, text }` for json, xml and text, `{ status, type, data }` with base64 for png and mvt, or `{ status, error }`.
+
+**Round trip.** The call is synchronous for the plugin, but data takes time: the first time a request is made, `fetch` fails with `net-pending` and the request goes to the app. The plugin lets this error end the call (in JavaScript it is thrown, in Rust `host("fetch", …)` returns `Err("net-pending")`, which the plugin returns). The app fetches the data, hands it to the plugin as a resource of kind `net` (the plugin's own `resource` function does not see it) and calls again; now `fetch` answers at once. This repeats up to 6 times per result, so a plugin can make one request after the other (search, then the map around the place found). To ask for several things in one round, a JavaScript plugin may catch `net-pending`, make the other requests and then throw it again. The plugin must give the same result for the same parameters and answers.
+
+**Checks of the app** (`src/plugins/net.ts`, in the app `src-tauri/src/plugin_net.rs`):
+
+- The user agrees per plugin before its first request, to the list of servers with their purpose; a changed server list asks again. The answer is a switch in the Extensions window, which also shows the plugin's requests of this session. A switch under the installed extensions keeps all plugins offline.
+- Only the declared servers and methods, at most `rate` requests per second per server.
+- HTTPS only, no redirects, cookies, credentials or referrer, a fixed User-Agent. In the app the request runs in Rust: the host name must resolve to public addresses only (no loopback, private, link-local or other local networks), checked by the resolver the connection uses.
+- At most 10 MB and 20 seconds per request; only the declared content types; HTTP errors come back as their status with `net-status`.
+- Answers are kept for an hour (50 MB at most), so a live preview does not ask the server again.
+
+The test load before installing makes no requests (a plugin that asks for data counts as answered). The headless runner has no network either: requests come back `net-denied` unless a test sets its own transport and consent (`setNetTransport`, `setNetConsent` in `src/plugins/net.ts`, as `scripts/plugin-net-test.ts` does).
+
+Error codes: `net-unknown-host`, `net-method`, `net-offline`, `net-denied`, `net-local`, `net-failed`, `net-status`, `net-type`, `net-too-large`. A plugin that ends its call with one of them gets the app's explanation shown to the user.
 
 ## Path tools and image filters (#205 stage 3)
 
@@ -276,4 +311,4 @@ Built so far (`plugins/core/dist/org.kizamubeam.core-generators.kzp`): gear, box
 
 ## Tests
 
-`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output, host functions from both runtimes), path tools and image filters (`scripts/plugin-tools-test.ts`: manifest, contract, registry, check, applying to the selection, `run_extension_tool`), plugins in packs (`scripts/plugin-packs-test.ts`) the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`) and both templates (`scripts/plugin-sdk-test.ts`, the Rust one only where the wasm32 target is installed).
+`npm run test:plugins` runs both runtimes in Node (the hole plate, a JavaScript plugin, the time and memory limits, refused output, host functions from both runtimes), path tools and image filters (`scripts/plugin-tools-test.ts`: manifest, contract, registry, check, applying to the selection, `run_extension_tool`), plugins in packs (`scripts/plugin-packs-test.ts`) the dialog schema with the headless runner (`scripts/plugin-dialog-test.ts`) and both templates (`scripts/plugin-sdk-test.ts`, the Rust one only where the wasm32 target is installed) and network access (`scripts/plugin-net-test.ts`: manifest, host.fetch round trip, the checks of `net.ts` with a fake transport, the generator computing again).

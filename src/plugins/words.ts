@@ -33,6 +33,22 @@ export function appCodeText(code: string, name: string): string | undefined {
       return t('Die Erweiterung „{name}“ hat ungültige Geometrie geliefert.', { name });
     case 'plugin-no-function':
       return t('Der Erweiterung „{name}“ fehlt eine Funktion.', { name });
+    // Data from the network (#280)
+    case 'net-pending':
+      return t('Daten werden geladen …');
+    case 'net-offline':
+      return t('Netzwerkzugriffe von Erweiterungen sind ausgeschaltet (Fenster „Erweiterungen“).');
+    case 'net-denied':
+      return t('Die Erweiterung „{name}“ darf keine Daten aus dem Internet laden (Fenster „Erweiterungen“).', { name });
+    case 'net-failed':
+    case 'net-status':
+    case 'net-too-large':
+    case 'net-type':
+    case 'net-local':
+      return t('Die Daten für „{name}“ ließen sich nicht laden ({code}).', { name, code });
+    case 'net-unknown-host':
+    case 'net-method':
+      return t('Die Erweiterung „{name}“ hat einen nicht angemeldeten Server angefragt ({code}).', { name, code });
   }
   return undefined;
 }
