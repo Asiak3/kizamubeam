@@ -39,12 +39,7 @@ npm run tauri dev    # Desktop app with live reload
 # or: npm run dev    # Browser UI only (not all native features)
 ```
 
-The repository also contains **KizamuBeam Virtual Machine**, an independently usable application under `vm/`. It shares the root Node.js dependencies but has its own Tauri/Rust application and release process.
-
-```bash
-npm run vm           # Virtual Machine development mode
-npm run vm:headless  # Virtual controller without the GUI
-```
+**KizamuBeam Virtual Machine** (the virtual GRBL/FluidNC/Ruida laser controller) is maintained in its own repository at [KizamuBeam/kizamubeam-vm](https://github.com/KizamuBeam/kizamubeam-vm).
 
 For a directory map and build details, see [the developer guide](docs/development.md). Coding agents should also follow [AGENTS.md](AGENTS.md).
 
@@ -60,7 +55,6 @@ npm run test:nest      # Automatic nesting
 npm run test:generators
 npm run test:3d
 npm run test:core      # Includes Rust core tests
-npm run test:vm        # VM tests, including Rust controller tests
 ```
 
 There are many more focused `test:*` commands in `package.json`; select the tests that cover the files and behavior you changed. Add a regression test for bug fixes wherever practical. If you cannot run a test, say so rather than claiming it passed.

@@ -14,7 +14,6 @@ Tick what applies and delete lines that do not apply to your change.
 - [ ] Translation
 - [ ] Documentation or website
 - [ ] Refactoring / maintenance
-- [ ] Virtual Machine (`vm/`)
 
 ## Screenshots
 

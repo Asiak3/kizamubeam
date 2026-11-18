@@ -9,7 +9,7 @@ These instructions apply to AI coding agents working in this repository. Read [C
 - **KizamuBeam:** open-source laser design and control application for Windows, macOS, and Linux, licensed **GPL-3.0-or-later**.
 - Main desktop stack: **Tauri 2**, **TypeScript**, **Vite**, and **Rust**.
 - Main UI uses **native DOM APIs**, not React, Vue, Svelte, or another UI framework. This is an intentional design decision; do not introduce a framework without explicit maintainer approval.
-- The repository also contains **KizamuBeam Virtual Machine** (`vm/`), a separate, independently usable Tauri app that emulates GRBL/FluidNC-style controllers. It is not just a testing screen of the main application.
+- **KizamuBeam Virtual Machine** lives in its own repository (`KizamuBeam/kizamubeam-vm`), a separate Tauri app that emulates GRBL/FluidNC/Ruida-style controllers.
 - Work may be AI-assisted, but all changes must be understandable, auditable, and testable by human contributors.
 
 ## Repository map
@@ -25,7 +25,6 @@ These instructions apply to AI coding agents working in this repository. Read [C
 | `src/importers.ts`, `src/lbrn.ts`, `src/pdfimport.ts` | File imports and compatibility |
 | `src/locales/`, `src/i18n.ts` | Translations and UI strings |
 | `src-tauri/`, `src-tauri/core/` | Main application native backend and Rust processing core |
-| `vm/src/`, `vm/src-tauri/`, `vm/src-tauri/core/` | Separate Virtual Machine UI, native app and controller engine |
 | `scripts/` | Focused regression and feature tests |
 | `docs/` | Developer and user documentation |
 | `manual/` | User manual (Docusaurus, published under `/kizamubeam/docs/`) |
@@ -97,12 +96,10 @@ npm run test:joints
 npm run test:history
 npm run test:lbrn
 npm run test:core       # Fixtures and Rust core tests
-npm run test:vm         # VM regression and Rust controller tests
 npm run tauri dev       # Main desktop dev mode
-npm run vm              # Separate VM dev mode
 ```
 
-There are additional focused `test:*` scripts in `package.json`; identify and run those relevant to the change. For Rust-specific work, use the corresponding workspace or package under `src-tauri/` or `vm/src-tauri/` as appropriate.
+There are additional focused `test:*` scripts in `package.json`; identify and run those relevant to the change. For Rust-specific work, use the corresponding workspace or package under `src-tauri/`.
 
 - Add regression tests for bug fixes. For geometry/nesting issues, include concrete dimensions and rotations; for machine issues, cover firmware variants and failure cases.
 - Do not delete or relax tests simply to obtain a passing build.
@@ -127,13 +124,6 @@ There are additional focused `test:*` scripts in `package.json`; identify and ru
 - Delegate read-heavy, well-scoped work (exploration, symbol lookup, suite runs,
   log triage) to subagents; keep decisions and small edits in the main session.
 - Keep answers and documentation free of filler; state facts, paths and numbers.
-
-## Virtual Machine specifics
-
-- `vm/` is a **separately distributed** product, even though it shares this repository and root dependencies.
-- Its controller core (`vm/src-tauri/core/`) should remain useful without its graphical interface; do not couple protocol behavior to a particular UI.
-- Preserve protocol response behavior and network defaults unless the task requires otherwise. Avoid unintentionally exposing controller endpoints on external interfaces.
-- Keep emulator behavior distinct from physical hardware guarantees, and cover changes with `npm run test:vm` or focused Rust tests.
 
 ## Pull requests and communication
 

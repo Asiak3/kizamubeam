@@ -1,7 +1,7 @@
 # Baut die Installer für macOS, Windows und Linux, sobald ein Release veröffentlicht wird
 # (GitHub → Releases → Draft a new release → neuen Tag anlegen → Publish release), und hängt sie an diesen Release.
 # Für einen schon veröffentlichten Release: Actions → Release → Run workflow mit dem Tag.
-# Releases of the Virtual Machine (tags vm-v…) are built by .github/workflows/vm-release.yml, not by this workflow.
+# Releases of the Virtual Machine live in KizamuBeam/kizamubeam-vm; legacy vm-v… tags are ignored here.
 # Nightly builds: .github/workflows/nightly.yml creates the pre-release and calls this workflow with the tag and the
 # nightly version, which is written into package.json and tauri.conf.json for the build only (not committed).
 #
