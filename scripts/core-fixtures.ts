@@ -5,7 +5,8 @@ import './core-fixtures-env';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { applyAdjust, dither, resample } from '../src/images';
 import { DEFAULT_ROTARY, estimate, FIRMWARES, gcodeLines, Moves, newDevice, outAxis, packMoves, rotaryMoves, scanLines, zInserts } from '../src/gcode';
-import { defaultImageLayer, inv, ImageAdjust, Mat, mul } from '../src/model';
+import { defaultImageLayer, defaultLayer, inv, ImageAdjust, Mat, mul } from '../src/model';
+import { ruidaLayersFromMoves, RuidaParams, writeRuida } from '../src/ruida';
 
 // Reproduzierbare Zufallszahlen
 let seed = 12345;
@@ -80,6 +81,39 @@ function gcodeCase(fw: 'fluidnc' | 'smoothie', axis?: 'A', withZ = false) {
   };
 }
 
+function ruidaCase(startFrom: 'absolute' | 'current', origin: 'top-right' | 'bottom-left', magic: '88' | '11', laser: '1' | 'both') {
+  const mv = new Moves(10, 15);
+  mv.push(10, 15, 0, 0, 0);
+  mv.push(45.5, 15, 1800, 0.75, 0);
+  mv.push(45.5, 32.25, 1800, 0.75, 0);
+  mv.push(20, 40, 0, 0, 1);
+  mv.push(60, 55.125, 3600, 0.4, 1);
+  const est = estimate(mv, newDevice({ fw: 'ruida' }));
+  const layers = ruidaLayersFromMoves(mv, (i) => ({
+    ...defaultLayer(i),
+    speed: i === 0 ? 1800 : 3600,
+    power: i === 0 ? 75 : 40,
+    minPower: i === 0 ? 25 : 0,
+    air: i === 1,
+  }));
+  const params: RuidaParams = {
+    x0: mv.x0,
+    y0: mv.y0,
+    bedW: 600,
+    bedH: 400,
+    origin,
+    startFrom,
+    magic: magic === '11' ? 0x11 : 0x88,
+    laser,
+    air: [1],
+    layers,
+  };
+  return {
+    packed: arr(packMoves(mv, est.t, JSON.stringify(params))),
+    bytes: arr(writeRuida(mv, params)),
+  };
+}
+
 const out = {
   src: { w: SW, h: SH, v: arr(src) },
   down: arr(down),
@@ -90,6 +124,10 @@ const out = {
   dithered,
   scans,
   gcode: [gcodeCase('fluidnc'), gcodeCase('smoothie'), gcodeCase('fluidnc', 'A'), gcodeCase('fluidnc', undefined, true)],
+  ruida: [
+    ruidaCase('absolute', 'top-right', '88', '1'),
+    ruidaCase('current', 'bottom-left', '11', 'both'),
+  ],
 };
 mkdirSync(new URL('../src-tauri/core/tests/fixtures/', import.meta.url), { recursive: true });
 writeFileSync(new URL('../src-tauri/core/tests/fixtures/parity.json', import.meta.url), JSON.stringify(out));

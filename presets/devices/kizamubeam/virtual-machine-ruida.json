@@ -1,0 +1,18 @@
+{
+  "id": "kizamubeam.virtual-machine-ruida",
+  "vendor": "KizamuBeam",
+  "name": "KizamuBeam Virtual Machine (Ruida)",
+  "fw": "ruida",
+  "bedW": 400,
+  "bedH": 400,
+  "conn": "tcp",
+  "host": "127.0.0.1",
+  "ruidaPort": 50200,
+  "ruidaJogPort": 50207,
+  "ruidaOrigin": "top-right",
+  "ruidaMagic": "88",
+  "ruidaLaser": "1",
+  "limitSwitches": "yes",
+  "source": "Virtual machine for testing Ruida DSP without hardware (vm/ in this repository); UDP ports as preset there",
+  "checked": "2026-11-18"
+}

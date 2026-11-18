@@ -2,11 +2,11 @@
 import type { Editor } from './editor';
 import { commandMatches } from './commandKeys';
 import { escapeXml, h, numInput, setIcon, setTrustedSvg } from './dom';
-import { saveText } from './files';
+import { saveBinary, saveText } from './files';
 import { native } from './native';
 import {
   anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, liveStatus, formatDuration, frameGCode, Job, jogLines, jogToLines, LASER_TYPES, moveLines, LaserModule, LaserType, loadDevices, Moves, newDevice,
-  posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, sameMoves, saveDevices, StartFrom, startHere, zJogLines,
+  posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, RuidaLaser, RuidaMagic, RuidaOrigin, sameMoves, saveDevices, StartFrom, startHere, zJogLines,
 } from './gcode';
 import { isTauri, machine, PortInfo } from './machine';
 import type { PreparedGCode } from './gcode';
@@ -296,7 +296,7 @@ export async function uploadJob(ed: Editor, fs: FluidFs, file: string): Promise<
   const job = await makeJob(ed, false);
   if (nothingToDo(job)) return null;
   job.warnings.forEach((w) => notify(w));
-  const g = await prepareGCode(job, device, estimate(job.moves, device));
+  const g = await prepareGCode(job, device, estimate(job.moves, device), undefined, (i) => ed.layer(i));
   return uploadGCode(g, fs, file);
 }
 
@@ -324,7 +324,7 @@ export async function startJob(ed: Editor, src?: JobSource) {
   if (nothingToDo(job) || (!src && !designOk(ed)) || !boundsOk(ed, job) || !airOk(job)) return;
   job.warnings.forEach((w) => notify(w));
   const est = estimate(job.moves, device);
-  const g = await prepareGCode(job, device, est, src?.name);
+  const g = await prepareGCode(job, device, est, src?.name, src?.layer ?? ((i) => ed.layer(i)));
   notify(t('Job gestartet, geschätzt {total}.', { total: formatDuration(est.total) }));
   if ((await runGCode(g)) && !src) ed.afterJob();
 }
@@ -351,7 +351,7 @@ export async function startJobAt(ed: Editor, preview: Moves, i: number, frac: nu
   job.warnings.forEach((w) => notify(w));
   const est = estimate(job.moves, device);
   const at = formatDuration(Math.max(0, total - est.total));
-  const g = await prepareGCode(job, device, est, t('{name} ab {at}', { name: src?.name ?? 'KizamuBeam', at }));
+  const g = await prepareGCode(job, device, est, t('{name} ab {at}', { name: src?.name ?? 'KizamuBeam', at }), src?.layer ?? ((i) => ed.layer(i)));
   notify(t('Job ab {at} gestartet, geschätzt {total}.', { at, total: formatDuration(est.total) }));
   return runGCode(g);
 }
@@ -370,8 +370,17 @@ export async function saveGCode(ed: Editor, src?: JobSource) {
   const job = await makeJob(ed, false, src);
   if (nothingToDo(job)) return;
   if (device.startFrom === 'current') notify(t('Hinweis: Die Datei enthält die aktuelle Laserposition als Startpunkt.'));
-  const g = await prepareGCode(job, device, estimate(job.moves, device), src?.name);
-  const name = src ? `${src.name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-')}.gcode` : 'projekt.gcode';
+  const g = await prepareGCode(job, device, estimate(job.moves, device), src?.name, src?.layer ?? ((i) => ed.layer(i)));
+  const slug = src ? src.name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-') : 'projekt';
+  if (device.fw === 'ruida') {
+    const name = `${slug}.rd`;
+    const saved = g.ruida
+      ? await saveBinary(name, 'Ruida (.rd)', 'rd', g.ruida)
+      : (await native<string | null>('ruida_save', { id: g.id, defaultName: name, filterName: 'Ruida (.rd)' })) !== null;
+    if (saved && !src) ed.afterJob();
+    return;
+  }
+  const name = `${slug}.gcode`;
   const saved = g.lines
     ? await saveText(name, 'G-Code', 'gcode', 'text/plain', g.lines.join('\n') + '\n')
     : (await native<string | null>('gcode_save', { id: g.id, defaultName: name, filterName: 'G-Code' })) !== null;
@@ -603,10 +612,14 @@ function laserTab(ed: Editor): HTMLElement {
       portSel.append(h('option', { value: n }, p?.description ? `${n} (${p.description})` : n));
     }
     if (!names.length) portSel.append(h('option', { value: '', disabled: true }, t('Keine serielle Schnittstelle gefunden')));
-    portSel.append(h('option', { value: NET }, t('WLAN: {address}', { address: `${device.host}:${device.tcpPort}` })));
-    portSel.append(h('option', { value: NET_WS }, t('WLAN (WebSocket): {address}', { address: `${device.host}:${device.wsPort}` })));
+    if (device.fw === 'ruida') {
+      portSel.append(h('option', { value: NET }, t('Netzwerk (UDP): {address}', { address: `${device.host}:${device.ruidaPort || 50200}` })));
+    } else {
+      portSel.append(h('option', { value: NET }, t('WLAN: {address}', { address: `${device.host}:${device.tcpPort}` })));
+      portSel.append(h('option', { value: NET_WS }, t('WLAN (WebSocket): {address}', { address: `${device.host}:${device.wsPort}` })));
+    }
     if (device.conn === 'remote' || device.remoteFp) portSel.append(h('option', { value: REMOTE }, t('Anderer KizamuBeam: {address}', { address: `${device.host}:${device.remotePort}` })));
-    portSel.value = device.conn === 'tcp' ? NET : device.conn === 'ws' ? NET_WS : device.conn === 'remote' ? REMOTE : device.port || names[0] || NET;
+    portSel.value = device.conn === 'tcp' || (device.fw === 'ruida' && device.conn === 'ws') ? NET : device.conn === 'ws' ? NET_WS : device.conn === 'remote' ? REMOTE : device.port || names[0] || NET;
   };
   const applyPortChoice = () => {
     if (portSel.value === NET) device.conn = 'tcp';
@@ -643,6 +656,8 @@ function laserTab(ed: Editor): HTMLElement {
     for (const b of [startB, frameB, contourB, homeB, originB]) b.disabled = !on || busy;
     pauseB.disabled = !on;
     stopB.disabled = !on;
+    saveB.lastChild!.textContent = device.fw === 'ruida' ? '.rd' : 'G-Code';
+    saveB.title = device.fw === 'ruida' ? t('Als Ruida-Datei (.rd) speichern') : t('G-Code speichern');
     const hold = machine.status.state.startsWith('Hold');
     pauseB.lastChild!.textContent = hold ? t('Weiter') : t('Pause');
     setIcon(pauseB.firstChild as HTMLElement, hold ? 'play' : 'pause');
@@ -912,10 +927,16 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     const el = h('input', { type: 'checkbox', checked: get(), onchange: (e: Event) => set((e.target as HTMLInputElement).checked) });
     rows.push(h('label', { title }, label), h('span', {}, el));
   };
-  const head = (t: string) => rows.push(h('div', { class: 'sub' }, t));
+  const head = (txt: string) => {
+    const el = h('div', { class: 'sub' }, txt);
+    rows.push(el);
+    return el;
+  };
+  const ruidaEls: HTMLElement[] = [];
+  const nonRuidaEls: HTMLElement[] = [];
   newTab(t('Allgemein'));
   text(t('Name'), () => d.name, (v) => (d.name = v));
-  const sMaxRef: { el?: HTMLInputElement } = {};
+  const sMaxRef: { el?: HTMLInputElement; lab?: HTMLElement } = {};
   const fwSel = h('select', {
     onchange: (e: Event) => {
       const old = FIRMWARES[d.fw];
@@ -923,12 +944,48 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
       // Leistungsskala mitziehen, wenn sie noch dem Standard der alten Firmware entsprach
       if (d.sMax === old.sMax && sMaxRef.el) ((d.sMax = FIRMWARES[d.fw].sMax), (sMaxRef.el.value = String(d.sMax)));
       readBtn.disabled = !canRead();
+      syncFw();
     },
   }, ...(Object.keys(FIRMWARES) as Firmware[]).map((k) => h('option', { value: k, selected: k === d.fw }, FIRMWARES[k].label))) as HTMLSelectElement;
   rows.push(h('label', {}, t('Steuerung (Firmware)')), fwSel);
   const bw = num(t('Breite (mm)'), () => bed.w, (v) => (bed.w = v), t('Arbeitsbereich X'));
   const bh = num(t('Höhe (mm)'), () => bed.h, (v) => (bed.h = v), t('Arbeitsbereich Y'));
-  sMaxRef.el = num(t('S-Wert für 100 %'), () => d.sMax, (v) => (d.sMax = v), t('GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1'));
+  {
+    const title = t('GRBL $30 bzw. FluidNC speed_map (meist 1000), Marlin meist 255, Smoothieware 1');
+    const lab = h('label', { title }, t('S-Wert für 100 %'));
+    const el = numInput('', (v) => v > 0 && (d.sMax = v), title);
+    el.value = String(d.sMax);
+    rows.push(lab, el);
+    sMaxRef.el = el;
+    sMaxRef.lab = lab;
+    nonRuidaEls.push(lab, el);
+  }
+  {
+    const ruidaHead = head('Ruida DSP');
+    const origLab = h('label', { title: t('Ecke des Arbeitsbereichs, in der die Ruida-Steuerung ihren Maschinennullpunkt (0, 0) hat') }, t('Maschinennullpunkt'));
+    const origSel = h('select', { onchange: (e: Event) => (d.ruidaOrigin = (e.target as HTMLSelectElement).value as RuidaOrigin) },
+      h('option', { value: 'top-right', selected: (d.ruidaOrigin ?? 'top-right') === 'top-right' }, t('Hinten rechts (Standard)')),
+      h('option', { value: 'top-left', selected: d.ruidaOrigin === 'top-left' }, t('Hinten links')),
+      h('option', { value: 'bottom-left', selected: d.ruidaOrigin === 'bottom-left' }, t('Vorne links')),
+      h('option', { value: 'bottom-right', selected: d.ruidaOrigin === 'bottom-right' }, t('Vorne rechts')),
+    );
+    const magicLab = h('label', { title: t('Byte-Verschleierung für .rd-Dateien und Direktverbindung (meist 0x88 für RDC6442/RDC6445)') }, t('Paket-Codierung (Magic)'));
+    const magicSel = h('select', { onchange: (e: Event) => (d.ruidaMagic = (e.target as HTMLSelectElement).value as RuidaMagic) },
+      h('option', { value: 'auto', selected: (d.ruidaMagic ?? '88') === 'auto' }, t('Automatisch erkennen')),
+      h('option', { value: '88', selected: (d.ruidaMagic ?? '88') === '88' }, '0x88 (RDC6442 / RDC6445)'),
+      h('option', { value: '11', selected: d.ruidaMagic === '11' }, '0x11 (RDC6342G / 634XG)'),
+      h('option', { value: '38', selected: d.ruidaMagic === '38' }, '0x38 (RDL9635)'),
+    );
+    const laserLab = h('label', { title: t('Welche Laserröhre im Auftrag angesteuert wird') }, t('Laserröhre'));
+    const laserSel = h('select', { onchange: (e: Event) => (d.ruidaLaser = (e.target as HTMLSelectElement).value as RuidaLaser) },
+      h('option', { value: '1', selected: (d.ruidaLaser ?? '1') === '1' }, t('Laser 1')),
+      h('option', { value: '2', selected: d.ruidaLaser === '2' }, t('Laser 2')),
+      h('option', { value: 'both', selected: d.ruidaLaser === 'both' }, t('Laser 1 + 2')),
+    );
+    const ruidaNote = h('div', { class: 'note wide' }, t('Ruida-Direktsteuerung ist experimentell: Vor dem ersten Auftrag Fahrtrichtungen, Nullpunkt und Rahmen prüfen. Für den Dateiexport über RDWorks oder USB-Stick genügt „.rd speichern“.'));
+    rows.push(origLab, origSel, magicLab, magicSel, laserLab, laserSel, ruidaNote);
+    ruidaEls.push(ruidaHead, origLab, origSel, magicLab, magicSel, laserLab, laserSel, ruidaNote);
+  }
   head(t('Lasermodul'));
   {
     const laserTip = t('Nur zur Information, z. B. für passende Materialeinstellungen; ändert den G-Code nicht');
@@ -960,26 +1017,33 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   bool(t('Z+ fährt Richtung Material'), () => d.zFlip, (v) => (d.zFlip = v), t('Einschalten, wenn bei dieser Maschine positive Z-Werte den Tisch anheben oder den Kopf absenken'));
   bool(t('Z-Jog nur nach Referenzfahrt'), () => d.zJogStrict ?? true, (v) => (d.zJogStrict = v), t('Bewegen-Fenster: Z-Tasten bleiben gesperrt, bis einmal referenziert wurde (pro Verbindung). Aus = lax: dann genügt eine bekannte Position.'));
   rows.push(h('label', {}, t('Drehachse')), h('span', {}, h('button', { class: 'btn small', onclick: () => openRotaryDialog() }, t('Drehachse (Rotary) …'))));
-  head(t('Air Assist & Ausgänge'));
-  rows.push(h('label', { title: t('Wird auf Layern mit „Air Assist“ vor dem Lasern gesendet, ausgeschaltet wird mit M9') }, t('Einschalten mit')), h('select', { onchange: (e: Event) => (d.airCmd = (e.target as HTMLSelectElement).value as Device['airCmd']) },
-    h('option', { value: 'M8', selected: d.airCmd !== 'M7' }, t('M8 (Flood, üblich)')),
-    h('option', { value: 'M7', selected: d.airCmd === 'M7' }, 'M7 (Mist)'),
-  ));
-  const outsIn = h('input', {
-    type: 'text', value: d.jobOutputs.join(', '), placeholder: t('z. B. 0, 1'),
-    onchange: (e: Event) => {
-      const el = e.target as HTMLInputElement;
-      d.jobOutputs = [...new Set(el.value.split(/[\s,;]+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < 8))];
-      el.value = d.jobOutputs.join(', ');
-    },
-  }) as HTMLInputElement;
-  rows.push(h('label', { title: t('Digitale Ausgänge (user_outputs, M64/M65 P…), die während jedes Jobs an sind, z. B. Absaugung') }, t('Ausgänge im Job')), outsIn);
+  {
+    const airHead = head(t('Air Assist & Ausgänge'));
+    const airLab = h('label', { title: t('Wird auf Layern mit „Air Assist“ vor dem Lasern gesendet, ausgeschaltet wird mit M9') }, t('Einschalten mit'));
+    const airSel = h('select', { onchange: (e: Event) => (d.airCmd = (e.target as HTMLSelectElement).value as Device['airCmd']) },
+      h('option', { value: 'M8', selected: d.airCmd !== 'M7' }, t('M8 (Flood, üblich)')),
+      h('option', { value: 'M7', selected: d.airCmd === 'M7' }, 'M7 (Mist)'),
+    );
+    const outsLab = h('label', { title: t('Digitale Ausgänge (user_outputs, M64/M65 P…), die während jedes Jobs an sind, z. B. Absaugung') }, t('Ausgänge im Job'));
+    const outsIn = h('input', {
+      type: 'text', value: d.jobOutputs.join(', '), placeholder: t('z. B. 0, 1'),
+      onchange: (e: Event) => {
+        const el = e.target as HTMLInputElement;
+        d.jobOutputs = [...new Set(el.value.split(/[\s,;]+/).filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < 8))];
+        el.value = d.jobOutputs.join(', ');
+      },
+    }) as HTMLInputElement;
+    rows.push(airLab, airSel, outsLab, outsIn);
+    nonRuidaEls.push(airHead, airLab, airSel, outsLab, outsIn);
+  }
   rows.push(h('div', { class: 'note wide' }, t('Startreferenz und Job-Ursprung stehen im Laser-Fenster.')));
   newTab(t('Verbindung|Gerät'));
+  const connTcpOpt = h('option', { value: 'tcp', selected: d.conn === 'tcp' }, t('WLAN (Telnet)')) as HTMLOptionElement;
+  const connWsOpt = h('option', { value: 'ws', selected: d.conn === 'ws' }, t('WLAN (WebSocket)')) as HTMLOptionElement;
   const connSel: HTMLSelectElement = h('select', { onchange: (e: Event) => (d.conn = (e.target as HTMLSelectElement).value as Device['conn']) },
     h('option', { value: 'serial', selected: d.conn === 'serial' }, t('USB (seriell)')),
-    h('option', { value: 'tcp', selected: d.conn === 'tcp' }, t('WLAN (Telnet)')),
-    h('option', { value: 'ws', selected: d.conn === 'ws' }, t('WLAN (WebSocket)')),
+    connTcpOpt,
+    connWsOpt,
     h('option', { value: 'remote', selected: d.conn === 'remote' }, t('Anderer KizamuBeam (Netzwerk)')),
   ) as HTMLSelectElement;
   rows.push(h('label', {}, t('Anschluss')), connSel);
@@ -989,19 +1053,39 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   portIn.setAttribute('list', portList.id);
   rows.push(h('label', { title: t('Feste USB-Schnittstelle dieses Geräts') }, t('USB-Schnittstelle')), portIn, portList);
   machine.ports().then((ps) => ps.forEach((p) => portList.append(h('option', { value: p.name }, p.description || p.name)))).catch(() => {});
+  const baudLab = h('label', {}, t('Baudrate'));
   const baud = h('select', { onchange: (e: Event) => (d.baud = Number((e.target as HTMLSelectElement).value)) },
     ...[57600, 115200, 230400, 250000, 460800, 921600].map((b) => h('option', { value: String(b), selected: b === d.baud }, String(b))),
   );
-  rows.push(h('label', {}, t('Baudrate')), baud);
+  rows.push(baudLab, baud);
+  nonRuidaEls.push(baudLab, baud);
   const hostIn = h('input', { type: 'text', value: d.host, oninput: (e: Event) => (d.host = (e.target as HTMLInputElement).value.trim()) }) as HTMLInputElement;
-  rows.push(h('label', {}, t('WLAN-Adresse')), h('span', { class: 'conn-row' }, hostIn,
-    h('button', {
-      class: 'btn small', title: t('FluidNC-Steuerungen im lokalen Netzwerk suchen'),
-      onclick: () => import('./fluidncDialog').then((m) => m.openDiscovery(d.httpPort || 80, (host) => ((d.host = host), (hostIn.value = host)))),
-    }, t('Suchen …'))));
-  num(t('Telnet-Port'), () => d.tcpPort, (v) => (d.tcpPort = Math.round(v)));
-  num(t('WebSocket-Port'), () => d.wsPort, (v) => (d.wsPort = Math.round(v)), t('FluidNC: 81; ist er nicht erreichbar, wird 80 versucht'));
-  num(t('Web-Port'), () => d.httpPort, (v) => (d.httpPort = Math.round(v)), t('Weboberfläche von FluidNC (meist 80): zum Hochladen auf SD-Karte/Flash und für die Suche'));
+  const fluidDiscoverBtn = h('button', {
+    class: 'btn small', title: t('FluidNC-Steuerungen im lokalen Netzwerk suchen'),
+    onclick: () => import('./fluidncDialog').then((m) => m.openDiscovery(d.httpPort || 80, (host) => ((d.host = host), (hostIn.value = host)))),
+  }, t('Suchen …'));
+  rows.push(h('label', {}, t('WLAN-Adresse')), h('span', { class: 'conn-row' }, hostIn, fluidDiscoverBtn));
+  {
+    const rPortTitle = t('UDP-Zielport der Ruida-Steuerung (Standard 50200)');
+    const rPortLab = h('label', { title: rPortTitle }, t('UDP-Datenport'));
+    const rPortEl = numInput('', (v) => v > 0 && v <= 65535 && (d.ruidaPort = Math.round(v)), rPortTitle);
+    rPortEl.value = String(d.ruidaPort || 50200);
+    const jPortTitle = t('UDP-Port für Ruida-Tastenbefehle (Standard 50207, 0 = aus)');
+    const jPortLab = h('label', { title: jPortTitle }, t('UDP-Tastenport'));
+    const jPortEl = numInput('', (v) => v >= 0 && v <= 65535 && (d.ruidaJogPort = Math.round(v)), jPortTitle);
+    jPortEl.value = String(d.ruidaJogPort ?? 50207);
+    rows.push(rPortLab, rPortEl, jPortLab, jPortEl);
+    ruidaEls.push(rPortLab, rPortEl, jPortLab, jPortEl);
+  }
+  {
+    const tcpEl = num(t('Telnet-Port'), () => d.tcpPort, (v) => (d.tcpPort = Math.round(v)));
+    const tcpLab = rows[rows.length - 2] as HTMLElement;
+    const wsEl = num(t('WebSocket-Port'), () => d.wsPort, (v) => (d.wsPort = Math.round(v)), t('FluidNC: 81; ist er nicht erreichbar, wird 80 versucht'));
+    const wsLab = rows[rows.length - 2] as HTMLElement;
+    const httpEl = num(t('Web-Port'), () => d.httpPort, (v) => (d.httpPort = Math.round(v)), t('Weboberfläche von FluidNC (meist 80): zum Hochladen auf SD-Karte/Flash und für die Suche'));
+    const httpLab = rows[rows.length - 2] as HTMLElement;
+    nonRuidaEls.push(tcpLab, tcpEl, wsLab, wsEl, httpLab, httpEl);
+  }
   // Remote KizamuBeam: host address is the network address above
   const remotePortIn = num(t('Host-Port'), () => d.remotePort, (v) => (d.remotePort = Math.round(v)), t('Port eines anderen KizamuBeam im Host-Modus (Standard 47900)'));
   const pairState = h('span', { class: 'note' });
@@ -1066,8 +1150,12 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     d.rxBuffer = free;
     bufNote.textContent = t('Die Steuerung meldet {n} Bytes freien Empfangspuffer; eingestellt auf {m}.', { n: bf[1], m: free });
   };
-  rows.push(h('label', { title: t('Wie viele Zeichen KizamuBeam an die Steuerung schickt, bevor sie bestätigt hat. Wirkt beim nächsten Verbinden.') }, t('Empfangspuffer')),
-    h('span', { class: 'conn-row' }, bufSel, h('button', { class: 'btn small', title: t('Pufferstand der verbundenen Steuerung lesen'), onclick: measureBuf }, t('Messen'))), bufNote);
+  {
+    const bufLab = h('label', { title: t('Wie viele Zeichen KizamuBeam an die Steuerung schickt, bevor sie bestätigt hat. Wirkt beim nächsten Verbinden.') }, t('Empfangspuffer'));
+    const bufRow = h('span', { class: 'conn-row' }, bufSel, h('button', { class: 'btn small', title: t('Pufferstand der verbundenen Steuerung lesen'), onclick: measureBuf }, t('Messen')));
+    rows.push(bufLab, bufRow, bufNote);
+    nonRuidaEls.push(bufLab, bufRow, bufNote);
+  }
   bool(t('Beim Verbinden referenzieren'), () => d.homeOnConnect, (v) => (d.homeOnConnect = v), t('Nach dem Verbinden eine Referenzfahrt starten'));
   rows.push(h('label', { title: t('Ohne Endschalter bietet der Assistent „Laser einrichten“ keine Referenzfahrt an') }, t('Endschalter')), h('select', { onchange: (e: Event) => (d.limitSwitches = (e.target as HTMLSelectElement).value as Device['limitSwitches']) },
     h('option', { value: 'unknown', selected: d.limitSwitches === 'unknown' }, t('Unbekannt')),
@@ -1130,26 +1218,55 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   rows.push(h('div', { class: 'note wide' }, t('Nur für Positionieren, Startreferenz (Aktuelle Position/Benutzer-Ursprung) und Rotpunkt-Framing. Geometrie, Schnitt und G-Code-Export bleiben Werkzeuglaser.')));
   updatePointer();
   newTab(t('G-Code'));
-  head('FluidNC');
-  rows.push(h('label', { title: t('Bei WLAN-Aussetzern läuft ein Job von SD-Karte oder Flash weiter; er wird vor dem Start über die Weboberfläche hochgeladen') }, t('Job ausführen')),
-    h('select', { onchange: (e: Event) => (d.runFrom = (e.target as HTMLSelectElement).value as Device['runFrom']) },
+  {
+    const fncHead = head('FluidNC');
+    const fncLab = h('label', { title: t('Bei WLAN-Aussetzern läuft ein Job von SD-Karte oder Flash weiter; er wird vor dem Start über die Weboberfläche hochgeladen') }, t('Job ausführen'));
+    const fncSel = h('select', { onchange: (e: Event) => (d.runFrom = (e.target as HTMLSelectElement).value as Device['runFrom']) },
       h('option', { value: 'stream', selected: d.runFrom === 'stream' }, t('Vom Rechner senden')),
       h('option', { value: 'sd', selected: d.runFrom === 'sd' }, t('Auf SD-Karte laden und dort starten')),
       h('option', { value: 'localfs', selected: d.runFrom === 'localfs' }, t('Im Flash speichern und dort starten')),
-    ));
-  rows.push(h('label', {}, ''), h('span', { class: 'conn-row' },
-    h('button', { class: 'btn small', title: t('config.yaml der verbundenen Steuerung lesen und ändern'), onclick: () => import('./fluidncDialog').then((m) => m.openFluidConfig()) }, t('Konfiguration …')),
-    h('button', { class: 'btn small', title: t('Dateien auf SD-Karte und Flash'), onclick: () => import('./fluidncDialog').then((m) => m.openFluidFiles(ed)) }, t('Dateien …')),
-  ));
-  head(t('G-Code-Skripte'));
+    );
+    const fncEmpty = h('label', {}, '');
+    const fncBtns = h('span', { class: 'conn-row' },
+      h('button', { class: 'btn small', title: t('config.yaml der verbundenen Steuerung lesen und ändern'), onclick: () => import('./fluidncDialog').then((m) => m.openFluidConfig()) }, t('Konfiguration …')),
+      h('button', { class: 'btn small', title: t('Dateien auf SD-Karte und Flash'), onclick: () => import('./fluidncDialog').then((m) => m.openFluidFiles(ed)) }, t('Dateien …')),
+    );
+    const scrHead = head(t('G-Code-Skripte'));
+    rows.push(fncLab, fncSel, fncEmpty, fncBtns);
+    // Move scrHead after fncBtns in rows
+    rows.splice(rows.indexOf(scrHead), 1);
+    rows.push(scrHead);
+    nonRuidaEls.push(fncHead, fncLab, fncSel, fncEmpty, fncBtns, scrHead);
+  }
   const script = (label: string, title: string, get: () => string, set: (v: string) => void) => {
     const el = h('textarea', { class: 'script', rows: 3, spellcheck: false, placeholder: t('Eine Zeile je Befehl'), oninput: (e: Event) => set((e.target as HTMLTextAreaElement).value) }) as HTMLTextAreaElement;
     el.value = get();
-    rows.push(h('label', { class: 'wide', title }, label), el);
+    const lab = h('label', { class: 'wide', title }, label);
+    rows.push(lab, el);
+    nonRuidaEls.push(lab, el);
   };
   script(t('Vor dem Job'), t('Wird nach G21, G90 und dem Laser-Modus gesendet, vor der ersten Bewegung'), () => d.startScript, (v) => (d.startScript = v));
   script(t('Nach dem Job'), t('Wird nach dem Ausschalten des Lasers (M5) gesendet, vor dem Programmende'), () => d.endScript, (v) => (d.endScript = v));
-  rows.push(h('div', { class: 'note wide' }, t('Gilt für Jobs und gespeicherten G-Code, nicht für Rahmenfahrten. Die Zeilen werden unverändert gesendet.')));
+  {
+    const gcodeNote = h('div', { class: 'note wide' }, t('Gilt für Jobs und gespeicherten G-Code, nicht für Rahmenfahrten. Die Zeilen werden unverändert gesendet.'));
+    const ruidaGcodeNote = h('div', { class: 'note wide' }, t('Ruida-Steuerungen verwenden binäre .rd-Aufträge statt G-Code. Start- und Endskripte entfallen.'));
+    rows.push(gcodeNote, ruidaGcodeNote);
+    nonRuidaEls.push(gcodeNote);
+    ruidaEls.push(ruidaGcodeNote);
+  }
+  const syncFw = () => {
+    const isRuida = d.fw === 'ruida';
+    for (const el of ruidaEls) el.hidden = !isRuida;
+    for (const el of nonRuidaEls) el.hidden = isRuida;
+    connTcpOpt.textContent = isRuida ? t('Netzwerk (UDP)') : t('WLAN (Telnet)');
+    connWsOpt.hidden = isRuida;
+    fluidDiscoverBtn.hidden = isRuida;
+    if (isRuida && d.conn === 'ws') {
+      d.conn = 'tcp';
+      connSel.value = 'tcp';
+    }
+  };
+  syncFw();
   newTab(t('Erweitert'));
   head(t('KI-Agenten'));
   const limit = (label: string, title: string, get: () => number, set: (v: number) => void) => {
@@ -1166,7 +1283,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     () => d.agentMinSpeed, (v) => (d.agentMinSpeed = Math.max(0, v)));
   rows.push(h('div', { class: 'note wide' }, t('Gerätevorlagen für neue Geräte stehen im Dialog „Geräte …“.')));
   const readNote = h('div', { class: 'note wide' });
-  // Lesen nur vom verbundenen Gerät und nur bei FluidNC und GRBL-artigen Steuerungen
+  // Lesen nur vom verbundenen Gerät und nur bei FluidNC, GRBL-artigen Steuerungen und Ruida
   const canRead = () => isCurrent && machine.connected && !machine.running && FIRMWARES[d.fw].read !== null;
   const readBtn: HTMLButtonElement = h('button', {
     class: 'btn',
@@ -1177,7 +1294,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
       const got: Record<string, number> = {};
       const off = machine.on((e) => {
         if (e.type !== 'line') return;
-        // FluidNC: $/axes/x/max_travel_mm=400.000 · GRBL: $130=400.000
+        // FluidNC: $/axes/x/max_travel_mm=400.000 · GRBL/Ruida: $130=400.000
         let m = /\/axes\/([xy])\/(max_travel_mm|max_rate_mm_per_min|acceleration_mm_per_sec2)\s*[=:]\s*([\d.]+)/i.exec(e.line);
         if (m) got[`${m[1].toLowerCase()}.${m[2]}`] = Number(m[3]);
         m = /^\$(30|11[01]|12[01]|13[01])=([\d.]+)/.exec(e.line);
@@ -1203,7 +1320,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
         if (isFinite(r)) ((d.rapid = r), (rapid.value = String(r)), found.push(t('Eilgang {r} mm/min', { r })));
         const a = Math.min(got['x.acceleration_mm_per_sec2'] || Infinity, got['y.acceleration_mm_per_sec2'] || Infinity);
         if (isFinite(a)) ((d.accel = a), (accel.value = String(a)), found.push(t('Beschleunigung {a} mm/s²', { a })));
-        if (got.smax && sMaxRef.el) ((d.sMax = got.smax), (sMaxRef.el.value = String(got.smax)), found.push(t('S-Wert für 100 % {smax}', { smax: got.smax })));
+        if (got.smax && sMaxRef.el && d.fw !== 'ruida') ((d.sMax = got.smax), (sMaxRef.el.value = String(got.smax)), found.push(t('S-Wert für 100 % {smax}', { smax: got.smax })));
         readNote.textContent = found.length ? t('Gelesen: {found}. Mit „Übernehmen“ speichern.', { found: found.join(', ') }) : t('Keine Werte erhalten. Details stehen in der Konsole.');
       }, 2500);
     },
@@ -1492,7 +1609,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
         warn,
         h('div', { class: 'note' }, t('Mausrad zoomt, Ziehen verschiebt, Doppelklick passt ein. Die Zeit ist eine Schätzung aus Eilgang und Beschleunigung in den Geräteeinstellungen.')),
         h('div', { class: 'dialog-buttons' },
-          h('button', { class: 'btn', onclick: () => saveGCode(ed, src) }, t('G-Code speichern')),
+          h('button', { class: 'btn', onclick: () => saveGCode(ed, src) }, device.fw === 'ruida' ? t('.rd speichern') : t('G-Code speichern')),
           h('button', { class: 'btn primary', onclick: () => dlg.close() }, t('Schließen')),
         ),
       ),

@@ -61,6 +61,7 @@ pub enum Cmd {
     /// Echtzeitbefehl, wird sofort und ohne Puffer gesendet (? ! ~ 0x18 0x85)
     Realtime(u8),
     Job(Vec<String>),
+    RuidaJob(Vec<u8>),
     Pause,
     Resume,
     Stop,
@@ -234,7 +235,7 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
                 }
                 self.synthetic("Idle");
             }
-            Cmd::Close => {}
+            Cmd::Close | Cmd::RuidaJob(_) => {}
         }
         Ok(())
     }

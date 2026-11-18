@@ -103,6 +103,13 @@ pub async fn machine_connect(
     realtime: bool,
     poll: Option<String>,
     rx_buffer: Option<usize>,
+    fw: Option<String>,
+    bed_w: Option<f64>,
+    bed_h: Option<f64>,
+    ruida_port: Option<u16>,
+    ruida_jog_port: Option<u16>,
+    ruida_magic: Option<String>,
+    ruida_origin: Option<String>,
 ) -> Result<(), String> {
     // Ältere Oberflächen schicken keinen Puffer; unter 64 und über 16 KiB ist sicher ein Tippfehler
     let rx_buffer = rx_buffer.unwrap_or(crate::stream::RX_BUFFER).clamp(64, 16384);
@@ -113,6 +120,44 @@ pub async fn machine_connect(
     let busy = state.busy.clone();
     busy.store(false, Ordering::SeqCst);
     let events = WindowEvents(app);
+
+    if fw.as_deref() == Some("ruida") {
+        let magic = match ruida_magic.as_deref() {
+            Some("88") => Some(0x88),
+            Some("11") => Some(0x11),
+            Some("38") => Some(0x38),
+            _ => None,
+        };
+        let rcfg = crate::ruida_link::RuidaConfig {
+            bed_w: bed_w.unwrap_or(600.0).max(10.0),
+            bed_h: bed_h.unwrap_or(400.0).max(10.0),
+            origin: ruida_origin.unwrap_or_else(|| "top-right".into()),
+            magic,
+        };
+        match kind.as_str() {
+            "serial" => {
+                if port.trim().is_empty() {
+                    return Err("Keine Schnittstelle gewählt".into());
+                }
+                let p = crate::serial_transport::open(port.trim(), baud.max(9600))
+                    .map_err(|e| format!("{}: {e}", port.trim()))?;
+                let tr = crate::ruida_link::SerialRuidaTransport::new(p);
+                let streamer = crate::ruida_link::RuidaStreamer::connect(tr, events, busy, rcfg)?;
+                std::thread::spawn(move || streamer.run(rx));
+            }
+            "tcp" | "udp" => {
+                let dport = ruida_port.unwrap_or(50200);
+                let jport = ruida_jog_port.unwrap_or(50207);
+                let tr = crate::ruida_link::UdpTransport::connect(host.trim(), dport, jport)?;
+                let streamer = crate::ruida_link::RuidaStreamer::connect(tr, events, busy, rcfg)?;
+                std::thread::spawn(move || streamer.run(rx));
+            }
+            _ => return Err(format!("Verbindungsart „{kind}“ wird für Ruida nicht unterstützt.")),
+        }
+        *state.tx.lock().unwrap() = Some(tx);
+        return Ok(());
+    }
+
     match kind.as_str() {
         "serial" => {
             if port.trim().is_empty() {
@@ -173,11 +218,22 @@ pub async fn machine_job(state: State<'_, Machine>, lines: Vec<String>) -> Resul
     state.send(Cmd::Job(lines))
 }
 
-/// Job mit G-Code, den der Rust-Kern schon vorbereitet hat (native::gcode_prepare)
+#[tauri::command]
+pub async fn machine_ruida_job(state: State<'_, Machine>, data: Vec<u8>) -> Result<(), String> {
+    if state.busy.load(Ordering::SeqCst) {
+        return Err("Es läuft bereits ein Job.".into());
+    }
+    state.send(Cmd::RuidaJob(data))
+}
+
+/// Job mit G-Code oder Ruida-Daten, die der Rust-Kern schon vorbereitet hat (native::gcode_prepare / ruida_prepare)
 #[tauri::command]
 pub async fn machine_job_prepared(state: State<'_, Machine>, native: State<'_, Arc<crate::native::Native>>, id: u32) -> Result<(), String> {
     if state.busy.load(Ordering::SeqCst) {
         return Err("Es läuft bereits ein Job.".into());
+    }
+    if let Some(rd) = native.ruida_opt(id) {
+        return state.send(Cmd::RuidaJob(rd.as_ref().clone()));
     }
     let lines = native.gcode(id)?;
     state.send(Cmd::Job(lines.as_ref().clone()))

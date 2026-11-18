@@ -12,12 +12,16 @@ import { dedupPolys } from './dedup';
 import { jobOutputsOff, jobOutputsOn } from './fluidnc';
 import { parkedObjs } from './parking';
 import { addPt, boxesOf, buildContainment, containsStrict, emptyBox } from './polyTopology';
+import { ruidaParamsForJob, writeRuida } from './ruida';
 
 // ---------- Geräte und Firmware ----------
 
 export type StartFrom = 'absolute' | 'user' | 'current';
 
-export type Firmware = 'fluidnc' | 'grbl' | 'grblhal' | 'marlin' | 'smoothie' | 'xtool';
+export type Firmware = 'fluidnc' | 'grbl' | 'grblhal' | 'marlin' | 'smoothie' | 'xtool' | 'ruida';
+export type RuidaOrigin = 'top-right' | 'top-left' | 'bottom-left' | 'bottom-right';
+export type RuidaMagic = 'auto' | '88' | '11' | '38';
+export type RuidaLaser = '1' | '2' | 'both';
 
 /** Was je Steuerung anders ist: Übertragung, Laserbefehle, Maschinenbefehle */
 export interface FirmwareInfo {
@@ -45,8 +49,8 @@ export interface FirmwareInfo {
   jog: (x: number, y: number, f: number, axis?: string) => string[];
   setOrigin: string;
   clearOrigin: string | null;
-  /** Einstellungen der Maschine lesen: FluidNC-Pfade, GRBL-$$ oder gar nicht */
-  read: 'fluidnc' | 'grbl' | null;
+  /** Einstellungen der Maschine lesen: FluidNC-Pfade, GRBL-$$, Ruida-Speicher oder gar nicht */
+  read: 'fluidnc' | 'grbl' | 'ruida' | null;
   /** Echtzeit-Overrides für Vorschub, Eilgang und Leistung (0x90 …), Kühlmittel umschalten (0xA0/0xA1) */
   overrides: boolean;
   /** Queued motion only runs after a program end (M2), so every motion sequence must end with it (xTool) */
@@ -85,6 +89,20 @@ export const FIRMWARES: Record<Firmware, FirmwareInfo> = {
   // `<MPos:…>` has no state word and an extra `ok`, so the status is polled as a line while idle only.
   // Pause/stop keep the GRBL real-time bytes (! ~ 0x18); overrides and $$ are not known to work.
   xtool: { ...GRBL_BASE, label: 'xTool (USB)', sMax: 1000, poll: '?', jog: xtoolJog, read: null, overrides: false, runsOnM2: true },
+  ruida: {
+    ...GRBL_BASE,
+    label: 'Ruida (DSP / CO2)',
+    sMax: 100,
+    sync: true,
+    laserOn: [],
+    frameOn: [],
+    footer: [],
+    unlock: null,
+    setOrigin: 'G92 X0 Y0',
+    clearOrigin: 'G92.1',
+    read: 'ruida',
+    overrides: false,
+  },
 };
 
 /** Controller sends real-time status reports on `?` (GRBL family, Smoothieware); otherwise it is polled as a line */
@@ -212,6 +230,16 @@ export interface Device {
   frameView: 'pointer' | 'tool';
   /** Laser module (from the preset or entered by hand); informational, not used for G-code */
   laser?: LaserModule;
+  /** Ruida UDP-Datenport auf dem Laser (Standard 50200, manche Steuerungen 40200) */
+  ruidaPort?: number;
+  /** Ruida UDP-Tastenport auf dem Laser (Standard 50207) */
+  ruidaJogPort?: number;
+  /** Ruida-Verschlüsselungsbyte (auto, 0x88, 0x11, 0x38) */
+  ruidaMagic?: RuidaMagic;
+  /** Ruida-Maschinennullpunkt-Ecke (Standard hinten rechts) */
+  ruidaOrigin?: RuidaOrigin;
+  /** Aktive Laserröhre bei Ruida (1, 2 oder beide) */
+  ruidaLaser?: RuidaLaser;
 }
 
 export const DEFAULT_DEVICE: Device = {
@@ -259,6 +287,11 @@ export const DEFAULT_DEVICE: Device = {
   zFlip: false,
   pointerOffset: { x: 0, y: 0, enabled: false },
   frameView: 'pointer',
+  ruidaPort: 50200,
+  ruidaJogPort: 50207,
+  ruidaMagic: 'auto',
+  ruidaOrigin: 'top-right',
+  ruidaLaser: '1',
 };
 
 /** Built-in presets for new devices live in presets/devices (one JSON file per device), see packs.ts presetList */
@@ -2245,13 +2278,39 @@ export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[
 export interface PreparedGCode {
   id: number | null;
   lines: string[] | null;
+  /** Verwürfelte .rd-Bytes bei Ruida im Browser-/JS-Modus */
+  ruida?: Uint8Array | null;
   count: number;
   /** Geschätzte Zeit (s), zu der die Zeile fertig ist */
   times: Float64Array;
   total: number;
 }
 
-export async function prepareGCode(job: Job, d: Device, est: Estimate, name = 'KizamuBeam'): Promise<PreparedGCode> {
+export async function prepareGCode(
+  job: Job,
+  d: Device,
+  est: Estimate,
+  name = 'KizamuBeam',
+  layerOf?: (i: number) => Layer,
+): Promise<PreparedGCode> {
+  if (d.fw === 'ruida') {
+    const { mv, t } = rotaryMoves(job.moves, d, job.bounds, est.t);
+    const rParams = ruidaParamsForJob({ ...job, moves: mv }, d, layerOf);
+    if (hasNative()) {
+      try {
+        const buf = await native<ArrayBuffer>('ruida_prepare', packMoves(mv, t!, JSON.stringify(rParams)));
+        const head = new Uint32Array(buf, 0, 2);
+        const count = Math.max(1, head[1]);
+        const times = new Float64Array(count);
+        for (let i = 0; i < count; i++) times[i] = ((i + 1) / count) * est.total;
+        return { id: head[0], lines: null, ruida: null, count, times, total: est.total };
+      } catch {
+        /* ältere Desktop-App ohne Rust-Kern: weiter in TypeScript */
+      }
+    }
+    const bytes = writeRuida(mv, rParams);
+    return { id: null, lines: null, ruida: bytes, count: 1, times: new Float64Array([est.total]), total: est.total };
+  }
   const header = gcodeHeader(job, d, est, name);
   if (hasNative()) {
     try {

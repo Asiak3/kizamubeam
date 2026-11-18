@@ -1026,7 +1026,113 @@ await test('xTool status report without a state word', () => {
   assert.equal(parseStatus('<Hold:0|MPos:1,2,0>', run, wco).state, 'Hold');
 });
 
+// ---------- Ruida DSP (.rd Export & Import, Issue #244) ----------
+
+await test('Ruida: .rd Export, Layer-Parameter (Speed, Power, MinPower, Air) und Decoder', async () => {
+  const { decodeRuida, importRuida, isRuidaFile, prepareGCode } = await Promise.all([import('../src/ruida'), import('../src/gcode')]).then(([r, g]) => ({ ...r, ...g }));
+  const dev = newDevice({
+    fw: 'ruida',
+    bedW: 600,
+    bedH: 400,
+    ruidaOrigin: 'top-right',
+    ruidaMagic: '88',
+    ruidaLaser: '1',
+    optInnerFirst: false,
+    optTravel: false,
+    optGroup: false,
+  });
+  // Rechteck bei (100, 50) mit 80x40 mm im Dokument (bedH=400 → Bett Y: 310..350, Ruida top-right: X=420..500, Y=50..90)
+  const rect: Obj = { id: 1, m: [1, 0, 0, 1, 100, 50], layer: 2, shape: { kind: 'rect', w: 80, h: 40, r: 0 } as never };
+  const doc = loadDoc({ bed: { w: 600, h: 400 }, objs: [rect], layers: {} });
+  const layerFn = (i: number): Layer => ({
+    ...defaultLayer(i),
+    speed: 1500, // 25 mm/s
+    power: 65,
+    minPower: 20,
+    air: true,
+  });
+  const job = await buildJob({
+    doc,
+    layer: layerFn,
+    imgLayer: defaultImageLayer,
+    device: dev,
+    only: null,
+    position: null,
+    forPreview: false,
+  });
+  const prep = await prepareGCode(job, dev, estimate(job.moves, dev), 'test', layerFn);
+  assert.ok(prep.ruida && prep.ruida.length > 20, 'Ruida-Binärdaten erzeugt');
+  assert.ok(isRuidaFile(prep.ruida!));
+
+  const dec = decodeRuida(prep.ruida!);
+  assert.equal(dec.magic, 0x88);
+  assert.equal(dec.startFrom, 'absolute');
+  assert.equal(dec.eof, true);
+  assert.equal(dec.cuts.length, 4);
+  assert.ok(dec.bounds);
+  assert.ok(Math.abs(dec.bounds![0] - 420) < 0.01 && Math.abs(dec.bounds![1] - 50) < 0.01);
+  assert.ok(Math.abs(dec.bounds![2] - 500) < 0.01 && Math.abs(dec.bounds![3] - 90) < 0.01);
+
+  const l2 = dec.layers.get(2)!;
+  assert.ok(l2, 'Layer 2 in .rd vorhanden');
+  assert.ok(Math.abs(l2.speed - 1500) < 1);
+  assert.ok(Math.abs(l2.power - 65) < 0.2);
+  assert.ok(Math.abs(l2.minPower - 20) < 0.2);
+  assert.equal(l2.air, true);
+
+  // Round-Trip-Import zurück in ein KizamuBeam-Dokument
+  const imp = importRuida(prep.ruida!, 600, 400, 'top-right');
+  assert.equal(imp.objs.length, 1);
+  const pathObj = imp.objs[0];
+  assert.equal(pathObj.layer, 2);
+  assert.equal(pathObj.shape.kind, 'path');
+  const nodes = pathObj.shape.subs[0].nodes;
+  const xs = nodes.map((n) => n.x);
+  const ys = nodes.map((n) => n.y);
+  assert.ok(Math.abs(Math.min(...xs) - 100) < 0.01);
+  assert.ok(Math.abs(Math.max(...xs) - 180) < 0.01);
+  assert.ok(Math.abs(Math.min(...ys) - 50) < 0.01);
+  assert.ok(Math.abs(Math.max(...ys) - 90) < 0.01);
+  const impLayer = imp.layers[2]!;
+  assert.equal(impLayer.speed, 1500);
+  assert.equal(impLayer.power, 65);
+  assert.equal(impLayer.minPower, 20);
+  assert.equal(impLayer.air, true);
+});
+
+await test('Ruida: Nullpunkt-Ecken, relative Referenz (current/user) und Magic 0x11 / 0x38', async () => {
+  const { decodeRuida, toRuidaAbs, fromRuidaAbs, writeRuida } = await import('../src/ruida');
+  for (const origin of ['top-right', 'top-left', 'bottom-left', 'bottom-right'] as const) {
+    const [rx, ry] = toRuidaAbs(origin, 500, 300, 123.4, 56.7);
+    const [bx, by] = fromRuidaAbs(origin, 500, 300, rx, ry);
+    assert.ok(Math.abs(bx - 123.4) < 1e-6 && Math.abs(by - 56.7) < 1e-6, origin);
+  }
+  const mv = new Moves(50, 60);
+  mv.push(50, 60, 0, 0, 0);
+  mv.push(70, 60, 1200, 0.5, 0);
+  const bytes = writeRuida(mv, {
+    x0: 50,
+    y0: 60,
+    bedW: 500,
+    bedH: 300,
+    origin: 'bottom-left',
+    startFrom: 'current',
+    magic: 0x38,
+    laser: 'both',
+    layers: [{ index: 0, speed: 1200, power: 50, minPower: 0, color: 0xff0000 }],
+  });
+  const dec = decodeRuida(bytes);
+  assert.equal(dec.magic, 0x38);
+  assert.equal(dec.startFrom, 'current');
+  assert.equal(dec.cuts.length, 1);
+  assert.deepEqual(dec.cuts[0].from, [0, 0]);
+  assert.deepEqual(dec.cuts[0].to, [20, 0]);
+  // minPower=0 fällt auf maxPower (50%) zurück, damit Ecken nicht ungewollt auf 0% abfallen
+  assert.ok(Math.abs(dec.layers.get(0)!.minPower - 50) < 0.2);
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
 }
+

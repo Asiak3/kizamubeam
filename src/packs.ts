@@ -183,6 +183,13 @@ export function sanitizeDevice(raw: unknown, where: string): PresetEntry {
   if (rxBuffer !== undefined) p.rxBuffer = Math.round(rxBuffer);
   if (typeof r.zAxis === 'boolean') p.zAxis = r.zAxis;
   if (typeof r.zFlip === 'boolean') p.zFlip = r.zFlip;
+  const ruidaPort = numIn(r.ruidaPort, 1, 65535);
+  if (ruidaPort !== undefined) p.ruidaPort = Math.round(ruidaPort);
+  const ruidaJogPort = numIn(r.ruidaJogPort, 0, 65535);
+  if (ruidaJogPort !== undefined) p.ruidaJogPort = Math.round(ruidaJogPort);
+  if (r.ruidaOrigin === 'top-right' || r.ruidaOrigin === 'top-left' || r.ruidaOrigin === 'bottom-left' || r.ruidaOrigin === 'bottom-right') p.ruidaOrigin = r.ruidaOrigin;
+  if (r.ruidaMagic === 'auto' || r.ruidaMagic === '88' || r.ruidaMagic === '11' || r.ruidaMagic === '38') p.ruidaMagic = r.ruidaMagic;
+  if (r.ruidaLaser === '1' || r.ruidaLaser === '2' || r.ruidaLaser === 'both') p.ruidaLaser = r.ruidaLaser;
   const po = r.pointerOffset as Record<string, unknown> | undefined;
   if (po && typeof po === 'object') {
     const x = numIn(po.x, -200, 200);

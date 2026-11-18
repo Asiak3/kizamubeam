@@ -12,6 +12,8 @@ import { loadFont, textToSubs } from './fonts';
 import { importDxf, importSvg, ImportResult, PathBuilder, transformSubs } from './importers';
 import { buildDxf, buildPdf, ExportItem, ExportPage, LayerInfo } from './vecexport';
 import { FallbackResolver, importPdfPages, isPdf } from './pdfimport';
+import { importRuida, isRuidaFile } from './ruida';
+import { device } from './laser';
 import { t, tn } from './i18n';
 import { tabNameFromPath } from './editor/tabs';
 import { installNativeFileDrop, installDomFileDrop, dispatchNativeFiles } from './nativeFileDrop';
@@ -370,7 +372,7 @@ export function bytesToBase64(b: Uint8Array): string {
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'tif', 'tiff'];
 /** Was Importieren annimmt; .kza = Eintrag der Bibliothek */
 export const MODEL_EXT = ['stl', 'obj'];
-export const IMPORT_EXT = ['svg', 'dxf', 'pdf', 'ai', 'lbrn2', 'lbrn', ...IMAGE_EXT, ...MODEL_EXT, 'kza'];
+export const IMPORT_EXT = ['svg', 'dxf', 'pdf', 'ai', 'lbrn2', 'lbrn', 'rd', ...IMAGE_EXT, ...MODEL_EXT, 'kza'];
 const MIME: Record<string, string> = {
   png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', bmp: 'image/bmp', gif: 'image/gif', webp: 'image/webp',
 };
@@ -429,8 +431,11 @@ const pdfFontFallback: FallbackResolver = async (families, bold, italic) => {
 };
 
 /** Dateiinhalt anhand von Endung bzw. Dateikopf lesen; Fehler werden geworfen */
-async function parseFile(name: string, bytes: Uint8Array, bedH: () => number): Promise<ParsedFile> {
+async function parseFile(name: string, bytes: Uint8Array, bedH: () => number, bedW: () => number = () => device.bedW): Promise<ParsedFile> {
   const ext = (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? '').toLowerCase();
+  if (ext === 'rd' || (!ext && isRuidaFile(bytes))) {
+    return { kind: 'lbrn', res: importRuida(bytes, bedW(), bedH(), device.ruidaOrigin ?? 'top-right') };
+  }
   const head = new TextDecoder().decode(bytes.slice(0, 512)).trimStart();
   if (ext === 'lbrn2' || ext === 'lbrn' || isLbrn(head)) {
     const res = await convertLbrn(new TextDecoder().decode(bytes), { bedH: bedH(), assetId: hashId, flipImage: flipImageV });
@@ -451,7 +456,7 @@ async function parseFile(name: string, bytes: Uint8Array, bedH: () => number): P
   if (ext === 'dxf' || /^\s*0\s*\r?\n\s*SECTION/.test(head)) return { kind: 'vectors', res: importDxf(new TextDecoder().decode(bytes)) };
   if (ext === 'tif' || ext === 'tiff' || isTiff(bytes)) return { kind: 'image', ...(await decodeTiff(bytes)) };
   const mime = MIME[ext] ?? sniffImage(bytes);
-  if (!mime) throw new Error(t('Dateiformat wird nicht unterstützt (SVG, DXF, PDF, AI, PNG, JPG, BMP, GIF, WebP, TIFF).'));
+  if (!mime) throw new Error(t('Dateiformat wird nicht unterstützt (SVG, DXF, PDF, AI, RD, PNG, JPG, BMP, GIF, WebP, TIFF).'));
   return { kind: 'image', dataUrl: await bytesToDataUrl(bytes, mime), dpi: readDpi(bytes) };
 }
 
@@ -466,7 +471,7 @@ export async function importBytesOrThrow(ed: Editor, name: string, bytes: Uint8A
     await insertAssetFile(ed, new TextDecoder().decode(bytes));
     return;
   }
-  const f = await parseFile(name, bytes, () => ed.doc.bed.h);
+  const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w);
   if (f.kind === 'vectors') await ed.importVectors(f.res, name);
   else if (f.kind === 'pdf') await ed.importPdfPages(f.pages, name);
   else if (f.kind === 'lbrn') ed.importLbrn(f.res, name);
@@ -475,7 +480,7 @@ export async function importBytesOrThrow(ed: Editor, name: string, bytes: Uint8A
 
 /** Datei zu Objekten machen, ohne sie einzufügen (für die Bibliothek); notes: Hinweise des Imports */
 export async function fileObjs(ed: Editor, name: string, bytes: Uint8Array): Promise<{ objs: Obj[]; notes: string[] }> {
-  const f = await parseFile(name, bytes, () => ed.doc.bed.h);
+  const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w);
   if (f.kind === 'image') return { objs: [await ed.imageObj(f.dataUrl, f.dpi, name)], notes: [] };
   if (f.kind === 'lbrn') {
     for (const [id, url] of Object.entries(f.res.assets)) registerAsset(id, url);
@@ -580,6 +585,7 @@ export async function importFile(ed: Editor) {
         [t('Bilder'), IMAGE_EXT],
         [t('Vektoren (SVG, DXF, PDF, AI)'), ['svg', 'dxf', 'pdf', 'ai']],
         [t('LightBurn-Projekte'), ['lbrn2', 'lbrn']],
+        [t('Ruida-Aufträge (.rd)'), ['rd']],
         [t('3D-Modelle (STL, OBJ)'), MODEL_EXT],
         [t('Bibliotheks-Einträge'), ['kza']],
       ],
@@ -709,6 +715,11 @@ export async function saveDataUrl(name: string, filterName: string, ext: string,
   a.download = name;
   a.click();
   return true;
+}
+
+/** Binärdaten (Uint8Array) speichern; false, wenn der Dialog abgebrochen wurde */
+export async function saveBinary(name: string, filterName: string, ext: string, bytes: Uint8Array): Promise<boolean> {
+  return saveDataUrl(name, filterName, ext, 'data:application/octet-stream;base64,' + bytesToBase64(bytes));
 }
 
 /** Das gerasterte/geditherte Bild so speichern, wie es gelasert würde */

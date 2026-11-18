@@ -2,3 +2,4 @@
 
 pub mod gcode;
 pub mod raster;
+pub mod ruida;

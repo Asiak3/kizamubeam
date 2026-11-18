@@ -1,0 +1,23 @@
+{
+  "id": "generic.ruida",
+  "name": {
+    "de": "Ruida CO₂-Laser (allgemein)",
+    "en": "Ruida CO₂ laser (generic)",
+    "it": "Laser CO₂ Ruida (generico)",
+    "es": "Láser CO₂ Ruida (genérico)",
+    "pt-BR": "Laser CO₂ Ruida (genérico)"
+  },
+  "fw": "ruida",
+  "bedW": 600,
+  "bedH": 400,
+  "conn": "tcp",
+  "ruidaPort": 50200,
+  "ruidaJogPort": 50207,
+  "ruidaOrigin": "top-right",
+  "ruidaMagic": "88",
+  "ruidaLaser": "1",
+  "laser": {
+    "type": "co2",
+    "wavelength": 10600
+  }
+}

@@ -1,7 +1,7 @@
 //! Vergleich mit der TypeScript-Fassung: `npm run test:core` erzeugt tests/fixtures/parity.json aus
 //! src/images.ts und src/gcode.ts und startet danach diese Tests.
 
-use kizamubeam_core::{gcode, raster};
+use kizamubeam_core::{gcode, raster, ruida};
 use serde_json::Value;
 
 fn fixtures() -> Value {
@@ -107,5 +107,15 @@ fn packed_gcode_matches() {
         let want: Vec<&str> = c["lines"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
         assert_eq!(lines, want);
         assert_eq!(times, f64s(&c["times"]));
+    }
+}
+
+#[test]
+fn packed_ruida_matches() {
+    let f = fixtures();
+    for (i, c) in f["ruida"].as_array().unwrap().iter().enumerate() {
+        let bytes = ruida::write_packed(&u8s(&c["packed"])).unwrap();
+        let want = u8s(&c["bytes"]);
+        assert_eq!(bytes, want, "Ruida-Fall {i}");
     }
 }

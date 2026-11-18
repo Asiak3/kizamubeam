@@ -8,6 +8,7 @@ mod netcam;
 mod packs;
 mod plugin_net;
 mod remote;
+mod ruida_link;
 mod serial_transport;
 mod stream;
 mod sync;
@@ -216,12 +217,15 @@ pub fn run() {
             machine::machine_send,
             machine::machine_realtime,
             machine::machine_job,
+            machine::machine_ruida_job,
             machine::machine_job_prepared,
             native::image_register,
             native::image_process,
             native::image_scan,
             native::gcode_prepare,
             native::gcode_save,
+            native::ruida_prepare,
+            native::ruida_save,
             machine::machine_pause,
             machine::machine_resume,
             machine::machine_stop,
