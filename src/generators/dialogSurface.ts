@@ -8,7 +8,12 @@
 // the surface sends a move at the pointer, so the generator can show what the key does without the pointer moving.
 // The right column (#411) gets the help as a list and the number fields the drawing asks for (a typed value goes to
 // the generator as a "field" event); the dialog hears about every new drawing, for the marks in its preview.
+// The app zooms (wheel, pinch) and pans (middle button, the right one with the workspace setting, Shift+wheel) the surface (#411); the generator keeps working in mm
+// and gets the size times the zoom, so it can place its texts at the scale the drawing is shown at.
 import { pointerMods } from './pointerMods';
+import { canvasWheelFactor, installPinchGestures, pinchGestureActive } from '../canvasZoom';
+import { t } from '../i18n';
+import { drawSize, panBy, viewFit, zoomAt, type Fit, type UserView } from './surfaceView';
 import { evalExpr, f2, h } from '../dom';
 import type { GenDrawing, GenItem, GenLayer, Generator, GenPointer, GenSideField, GenStyle, GenSurfaceChange, GenSurfaceState, Params } from './types';
 
@@ -38,8 +43,23 @@ const HIT_HANDLE = 8;
 const HIT_LINE = 6;
 /** The surface gives way down to this height (px) in a dialog made smaller than the manifest's height */
 const MIN_H = 200;
-
-type Fit = { k: number; ox: number; oy: number };
+/** After the last zoom or pan step (ms): layers drawn sharp again, the drawing asked for at the new scale */
+const SETTLE_MS = 150;
+/** From this many triangles a layer is stretched while the view moves, instead of drawn again at every step */
+const HEAVY_TRIS = 2000;
+/** The right button pans once it has moved this far (px), as on the workspace (OVERLAP_MOVE_PX) */
+const RIGHT_PAN_PX = 6;
+/**
+ * Right-drag panning, as the workspace's setting says (src/editor/pointer.ts, loadRightPan; read here by its key so
+ * the dialog does not pull in the editor). Off unless switched on, as there.
+ */
+const rightPan = () => {
+  try {
+    return JSON.parse(localStorage.getItem('kizamubeam.rightPan') ?? 'false') === true;
+  } catch {
+    return false;
+  }
+};
 
 export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => void, isOpen: () => boolean): SurfaceArea | null {
   const spec = g.surface;
@@ -52,8 +72,10 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   const drawingListeners: (() => void)[] = [];
 
   const canvas = h('canvas', { class: 'gen-surface', tabindex: '0' }) as HTMLCanvasElement;
+  // Shown only while the view is zoomed or moved
+  const fitButton = h('button', { class: 'small gen-surface-fit', type: 'button', icon: 'zoompage', title: t('Ansicht einpassen'), 'aria-label': t('Ansicht einpassen'), hidden: true, onclick: () => fitView() });
   // The canvas fills a box that grows with the dialog; its own size never feeds back into the layout
-  const box = h('div', { class: 'gen-surface-box', style: `min-height:${H}px` }, canvas);
+  const box = h('div', { class: 'gen-surface-box', style: `min-height:${H}px` }, canvas, fitButton);
   const note = h('div', { class: 'note' });
   const tabs = spec.views.map((v) => h('button', { class: 'small', onclick: () => change({ view: v.id }) }, v.label));
   const syncTabs = () => tabs.forEach((b, i) => b.classList.toggle('on', spec.views[i].id === st.view));
@@ -61,9 +83,28 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   // ---- Drawing ----
   let drawing: GenDrawing | null = null;
   let fit: Fit = { k: 1, ox: 0, oy: 0 };
+  /** The user's zoom and pan per view (none: the drawing is fitted) */
+  const userViews = new Map<string, UserView>();
+  const userView = () => userViews.get(st.view) ?? null;
+  /** The last frame of each view (the zoom is relative to it) */
+  const frames = new Map<string, GenDrawing['frame']>();
   const layers = new Map<string, GenLayer>();
   const pictures = new Map<string, HTMLCanvasElement>();
+  /** The newest picture of each layer and the scale it was made for: stretched while zooming, until drawn sharp */
+  const lastPictures = new Map<string, { c: HTMLCanvasElement; fit: Fit; r: number }>();
+  /** Until then (ms) the view moves: layers are stretched instead of drawn again */
+  let movingUntil = 0;
   const size = () => ({ w: canvas.clientWidth || 560, h: canvas.clientHeight || H });
+  /** The size draw is told: the surface times the zoom */
+  const wantSize = () => {
+    const { w, h: hh } = size();
+    return drawSize(userView(), frames.get(st.view) ?? null, w, hh);
+  };
+  const refit = () => {
+    if (!drawing) return;
+    const { w, h: hh } = size();
+    fit = viewFit(userView(), drawing.frame, w, hh);
+  };
   const dpr = () => Math.max(1, Math.min(3, window.devicePixelRatio || 1));
   const colors = () => {
     const css = getComputedStyle(canvas);
@@ -185,6 +226,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     if (L.items) drawItems(ctx, L.items, col);
     if (pictures.size > MAX_LAYERS * 2) pictures.delete(pictures.keys().next().value!);
     pictures.set(id, c);
+    lastPictures.set(L.key, { c, fit: { ...fit }, r });
     return c;
   };
 
@@ -199,21 +241,31 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    fitButton.hidden = !userView();
     if (!drawing) return;
-    const f = drawing.frame;
-    const fw = Math.max(1e-6, f.x1 - f.x0), fh = Math.max(1e-6, f.y1 - f.y0);
-    const k = Math.min((w * 0.92) / fw, (hh * 0.9) / fh);
-    fit = { k, ox: w / 2 - ((f.x0 + f.x1) / 2) * k, oy: hh / 2 - ((f.y0 + f.y1) / 2) * k };
+    refit();
     const col = colors();
+    const moving = performance.now() < movingUntil;
     for (const L of drawing.layers ?? []) {
       const data = layers.get(L.key);
-      if (data) ctx.drawImage(picture(data, col), 0, 0);
+      if (!data) continue;
+      // While the view moves, the last picture of a layer with many triangles is stretched to the new scale (a large
+      // model would be slow to draw again at every step); it is drawn sharp once the view stands still
+      const last = moving && (data.tris?.length ?? 0) > HEAVY_TRIS * 6 ? lastPictures.get(L.key) : undefined;
+      if (last && last.r === r) {
+        const s = fit.k / last.fit.k;
+        ctx.drawImage(last.c, (fit.ox - last.fit.ox * s) * r, (fit.oy - last.fit.oy * s) * r, last.c.width * s, last.c.height * s);
+      } else ctx.drawImage(picture(data, col), 0, 0);
     }
     ctx.setTransform(r, 0, 0, r, 0, 0);
     drawItems(ctx, drawing.items, col);
-    canvas.style.cursor = cursorAt(pointer);
+    canvas.style.cursor = panning?.moved ? 'grabbing' : cursorAt(pointer);
   };
   const cursorAt = (q: { px: number; py: number } | null) => drawing?.cursor ?? (q && hit(q.px, q.py) ? 'move' : 'default');
+  let painting = 0;
+  const paintSoon = () => {
+    if (!painting) painting = requestAnimationFrame(() => ((painting = 0), paint()));
+  };
 
   // ---- Calls to the generator, one after the other ----
   let drawSeq = 0;
@@ -232,10 +284,10 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
         drawAgain = false;
         const token = ++drawSeq;
         let d: GenDrawing;
-        const { w, h: hh } = size();
-        drawnSize = { width: Math.round(w), height: Math.round(hh) };
+        drawnSize = wantSize();
+        const view = st.view;
         try {
-          d = await g.draw!({ view: st.view, state: st.state, selected: { ...st.selected }, have: [...layers.keys()], size: drawnSize }, { ...current });
+          d = await g.draw!({ view, state: st.state, selected: { ...st.selected }, have: [...layers.keys()], size: drawnSize }, { ...current });
         } catch {
           continue;
         }
@@ -245,9 +297,11 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
             layers.delete(L.key);
             layers.set(L.key, L);
             for (const id of [...pictures.keys()]) if (id.startsWith(L.key + '\u0000')) pictures.delete(id);
+            lastPictures.delete(L.key);
           }
         }
         while (layers.size > MAX_LAYERS) layers.delete(layers.keys().next().value!);
+        frames.set(view, d.frame);
         drawing = d;
         paint();
         showFields(d.fields ?? []);
@@ -352,7 +406,109 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     const q = at(e);
     return { type, x: round(q.x), y: round(q.y), ...extra, ...pointerMods(e) };
   };
+  // ---- Zoom and pan (#411): the view only, nothing goes to the generator but the size ----
+  /**
+   * The button that pans (middle, or right with the setting on) and where it was last. The right button pans only
+   * once it has moved a few pixels; released before, it was a right click (`context`, also when the menu event came
+   * while it was held, as on macOS).
+   */
+  let panning: { button: number; x: number; y: number; moved: boolean; context: MouseEvent | null } | null = null;
+  /** A right drag just ended: the menu event that follows is not a right click */
+  let noContext = false;
+  let settling = 0;
+  /** Once the view stands still: layers sharp again, and the drawing asked for at the new size if it changed */
+  const settle = () => {
+    clearTimeout(settling);
+    settling = window.setTimeout(() => {
+      movingUntil = 0;
+      if (!isOpen()) return;
+      paint();
+      const s = wantSize();
+      if (drawing && (s.width !== drawnSize.width || s.height !== drawnSize.height)) void redraw();
+    }, SETTLE_MS);
+  };
+  const setView = (v: UserView | null) => {
+    if (v) userViews.set(st.view, v);
+    else userViews.delete(st.view);
+    refit();
+    movingUntil = v ? performance.now() + SETTLE_MS * 2 : 0;
+    paintSoon();
+    settle();
+  };
+  const zoom = (factor: number, px: number, py: number) => {
+    if (!drawing) return;
+    const { w, h: hh } = size();
+    setView(zoomAt(userView(), drawing.frame, w, hh, factor, px, py));
+  };
+  const pan = (dx: number, dy: number) => {
+    if (!drawing) return;
+    const { w, h: hh } = size();
+    setView(panBy(userView(), drawing.frame, w, hh, dx, dy));
+  };
+  const fitView = () => {
+    setView(null);
+    canvas.focus();
+  };
+  /** The view moved under a pointer standing still: with track on, the generator hears where it is now */
+  const movedUnder = (e: MouseEvent) => {
+    if (!pointer) return;
+    const q = at(e);
+    pointer = { px: q.px, py: q.py, x: round(q.x), y: round(q.y) };
+    if (!down && drawing?.track) send(ev('move', e));
+  };
+  canvas.addEventListener(
+    'wheel',
+    (e) => {
+      if (!drawing) return;
+      e.preventDefault();
+      if (e.ctrlKey && pinchGestureActive(canvas)) return;
+      const q = at(e);
+      if (e.shiftKey && !e.ctrlKey) pan(-e.deltaX, -e.deltaY);
+      // As fast as on the workspace (about 16 % per wheel notch)
+      else zoom(canvasWheelFactor(e, Math.log(1.0015)), q.px, q.py);
+      movedUnder(e);
+    },
+    { passive: false },
+  );
+  installPinchGestures(canvas, zoom);
+  const panMove = (e: MouseEvent) => {
+    if (!panning) return;
+    if (!panning.moved) {
+      if (Math.hypot(e.clientX - panning.x, e.clientY - panning.y) < RIGHT_PAN_PX) return;
+      panning.moved = true;
+      canvas.style.cursor = 'grabbing';
+    }
+    // From where the button was, so the view does not jump by the few pixels before it moved
+    pan(e.clientX - panning.x, e.clientY - panning.y);
+    panning.x = e.clientX;
+    panning.y = e.clientY;
+  };
+  const panEnd = (e: MouseEvent) => {
+    if (!panning || e.button !== panning.button) return;
+    const p = panning;
+    panning = null;
+    window.removeEventListener('mousemove', panMove, true);
+    window.removeEventListener('mouseup', panEnd, true);
+    canvas.style.cursor = cursorAt(pointer);
+    if (p.button !== 2) return;
+    if (p.moved) noContext = true;
+    else if (p.context) context(p.context);
+  };
+  // The middle button never scrolls the page or pastes (Windows autoscroll, Linux)
+  canvas.addEventListener('auxclick', (e) => e.button === 1 && e.preventDefault());
+
   canvas.addEventListener('mousedown', (e) => {
+    noContext = false;
+    if (e.button === 1 || (e.button === 2 && rightPan())) {
+      if (e.button === 1) e.preventDefault();
+      if (down || panning || !drawing) return;
+      canvas.focus();
+      panning = { button: e.button, x: e.clientX, y: e.clientY, moved: e.button === 1, context: null };
+      if (panning.moved) canvas.style.cursor = 'grabbing';
+      window.addEventListener('mousemove', panMove, true);
+      window.addEventListener('mouseup', panEnd, true);
+      return;
+    }
     if (e.button !== 0) return;
     canvas.focus();
     const q = at(e);
@@ -363,6 +519,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   canvas.addEventListener('mousemove', (e) => {
     const q = at(e);
     pointer = { px: q.px, py: q.py, x: round(q.x), y: round(q.y) };
+    if (panning?.moved) return;
     if (!down) canvas.style.cursor = cursorAt(q);
     if (!down && !drawing?.track) return;
     send(ev('move', e, down ? { drag: true, from: down } : {}));
@@ -395,11 +552,17 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     const id = hit(q.px, q.py);
     send(ev('dblclick', e, id ? { hit: id } : {}));
   });
-  canvas.addEventListener('contextmenu', (e) => {
-    e.preventDefault();
+  const context = (e: MouseEvent) => {
     const q = at(e);
     const id = hit(q.px, q.py);
     send(ev('context', e, id ? { hit: id } : {}));
+  };
+  canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    // Right button still held while it may pan: click or drag is decided on release
+    if (panning?.button === 2) return void (panning.context = e);
+    if (noContext) return void (noContext = false);
+    context(e);
   });
   canvas.addEventListener('keydown', (e) => {
     if (!['Enter', 'Escape', 'Delete', 'Backspace'].includes(e.key)) return;
@@ -419,9 +582,9 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
           paint();
           clearTimeout(resized);
           resized = window.setTimeout(() => {
-            const { w, h: hh } = size();
-            if (isOpen() && drawing && (Math.round(w) !== drawnSize.width || Math.round(hh) !== drawnSize.height)) void redraw();
-          }, 150);
+            const s = wantSize();
+            if (isOpen() && drawing && (s.width !== drawnSize.width || s.height !== drawnSize.height)) void redraw();
+          }, SETTLE_MS);
         })
       : null;
   ro?.observe(canvas);
