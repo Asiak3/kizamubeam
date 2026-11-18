@@ -1,7 +1,7 @@
 {
  "format": "kizamubeam-catalog",
  "version": 1,
- "generated": "2026-11-18T12:35:08.181Z",
+ "generated": "2026-11-18T12:51:44.967Z",
  "packs": [
   {
    "id": "org.kizamubeam.box-composer",
@@ -31,11 +31,11 @@
     "js"
    ],
    "pluginApi": 1,
-   "codeSize": 38356,
+   "codeSize": 40291,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/box-composer",
    "file": "org.kizamubeam.box-composer.kzp",
-   "sha256": "bfd5f382f770cf5bab2723500dbb65583b6e15a6b4a06fade51e22b52247c33e",
-   "size": 74190
+   "sha256": "cbb9e38bf48ae761a9b5e89b3010bbbb10c4725e943acada8ba12ff8b78f7fcd",
+   "size": 78488
   },
   {
    "id": "org.kizamubeam.example",
@@ -89,7 +89,7 @@
    "codeSize": 5644,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/game-board",
    "file": "org.kizamubeam.game-board.kzp",
-   "sha256": "f96fa4eaf653d35f9489711ba4f9310ece31b9c400cdfef13e15b2894e38c253",
+   "sha256": "35c2511b1b234d32fc71c19407511c22fd41748e3eb85208769ba101e7e06b19",
    "size": 14490
   },
   {
@@ -181,7 +181,7 @@
    "codeSize": 12700,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/layered-art",
    "file": "org.kizamubeam.layered-art.kzp",
-   "sha256": "b69490ec8d98cf3c2edbac2bbfbe08922aff35451c5f07c1b9fe6b89527c922e",
+   "sha256": "f6291528150794654cd3e43e28c671dec79bbc027e3769bd7a7617d6f0ff58a3",
    "size": 25812
   },
   {
@@ -247,7 +247,7 @@
    "codeSize": 3350,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/stencil-bridges",
    "file": "org.kizamubeam.stencil-bridges.kzp",
-   "sha256": "6a432038debf6fab3cf4a58b8e313f41b6039adcda7e367aec2f55e2f514b290",
+   "sha256": "bd258d080d2f2bf1a549e6ee42b2d6ecc4ef2f98cb3104abd319823129bfb51b",
    "size": 12980
   },
   {
