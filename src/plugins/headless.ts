@@ -213,7 +213,8 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
       }
       await g.prepare(p);
       const r = buildGen(g, p);
-      const drawn = g.draw ? await g.draw({ ...surf, selected: { ...surf.selected }, have: [] }, p) : null;
+      // As the app draws it at its smallest: about 560 px wide, the manifest's height
+      const drawn = g.draw ? await g.draw({ ...surf, selected: { ...surf.selected }, have: [], size: { width: 560, height: g.surface?.height ?? 300 } }, p) : null;
       const parts = r.parts.map((x, k) => {
         const pts = x.shape.subs.flatMap((s) => s.nodes);
         const xs = pts.map((q) => q.x);

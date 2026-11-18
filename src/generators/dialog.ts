@@ -260,6 +260,8 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
     if (!form.childElementCount) form.remove();
     return panel;
   });
+  // The panel of the lists under the steps grows only when a list is left in it (not all went into steps)
+  if (lists?.el.querySelector('.gen-list')) lists.el.classList.add('gen-grow');
   function showStep(i: number) {
     stepPanels.forEach((el, k) => (el.hidden = k !== i));
     stepTabs.forEach((b, k) => b.classList.toggle('on', k === i));
@@ -510,30 +512,38 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
     onclick: () => void commit(false),
   }, t('Hinzufügen')) as HTMLButtonElement;
 
+  // Layout (#411): the body grows with the dialog and scrolls when it does not fit, the foot (question, issues, notes,
+  // buttons) stays at the bottom. The steps lie on top of each other, so the dialog keeps one size for all of them;
+  // the surface and the lists take the room. A dialog with a surface or lists can always be resized (dialogDrag.ts),
+  // and its size is kept per generator.
   const dlg = h(
     'dialog',
-    { class: 'offset-dialog gen-dialog' },
+    { class: 'offset-dialog gen-dialog' + (surface || lists ? ' dlg-resizable' : ''), 'data-dlg-size': `gen:${g.id}` },
     h('h3', {}, old ? t('{name} bearbeiten', { name: g.name }) : t('{name} erstellen', { name: g.name })),
     stepTabs.length ? h('div', { class: 'conn-row gen-steps', role: 'tablist' }, ...stepTabs) : null,
-    h('div', { class: 'qr-layout' },
-      h('div', {},
-        ...stepPanels,
-        h('div', { class: 'form' }, ...main),
-        ...sectionEls,
-        adv.length ? h('details', {}, h('summary', {}, t('Erweitert')), h('div', { class: 'form' }, ...adv)) : null,
+    h('div', { class: 'gen-body' },
+      h('div', { class: 'qr-layout gen-main' },
+        h('div', { class: 'gen-fields' },
+          stepPanels.length ? h('div', { class: 'gen-step-stack' }, ...stepPanels) : null,
+          h('div', { class: 'form' }, ...main),
+          ...sectionEls,
+          adv.length ? h('details', {}, h('summary', {}, t('Erweitert')), h('div', { class: 'form' }, ...adv)) : null,
+        ),
+        h('div', { class: 'gen-side' }, canvas, infoEl),
       ),
-      h('div', {}, canvas, infoEl),
+      inStep.has('surface') ? null : (surface?.el ?? null),
+      lists?.el ?? null,
     ),
-    inStep.has('surface') ? null : (surface?.el ?? null),
-    lists?.el ?? null,
-    askEl,
-    issuesEl,
-    calibNote,
-    kerfNote,
-    h('div', { class: 'dialog-buttons' },
-      h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen')),
-      addBtn,
-      okBtn,
+    h('div', { class: 'gen-foot' },
+      askEl,
+      issuesEl,
+      calibNote,
+      kerfNote,
+      h('div', { class: 'dialog-buttons' },
+        h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen')),
+        addBtn,
+        okBtn,
+      ),
     ),
   );
   dlg.addEventListener('keydown', (e) => {

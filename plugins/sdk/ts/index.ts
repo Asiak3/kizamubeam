@@ -226,8 +226,11 @@ export interface Plugin<P extends Params = Params> {
    * inputs holds what the action declares, surface the drawing surface if the dialog has one
    */
   onEvent?(input: { action: string; params: P; inputs: EventInputs; row?: number; surface?: Surface }): EventResult | null;
-  /** Optional (dialog version 3, dialog.surface): what the drawing surface shows; have = layer keys the app keeps */
-  draw?(input: Surface & { have: string[]; params: P }): Drawing;
+  /**
+   * Optional (dialog version 3, dialog.surface): what the drawing surface shows; have = layer keys the app keeps, size =
+   * the surface in screen pixels (newer apps; draw is called again when it changes)
+   */
+  draw?(input: Surface & { have: string[]; size?: { width: number; height: number }; params: P }): Drawing;
   /** Optional: a pointer or key event on the drawing surface */
   onSurface?(input: { event: Pointer; surface: Surface; params: P }): EventResult | null;
   /** Optional: a dialog with the plugin opened (a session); do expensive work once and keep it for the following calls */

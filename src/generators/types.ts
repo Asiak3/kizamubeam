@@ -303,6 +303,8 @@ export interface GenSurfaceState {
 export interface GenDrawRequest extends GenSurfaceState {
   /** Keys of the layers the app already has */
   have: string[];
+  /** Size of the surface in screen pixels (it grows with the dialog; draw is asked again when it changes) */
+  size?: { width: number; height: number };
 }
 
 /** A pointer or key event on the surface, in mm of the view */

@@ -2,6 +2,8 @@
 // of lines, handles and texts in mm, plus layers the app keeps as pictures) and answers pointer events
 // (Generator.onSurface). The app scales, draws, hit-tests and keeps the surface state; the generator only ever
 // changes parameters. Answers of a plugin arrive later: events are sent one after the other, moves are merged.
+// The surface fills the room the dialog gives it (the manifest's height is the smallest); the generator gets the size
+// in pixels with every draw and is asked again when it changes (#411).
 import { pointerMods } from './pointerMods';
 import { h } from '../dom';
 import type { GenDrawing, GenItem, GenLayer, Generator, GenPointer, GenStyle, GenSurfaceChange, GenSurfaceState, Params } from './types';
@@ -30,12 +32,15 @@ type Fit = { k: number; ox: number; oy: number };
 export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => void, isOpen: () => boolean): SurfaceArea | null {
   const spec = g.surface;
   if (!spec || !g.draw || !spec.views.length) return null;
+  /** Smallest height (px): the manifest's; the surface grows with the dialog */
   const H = spec.height ?? 300;
   let current = p;
   const st: GenSurfaceState = { view: spec.views[0].id, state: null, selected: {} };
   const selectListeners: (() => void)[] = [];
 
-  const canvas = h('canvas', { class: 'gen-surface', tabindex: '0', style: `height:${H}px` }) as HTMLCanvasElement;
+  const canvas = h('canvas', { class: 'gen-surface', tabindex: '0' }) as HTMLCanvasElement;
+  // The canvas fills a box that grows with the dialog; its own size never feeds back into the layout
+  const box = h('div', { class: 'gen-surface-box', style: `min-height:${H}px` }, canvas);
   const note = h('div', { class: 'note' });
   const tabs = spec.views.map((v) => h('button', { class: 'small', onclick: () => change({ view: v.id }) }, v.label));
   const syncTabs = () => tabs.forEach((b, i) => b.classList.toggle('on', spec.views[i].id === st.view));
@@ -45,7 +50,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   let fit: Fit = { k: 1, ox: 0, oy: 0 };
   const layers = new Map<string, GenLayer>();
   const pictures = new Map<string, HTMLCanvasElement>();
-  const size = () => ({ w: canvas.clientWidth || 560, h: H });
+  const size = () => ({ w: canvas.clientWidth || 560, h: canvas.clientHeight || H });
   const dpr = () => Math.max(1, Math.min(3, window.devicePixelRatio || 1));
   const colors = () => {
     const css = getComputedStyle(canvas);
@@ -113,14 +118,14 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
 
   /** A layer as a picture for the current size and scale */
   const picture = (L: GenLayer, col: Record<GenStyle, string>): HTMLCanvasElement => {
-    const { w } = size();
+    const { w, h: hh } = size();
     const r = dpr();
-    const id = `${L.key}\u0000${w}\u0000${r}\u0000${fit.k}\u0000${fit.ox}\u0000${fit.oy}`;
+    const id = `${L.key}\u0000${w}\u0000${hh}\u0000${r}\u0000${fit.k}\u0000${fit.ox}\u0000${fit.oy}`;
     let c = pictures.get(id);
     if (c) return c;
     c = document.createElement('canvas');
     c.width = Math.round(w * r);
-    c.height = Math.round(H * r);
+    c.height = Math.round(hh * r);
     const ctx = c.getContext('2d')!;
     ctx.setTransform(r, 0, 0, r, 0, 0);
     const T = L.tris ?? [];
@@ -171,11 +176,11 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   };
 
   const paint = () => {
-    const { w } = size();
+    const { w, h: hh } = size();
     const r = dpr();
-    if (canvas.width !== Math.round(w * r) || canvas.height !== Math.round(H * r)) {
+    if (canvas.width !== Math.round(w * r) || canvas.height !== Math.round(hh * r)) {
       canvas.width = Math.round(w * r);
-      canvas.height = Math.round(H * r);
+      canvas.height = Math.round(hh * r);
     }
     const ctx = canvas.getContext('2d')!;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -183,8 +188,8 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     if (!drawing) return;
     const f = drawing.frame;
     const fw = Math.max(1e-6, f.x1 - f.x0), fh = Math.max(1e-6, f.y1 - f.y0);
-    const k = Math.min((w * 0.92) / fw, (H * 0.9) / fh);
-    fit = { k, ox: w / 2 - ((f.x0 + f.x1) / 2) * k, oy: H / 2 - ((f.y0 + f.y1) / 2) * k };
+    const k = Math.min((w * 0.92) / fw, (hh * 0.9) / fh);
+    fit = { k, ox: w / 2 - ((f.x0 + f.x1) / 2) * k, oy: hh / 2 - ((f.y0 + f.y1) / 2) * k };
     const col = colors();
     for (const L of drawing.layers ?? []) {
       const data = layers.get(L.key);
@@ -199,6 +204,8 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   let drawSeq = 0;
   let drawBusy = false;
   let drawAgain = false;
+  /** The size the last drawing was asked for (px) */
+  let drawnSize = { width: 0, height: 0 };
   const redraw = async () => {
     if (drawBusy) {
       drawAgain = true;
@@ -210,8 +217,10 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
         drawAgain = false;
         const token = ++drawSeq;
         let d: GenDrawing;
+        const { w, h: hh } = size();
+        drawnSize = { width: Math.round(w), height: Math.round(hh) };
         try {
-          d = await g.draw!({ view: st.view, state: st.state, selected: { ...st.selected }, have: [...layers.keys()] }, { ...current });
+          d = await g.draw!({ view: st.view, state: st.state, selected: { ...st.selected }, have: [...layers.keys()], size: drawnSize }, { ...current });
         } catch {
           continue;
         }
@@ -367,13 +376,25 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     e.stopPropagation();
     send({ type: 'key', x: 0, y: 0, key: e.key, ...pointerMods(e) });
   });
-  // The width follows the dialog
-  const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(() => paint()) : null;
+  // The size follows the dialog: painted again at once, drawn again (the generator may place its texts by the size)
+  // once the size has settled
+  let resized = 0;
+  const ro =
+    typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => {
+          paint();
+          clearTimeout(resized);
+          resized = window.setTimeout(() => {
+            const { w, h: hh } = size();
+            if (isOpen() && drawing && (Math.round(w) !== drawnSize.width || Math.round(hh) !== drawnSize.height)) void redraw();
+          }, 150);
+        })
+      : null;
   ro?.observe(canvas);
 
   const el = h('div', { class: 'gen-surface-area' },
     spec.views.length > 1 ? h('div', { class: 'conn-row' }, ...tabs) : null,
-    canvas,
+    box,
     note,
     spec.help ? h('div', { class: 'note muted' }, spec.help) : null,
   );
