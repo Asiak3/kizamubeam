@@ -15,6 +15,7 @@ import { curvaturePreview } from './vector';
 import { arcSubPath } from './arc';
 import { GRID_MIN_PX, gridLevels, gridLines, LEVEL_ALPHA } from '../grid';
 import { closurePreview } from '../shaper';
+import { groupFactor, withBaselineTypography } from '../uiTypography';
 
 function rectPath(w: number, h: number): Path2D {
   const p = new Path2D();
@@ -100,7 +101,7 @@ export class EditorRender {
       this.continuedFrom = null;
       this.centerMarks = 'off';
       this.isolation = null; this.builderSession = null; this.overlapHover = null;
-      this.render();
+      withBaselineTypography(this, () => this.render());
       return off.toDataURL('image/png');
     } finally {
       Object.assign(this, saved);
@@ -425,12 +426,14 @@ export class EditorRender {
         ctx.stroke();
         const mx = (a.x + b.x) / 2,
           my = (a.y + b.y) / 2;
+        // Arbeitsflächen-Skalierung: Zahl und Markierung wachsen gemeinsam
+        const fWs = groupFactor(this.typo, 'workspace');
         ctx.fillStyle = '#ff6020';
         ctx.beginPath();
-        ctx.arc(mx, my, 8 * px, 0, Math.PI * 2);
+        ctx.arc(mx, my, 8 * px * fWs, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${11 * px}px sans-serif`;
+        ctx.font = `bold ${11 * px * fWs}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(String(i + 1), mx, my + 0.5 * px);
@@ -568,13 +571,15 @@ export class EditorRender {
     if (d && d.type === 'rotate') {
       const q = this.toScreen(this.cursor);
       const label = `${d.angle.toFixed(1)}°`;
-      ctx.font = '12px system-ui, sans-serif';
+      // Arbeitsflächen-Skalierung: Schrift und Box wachsen gemeinsam (Baseline: 12/18/10/19)
+      const fWs = groupFactor(this.typo, 'workspace');
+      ctx.font = `${12 * fWs}px system-ui, sans-serif`;
       const w = ctx.measureText(label).width + 10;
       ctx.fillStyle = T.label;
-      ctx.fillRect(q.x + 14, q.y + 10, w, 18);
+      ctx.fillRect(q.x + 14, q.y + 10, w, 18 * fWs);
       ctx.fillStyle = T.labelText;
       ctx.textBaseline = 'middle';
-      ctx.fillText(label, q.x + 19, q.y + 19);
+      ctx.fillText(label, q.x + 14 + 5 * fWs, q.y + 10 + 9 * fWs);
       const c = this.toScreen(d.center);
       ctx.setLineDash([3, 3]);
       ctx.strokeStyle = T.sel;
@@ -928,11 +933,13 @@ export class EditorRender {
     }
     // Beschriftungen: Symbole der Beziehungen und Bemaßungen
     s.labels = [];
-    ctx.font = '11px system-ui, sans-serif';
+    // Arbeitsflächen-Skalierung: Schrift, Boxen und Abstände wachsen gemeinsam (Baseline: 11/16)
+    const fWs = groupFactor(this.typo, 'workspace');
+    ctx.font = `${11 * fWs}px system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
     const box = (id: number, text: string, x: number, y: number, fg: string, bg: string) => {
       const w = ctx.measureText(text).width + 8,
-        h = 16;
+        h = 16 * fWs;
       const bx = Math.round(x - w / 2),
         by = Math.round(y - h / 2);
       const sel = s.sel.has(id),
@@ -974,16 +981,16 @@ export class EditorRender {
           const a = scr(ptOf(sk, e.a)!),
             b = scr(ptOf(sk, e.b)!);
           const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-          return { key: `e${id}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, dx: (-(b.y - a.y) / L) * 13, dy: ((b.x - a.x) / L) * 13 };
+          return { key: `e${id}`, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, dx: (-(b.y - a.y) / L) * 13 * fWs, dy: ((b.x - a.x) / L) * 13 * fWs };
         }
         if (e) {
           const c0 = scr(ptOf(sk, e.c)!);
           const r = e.r * k;
-          return { key: `e${id}`, x: c0.x + r * 0.71, y: c0.y - r * 0.71, dx: 11, dy: -11 };
+          return { key: `e${id}`, x: c0.x + r * 0.71, y: c0.y - r * 0.71, dx: 11 * fWs, dy: -11 * fWs };
         }
         const p = ptOf(sk, id);
         const q = p ? scr(p) : { x: 0, y: 0 };
-        return { key: `p${id}`, x: q.x, y: q.y, dx: 12, dy: -12 };
+        return { key: `p${id}`, x: q.x, y: q.y, dx: 12 * fWs, dy: -12 * fWs };
       };
       const refs = c.t === 'fixed' || c.t === 'horizontal' || c.t === 'vertical' ? [first] : c.t === 'midpoint' || c.t === 'pointOnLine' || c.t === 'pointOnCircle' ? [c.r[0]] : c.t === 'symmetric' ? [c.r[2]] : c.r;
       if ((c.t === 'horizontal' || c.t === 'vertical') && !e0) refs.splice(0, 1, ...c.r);
@@ -1016,12 +1023,12 @@ export class EditorRender {
         const from = c.t === 'diameter' ? { x: C.x - e.r * Math.cos(dir), y: C.y - e.r * Math.sin(dir) } : C;
         const a = scr(from),
           b = scr(rim);
-        const out = { x: b.x + Math.cos(dir) * 18, y: b.y + Math.sin(dir) * 18 };
+        const out = { x: b.x + Math.cos(dir) * 18 * fWs, y: b.y + Math.sin(dir) * 18 * fWs };
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(out.x, out.y);
         ctx.stroke();
-        label = { x: out.x + Math.cos(dir) * 14, y: out.y + Math.sin(dir) * 8 };
+        label = { x: out.x + Math.cos(dir) * 14 * fWs, y: out.y + Math.sin(dir) * 8 * fWs };
       } else if (c.t === 'angle') {
         const l1 = entOf(sk, c.r[0]),
           l2 = entOf(sk, c.r[1]);
@@ -1137,13 +1144,15 @@ export class EditorRender {
   renderMeasure(this: Editor, ctx: CanvasRenderingContext2D) {
     const T = this.colors;
     const label = (text: string, x: number, y: number) => {
-      ctx.font = '12px system-ui, sans-serif';
+      // Arbeitsflächen-Skalierung: Schrift und Box wachsen gemeinsam (Baseline: 12/10/20/5)
+      const fWs = groupFactor(this.typo, 'workspace');
+      ctx.font = `${12 * fWs}px system-ui, sans-serif`;
       ctx.textBaseline = 'middle';
       const w = ctx.measureText(text).width + 10;
       ctx.fillStyle = T.label;
-      ctx.fillRect(x, y - 10, w, 20);
+      ctx.fillRect(x, y - 10 * fWs, w, 20 * fWs);
       ctx.fillStyle = T.labelText;
-      ctx.fillText(text, x + 5, y);
+      ctx.fillText(text, x + 5 * fWs, y);
     };
     const mm = (v: number) => dec(v.toFixed(2));
     ctx.save();
@@ -1261,13 +1270,15 @@ export class EditorRender {
     }
     ctx.stroke();
     const label = SNAP_LABELS[hit.kind];
-    ctx.font = '11px system-ui, sans-serif';
+    // Arbeitsflächen-Skalierung: Schrift und Box wachsen gemeinsam (Baseline: 11/8/16/14/16)
+    const fWs = groupFactor(this.typo, 'workspace');
+    ctx.font = `${11 * fWs}px system-ui, sans-serif`;
     ctx.textBaseline = 'middle';
     const w = ctx.measureText(label).width + 8;
     ctx.fillStyle = T.label;
-    ctx.fillRect(x + 10, y + 8, w, 16);
+    ctx.fillRect(x + 10, y + 8, w, 16 * fWs);
     ctx.fillStyle = T.labelText;
-    ctx.fillText(label, x + 14, y + 16);
+    ctx.fillText(label, x + 14, y + 8 + 8 * fWs);
   }
 
   renderRulers(this: Editor, ctx: CanvasRenderingContext2D) {
@@ -1290,7 +1301,8 @@ export class EditorRender {
     const major = steps.find((s) => s * z >= 60) ?? 1000;
     const minor = major / (String(major).startsWith('2') ? 4 : 5);
     ctx.fillStyle = T.rulerText;
-    ctx.font = '10px system-ui, sans-serif';
+    // Arbeitsflächen-Skalierung: Linealzahlen (Baseline: 10)
+    ctx.font = `${10 * groupFactor(this.typo, 'workspace')}px system-ui, sans-serif`;
     ctx.textBaseline = 'top';
     ctx.beginPath();
     const x0 = this.toWorld(RULER, 0).x,

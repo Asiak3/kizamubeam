@@ -23,6 +23,7 @@ import {
 } from './camera';
 import type { CameraFineTune, CameraImageAdjustments } from './cameraProfile';
 import { dec, t, tn } from './i18n';
+import { getTypography, groupFactor, onTypographyChange, resolveTypography } from './uiTypography';
 import { openWorkpieceDialog } from './workpieceDialog';
 
 // ---------- Einstellungen je Gerät ----------
@@ -1425,7 +1426,8 @@ function openCalibration(ed: Editor, u: CamUnit) {
     c.fillRect(ox + A.x0 * k, oy + (bedH - A.y1) * k, aw * k, ah * k);
     c.strokeStyle = css.getPropertyValue('--line') || '#888';
     c.strokeRect(ox + A.x0 * k, oy + (bedH - A.y1) * k, aw * k, ah * k);
-    c.font = '10px sans-serif';
+    // Unterstützend: Kalibrier-Nummern (Baseline: 10)
+    c.font = `${10 * groupFactor(resolveTypography(getTypography()), 'supporting')}px sans-serif`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     targets.forEach((t, i) => {
@@ -1473,7 +1475,8 @@ function openCalibration(ed: Editor, u: CamUnit) {
     }
     if (!f) {
       c.fillStyle = getComputedStyle(dlg).getPropertyValue('--muted') || '#888';
-      c.font = '13px sans-serif';
+      // Unterstützend: Platzhaltertext (Baseline: 13)
+      c.font = `${13 * groupFactor(resolveTypography(getTypography()), 'supporting')}px sans-serif`;
       c.textAlign = 'center';
       c.fillText(cam.open ? t('Nach dem Lasern „Foto aufnehmen“.') : t('Kamera nicht verbunden.'), r.width / 2, r.height / 2);
       skipBtn.disabled = backBtn.disabled = true;
@@ -1501,7 +1504,8 @@ function openCalibration(ed: Editor, u: CamUnit) {
       c.lineTo(q.x, q.y + 7);
       c.stroke();
       c.fillStyle = '#20e060';
-      c.font = 'bold 12px sans-serif';
+      // Unterstützend: gesetzte Klickpunkte (Baseline: 12)
+      c.font = `bold ${12 * groupFactor(resolveTypography(getTypography()), 'supporting')}px sans-serif`;
       c.fillText(String(i + 1), q.x + 6, q.y - 6);
     });
     // Wo das Modell die Markierungen erwartet (nach der ersten Berechnung)
@@ -1551,6 +1555,8 @@ function openCalibration(ed: Editor, u: CamUnit) {
   });
   ro.observe(view);
   const offDevice = onDeviceChange(() => dlg.close());
+  // Typografie live nachführen, beim Schließen abmelden
+  const offTypo = onTypographyChange(() => draw());
   const offMachine = machine.on((event) => {
     if (disposed) return;
     burnBtn.disabled = !machine.connected || machine.running;
@@ -1565,7 +1571,7 @@ function openCalibration(ed: Editor, u: CamUnit) {
       ...(head ? { center: { ...center } } : {}) };
     save();
     disposed = true; captureGeneration++;
-    ro.disconnect(); offDevice(); offMachine(); machinePanel.dispose();
+    ro.disconnect(); offDevice(); offMachine(); offTypo(); machinePanel.dispose();
     cancelAnimationFrame(liveFrame); dlg.remove();
   });
   dlg.addEventListener('keydown', (e) => e.stopPropagation());

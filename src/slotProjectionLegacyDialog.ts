@@ -9,6 +9,7 @@ import { createSlotPreviewClient } from './slotPreviewClient';
 import { applySlotRecipe, openLegacySlotPlacementDialog } from './slotLegacyDialog';
 import { movableToolWindow } from './toolWindow';
 import { t } from './i18n';
+import { getTypography, groupFactor, onTypographyChange, resolveTypography } from './uiTypography';
 export { applySlotRecipe } from './slotLegacyDialog';
 
 // UI owns only a staged recipe. Geometry calculation is performed by a disposable worker.
@@ -124,12 +125,16 @@ export function openProjectionLegacyDialog(ed: Editor, target?: Obj): void {
       if (valid && !pending && selected?.projection) {
         const frame = projectionFrame(geometryRecipe.base, selected); selectedOrigin = frame.origin;
         ctx.strokeStyle = '#ffe277'; ctx.setLineDash([4 / scale, 3 / scale]); ctx.beginPath(); ctx.moveTo(frame.origin.x, frame.origin.y); ctx.lineTo(frame.zero.x, frame.zero.y); ctx.lineTo(frame.target.x, frame.target.y); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = '#ffe277'; ctx.font = `${12 / scale}px sans-serif`; ctx.fillText(`${selected.projection.distance.toFixed(2)} mm`, (frame.zero.x + frame.target.x) / 2, (frame.zero.y + frame.target.y) / 2 - 8 / scale);
+        // Arbeitsfläche: Bemaßung (Baseline: 12)
+        const fWs = groupFactor(resolveTypography(getTypography()), 'workspace');
+        ctx.fillStyle = '#ffe277'; ctx.font = `${(12 * fWs) / scale}px sans-serif`; ctx.fillText(`${selected.projection.distance.toFixed(2)} mm`, (frame.zero.x + frame.target.x) / 2, (frame.zero.y + frame.target.y) / 2 - 8 / scale);
         ctx.strokeStyle = '#ffe277'; ctx.beginPath(); ctx.arc(frame.target.x, frame.target.y, 5 / scale, 0, Math.PI * 2); ctx.stroke();
       }
       if (selectedOrigin) { ctx.strokeStyle = '#ff4040'; ctx.lineWidth = 2.5 / scale; ctx.beginPath(); ctx.arc(selectedOrigin.x, selectedOrigin.y, 7 / scale, 0, Math.PI * 2); ctx.stroke(); }
     };
     function scheduleDraw() { if (!closed && !drawing) drawing = requestAnimationFrame(() => { drawing = 0; draw(); }); }
+    // Typografie live nachführen, beim Schließen abmelden
+    const offTypo = onTypographyChange(() => scheduleDraw());
     canvas.addEventListener('pointerdown', e => {
       if (e.button !== 0 || stale || pending) return;
       const r = canvas.getBoundingClientRect(), p = { x: (e.clientX - r.left - ox) / scale, y: (e.clientY - r.top - oy) / scale }, tolerance = 12 / scale;
@@ -189,7 +194,7 @@ export function openProjectionLegacyDialog(ed: Editor, target?: Obj): void {
       catch (e) { info.textContent = e instanceof Error ? e.message : String(e); }
     });
     let disposeWindow = () => {};
-    dlg.addEventListener('close', () => { closed = true; client.dispose(); ed.off(changed); disposeWindow(); if (drawing) cancelAnimationFrame(drawing); dlg.remove(); });
+    dlg.addEventListener('close', () => { closed = true; client.dispose(); ed.off(changed); disposeWindow(); offTypo(); if (drawing) cancelAnimationFrame(drawing); dlg.remove(); });
     dlg.addEventListener('keydown', e => e.stopPropagation());
     document.body.append(dlg); dlg.showModal(); disposeWindow = movableToolWindow(dlg, title, scheduleDraw); refreshList(); request();
   } catch (e) { ed.hint = e instanceof Error ? e.message : String(e); ed.emit('tool'); }

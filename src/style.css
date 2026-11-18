@@ -21,7 +21,13 @@
   --backdrop: rgba(20, 30, 50, 0.15);
   color-scheme: light;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-interface));
+  /* UI-Schriftgruppen (src/uiTypography.ts): Faktoren je semantischer Gruppe, 1 = heutiger Stand */
+  --ty-interface: 1;
+  --ty-supporting: 1;
+  --ty-technical: 1;
+  --ty-workspace: 1;
+  --ty-control-height: calc(22px * var(--ty-interface));
   color: var(--text);
 }
 /* Dunkles Design: ausdrücklich gewählt oder vom System vorgegeben */
@@ -212,7 +218,7 @@ body {
 }
 .fontpick-chev {
   color: var(--muted);
-  font-size: 10px;
+  font-size: calc(10px * var(--ty-interface));
 }
 .fontpick-pop {
   position: fixed;
@@ -227,7 +233,7 @@ body {
 .fontpick-group {
   padding: 4px 14px 2px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
 }
 .fontpick-row {
   display: block;
@@ -235,7 +241,7 @@ body {
   border: 0;
   background: none;
   padding: 5px 14px;
-  font-size: 16px;
+  font-size: calc(16px * var(--ty-interface));
   text-align: left;
   color: inherit;
   cursor: default;
@@ -303,7 +309,7 @@ select {
   background: var(--field);
   border: 1px solid var(--line);
   border-radius: 3px;
-  height: 22px;
+  height: var(--ty-control-height);
   padding: 0 4px;
 }
 input[type='text']:focus,
@@ -325,9 +331,9 @@ select:focus {
   max-width: 220px;
 }
 /* Bogen-Optionen: Zielgröße 24 px für die nativen Auswahlfelder */
-#arcbar select,
-.arcbar select {
-  height: 24px;
+#arcbar select {
+  height: calc(24px * var(--ty-interface));
+  min-height: 24px;
 }
 .toolbar-view {
   display: grid;
@@ -604,7 +610,7 @@ select:focus {
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: 3px;
-  height: 22px;
+  height: var(--ty-control-height);
   min-width: 24px;
   font: inherit;
   padding: 0 5px;
@@ -663,7 +669,7 @@ select:focus {
 #texteditor textarea {
   width: 260px;
   height: 64px;
-  font: 14px system-ui, sans-serif;
+  font: calc(14px * var(--ty-interface)) system-ui, sans-serif;
   border: 1px solid var(--line);
   border-radius: 3px;
   resize: both;
@@ -671,7 +677,7 @@ select:focus {
 }
 #texteditor .hint {
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
   padding-top: 3px;
 }
 
@@ -858,7 +864,7 @@ table.layers tr.active td {
   background: var(--accent-soft);
 }
 table.layers select {
-  height: 20px;
+  height: calc(20px * var(--ty-interface));
   padding: 0 2px;
 }
 .swatch {
@@ -869,7 +875,7 @@ table.layers select {
   height: 16px;
   border-radius: 2px;
   color: #fff;
-  font-size: 10px;
+  font-size: calc(10px * var(--ty-interface));
   font-weight: 600;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
 }
@@ -924,16 +930,21 @@ table.layers select {
 }
 .laser-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
 }
 .laser-grid .btn {
-  height: 42px;
+  min-height: 42px;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
+}
+.laser-grid .btn > span {
+  display: flex;
+  flex: none;
 }
 .laser-grid .btn svg {
   width: 16px;
@@ -941,7 +952,7 @@ table.layers select {
 }
 .note {
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
   margin-top: 6px;
 }
 
@@ -959,7 +970,7 @@ table.layers select {
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 2px;
   color: #fff;
-  font: 600 10px system-ui, sans-serif;
+  font: 600 calc(10px * var(--ty-interface)) system-ui, sans-serif;
   text-shadow: 0 0 2px rgba(0, 0, 0, 0.9);
   padding: 0;
 }
@@ -1023,7 +1034,7 @@ dialog.about img {
 }
 dialog h3 {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ty-interface));
 }
 /* Titelleiste verschiebbarer Dialoge wie bei den schwebenden Dock-Fenstern (src/dialogDrag.ts
    setzt die Ränder passend zum Innenabstand des jeweiligen Dialogs) */
@@ -1058,7 +1069,7 @@ dialog > .dlg-bar button {
 dialog > .dlg-bar .ib {
   width: 22px;
   height: 22px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ty-interface));
   font-weight: normal;
 }
 dialog > .dlg-bar .dlg-close {
@@ -1196,8 +1207,29 @@ dialog {
 .form .checks {
   grid-column: 1 / -1;
 }
+.laser-tab {
+  container-type: inline-size;
+}
 .laser-tab .form {
-  grid-template-columns: 1fr 150px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, calc(150px * var(--ty-interface)));
+}
+.laser-tab .form > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.laser-tab .conn-row {
+  flex-wrap: wrap;
+}
+.laser-tab .conn-row .port {
+  flex-basis: calc(150px * var(--ty-interface));
+  max-width: 100%;
+}
+/* Stack label/control pairs when the panel cannot accommodate the scaled text. */
+@container (max-width: 22em) {
+  .laser-tab .form,
+  .laser-tab .ov-box .form {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .checks {
   display: flex;
@@ -1347,7 +1379,7 @@ label.check {
 }
 .progress-text {
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
   margin-top: 2px;
 }
 .origin-grid {
@@ -1420,7 +1452,7 @@ label.check {
 .jog .btn {
   height: 30px;
   padding: 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--ty-interface));
 }
 .move-form {
   grid-template-columns: auto 80px;
@@ -1440,7 +1472,7 @@ label.check {
   border-radius: 3px;
   padding: 4px;
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-technical));
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -1707,7 +1739,7 @@ table.devices .actions {
 }
 /* Calibration machine controls */
 .calibration-machine-controls { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
-.calibration-machine-controls h3 { font-size: 14px; }
+.calibration-machine-controls h3 { font-size: calc(14px * var(--ty-interface)); }
 .calibration-machine-controls .move-row { flex-wrap: wrap; }
 .calibration-machine-controls .move-form { flex: 1 1 11rem; min-width: 0; grid-template-columns: minmax(0, 1fr) 8ch; }
 .cal-step {
@@ -1924,7 +1956,7 @@ table.layers input[type='checkbox'] {
 }
 .mt-preview text {
   fill: var(--text);
-  font-size: 8px;
+  font-size: calc(8px * var(--ty-workspace));
 }
 .mt-preview .mt-axis {
   font-weight: 600;
@@ -1954,7 +1986,7 @@ table.layers input[type='checkbox'] {
 .ft-steps {
   margin: 0;
   padding-left: 1.3em;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-interface));
   line-height: 1.45;
 }
 .ft-preview .ft-bed {
@@ -2129,7 +2161,7 @@ table.layers td:nth-child(2) {
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 4px;
-  font: 11px ui-monospace, monospace;
+  font: calc(11px * var(--ty-technical)) ui-monospace, monospace;
   white-space: pre-wrap;
   word-break: break-all;
   user-select: text;
@@ -2170,7 +2202,7 @@ table.layers td:nth-child(2) {
   width: 100%;
   border-collapse: collapse;
   margin: 6px 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-interface));
 }
 .agent-confirm-layers th,
 .agent-confirm-layers td {
@@ -2201,7 +2233,7 @@ table.layers td:nth-child(2) {
 }
 .device-dialog textarea.script {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-technical));
   resize: vertical;
 }
 
@@ -2247,7 +2279,7 @@ table.layers td:nth-child(2) {
   margin: 12px 0 4px;
 }
 .vt-preview {
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-technical));
   display: grid;
   gap: 2px;
   max-width: 540px;
@@ -2262,7 +2294,7 @@ table.layers td:nth-child(2) {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 2px 14px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-technical));
   margin-top: 6px;
 }
 .vt-dialog details {
@@ -2374,7 +2406,7 @@ body.dock-resizing #canvas {
 }
 .dg-close {
   display: none;
-  font-size: 14px;
+  font-size: calc(14px * var(--ty-interface));
   margin-right: -4px;
 }
 .dg-tab.cur .dg-close {
@@ -2528,7 +2560,7 @@ body.dock-resizing #canvas {
   height: auto;
   min-height: 24px;
   padding: 2px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ty-interface));
   white-space: normal;
   line-height: 1.1;
 }
@@ -2541,7 +2573,7 @@ body.dock-resizing #canvas {
 }
 .bar-empty {
   padding: 0 8px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
 }
 #tools .bar-empty {
   writing-mode: vertical-rl;
@@ -2609,7 +2641,7 @@ body.dock-resizing #canvas {
   border-radius: 3px;
   background: none;
   color: var(--muted);
-  font-size: 9px;
+  font-size: calc(9px * var(--ty-interface));
   padding: 0;
 }
 .ib-more:hover {
@@ -2714,7 +2746,7 @@ body.dock-resizing #canvas {
   flex: none;
   display: inline-flex;
   justify-content: center;
-  font-size: 9px;
+  font-size: calc(9px * var(--ty-interface));
   color: var(--icon);
 }
 .tb-icon.text {
@@ -2732,7 +2764,7 @@ body.dock-resizing #canvas {
 }
 .tb-cat {
   padding: 4px 6px 2px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-interface));
   font-weight: 600;
   color: var(--muted);
   background: var(--surface-2);
@@ -2795,7 +2827,7 @@ body.dock-resizing #canvas {
 }
 .hist-time {
   color: var(--muted);
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
   font-variant-numeric: tabular-nums;
 }
 
@@ -2893,7 +2925,7 @@ body.dock-resizing #canvas {
   flex: none;
 }
 .gen-info {
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-supporting));
   margin-top: 6px;
   max-width: 240px;
   line-height: 1.5;
@@ -3004,7 +3036,6 @@ body.dock-resizing #canvas {
 .gen-surface-area > .note:not(.muted) {
   min-height: 2.9em;
 }
-
 /* Steps of a generator dialog (#211 stage 7): numbered tabs, one step at a time */
 .gen-steps {
   margin-bottom: 8px;
@@ -3194,7 +3225,7 @@ body.dock-resizing #canvas {
   min-width: 40px;
 }
 .param-uses {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
 }
 .param-move button {
   padding: 0 4px;
@@ -3221,7 +3252,7 @@ body.dock-resizing #canvas {
   font-style: italic;
 }
 .gen-bound {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
 }
 .gen-linkable {
   display: flex;
@@ -3341,7 +3372,7 @@ input.bound {
   border-color: var(--accent);
 }
 .tpl-pick .muted {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
 }
 .tpl-noimg {
   display: flex;
@@ -3379,7 +3410,7 @@ input.bound {
   padding-top: 4px;
 }
 .tpl-note {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
   margin-top: 2px;
 }
 @media (max-width: 560px) {
@@ -3411,7 +3442,7 @@ input.bound {
   flex-wrap: wrap;
 }
 .series-src .muted {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
 }
 .series-grid {
   max-height: 260px;
@@ -3440,7 +3471,7 @@ input.bound {
 }
 .series-num {
   text-align: right;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
   padding-right: 4px;
 }
 .series-addrow {
@@ -3453,7 +3484,7 @@ input.bound {
 }
 .setup-status {
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-supporting));
   margin: -4px 0 10px;
   font-variant-numeric: tabular-nums;
 }
@@ -3500,7 +3531,7 @@ input.bound {
   height: 20px;
   border-radius: 50%;
   border: 1px solid var(--line);
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-interface));
   flex: none;
 }
 .setup-steps li.cur .num,
@@ -3528,7 +3559,7 @@ input.bound {
 }
 .setup-body p.note {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-supporting));
 }
 .setup-body .conn-row {
   flex-wrap: wrap;
@@ -3539,7 +3570,7 @@ input.bound {
 }
 .setup-facts {
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-interface));
 }
 .setup-facts th {
   text-align: left;
@@ -3576,7 +3607,7 @@ input.bound {
   border-radius: 4px;
   border-left: 3px solid var(--line);
   background: var(--panel);
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-interface));
 }
 .setup-finding .icon {
   display: inline-grid;
@@ -3584,7 +3615,7 @@ input.bound {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-interface));
   font-weight: 700;
   color: #fff;
   background: var(--muted);
@@ -3641,7 +3672,7 @@ input.bound {
   justify-content: space-between;
 }
 .setup-close {
-  font-size: 14px;
+  font-size: calc(14px * var(--ty-interface));
 }
 /* Fenster Prüfung (Konstruktion prüfen) */
 .win-check {
@@ -3657,7 +3688,7 @@ input.bound {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
 }
 .chk-settings {
   display: flex;
@@ -3730,7 +3761,7 @@ input.bound {
   min-width: 0;
 }
 .chk-objs {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3955,7 +3986,7 @@ input.bound {
 }
 .fluid-config label {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-technical));
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3963,7 +3994,7 @@ input.bound {
 }
 .fluid-config input {
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-technical));
 }
 .fluid-config input.changed {
   border-color: var(--accent);
@@ -4071,7 +4102,7 @@ input.bound {
   border-radius: 3px;
 }
 .lib-name {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-interface));
   width: 100%;
   text-align: center;
   overflow: hidden;
@@ -4082,7 +4113,7 @@ input.bound {
   position: absolute;
   top: 2px;
   right: 4px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ty-supporting));
   color: var(--muted);
 }
 .lib-foot {
@@ -4093,7 +4124,7 @@ input.bound {
   gap: 3px;
 }
 .lib-info {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-interface));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4147,7 +4178,7 @@ input.bound {
 }
 .wp-row .btn.small {
   padding: 1px 6px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-interface));
 }
 .bg-dialog {
   max-width: 420px;
@@ -4201,7 +4232,7 @@ input.bound {
   gap: 4px;
   max-width: 220px;
   padding: 0 4px 0 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-interface));
   color: var(--muted);
   background: var(--surface-2);
   border-right: 1px solid var(--line);
@@ -4230,7 +4261,7 @@ input.bound {
   border: 0;
   background: none;
   color: inherit;
-  font-size: 15px;
+  font-size: calc(15px * var(--ty-interface));
   line-height: 1;
   padding: 2px 5px;
   border-radius: 3px;
@@ -4347,7 +4378,7 @@ input.bound {
   padding: 1px 7px;
   background: var(--surface);
   color: var(--text);
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-interface));
   cursor: pointer;
 }
 .apps-chip.on {
@@ -4387,7 +4418,7 @@ input.bound {
 .apps-count {
   color: var(--muted);
   font-weight: 400;
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-supporting));
 }
 .apps-chev {
   margin-left: auto;
@@ -4456,7 +4487,7 @@ input.bound {
   right: -3px;
   background: #e8742c;
   color: #fff;
-  font-size: 9px;
+  font-size: calc(9px * var(--ty-supporting));
   font-weight: 700;
   line-height: 1;
   padding: 2px 5px;
@@ -4487,7 +4518,7 @@ input.bound {
   color: var(--text);
 }
 .app-name {
-  font-size: 11px;
+  font-size: calc(11px * var(--ty-interface));
   line-height: 1.25;
   text-align: center;
   width: 100%;
@@ -4505,7 +4536,7 @@ input.bound {
   grid-template-columns: 170px 300px;
 }
 .bc-help {
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-supporting));
   max-width: 300px;
 }
 .bc-preview {
@@ -4562,7 +4593,7 @@ input.bound {
   min-width: 0;
 }
 .font-sample {
-  font-size: 22px;
+  font-size: calc(22px * var(--ty-interface));
   line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
@@ -4572,7 +4603,7 @@ input.bound {
 .font-star {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: calc(18px * var(--ty-interface));
   cursor: pointer;
   color: var(--muted);
   padding: 0 2px;
@@ -4602,7 +4633,7 @@ input.bound {
 }
 .pc-table .pc-h {
   color: var(--muted);
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-supporting));
 }
 .pc-btns {
   display: flex;
@@ -4693,7 +4724,7 @@ input.jig-count {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-interface));
 }
 .sketch-bar[hidden] {
   display: none;
@@ -4705,7 +4736,7 @@ input.jig-count {
 .sketch-group .btn {
   min-width: 28px;
   padding: 3px 6px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ty-interface));
   line-height: 1;
 }
 .sketch-bar .btn.on {
@@ -4734,7 +4765,7 @@ input.jig-count {
 .sync-section input { margin-top: 3px; }
 .sync-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 0; }
 .sync-row input[type="text"] { flex: 1; min-width: 160px; }
-.sync-path { font-size: 12px; word-break: break-all; opacity: 0.8; }
+.sync-path { font-size: calc(12px * var(--ty-supporting)); word-break: break-all; opacity: 0.8; }
 .sync-state { margin: 6px 0; display: grid; gap: 4px; }
 .sync-mode { display: grid; gap: 4px; margin: 8px 0; }
 .sync-folder { border-top: 1px solid var(--line); margin-top: 12px; }
@@ -4858,7 +4889,7 @@ input.jig-count {
 .remote-code {
   margin: 12px 0;
   text-align: center;
-  font: 600 40px ui-monospace, monospace;
+  font: 600 calc(40px * var(--ty-technical)) ui-monospace, monospace;
   letter-spacing: 4px;
   user-select: text;
 }
@@ -4871,7 +4902,7 @@ input.jig-count {
 }
 .remote-code-input {
   width: 9em;
-  font: 600 20px ui-monospace, monospace;
+  font: 600 calc(20px * var(--ty-technical)) ui-monospace, monospace;
   letter-spacing: 3px;
   text-align: center;
 }
@@ -5014,7 +5045,7 @@ dialog.settings-dialog[open] {
 }
 .settings-body h4 {
   margin: 4px 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--ty-interface));
 }
 .settings-section + .settings-section {
   margin-top: 14px;
@@ -5070,6 +5101,23 @@ label.settings-label input {
   flex: 1;
   min-width: 0;
 }
+.settings-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.settings-slider input {
+  flex: 1;
+  min-width: 24px;
+  min-height: 24px;
+}
+.settings-slider-value {
+  min-width: 5ch;
+  text-align: right;
+  white-space: nowrap;
+}
 .settings-color {
   display: flex;
   align-items: center;
@@ -5118,7 +5166,7 @@ label.settings-label input {
 }
 .settings-group {
   margin: 14px 0 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--ty-supporting));
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;

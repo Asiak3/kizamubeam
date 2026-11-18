@@ -14,6 +14,8 @@ Settings that also have a menu entry (language, theme, snapping, grid and so on)
 
 ## Language and theme
 
+Under **Edit → Settings → Appearance**, set font sizes separately for controls and menus, supporting text, technical values and output, and workspace labels (80%, 100%, 125% or 150%). Only the sample changes immediately; **OK** applies the sizes and **Cancel** discards them. Choose 100% to reset one group, or use the button below the sample to reset all groups before confirming. Documents and exports are unchanged; native tooltips keep their system font size.
+
 - **View → Language**: English, German or Italian. The default follows the system language.
 - **View → Theme** (or the button at the far right of the main toolbar): light or dark. The default follows the system.
 

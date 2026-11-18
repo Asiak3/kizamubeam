@@ -14,6 +14,8 @@ Einstellungen, die es auch als Menüeintrag gibt (Sprache, Design, Fangen, Raste
 
 ## Sprache und Design
 
+Unter **Bearbeiten → Einstellungen → Darstellung** stellst du die Schriftgrößen für Bedienelemente und Menüs, Hinweise und Zusatztexte, technische Werte und Ausgaben sowie Beschriftungen im Arbeitsbereich getrennt ein (80 %, 100 %, 125 % oder 150 %). Sofort ändert sich nur das Muster; **OK** übernimmt die Größen, **Abbrechen** verwirft sie. Wähle 100 % für eine Gruppe oder setze vor dem Bestätigen alle Gruppen mit dem Knopf unter dem Muster zurück. Dokumente und Exporte bleiben unverändert; native Tooltips behalten die Schriftgröße des Systems.
+
 - **Ansicht → Sprache**: Deutsch, Englisch oder Italienisch. Standardmäßig folgt sie der Systemsprache.
 - **Ansicht → Design** (oder die Schaltfläche ganz rechts in der Hauptleiste): hell oder dunkel. Standardmäßig folgt es dem System.
 

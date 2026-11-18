@@ -90,7 +90,7 @@
     "test:jig": "node scripts/run-ts.mjs scripts/jig-test.ts",
     "test:arcs": "node scripts/run-ts.mjs scripts/arcs-test.ts",
     "test:sync": "node scripts/run-ts.mjs scripts/sync-test.ts",
-    "test:settings": "node scripts/run-ts.mjs scripts/settings-test.ts",
+    "test:settings": "node scripts/run-ts.mjs scripts/settings-test.ts && node scripts/settings-typography-test.mjs",
     "test:remote": "node scripts/run-ts.mjs scripts/remote-test.ts",
     "test:relations": "node scripts/run-ts.mjs scripts/relations-test.ts",
     "test:sketch": "node scripts/run-ts.mjs scripts/sketch-test.ts",
@@ -104,7 +104,8 @@
     "test:refit": "node scripts/run-ts.mjs scripts/vector-fit-test.ts && node scripts/vector-offline-test.mjs scripts/path-refit-editor-test.ts",
     "test:pencil": "node scripts/vector-offline-test.mjs scripts/pencil-test.ts",
     "test:shaper": "node scripts/vector-offline-test.mjs scripts/shaper-test.ts",
-    "test:pointer": "node scripts/run-ts.mjs scripts/pointer-offset-test.ts"
+    "test:pointer": "node scripts/run-ts.mjs scripts/pointer-offset-test.ts",
+    "test:typography": "node scripts/run-ts.mjs scripts/ui-typography-test.ts && node scripts/run-ts.mjs scripts/ui-typography-dom-test.ts && node scripts/laser-typography-css-test.mjs && node scripts/vector-offline-test.mjs scripts/ui-typography-render-test.ts"
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {

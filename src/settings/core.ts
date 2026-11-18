@@ -24,6 +24,7 @@ import { openFontManager } from '../fontManager';
 import { agentLevels, agentSettings, configureAgent, openAgentDialog } from '../agentui';
 import { configureHost, hostSettings, openRemoteHostDialog } from '../remoteHost';
 import { registerSettingsSection } from './registry';
+import { typographySettingsFields } from './typography';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -86,6 +87,7 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         get: () => hooks.theme(),
         set: (v) => hooks.setTheme(v as ThemeMode),
       },
+      ...typographySettingsFields(),
       {
         kind: 'select', id: 'appearance.toolbarIconSize', label: t('Symbolgröße'), def: 'm',
         options: () => [['s', t('Klein|Symbole')], ['m', t('Normal|Symbole')], ['l', t('Groß|Symbole')]],

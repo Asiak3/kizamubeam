@@ -12,6 +12,7 @@ import { applySlotRecipe } from './slotLegacyDialog';
 import { openProjectionLegacyDialog } from './slotProjectionLegacyDialog';
 import { movableToolWindow } from './toolWindow';
 import { t } from './i18n';
+import { getTypography, groupFactor, onTypographyChange, resolveTypography } from './uiTypography';
 import { SLOT_TOOL_ICONS } from './slotToolIcons';
 import { canvasWheelFactor, installPinchGestures, pinchGestureActive } from './canvasZoom';
 export { applySlotRecipe } from './slotLegacyDialog';
@@ -441,11 +442,15 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
       if (selectedSlot?.projection && visible('slot', selectedSlot.id!)) {
         const f = previewFrame(selectedSlot); refPoint = f.origin;
         ctx.strokeStyle = '#ffe277'; ctx.setLineDash([4 / scale, 3 / scale]); ctx.beginPath(); ctx.moveTo(f.origin.x, f.origin.y); ctx.lineTo(f.zero.x, f.zero.y); ctx.lineTo(f.target.x, f.target.y); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = '#ffe277'; ctx.font = `${12 / scale}px sans-serif`; ctx.fillText(`${selectedSlot.projection.distance.toFixed(2)} mm`, (f.zero.x + f.target.x) / 2, (f.zero.y + f.target.y) / 2 - 8 / scale);
+        // Arbeitsfläche: Bemaßung (Baseline: 12)
+        const fWs = groupFactor(resolveTypography(getTypography()), 'workspace');
+        ctx.fillStyle = '#ffe277'; ctx.font = `${(12 * fWs) / scale}px sans-serif`; ctx.fillText(`${selectedSlot.projection.distance.toFixed(2)} mm`, (f.zero.x + f.target.x) / 2, (f.zero.y + f.target.y) / 2 - 8 / scale);
       }
       if (refPoint) { ctx.strokeStyle = '#ff4040'; ctx.lineWidth = 2.5 / scale; ctx.beginPath(); ctx.arc(refPoint.x, refPoint.y, 7 / scale, 0, Math.PI * 2); ctx.stroke(); }
     }
     function scheduleDraw(): void { if (!closed && !drawing) drawing = requestAnimationFrame(() => { drawing = 0; draw(); }); }
+    // Typografie live nachführen, beim Schließen abmelden
+    const offTypo = onTypographyChange(() => scheduleDraw());
     globalAngle.addEventListener('input', () => { recipe.settings!.cornerAngle = globalAngle.valueAsNumber; request(); });
     const title = h('header', { class: 'slot-tool-title' }, h('h3', {}, t('Parametrische Schlitze / Ausklinkungen')),
       iconButton('slot-reset-window', t('Fenster zurücksetzen'), 'zoompage', () => { dlg.style.width = ''; dlg.style.height = ''; dlg.style.left = '8px'; dlg.style.top = '8px'; fit(); }));
@@ -469,7 +474,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
       } catch (e) { info.textContent = e instanceof Error ? e.message : String(e); }
     });
     let disposeWindow = () => {};
-    dlg.addEventListener('close', () => { closed = true; client.dispose(); tree.dispose(); disposeWindow(); disposePinch(); ed.off(changed); if (drawing) cancelAnimationFrame(drawing); dlg.remove(); });
+    dlg.addEventListener('close', () => { closed = true; client.dispose(); tree.dispose(); disposeWindow(); disposePinch(); offTypo(); ed.off(changed); if (drawing) cancelAnimationFrame(drawing); dlg.remove(); });
     dlg.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Escape' && pick) { e.preventDefault(); pick = null; showProperties(); updateToolbar(); } });
     document.body.append(dlg); dlg.showModal(); disposeWindow = movableToolWindow(dlg, title, scheduleDraw); showProperties(); refreshTree(); request();
   } catch (error) { ed.hint = error instanceof Error ? error.message : String(error); ed.emit('tool'); }

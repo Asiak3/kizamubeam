@@ -1,4 +1,12 @@
 {
+  "Bedienelemente und Menüs": "Controls and menus",
+  "Hinweise und Zusatztexte": "Hints and supporting text",
+  "Technische Werte und Ausgaben": "Technical values and output",
+  "Beschriftungen im Arbeitsbereich": "Workspace labels",
+  "Schriftgrößen": "Text sizes",
+  "Schriftvorschau": "Text preview",
+  "Nur diese Vorschau ändert sich sofort. 100 % setzt eine Schriftgruppe zurück. Mit OK werden die Schriftgrößen übernommen; Dokumente und Exporte bleiben unverändert.": "Only this preview changes immediately. Select 100% to reset a text group. OK applies the text sizes; documents and exports stay unchanged.",
+  "Alle Schriftgruppen zurücksetzen": "Reset all text groups",
   "{n} Konturen über Objekt {id}: Layer {layer}, Modus {mode}, Kerf {kerf} mm, Geschwindigkeit {speed}, Leistung {power} %.": "{n} contours via object {id}: layer {layer}, mode {mode}, kerf {kerf} mm, speed {speed}, power {power}%.",
   "Verbleibende offene Quellreste und ihre geänderte Kerf-Wirkung müssen ausdrücklich bestätigt werden.": "Remaining open source fragments and their changed kerf behavior must be explicitly confirmed.",
   "Achtung: Verbleibende Quellreste werden offene Linien. Darauf wirkt kein Layer-Kerf; die gemeinsame Ergebniskontur bleibt geschlossen. Diese Änderung muss bestätigt werden.": "Warning: remaining source fragments become open lines. Layer kerf does not apply to them; the common result contour remains closed. This change must be confirmed.",

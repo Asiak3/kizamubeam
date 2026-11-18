@@ -14,6 +14,8 @@ Le impostazioni che hanno anche una voce di menu (lingua, tema, aggancio, grigli
 
 ## Lingua e tema
 
+In **Modifica → Impostazioni → Aspetto** puoi impostare separatamente le dimensioni del testo per controlli e menu, testi di supporto, valori e output tecnici ed etichette dell’area di lavoro (80%, 100%, 125% o 150%). Solo il campione cambia subito; **OK** applica le dimensioni e **Annulla** le scarta. Scegli il 100% per ripristinare un gruppo oppure usa il pulsante sotto il campione per ripristinarli tutti prima di confermare. Documenti ed esportazioni restano invariati; i tooltip nativi mantengono la dimensione del testo di sistema.
+
 - **Visualizza → Lingua**: italiano, inglese o tedesco. Per impostazione predefinita segue la lingua del sistema.
 - **Visualizza → Tema** (o il pulsante all’estrema destra della barra principale): chiaro o scuro. Per impostazione predefinita segue il sistema.
 

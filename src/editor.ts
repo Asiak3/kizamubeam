@@ -58,6 +58,13 @@ import { EditorShaper, type ShaperSession } from './editor/shaper';
 import { SHAPER_CLOSE_GAP } from './shaper';
 import { EditorInteraction, BuilderSession } from './editor/interaction';
 import { EditorContourOffset } from './editor/contourOffset';
+import {
+  baselineTypography,
+  getTypography,
+  onTypographyChange,
+  resolveTypography,
+  type ResolvedTypography,
+} from './uiTypography';
 
 export type { Tool } from './editor/shared';
 export { RULER, TOOL_HINTS } from './editor/shared';
@@ -78,6 +85,8 @@ export class Editor {
   filled = true;
   /** Dunkles Design der Arbeitsfläche */
   dark = false;
+  /** Aufgelöste Schriftfaktoren je Gruppe (Arbeitsfläche); live über Typografie-Änderungen aktualisiert */
+  typo: ResolvedTypography = baselineTypography();
   snapGrid = false;
   gridStep = 1;
   /** Hintergrundgitter (Ansicht → Gitter), je Nutzer gespeichert */
@@ -312,6 +321,12 @@ export class Editor {
     // Texte werden mit den Schriftkonturen gezeichnet; nach dem Laden einer Schrift neu zeichnen
     onFontLoaded(() => this.emit('sel'));
     onImageReady(() => this.redraw());
+    // Schriftgrößen der Arbeitsfläche live nachführen (Baseline bis Speicher gelesen ist)
+    this.typo = resolveTypography(getTypography());
+    onTypographyChange(() => {
+      this.typo = resolveTypography(getTypography());
+      this.redraw();
+    });
     new ResizeObserver(() => this.resize()).observe(canvas);
     canvas.addEventListener('pointerdown', (e) => this.onDown(e));
     installOverlapPicker(this);

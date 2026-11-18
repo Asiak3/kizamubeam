@@ -2,6 +2,8 @@
 
 English · [Deutsch](development.de.md) · [Back to the README](../README.md)
 
+For font-size groups, CSS/Canvas integration and settings previews, see [UI typography](ui-typography.md).
+
 ## Building
 
 Requirements: Node.js 20+, Rust (stable), on Linux also `libwebkit2gtk-4.1-dev`, `librsvg2-dev`, `build-essential`, `libssl-dev`

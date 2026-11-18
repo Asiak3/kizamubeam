@@ -29,6 +29,8 @@ Offline regressions: `npm run test:camera`. No hardware is acquired by the tests
 
 ## Interface and workspace
 
+- **UI font sizes** (Edit → Settings → Appearance): independently set controls and menus, supporting text, technical values and output, and workspace labels to 80%, 100%, 125% or 150%. A local sample previews changes; OK applies them, Cancel discards them. 100% restores a group's original sizes; documents and exports stay unchanged.
+
 ### Extended vector editing
 
 - **Tools → Simplify / smooth paths…** refits whole selected paths/basic shapes

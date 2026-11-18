@@ -9,6 +9,7 @@ import { flattenSub, SCALE } from './clip';
 import { h } from './dom';
 import { boundsOf, Box, shapeSubs } from './geom';
 import { dec, t, tn } from './i18n';
+import { getTypography, groupFactor, onTypographyChange, resolveTypography } from './uiTypography';
 import { cloneObjs, IDENT, Mat, mul, newId, Obj, Pt, visibleLeaves } from './model';
 import { Blob, blobFromPolys, DEFAULT_DETECT, detectPieces, inside, Match, matchPiece, Piece, pieceMatrix, RGBAImage } from './workpieces';
 
@@ -203,7 +204,8 @@ export function openWorkpieceDialog(ed: Editor) {
       ctx.strokeStyle = col;
       ctx.lineWidth = (i === hover ? 3 : 1.6) * px;
       ctx.stroke(p);
-      ctx.font = `bold ${13 * px}px sans-serif`;
+      // Unterstützend: Konturen-Nummern (Baseline: 13)
+      ctx.font = `bold ${13 * px * groupFactor(resolveTypography(getTypography()), 'supporting')}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.lineWidth = 3 * px;
@@ -301,6 +303,8 @@ export function openWorkpieceDialog(ed: Editor) {
     clearTimeout(timer);
     timer = window.setTimeout(() => update(true), 150);
   };
+  // Typografie live nachführen, beim Schließen abmelden
+  const offTypo = onTypographyChange(() => update(false));
 
   // ----- Einstellungen -----
   const camSel = h('select', { onchange: (e: Event) => ((st.cam = (e.target as HTMLSelectElement).value), syncEmpty(), update(true)) },
@@ -392,6 +396,7 @@ export function openWorkpieceDialog(ed: Editor) {
   );
   dlg.addEventListener('close', () => {
     clearTimeout(timer);
+    offTypo();
     ed.setArrayPreview(null);
     if (applied) apply();
     else save(st);

@@ -5,6 +5,7 @@ import { ensurePacks } from './packs';
 import { initDialogDrag } from './dialogDrag';
 import { t } from './i18n';
 import { initPlugins, PENDING } from './plugins/registry';
+import { initTypographyDom } from './uiTypographyDom';
 import { workerProcess } from './plugins/client';
 import { setContextSource, setPluginSpawn, setResourceSource } from './plugins/generator';
 import { editorContext } from './plugins/context';
@@ -22,6 +23,8 @@ canvas.tabIndex = 0;
 const spawn = (m: PluginManifest) => workerProcess(m.runtime, m.code, m.host ?? []);
 setPluginSpawn(spawn);
 useCoreGenerators(CORE_PACK_TEXT);
+// Schriftgruppen laden und am Dokument anwenden, bevor Editor und UI entstehen
+initTypographyDom();
 const editor = new Editor(canvas);
 // Material and work area for plugins that declare them (#386)
 setContextSource((what) => editorContext(editor, what));
