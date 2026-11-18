@@ -384,11 +384,16 @@ await test('stage 4: a drawing surface with views, pointer events, selectable ro
   assert.throws(() => checkDrawing({ frame: F, items: [{ type: 'text', x: 0, y: 0, text: 'a', align: 'middle' }] }), /text align/);
   assert.throws(() => checkDrawing({ frame: F, items: [{ type: 'text', x: 0, y: 0, text: 'a', angle: '90' }] }), /text angle/);
   assert.throws(() => checkDrawing({ frame: F, items: [{ type: 'text', x: 0, y: 0, text: 'a', angle: Infinity }] }), /text angle/);
+  // A bubble under a text: true is kept, false left out, anything else refused
+  const bubbles = checkDrawing({ frame: F, items: [{ type: 'text', x: 1, y: 2, text: 'a', bubble: true }, { type: 'text', x: 1, y: 2, text: 'b', bubble: false }] });
+  assert.deepEqual(bubbles.items, [{ type: 'text', x: 1, y: 2, text: 'a', bubble: true }, { type: 'text', x: 1, y: 2, text: 'b' }]);
+  assert.throws(() => checkDrawing({ frame: F, items: [{ type: 'text', x: 0, y: 0, text: 'a', bubble: 'yes' }] }), /text bubble/);
   // How the surface draws them: the calls on a recording canvas, in screen pixels
   const { drawText } = await import('../src/generators/dialogSurface');
   const record = () => {
     const calls: unknown[][] = [];
-    const ctx = new Proxy({} as Record<string, unknown>, {
+    // Text 6 px wide per letter; alpha and colour as the surface sets them before a text
+    const ctx = new Proxy({ measureText: (s: string) => ({ width: 6 * s.length }), globalAlpha: 1, fillStyle: '#accent' } as Record<string, unknown>, {
       get: (o, k) => (k in o ? o[k as string] : (...a: unknown[]) => calls.push([k, ...a])),
       set: (o, k, v) => (calls.push([`${String(k)}=`, v]), (o[k as string] = v), true),
     });
@@ -408,6 +413,18 @@ await test('stage 4: a drawing surface with views, pointer events, selectable ro
   const centred = record();
   drawText(centred.ctx, { type: 'text', x: 0, y: 0, text: 'a', align: 'center' }, 100, 50);
   assert.deepEqual(centred.calls(), [['save'], ['translate', 100, 50], ['textAlign=', 'center'], ['textBaseline=', 'middle'], ['fillText', 'a', 0, 0], ['restore']], 'centred, not turned');
+  // The bubble: the background colour, 80 % opaque, 4 px around the text, then the text in its own colour
+  const under = (left: number, top: number, w: number) => [
+    ['globalAlpha=', 0.8], ['fillStyle=', '#back'], ['beginPath'], ['roundRect', left, top, w, 15, 7.5], ['fill'], ['globalAlpha=', 1], ['fillStyle=', '#accent'],
+  ];
+  const bubbled = record();
+  drawText(bubbled.ctx, { type: 'text', x: 0, y: 0, text: '81 mm', angle: 90, align: 'center', bubble: true }, 100, 50, '#back');
+  assert.deepEqual(bubbled.calls(), [
+    ['save'], ['translate', 100, 50], ['rotate', -Math.PI / 2], ['textAlign=', 'center'], ['textBaseline=', 'middle'], ...under(-19, -7.5, 38), ['fillText', '81 mm', 0, 0], ['restore'],
+  ], 'centred on the text, turned with it');
+  const bubbledStart = record();
+  drawText(bubbledStart.ctx, { type: 'text', x: 0, y: 0, text: 'a', bubble: true }, 100, 50, '#back');
+  assert.deepEqual(bubbledStart.calls(), [['save'], ['translate', 100, 50], ...under(2, -17, 14), ['fillText', 'a', 6, -6], ['restore']], 'under a text beside its point');
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], layers: [{ key: 'a', tris: [1, 2, 3] }] }), /tris/);
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [{ type: 'line', pts: [[0, 0]], style: 'pink' }] }), /style/);
   assert.throws(() => checkEvent({ select: { pts: 1.5 } }), /select/);

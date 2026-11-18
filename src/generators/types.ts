@@ -270,7 +270,8 @@ export type GenTextAlign = 'start' | 'center';
 export type GenItem =
   | { type: 'line'; pts: [number, number][]; closed?: boolean; style?: GenStyle; width?: number; dash?: boolean; alpha?: number; id?: string }
   | { type: 'handle'; x: number; y: number; id: string; style?: GenStyle; size?: number }
-  | { type: 'text'; x: number; y: number; text: string; style?: GenStyle; angle?: number; align?: GenTextAlign };
+  /** bubble: a rounded, half see-through patch of the background colour under the text, so it stays readable over lines */
+  | { type: 'text'; x: number; y: number; text: string; style?: GenStyle; angle?: number; align?: GenTextAlign; bubble?: boolean };
 
 /**
  * A layer that rarely changes (the silhouette of a model, the outlines of the parts): the app keeps it as a

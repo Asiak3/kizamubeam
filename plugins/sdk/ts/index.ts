@@ -166,9 +166,10 @@ export type Item =
   | { type: 'handle'; x: number; y: number; id: string; style?: Style; size?: number }
   /**
    * angle: degrees, counter-clockwise (90 = read from bottom to top); align: "start" (default) = 6 px after and above
-   * the point, "center" = centred on it in both directions; both follow the angle (#412)
+   * the point, "center" = centred on it in both directions; both follow the angle (#412); bubble: a rounded, half
+   * see-through patch of the background colour under the text, so it stays readable over lines
    */
-  | { type: 'text'; x: number; y: number; text: Text; style?: Style; angle?: number; align?: 'start' | 'center' };
+  | { type: 'text'; x: number; y: number; text: Text; style?: Style; angle?: number; align?: 'start' | 'center'; bubble?: boolean };
 /**
  * A region map on the surface: width × height cells over frame (mm), one byte per cell as base64 (0 = none,
  * n = region n − 1), filled with colors[n − 1] ("#rrggbb"). A click on a region arrives as hit "<layer key>:<region>";

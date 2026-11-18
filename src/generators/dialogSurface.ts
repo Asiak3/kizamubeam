@@ -63,12 +63,13 @@ const rightPan = () => {
 
 /**
  * A text of the surface at its point (x, y in screen pixels, #412): 6 px after and above the point, or centred on it
- * (align "center"), turned by its angle (degrees, counter-clockwise on the screen; 90 = read from bottom to top).
+ * (align "center"), turned by its angle (degrees, counter-clockwise on the screen; 90 = read from bottom to top). With
+ * bubble, a rounded patch of the background colour `back`, half see-through, lies under it.
  */
-export function drawText(ctx: CanvasRenderingContext2D, it: Extract<GenItem, { type: 'text' }>, x: number, y: number) {
+export function drawText(ctx: CanvasRenderingContext2D, it: Extract<GenItem, { type: 'text' }>, x: number, y: number, back = '#ffffff') {
   ctx.font = '11px system-ui, sans-serif';
   const center = it.align === 'center';
-  if (!it.angle && !center) {
+  if (!it.angle && !center && !it.bubble) {
     ctx.fillText(it.text, x + 6, y - 6);
     return;
   }
@@ -79,9 +80,27 @@ export function drawText(ctx: CanvasRenderingContext2D, it: Extract<GenItem, { t
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
   }
-  ctx.fillText(it.text, center ? 0 : 6, center ? 0 : -6);
+  const [tx, ty] = center ? [0, 0] : [6, -6];
+  if (it.bubble) {
+    // 4 px around the text; the text is about 11 px high (from the baseline 9 px up, 2 px down)
+    const w = ctx.measureText(it.text).width + 8,
+      h = 15;
+    const [left, top] = center ? [tx - w / 2, ty - h / 2] : [tx - 4, ty - 11];
+    const [alpha, fill] = [ctx.globalAlpha, ctx.fillStyle];
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.fillStyle = back;
+    ctx.beginPath();
+    ctx.roundRect(left, top, w, h, h / 2);
+    ctx.fill();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = fill;
+  }
+  ctx.fillText(it.text, tx, ty);
   ctx.restore();
 }
+
+/** The colours of the surface: one per style and the background */
+type Colors = Record<GenStyle | 'back', string>;
 
 export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => void, isOpen: () => boolean): SurfaceArea | null {
   const spec = g.surface;
@@ -136,12 +155,14 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
       muted: text,
       accent: css.getPropertyValue('--accent').trim() || '#2b7de9',
       warn: css.getPropertyValue('--warn').trim() || '#d9822b',
-    } as Record<GenStyle, string>;
+      // The background of the surface, for the bubble under a text
+      back: css.getPropertyValue('--surface').trim() || '#ffffff',
+    } as Colors;
   };
   const sx = (x: number) => fit.ox + x * fit.k;
   const sy = (y: number) => fit.oy + y * fit.k;
 
-  const drawItems = (ctx: CanvasRenderingContext2D, items: GenItem[], col: Record<GenStyle, string>) => {
+  const drawItems = (ctx: CanvasRenderingContext2D, items: GenItem[], col: Colors) => {
     for (const it of items) {
       const style = it.style ?? 'normal';
       ctx.strokeStyle = ctx.fillStyle = col[style];
@@ -160,7 +181,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
         ctx.beginPath();
         ctx.arc(sx(it.x), sy(it.y), it.size ?? 3.5, 0, Math.PI * 2);
         ctx.fill();
-      } else drawText(ctx, it, sx(it.x), sy(it.y));
+      } else drawText(ctx, it, sx(it.x), sy(it.y), col.back);
     }
     ctx.globalAlpha = 1;
   };
@@ -190,7 +211,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   };
 
   /** A layer as a picture for the current size and scale */
-  const picture = (L: GenLayer, col: Record<GenStyle, string>): HTMLCanvasElement => {
+  const picture = (L: GenLayer, col: Colors): HTMLCanvasElement => {
     const { w, h: hh } = size();
     const r = dpr();
     const id = `${L.key}\u0000${w}\u0000${hh}\u0000${r}\u0000${fit.k}\u0000${fit.ox}\u0000${fit.oy}`;
