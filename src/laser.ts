@@ -27,6 +27,8 @@ import { version as APP_VERSION } from '../package.json';
 import { electricityTariffText, energyDraft, estimateEnergy, parseEnergyNumber } from './energy';
 import { energyPreview, energySettingsRows, saveEnergySettings } from './energyUi';
 import { previewSplitter } from './previewLayout';
+import { advancePlayback, analyzePlayback, computeFactors, DEFAULT_TARGET, MAX_MARKERS, MAX_TARGET, MIN_TARGET } from './previewPlayback';
+import type { PlaybackSettings } from './previewPlayback';
 
 const store = loadDevices();
 /** Das gewählte Gerät (live gebunden: wechselt mit der Auswahl) */
@@ -1623,12 +1625,138 @@ export async function openPreview(ed: Editor, src?: JobSource) {
     hereBtn.title = why ?? t('Den Job ab der Stelle des Schiebereglers lasern, z. B. nach einem Abbruch');
   };
   const offMachine = machine.on(updateHere);
-  const speedSel = h('select', { title: t('Abspielgeschwindigkeit') },
-    ...[1, 2, 5, 10, 20, 50, 100, 200].map((v) => h('option', { value: String(v), selected: v === 10 }, `${v}×`)),
-  ) as HTMLSelectElement;
+  const speedSelect = (value: number) => {
+    const sel = h('select', { title: t('Abspielgeschwindigkeit') },
+      ...[1, 2, 5, 10, 20, 50, 100, 200, 400, 1000].map((v) => h('option', { value: String(v), selected: v === value }, `${v}×`)),
+    ) as HTMLSelectElement;
+    sel.value = String(value);
+    return sel;
+  };
+  const engraveSel = speedSelect(50);
+  engraveSel.classList.add('preview-engrave');
+  const cutSel = speedSelect(10);
+  cutSel.classList.add('preview-cut');
+  const pauseChk = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  pauseChk.classList.add('preview-pause');
+  const smoothChk = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  smoothChk.classList.add('preview-smooth');
+  const targetInp = h('input', { type: 'number', min: String(MIN_TARGET), max: String(MAX_TARGET), step: '1', value: String(DEFAULT_TARGET), class: 'preview-target', 'aria-describedby': 'preview-target-error' }) as HTMLInputElement;
+  const targetErr = h('span', { class: 'preview-error', id: 'preview-target-error', role: 'status', hidden: true }, t('Ziel muss zwischen 1 und 600 Sekunden liegen.'));
+  const factorTxt = h('span', { class: 'preview-factors' });
+  const status = h('span', { class: 'preview-status', role: 'status' });
+  const layerOf = (i: number) => (src ? src.layer(i) : ed.layer(i));
+  const layerColor = (i: number) => (src ? src.color(i) : ed.layerDrawColor(i));
+  const pct = (v: number) => `${(v * 100).toLocaleString(locale, { maximumFractionDigits: 1 })} %`;
+  const readPlayback = (): PlaybackSettings => ({
+    engrave: Number(engraveSel.value),
+    cut: Number(cutSel.value),
+    smooth: smoothChk.checked,
+    target: Number(targetInp.value),
+  });
+  let analysis = analyzePlayback(mv, est, readPlayback());
+  const stat = (k: string, v: string) => [h('dt', {}, k), h('dd', {}, v)];
+  const subLabel = (layer: number, sub: number) => {
+    const L = layerOf(layer);
+    if (sub < 0) return L.name;
+    const custom = L.sub?.[sub]?.name?.trim();
+    return `${L.name} – ${custom || t('Sublayer {n}', { n: sub + 1 })}`;
+  };
+  const layerRows = analysis.layerTimes.map((lt) => {
+    const swatch = h('span', { class: 'preview-layer-swatch' });
+    swatch.style.background = layerColor(lt.layer);
+    return h('div', { class: `preview-layer${lt.sub >= 0 ? ' sub' : ''}` },
+      swatch,
+      h('span', { class: 'preview-layer-name' }, subLabel(lt.layer, lt.sub)),
+      h('span', { class: 'preview-layer-time' }, formatDuration(lt.seconds)),
+      h('span', { class: 'preview-layer-share' }, pct(lt.share)),
+    );
+  });
+  const breakdown = h('details', { class: 'preview-breakdown' },
+    h('summary', {}, t('Zeit je Layer und Prozessart')),
+    h('div', { class: 'preview-layer-list' }, ...layerRows),
+    h('dl', { class: 'preview-stats preview-process-times' },
+      ...stat(t('Gravieren'), formatDuration(analysis.processTimes.engrave)),
+      ...stat(t('Schneiden'), formatDuration(analysis.processTimes.cut)),
+      ...stat(t('Laserlose Fahrzeit'), formatDuration(analysis.processTimes.travel)),
+    ),
+  ) as HTMLDetailsElement;
+  breakdown.open = true;
+  const jumpTo = (m: (typeof analysis.markers)[number]) => {
+    setPlaying(false);
+    status.textContent = '';
+    time = m.time;
+    render();
+  };
+  const markers = h('div', { class: 'preview-markers' });
+  // Bei sehr vielen Layern liegen 24-px-Ziele übereinander; dann führt eine einzelne Auswahl zum Layer.
+  const dense = analysis.markers.length > MAX_MARKERS;
+  for (const m of analysis.markers) {
+    const name = subLabel(m.layer, m.sub);
+    const change = m.change ? `, ${t('Prozesswechsel')}` : '';
+    if (dense) {
+      const tick = h('span', { class: `preview-marker static${m.change ? ' change' : ''}`, 'aria-hidden': 'true' });
+      tick.style.left = `${est.total ? (m.time / est.total) * 100 : 0}%`;
+      markers.append(tick);
+      continue;
+    }
+    const marker = h('button', {
+      type: 'button',
+      class: `preview-marker${m.change ? ' change' : ''}`,
+      title: `${name}${change}`,
+      'aria-label': t('Zu Layer „{name}“ springen', { name }) + change,
+    }) as HTMLButtonElement;
+    marker.style.left = `${est.total ? (m.time / est.total) * 100 : 0}%`;
+    marker.addEventListener('click', () => jumpTo(m));
+    markers.append(marker);
+  }
+  const layerJump = dense
+    ? (h('select', { class: 'preview-layer-jump', 'aria-label': t('Zu Layer springen') },
+        h('option', { value: '', selected: true, disabled: true }, t('Zu Layer springen')),
+        ...analysis.markers.map((m, i) => h('option', { value: String(i) }, `${subLabel(m.layer, m.sub)} · ${formatDuration(m.time)}${m.change ? `, ${t('Prozesswechsel')}` : ''}`)),
+      ) as HTMLSelectElement)
+    : null;
+  layerJump?.addEventListener('change', () => {
+    const m = analysis.markers[Number(layerJump.value)];
+    if (m) jumpTo(m);
+  });
+  const timeline = h('div', { class: 'preview-timeline' }, markers, slider);
+  const syncFactors = () => {
+    analysis.factors = computeFactors(analysis.processTimes, readPlayback());
+    factorTxt.textContent = t('Faktor Gravieren {engrave}×, Schneiden {cut}×', {
+      engrave: Number(analysis.factors.engrave.toFixed(1)).toLocaleString(locale),
+      cut: Number(analysis.factors.cut.toFixed(1)).toLocaleString(locale),
+    });
+    factorTxt.hidden = !smoothChk.checked;
+  };
+  const validTarget = () => {
+    const v = Number(targetInp.value);
+    return Number.isFinite(v) && v >= MIN_TARGET && v <= MAX_TARGET;
+  };
+  const validateTarget = () => {
+    const ok = validTarget();
+    targetInp.setAttribute('aria-invalid', ok ? 'false' : 'true');
+    targetErr.hidden = ok;
+    if (ok) syncFactors();
+  };
+  const syncMode = () => {
+    const smooth = smoothChk.checked;
+    engraveSel.disabled = smooth;
+    cutSel.disabled = smooth;
+    targetInp.disabled = !smooth;
+    if (smooth) validateTarget();
+    else {
+      targetInp.setAttribute('aria-invalid', 'false');
+      targetErr.hidden = true;
+      syncFactors();
+    }
+  };
+  engraveSel.addEventListener('change', syncFactors);
+  cutSel.addEventListener('change', syncFactors);
+  smoothChk.addEventListener('change', syncMode);
+  targetInp.addEventListener('input', validateTarget);
+  syncMode();
   const rapidChk = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement;
   const shadeChk = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement;
-  const stat = (k: string, v: string) => [h('dt', {}, k), h('dd', {}, v)];
   const b = job.bounds!;
   const info = h('dl', { class: 'preview-stats' },
     ...stat(t('Geschätzte Dauer'), formatDuration(est.total)),
@@ -1648,6 +1776,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
       cv,
       h('div', { class: 'preview-side' },
         info,
+        breakdown,
         energyPreview(estimateEnergy(mv, est, job.air, energyDraft(device.energy)), parseEnergyNumber(electricityTariffText())),
         h('label', { class: 'check' }, rapidChk, t('Leerwege zeigen')),
         h('label', { class: 'check' }, shadeChk, t('Nach Leistung schattieren')),
@@ -1659,7 +1788,23 @@ export async function openPreview(ed: Editor, src?: JobSource) {
         ),
       ),
     ),
-    h('div', { class: 'preview-bar' }, playBtn, slider, timeTxt, speedSel, hereBtn),
+    h('div', { class: 'preview-bar' },
+      playBtn,
+      timeline,
+      ...(layerJump ? [layerJump] : []),
+      timeTxt,
+      hereBtn,
+      h('div', { class: 'preview-process' },
+        h('label', {}, t('Gravieren'), engraveSel),
+        h('label', {}, t('Schneiden'), cutSel),
+        h('label', { class: 'check' }, pauseChk, t('Bei Prozesswechsel pausieren')),
+        h('label', { class: 'check' }, smoothChk, t('Prozessarten angleichen')),
+        h('label', {}, t('Ziel pro Prozessart (s)'), targetInp),
+        factorTxt,
+        targetErr,
+      ),
+      status,
+    ),
   );
   const main = dlg.querySelector<HTMLElement>('.preview-main')!;
   const side = dlg.querySelector<HTMLElement>('.preview-side')!;
@@ -1828,9 +1973,15 @@ export async function openPreview(ed: Editor, src?: JobSource) {
     last = 0;
   const step = (now: number) => {
     if (!playing || !dlg.open) return;
-    time = Math.min(est.total, time + ((now - last) / 1000) * Number(speedSel.value));
+    const next = advancePlayback(mv, est, analysis, time, (now - last) / 1000, pauseChk.checked);
+    time = next.time;
     last = now;
     render();
+    if (next.paused) {
+      setPlaying(false);
+      status.textContent = t('Bei Prozesswechsel pausiert');
+      return;
+    }
     if (time >= est.total) return setPlaying(false);
     requestAnimationFrame(step);
   };
@@ -1838,6 +1989,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
     playing = p;
     setIcon(playBtn, p ? 'pause' : 'play');
     if (p) {
+      status.textContent = '';
       if (time >= est.total) time = 0;
       last = performance.now();
       requestAnimationFrame(step);
@@ -1845,6 +1997,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
   };
   playBtn.addEventListener('click', () => setPlaying(!playing));
   slider.addEventListener('input', () => {
+    status.textContent = '';
     time = (Number(slider.value) / 1000) * est.total;
     render();
   });

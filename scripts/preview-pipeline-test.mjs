@@ -2,9 +2,8 @@
 // No app bootstrap, native calls, transport, hardware, or network.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-const source = fileURLToPath(new URL('../src/', import.meta.url));
+const source = new URL('../src/', import.meta.url).pathname;
 const observers = [];
 const forbidden = [];
 const deny = (name) => () => { forbidden.push(name); throw Error(`Forbidden offline operation: ${name}`); };
@@ -82,14 +81,20 @@ globalThis.ResizeObserver = class {
   observe(target) { this.targets.add(target); }
   disconnect() { this.targets.clear(); }
 };
+let frames = [];
+globalThis.requestAnimationFrame = (fn) => { frames.push(fn); return frames.length; };
+performance.now = () => 1000;
+const runFrame = (ms) => { performance.now = () => ms; const queued = frames; frames = []; for (const fn of queued) fn(ms); };
 const resize = (target) => { for (const observer of observers) if (observer.targets.has(target)) observer.fn(); };
-const job = { moves: { n: 2, x0: 10, y0: 20, x: [30, 60], y: [40, 70], s: [50, 50], f: [100, 100], layer: [0, 0] },
+let job = { moves: { n: 4, x0: 10, y0: 20, x: [20, 30, 40, 60], y: [30, 40, 50, 70], s: [0, 50, 0, 50], f: [0, 100, 0, 100], layer: [0, 0, 1, 1], cls: [0, 1, 0, 2] },
   bounds: { x0: 10, y0: 20, x1: 60, y1: 70 }, air: [], warnings: [] };
 const device = { energy: {}, cutSelected: false };
-const ed = { doc: { bed: { w: 200, h: 100 } }, layerDrawColor: () => '#123456' };
+const ed = { doc: { bed: { w: 200, h: 100 } }, layerDrawColor: () => '#123456', layer: (i) => ({ name: `Layer ${i}` }) };
+let estData = { total: 10, t: [1, 5, 6, 10], cutLength: 80, rapidLength: 0 };
 const immutable = JSON.stringify({ job, device, doc: ed.doc });
 const mocks = { h, setIcon() {}, t: (s) => s, dec: (s) => s, locale: 'en', loadDevices: () => ({ devices: [device] }),
-  buildJob: async () => job, estimate: () => ({ total: 10, t: [5, 10], cutLength: 80, rapidLength: 0 }),
+  MOVE_TRAVEL: 0, MOVE_ENGRAVE: 1, MOVE_CUT: 2,
+  buildJob: async () => job, estimate: () => estData,
   rotaryOn: () => false, formatDuration: String, energyDraft: () => ({}), estimateEnergy: () => ({}),
   electricityTariffText: () => '', parseEnergyNumber: () => null, energyPreview: () => h('section'),
   machine: { connected: false, status: {}, on: () => () => {}, send: deny('machine.send'), connect: deny('machine.connect') },
@@ -98,10 +103,11 @@ globalThis.__previewMocks = mocks;
 const laser = readFileSync(source + 'laser.ts', 'utf8');
 const imports = new Map();
 for (const match of laser.matchAll(/import\s*\{([^}]+)\}\s*from\s*'([^']+)'/g)) imports.set(match[2], match[1].split(',').map((name) => name.trim()).filter(Boolean));
+imports.get('./gcode')?.push('MOVE_TRAVEL', 'MOVE_ENGRAVE', 'MOVE_CUT');
 const bundle = await build({ stdin: { contents: laser, resolveDir: source, sourcefile: 'preview-pipeline-entry.ts', loader: 'ts' }, bundle: true, write: false, format: 'esm', platform: 'node',
   plugins: [{ name: 'offline-preview-boundaries', setup(b) {
     b.onResolve({ filter: /.*/ }, (args) => {
-      if (args.path === './previewLayout') return;
+      if (args.path === './previewLayout' || args.path === './previewPlayback') return;
       if (imports.has(args.path)) return { path: args.path, namespace: 'offline' };
       if (args.path === '../package.json') return { path: args.path, namespace: 'offline' };
       if (args.path === './setupWizard' || args.path === './fluidncDialog') return { path: args.path, namespace: 'blocked' };
@@ -119,6 +125,65 @@ const dlg = document.body.querySelector('dialog');
 const canvas = dlg.querySelector('.preview-canvas');
 const main = dlg.querySelector('.preview-main');
 const split = dlg.querySelector('.preview-splitter');
+const engrave = dlg.querySelector('.preview-engrave');
+const cut = dlg.querySelector('.preview-cut');
+const pause = dlg.querySelector('.preview-pause');
+const smooth = dlg.querySelector('.preview-smooth');
+const target = dlg.querySelector('.preview-target');
+const factors = dlg.querySelector('.preview-factors');
+assert.ok(engrave && cut && pause && smooth && target && factors, 'Playback controls exist');
+assert.equal(engrave.children.find((o) => o.selected)?.textContent, '50×');
+assert.equal(cut.children.find((o) => o.selected)?.textContent, '10×');
+assert.equal(pause.checked, undefined, 'Pause is off by default');
+assert.equal(smooth.checked, undefined, 'Smoothing is off by default');
+assert.equal(target.disabled, true, 'Smoothing target is disabled by default');
+assert.equal(dlg.querySelectorAll('.preview-marker').length, 1, 'One layer marker');
+const marker = dlg.querySelector('.preview-marker');
+assert.ok(marker.classList.contains('change'), 'Marker at the cut layer is marked as a process change');
+assert.ok(marker.title.includes('Prozesswechsel'), 'Marker title names the process change');
+assert.ok(marker['aria-label'].includes('Prozesswechsel'), 'Marker accessible name names the process change');
+const timeTxt = dlg.querySelector('.preview-time');
+const play = dlg.querySelector('.preview-bar').children.find((n) => n.tagName === 'BUTTON');
+play.emit('click');
+runFrame(1500);
+assert.ok(Math.abs(parseFloat(timeTxt.textContent) - 9.8) < 1e-6, 'Playback applies engrave factor 50x to the first segments');
+runFrame(1600);
+assert.equal(parseFloat(timeTxt.textContent), 10, 'Playback stops at the estimated total');
+pause.checked = true;
+play.emit('click');
+runFrame(2600);
+assert.ok(Math.abs(parseFloat(timeTxt.textContent) - 6) < 1e-6, 'Pause stops exactly at the process change');
+assert.equal(dlg.querySelector('.preview-status').textContent, 'Bei Prozesswechsel pausiert');
+runFrame(3000);
+assert.ok(Math.abs(parseFloat(timeTxt.textContent) - 6) < 1e-6, 'Paused playback does not advance on further frames');
+play.emit('click');
+runFrame(3200);
+assert.ok(Math.abs(parseFloat(timeTxt.textContent) - 8) < 1e-6, 'Resume uses the cut factor without re-pausing at the boundary');
+assert.equal(dlg.querySelector('.preview-status').textContent, '');
+assert.equal(dlg.querySelector('.preview-breakdown').open, true, 'Breakdown is open');
+assert.equal(dlg.querySelectorAll('.preview-layer').length, 2, 'One row per layer');
+smooth.checked = true;
+smooth.emit('change');
+assert.equal(engrave.disabled, true, 'Smoothing disables engrave speed control');
+assert.equal(cut.disabled, true, 'Smoothing disables cut speed control');
+assert.equal(target.disabled, false, 'Smoothing enables the target field');
+assert.equal(factors.hidden, false, 'Computed factors are shown in smoothing mode');
+assert.ok(factors.textContent.includes('Faktor'), 'Factors are described as text');
+smooth.checked = false;
+smooth.emit('change');
+assert.equal(engrave.disabled, false, 'Traditional mode restores engrave speed');
+assert.equal(factors.hidden, true, 'Traditional mode hides computed factors');
+assert.equal(target['aria-describedby'], 'preview-target-error', 'Target field references its error text');
+smooth.checked = true;
+smooth.emit('change');
+target.value = '0';
+target.emit('input');
+assert.equal(target.getAttribute('aria-invalid'), 'true');
+assert.equal(dlg.querySelector('.preview-error').hidden, false, 'Invalid target shows the associated error');
+smooth.checked = false;
+smooth.emit('change');
+assert.equal(dlg.querySelector('.preview-error').hidden, true, 'Leaving smoothing mode clears the stale target error');
+assert.equal(target.getAttribute('aria-invalid'), 'false');
 resize(main); resize(canvas);
 assert.equal(canvas.width, 1200); assert.equal(canvas.height, 800);
 canvas.emit('wheel', { clientX: 220, clientY: 120, deltaY: -1 });
@@ -126,12 +191,12 @@ canvas.emit('pointerdown', { clientX: 100, clientY: 100, pointerId: 1 });
 canvas.emit('pointermove', { clientX: 137, clientY: 81 });
 canvas.emit('pointerup');
 const lastArc = () => canvas.calls.filter((c) => c[0] === 'arc').at(-1);
-assert.deepEqual(lastArc().slice(1, 3), [219.5, 134.75], 'Real render applies nonidentity zoom and pan');
+assert.deepEqual(lastArc().slice(1, 3), [183.875, 170.375], 'Real render applies nonidentity zoom and pan');
 assert.ok(canvas.calls.some((c) => c[0] === 'setTransform' && c[1] === 2 && c[4] === 2), 'Real render uses DPR 2');
 split.emit('keydown', { key: 'ArrowLeft' });
 resize(canvas);
 assert.equal(canvas.width, 1180, 'Divider resizing reaches the actual canvas backing store');
-assert.deepEqual(lastArc().slice(1, 3), [183, 144], 'ResizeObserver refits and renders after nonidentity zoom/pan');
+assert.deepEqual(lastArc().slice(1, 3), [155, 172], 'ResizeObserver refits and renders after nonidentity zoom/pan');
 dialogHooks.initSize(dlg, 'preview-test');
 const grip = dlg.querySelector('.dlg-grip');
 assert.equal(grip.tabIndex, 0);
@@ -165,5 +230,23 @@ assert.equal(storage.get('kizamubeam.dialogSize'), savedSize, 'Cancelled grip dr
 assert.equal(JSON.stringify({ job, device, doc: ed.doc }), immutable, 'Resize/render never mutates job, device or document');
 assert.deepEqual(forbidden, []);
 dlg.close();
+const layers = 27, moves = layers * 2;
+const dense = (key, value) => Array.from({ length: moves }, (_, i) => (key === 'layer' ? Math.floor(i / 2) : value(i)));
+job = { moves: { n: moves, x0: 10, y0: 20, x: dense('x', (i) => 10 + i * 2), y: dense('y', (i) => 20 + i * 2),
+  s: dense('s', (i) => (i % 2 ? 50 : 0)), f: dense('f', (i) => (i % 2 ? 100 : 0)),
+  layer: dense('layer'), cls: dense('cls', (i) => (i % 2 ? 1 : 0)) },
+  bounds: { x0: 10, y0: 20, x1: 120, y1: 90 }, air: [], warnings: [] };
+estData = { total: moves, t: Array.from({ length: moves }, (_, i) => i + 1), cutLength: 0, rapidLength: 0 };
+await openPreview(ed);
+const denseDlg = document.body.querySelectorAll('dialog').at(-1);
+assert.equal(denseDlg.querySelectorAll('.preview-marker').length, layers - 1, 'Dense jobs show one visual tick per layer change');
+assert.equal(denseDlg.querySelectorAll('button.preview-marker').length, 0, 'Dense jobs do not create overlapping marker buttons');
+const jump = denseDlg.querySelector('.preview-layer-jump');
+assert.ok(jump, 'Dense jobs offer one layer jump control instead');
+assert.equal(jump.children.length, layers, 'Layer jump lists every layer change plus its prompt');
+jump.value = String(layers - 2);
+jump.emit('change');
+assert.equal(parseFloat(denseDlg.querySelector('.preview-time').textContent), 52, 'Layer jump moves playback to the selected marker time');
+denseDlg.close();
 assert.ok(observers.every((observer) => !observer.targets.has(canvas) && !observer.targets.has(main)), 'Preview observers disconnect on close');
-console.log('Preview real pipeline and grip regressions: 20 passed');
+console.log('Preview real pipeline and grip regressions: 33 passed');

@@ -1,7 +1,7 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, moveLines as rapidTo, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode, zJogLines } from '../src/gcode';
+import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode, zJogLines } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
 import { dedupPolys } from '../src/dedup';
@@ -587,6 +587,24 @@ await test('Sub-Layer: erst füllen, dann ausschneiden; ausgeschaltete Sub-Layer
   assert.equal(mv.f[mv.n - 1], 300);
 });
 
+await test('Prozessmarken: Füllen graviert, Sub-Layer schneidet, Eilgang neutral', async () => {
+  const sub = [{ ...defaultSubLayer('line'), speed: 300, power: 90 }];
+  const job = await cutJob([square()], { mode: 'fill', speed: 3000, power: 30, interval: 1, sub });
+  const mv = job.moves;
+  let fill = 0,
+    cut = 0;
+  for (let i = 0; i < mv.n; i++) {
+    if (mv.s[i] > 0 && mv.f[i] === 3000) {
+      assert.equal(mv.cls[i], MOVE_ENGRAVE);
+      fill++;
+    } else if (mv.s[i] > 0 && mv.f[i] === 300) {
+      assert.equal(mv.cls[i], MOVE_CUT);
+      cut++;
+    } else assert.equal(mv.cls[i], MOVE_TRAVEL);
+  }
+  assert.ok(fill > 0 && cut > 0, `fill ${fill}, cut ${cut}`);
+});
+
 await test('Durchgänge laufen pro Bearbeitung: erst Sub1 fertig, dann Sub2 (#218)', async () => {
   const sub = [
     { ...defaultSubLayer('line'), speed: 600, power: 80, passes: 2 },
@@ -602,6 +620,69 @@ await test('Durchgänge laufen pro Bearbeitung: erst Sub1 fertig, dann Sub2 (#21
     }
   }
   assert.deepEqual(groups, [900, 600, 1200]);
+});
+
+await test('Sublayer-Index bleibt auch bei deaktiviertem Sub-Layer stabil', async () => {
+  const sub = [
+    { ...defaultSubLayer('line'), speed: 300, power: 90 },
+    { ...defaultSubLayer('line'), speed: 100, power: 10, output: false },
+    { ...defaultSubLayer('line'), speed: 1200, power: 80 },
+  ];
+  const job = await cutJob([square()], { mode: 'fill', speed: 3000, power: 30, interval: 1, sub });
+  const mv = job.moves;
+  const byFeed = new Map<number, Set<number>>();
+  for (let i = 0; i < mv.n; i++) {
+    if (!(mv.f[i] > 0 && mv.s[i] > 0)) continue;
+    const set = byFeed.get(mv.f[i]) ?? new Set<number>();
+    set.add(mv.sub[i]);
+    byFeed.set(mv.f[i], set);
+  }
+  // Hauptbearbeitung -1, erster Sub 0, deaktivierter Sub fehlt, dritter Sub behält Index 2
+  assert.deepEqual([...byFeed.get(3000)!], [-1]);
+  assert.deepEqual([...byFeed.get(300)!], [0]);
+  assert.deepEqual([...byFeed.get(1200)!], [2]);
+  assert.ok(!byFeed.has(100), 'deaktivierter Sub-Layer erzeugt keine Arbeitsbewegung');
+});
+
+await test('Kommentar-Export ändert keine Maschinenzeilen', async () => {
+  const d = { ...newDevice({ fw: 'fluidnc' }), startScript: 'M7', endScript: 'M9' };
+  const sub = [{ ...defaultSubLayer('line'), speed: 300, power: 90 }];
+  const job = await cutJob([square()], { mode: 'fill', speed: 3000, power: 30, interval: 1, sub }, d);
+  const est = estimate(job.moves, d);
+  const plain = writeGCode(job, d, est);
+  const ann = writeGCode(job, d, est, 'KizamuBeam', true);
+  // Ohne Option keine einzige Meta-Zeile
+  assert.ok(!plain.lines.some((l) => l.startsWith(META_PREFIX)));
+  assert.ok(plain.origins.every((o) => o !== 'meta'));
+  // Mit Option: nach Entfernen der Meta-Zeilen exakt dieselbe Ausgabe
+  const stripped = ann.lines.filter((l) => !l.startsWith(META_PREFIX));
+  assert.deepEqual(stripped, plain.lines);
+  assert.deepEqual(motion(stripped), motion(plain.lines));
+  assert.equal(ann.lines.length - stripped.length > 0, true);
+  // Herkunft je Zeile: Länge passt, Meta nur auf Meta-Zeilen, Abschnitte vorhanden
+  assert.equal(ann.origins.length, ann.lines.length);
+  for (let i = 0; i < ann.lines.length; i++) {
+    if (ann.lines[i].startsWith(META_PREFIX)) assert.equal(ann.origins[i], 'meta');
+    else assert.ok(ann.origins[i] !== 'meta');
+  }
+  const kinds = new Set(ann.origins);
+  for (const k of ['header', 'start', 'move', 'end', 'footer'] as const) assert.ok(kinds.has(k), `Herkunft ${k} fehlt`);
+  assert.ok(ann.lines.some((l) => l === `${META_PREFIX} layer 1 sub 0`), 'Sublayer-Marke fehlt');
+});
+
+await test('Sublayer-Namen ändern die Maschinenausgabe nicht', async () => {
+  const d = newDevice({ fw: 'fluidnc' });
+  const sub = [{ ...defaultSubLayer('line'), speed: 300, power: 90 }];
+  const plain = await cutJob([square()], { mode: 'fill', speed: 3000, power: 30, interval: 1, sub }, d);
+  const named = await cutJob([square()], {
+    mode: 'fill',
+    speed: 3000,
+    power: 30,
+    interval: 1,
+    sub: [{ ...sub[0], name: 'Feinschnitt' }],
+  }, d);
+  const est = estimate(plain.moves, d);
+  assert.deepEqual(writeGCode(named, d, est).lines, writeGCode(plain, d, est).lines);
 });
 
 await test('Laser zur Klickposition: absolutes Verfahren je Firmware', () => {

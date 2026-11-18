@@ -5059,5 +5059,17 @@
   "Stromtarif ({cur}/kWh)": "Electricity tariff ({cur}/kWh)",
   "Geben Sie einen nicht negativen Preis pro kWh ein (Punkt oder Komma). Bei unbekanntem Tarif leer lassen; 0 bedeutet kostenlosen Strom. Ungültige oder fehlende Werte blenden die Kosten aus, nicht die Energie.": "Enter a non-negative price per kWh (point or comma). Leave empty if unknown; 0 means free electricity. Invalid or missing values hide costs, not energy.",
   "Der Stromtarif muss eine endliche, nicht negative Zahl sein. Geben Sie 0 oder einen positiven Preis pro kWh ein (Punkt oder Komma), oder leeren Sie das Feld bei unbekanntem Tarif.": "Electricity tariff must be a finite, non-negative number. Enter 0 or a positive price per kWh (point or comma), or clear the field if unknown.",
-  "Kosten ({cur})": "Cost ({cur})"
+  "Kosten ({cur})": "Cost ({cur})",
+  "Bei Prozesswechsel pausieren": "Pause on process change",
+  "Prozessarten angleichen": "Smooth process types",
+  "Ziel pro Prozessart (s)": "Target per process type (s)",
+  "Ziel muss zwischen 1 und 600 Sekunden liegen.": "Target must be between 1 and 600 seconds.",
+  "Faktor Gravieren {engrave}×, Schneiden {cut}×": "Factor engrave {engrave}×, cut {cut}×",
+  "Zeit je Layer und Prozessart": "Time per layer and process type",
+  "Laserlose Fahrzeit": "Laser-off travel time",
+  "Zu Layer „{name}“ springen": "Jump to layer “{name}”",
+  "Bei Prozesswechsel pausiert": "Paused at process change",
+  "Prozesswechsel": "Process change",
+  "Zu Layer springen": "Jump to layer",
+  "Sublayer {n}": "Sublayer {n}"
 }

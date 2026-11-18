@@ -64,7 +64,7 @@ export function openLayerDialog(ed: Editor, i: number) {
             class: 'btn small',
             title: s.output ? '' : t('Nicht ausgegeben'),
             onclick: () => ((tab = k), render()),
-          }, t('Sub-Layer {n}', { n: k + 1 })),
+          }, ((s.name ?? '').trim() || t('Sub-Layer {n}', { n: k + 1 }))),
           h('button', {
             type: 'button',
             class: 'btn small sub-del',
@@ -94,7 +94,9 @@ export function openLayerDialog(ed: Editor, i: number) {
     );
     const sub = tab >= 0 ? subs[tab] : null;
     general.replaceChildren(
-      ...(sub ? [] : row(t('Name'), h('input', { type: 'text', value: name, oninput: (ev: Event) => (name = (ev.target as HTMLInputElement).value) }))),
+      ...(sub
+        ? row(t('Name'), h('input', { type: 'text', value: sub.name ?? '', oninput: (ev: Event) => (sub.name = (ev.target as HTMLInputElement).value) }))
+        : row(t('Name'), h('input', { type: 'text', value: name, oninput: (ev: Event) => (name = (ev.target as HTMLInputElement).value) }))),
       ...(vecs ? row(t('Modus'), modeSel) : []),
       ...row(t('Geschwindigkeit (mm/min)'), num(() => e.speed, (v) => (e.speed = v), 1, 100000)),
       ...row(t('Max. Leistung (%)'), num(() => e.power, (v) => (e.power = v), 0, 100)),
@@ -291,7 +293,7 @@ export function openLayerDialog(ed: Editor, i: number) {
         title: t('Standardwerte für den gewählten Modus'),
         onclick: () => {
           if (tab < 0) Object.assign(c, { ...defaultCutSettings(vecs ? c.mode : 'fill'), mode: c.mode, sub: subs });
-          else subs[tab] = { ...defaultSubLayer(subs[tab].mode), output: subs[tab].output } as SubLayer;
+          else subs[tab] = { ...defaultSubLayer(subs[tab].mode), output: subs[tab].output, name: subs[tab].name ?? '' } as SubLayer;
           render();
         },
       }, t('Standardwerte')),

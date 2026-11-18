@@ -464,7 +464,7 @@ export async function convertLbrn(text: string, opts: LbrnOptions): Promise<Lbrn
         }
         const { air: _a, look: _l, sub: _s, ...rest } = lbCutSetting(sl.attrs.type ?? 'Cut', false, sv).settings;
         const out = sv('doOutput');
-        subs.push({ ...rest, output: out === null || out === '1' || out.toLowerCase() === 'true' });
+        subs.push({ ...rest, output: out === null || out === '1' || out.toLowerCase() === 'true', name: '' });
       }
       // Ältere Dateien: „Scan+Cut“ = füllen, danach mit denselben Werten den Umriss schneiden
       if ((cs.attrs.type ?? '').toLowerCase() === 'scan+cut' && !subs.length) {

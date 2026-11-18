@@ -1707,6 +1707,148 @@ label.check {
   min-width: 150px;
   text-align: center;
 }
+.preview-timeline {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 120px;
+  padding-top: 24px;
+}
+.preview-timeline input[type='range'] {
+  display: block;
+  width: 100%;
+}
+.preview-markers {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 24px;
+  pointer-events: none;
+}
+.preview-marker {
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  margin-left: -12px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.preview-marker::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 14px;
+  width: 2px;
+  height: 8px;
+  background: var(--muted);
+  opacity: 1;
+}
+/* Wechsel der Prozessart: zusätzlich zur Farbe breiter und höher. */
+.preview-marker.change::before {
+  left: 10px;
+  top: 12px;
+  width: 4px;
+  height: 12px;
+  background: var(--accent);
+  opacity: 0.9;
+}
+.preview-marker:hover::before,
+.preview-marker:focus-visible::before {
+  top: 13px;
+  height: 10px;
+  opacity: 1;
+}
+.preview-marker.change:hover::before,
+.preview-marker.change:focus-visible::before {
+  top: 11px;
+  height: 13px;
+}
+.preview-marker:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.preview-marker.static {
+  pointer-events: none;
+}
+.preview-layer-jump {
+  max-width: 12em;
+}
+.preview-process {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+.preview-process label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.preview-process input[type='number'] {
+  width: 4.5em;
+}
+.preview-factors {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.preview-error {
+  flex-basis: 100%;
+  color: var(--danger, #c33);
+}
+.preview-breakdown {
+  margin: 0 0 6px;
+}
+.preview-breakdown summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.preview-layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0;
+}
+.preview-layer {
+  display: grid;
+  grid-template-columns: 10px 1fr auto auto;
+  gap: 6px;
+  align-items: center;
+}
+.preview-layer-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.preview-layer-time,
+.preview-layer-share {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.preview-layer-share {
+  min-width: 3.5em;
+  color: var(--muted);
+}
+/* Sublayer-Zeilen stehen eingerückt unter ihrem Hauptlayer. */
+.preview-layer.sub {
+  padding-left: 16px;
+}
+.preview-process-times {
+  margin: 6px 0 0;
+}
+.preview-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
 /* Geräteliste */
 .devices-dialog {

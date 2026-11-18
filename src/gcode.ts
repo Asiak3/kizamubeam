@@ -455,11 +455,11 @@ export function rotaryMoves(mv: Moves, d: Device, box: Box | null = null, t?: Fl
     py = mv.y0,
     pa = out.y0,
     pt = 0;
-  const emit = (x: number, y: number, a: number, f: number, s: number, layer: number) => {
+  const emit = (x: number, y: number, a: number, f: number, s: number, layer: number, cls: number, sub = -1) => {
     const dx = x - px,
       l = Math.hypot(dx, y - py);
     if (f > 0 && l > 1e-9) f = Math.max(1, Math.round((f * Math.hypot(dx, a - pa)) / l));
-    out.push(x, a, f, s, layer);
+    out.push(x, a, f, s, layer, cls, sub);
     px = x;
     py = y;
     pa = a;
@@ -496,7 +496,7 @@ export function rotaryMoves(mv: Moves, d: Device, box: Box | null = null, t?: Fl
       const u = j / n,
         qx = sx + (x - sx) * u,
         qy = sy + (y - sy) * u;
-      emit(qx, qy, map(qx, qy), mv.f[i], mv.s[i], mv.layer[i]);
+      emit(qx, qy, map(qx, qy), mv.f[i], mv.s[i], mv.layer[i], mv.cls ? mv.cls[i] : MOVE_TRAVEL, mv.sub ? mv.sub[i] : -1);
       tt.push(pt + (ti - pt) * u);
     }
     pt = ti;
@@ -540,6 +540,11 @@ export function rotaryTestLines(d: Device, speed = 1500): string[] {
 
 // ---------- Bewegungsliste ----------
 
+/** Prozessart je Bewegung für die Vorschau: 0 = Verfahren, 1 = Gravieren, 2 = Schneiden */
+export const MOVE_TRAVEL = 0;
+export const MOVE_ENGRAVE = 1;
+export const MOVE_CUT = 2;
+
 /** Bewegungen als typisierte Felder (Rasterjobs haben schnell Hunderttausende davon). f = 0 bedeutet Eilgang. */
 export class Moves {
   n = 0;
@@ -551,14 +556,18 @@ export class Moves {
   f = new Float32Array(1024);
   /** Layer-Index; Int16, weil der Materialtest bis zu 400 eigene Testlayer anlegt */
   layer = new Int16Array(1024);
+  /** Prozessart (MOVE_*), nur für die Vorschau; 0 bei Verfahrwegen */
+  cls = new Uint8Array(1024);
+  /** Sublayer-Index im Layer (L.sub), -1 = Hauptbearbeitung; reine Metadaten, keine Maschinenwirkung */
+  sub = new Int16Array(1024).fill(-1);
   /** Z-Versatz in mm gegenüber der Höhe beim Start (positiv = Fokus tiefer), gilt ab dieser Bewegung */
   z = new Float32Array(1024);
   /** Z-Versatz für die folgenden push-Aufrufe */
   zCur = 0;
   constructor(public x0 = 0, public y0 = 0) {}
-  push(x: number, y: number, f: number, s: number, layer: number) {
+  push(x: number, y: number, f: number, s: number, layer: number, cls = MOVE_TRAVEL, sub = -1) {
     if (this.n === this.x.length) {
-      const grow = <T extends Float64Array | Float32Array | Int16Array>(a: T): T => {
+      const grow = <T extends Float64Array | Float32Array | Int16Array | Uint8Array>(a: T): T => {
         const b = new (a.constructor as new (n: number) => T)(a.length * 2);
         b.set(a);
         return b;
@@ -568,7 +577,8 @@ export class Moves {
       this.s = grow(this.s);
       this.f = grow(this.f);
       this.layer = grow(this.layer);
-      this.z = grow(this.z);
+      this.cls = grow(this.cls);
+      this.sub = grow(this.sub);
     }
     const i = this.n++;
     this.z[i] = this.zCur;
@@ -577,6 +587,8 @@ export class Moves {
     this.f[i] = f;
     this.s[i] = s;
     this.layer[i] = layer;
+    this.cls[i] = cls;
+    this.sub[i] = sub;
   }
   lastX() {
     return this.n ? this.x[this.n - 1] : this.x0;
@@ -596,12 +608,14 @@ export function startHere(mv: Moves, i: number, frac: number): Moves {
   const ax = i ? mv.x[i - 1] : mv.x0,
     ay = i ? mv.y[i - 1] : mv.y0;
   const f = mv.f[i] > 0 ? Math.min(1, Math.max(0, frac)) : 1;
+  const cls = mv.cls ? mv.cls[i] : MOVE_TRAVEL;
+  const sub = mv.sub ? mv.sub[i] : -1;
   out.zCur = mv.z[i];
-  out.push(ax + (mv.x[i] - ax) * f, ay + (mv.y[i] - ay) * f, 0, 0, mv.layer[i]);
-  if (f < 1) out.push(mv.x[i], mv.y[i], mv.f[i], mv.s[i], mv.layer[i]);
+  out.push(ax + (mv.x[i] - ax) * f, ay + (mv.y[i] - ay) * f, 0, 0, mv.layer[i], MOVE_TRAVEL, sub);
+  if (f < 1) out.push(mv.x[i], mv.y[i], mv.f[i], mv.s[i], mv.layer[i], cls, sub);
   for (let k = i + 1; k < mv.n; k++) {
     out.zCur = mv.z[k];
-    out.push(mv.x[k], mv.y[k], mv.f[k], mv.s[k], mv.layer[k]);
+    out.push(mv.x[k], mv.y[k], mv.f[k], mv.s[k], mv.layer[k], mv.cls ? mv.cls[k] : MOVE_TRAVEL, mv.sub ? mv.sub[k] : -1);
   }
   return out;
 }
@@ -1102,6 +1116,8 @@ interface ScanOptions {
   /** Überfahrweg in mm */
   overscan: number;
   layer: number;
+  /** Sublayer-Index im Layer, -1 = Hauptbearbeitung; reine Metadaten */
+  sub?: number;
   /** Zeilen liegen in einem um diesen Winkel (rad) gedrehten System */
   angle?: number;
 }
@@ -1111,10 +1127,11 @@ const GAP_RAPID = 10;
 
 function emitScanlines(out: Moves, lines: { y: number; runs: Run[] }[], o: ScanOptions, flip: { v: boolean }) {
   const { speed: F, overscan: ov, layer } = o;
+  const sub = o.sub ?? -1;
   const rc = Math.cos(o.angle ?? 0),
     rs = Math.sin(o.angle ?? 0);
   const mv = o.angle
-    ? { push: (x: number, y: number, f: number, s: number, l: number) => out.push(x * rc - y * rs, x * rs + y * rc, f, s, l) }
+    ? { push: (x: number, y: number, f: number, s: number, l: number, c = MOVE_TRAVEL, q = -1) => out.push(x * rc - y * rs, x * rs + y * rc, f, s, l, c, q) }
     : out;
   for (const ln of lines) {
     if (!ln.runs.length) continue;
@@ -1127,18 +1144,18 @@ function emitScanlines(out: Moves, lines: { y: number; runs: Run[] }[], o: ScanO
     let px = 0;
     for (const [a, b, s] of runs) {
       if (first) {
-        mv.push(sx * (a - ov), y, 0, 0, layer);
-        mv.push(sx * a, y, F, 0, layer);
+        mv.push(sx * (a - ov), y, 0, 0, layer, MOVE_TRAVEL, sub);
+        mv.push(sx * a, y, F, 0, layer, MOVE_TRAVEL, sub);
         first = false;
       } else if (a - px > GAP_RAPID + 2 * ov) {
-        mv.push(sx * (px + ov), y, F, 0, layer);
-        mv.push(sx * (a - ov), y, 0, 0, layer);
-        mv.push(sx * a, y, F, 0, layer);
-      } else if (a > px) mv.push(sx * a, y, F, 0, layer);
-      mv.push(sx * b, y, F, s, layer);
+        mv.push(sx * (px + ov), y, F, 0, layer, MOVE_TRAVEL, sub);
+        mv.push(sx * (a - ov), y, 0, 0, layer, MOVE_TRAVEL, sub);
+        mv.push(sx * a, y, F, 0, layer, MOVE_TRAVEL, sub);
+      } else if (a > px) mv.push(sx * a, y, F, 0, layer, MOVE_TRAVEL, sub);
+      mv.push(sx * b, y, F, s, layer, s > 0 ? MOVE_ENGRAVE : MOVE_TRAVEL, sub);
       px = b;
     }
-    mv.push(sx * (px + ov), y, F, 0, layer);
+    mv.push(sx * (px + ov), y, F, 0, layer, MOVE_TRAVEL, sub);
   }
 }
 
@@ -1267,12 +1284,15 @@ function rotatePolys(polys: Poly[], a: number): Poly[] {
 
 const FLIP = (h: number): Mat => [1, 0, 0, -1, 0, h];
 
-/** Eine Bearbeitung eines Layers: der Layer selbst oder ein Sub-Layer */
+/** Eine Bearbeitung eines Layers: der Layer selbst oder ein Sub-Layer, mit ursprünglichem Sublayer-Index */
 type CutEntry = Omit<CutSettings, 'air' | 'look' | 'sub'>;
+type EntryWithSub = { e: CutEntry; sub: number };
 
-/** Bearbeitungen eines Layers in Ausgabereihenfolge: erst der Layer, dann seine eingeschalteten Sub-Layer */
 /** Bearbeitungen eines Layers in Ausgabereihenfolge: der Layer selbst, dann eingeschaltete Sub-Layer. Durchgänge laufen pro Bearbeitung (#218): Jede Entry beendet ihre eigenen passes, bevor die nächste startet; es gibt keinen globalen Repeat. */
-const entriesOf = (L: Layer): CutEntry[] => [L, ...(L.sub ?? []).filter((s: SubLayer) => s.output)];
+const entriesOf = (L: Layer): EntryWithSub[] => [
+  { e: L, sub: -1 },
+  ...(L.sub ?? []).map((s: SubLayer, i: number) => ({ e: s as CutEntry, sub: i })).filter((x) => (x.e as SubLayer).output),
+];
 
 /** Manuelle Reihenfolge (Issue #153): zählt innere Formen, deren äußere Form früher geschnitten wird.
  * Manuell = Stapel-/Dokumentreihenfolge (alle drei Optimierungen aus); `containsStrict` aus dem Topologie-Modul (#219). */
@@ -1297,7 +1317,7 @@ function countManualViolations(polys: Poly[]): number {
 }
 
 /** Bewegungen einer Bearbeitung; pass(p) setzt vor jedem Durchgang den Z-Versatz */
-function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v: boolean }, pass: (p: number) => void, ord: OrderOpts) {
+function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, si: number, flip: { v: boolean }, pass: (p: number) => void, ord: OrderOpts) {
   const s = e.power / 100;
   const passes = Math.max(1, e.passes);
   if (e.mode === 'fill' && e.fillStyle === 'offset') {
@@ -1305,9 +1325,9 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v:
     for (let p = 0; p < passes; p++) {
       pass(p);
       for (const r of rings) {
-        mv.push(r.pts[0].x, r.pts[0].y, 0, 0, li);
-        for (let i = 1; i < r.pts.length; i++) mv.push(r.pts[i].x, r.pts[i].y, e.speed, s, li);
-        mv.push(r.pts[0].x, r.pts[0].y, e.speed, s, li);
+        mv.push(r.pts[0].x, r.pts[0].y, 0, 0, li, MOVE_TRAVEL, si);
+        for (let i = 1; i < r.pts.length; i++) mv.push(r.pts[i].x, r.pts[i].y, e.speed, s, li, s > 0 ? MOVE_ENGRAVE : MOVE_TRAVEL, si);
+        mv.push(r.pts[0].x, r.pts[0].y, e.speed, s, li, s > 0 ? MOVE_ENGRAVE : MOVE_TRAVEL, si);
       }
     }
     return;
@@ -1319,7 +1339,7 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v:
     const ov = (Math.max(0, e.overscan) / 100) * (e.speed / 60);
     for (let p = 0; p < passes; p++) {
       pass(p);
-      for (const st of sets) emitScanlines(mv, st.lines, { speed: e.speed, bidirectional: e.bidirectional, overscan: ov, layer: li, angle: st.a }, flip);
+      for (const st of sets) emitScanlines(mv, st.lines, { speed: e.speed, bidirectional: e.bidirectional, overscan: ov, layer: li, sub: si, angle: st.a }, flip);
     }
     return;
   }
@@ -1332,11 +1352,11 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, flip: { v:
     for (const poly of order) {
       const path = contourPath(poly, lead);
       if (path.pts.length < 2) continue;
-      mv.push(path.pts[0].x, path.pts[0].y, 0, 0, li);
+      mv.push(path.pts[0].x, path.pts[0].y, 0, 0, li, MOVE_TRAVEL, si);
       if (ramp) {
         const r = rampPath(path, s, sMin, ramp);
-        for (let i = 1; i < r.pts.length; i++) mv.push(r.pts[i].x, r.pts[i].y, e.speed, r.s[i - 1], li);
-      } else for (let i = 1; i < path.pts.length; i++) mv.push(path.pts[i].x, path.pts[i].y, e.speed, path.off[i - 1] ? 0 : s, li);
+        for (let i = 1; i < r.pts.length; i++) mv.push(r.pts[i].x, r.pts[i].y, e.speed, r.s[i - 1], li, r.s[i - 1] > 0 ? MOVE_CUT : MOVE_TRAVEL, si);
+      } else for (let i = 1; i < path.pts.length; i++) mv.push(path.pts[i].x, path.pts[i].y, e.speed, path.off[i - 1] ? 0 : s, li, path.off[i - 1] ? MOVE_TRAVEL : MOVE_CUT, si);
     }
   }
 }
@@ -1751,9 +1771,9 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   }
   for (const [li, b] of buckets) {
     const ents = entriesOf(layerOf(li));
-    const anyLine = ents.some((e) => e.mode === 'line');
-    const firstFill = ents.findIndex((e) => e.mode === 'fill');
-    b.sets = ents.map((e, k) => {
+    const anyLine = ents.some((x) => x.e.mode === 'line');
+    const firstFill = ents.findIndex((x) => x.e.mode === 'fill');
+    b.sets = ents.map(({ e }, k) => {
       const list: Poly[] = [];
 
       // Geometrie pro Objekt vorbereiten
@@ -1941,7 +1961,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
         mv.zCur = 0;
       }
     }
-    entriesOf(L).forEach((e, k) => {
+    entriesOf(L).forEach(({ e, sub }, k) => {
       const polys = bk.sets[k];
       if (!polys?.length) return;
       if (!useZ && (e.zOffset || e.zStep)) zSkipped = true;
@@ -1957,7 +1977,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
         manualViolations += countManualViolations(polys);
       }
 
-      emitEntry(mv, e, polys, li, flip, pass, orderOpts);
+      emitEntry(mv, e, polys, li, sub, flip, pass, orderOpts);
       mv.zCur = 0;
     });
   }
@@ -2125,11 +2145,15 @@ const num = (v: number) => {
   return Object.is(r, -0) ? '0' : String(r);
 };
 
+export type GCodeOrigin = 'header' | 'start' | 'move' | 'air' | 'z' | 'end' | 'footer' | 'meta';
+
 export interface GCode {
   lines: string[];
   /** Geschätzte Zeit (s), zu der die Zeile fertig ist */
   times: Float64Array;
   total: number;
+  /** Herkunft je Zeile; nur interne Metadaten, keine Maschinenwirkung */
+  origins: GCodeOrigin[];
 }
 
 /**
@@ -2137,10 +2161,10 @@ export interface GCode {
  * unveränderte Werte (G1, X, Y, F, S) werden weggelassen. Air Assist wird je Layer mit M8/M7 ein-
  * und mit M9 ausgeschaltet.
  */
-export function writeGCode(job: Job, d: Device, est: Estimate, name = 'KizamuBeam'): GCode {
+export function writeGCode(job: Job, d: Device, est: Estimate, name = 'KizamuBeam', annotate = false): GCode {
   const header = gcodeHeader(job, d, est, name);
   const r = rotaryMoves(job.moves, d, job.bounds, est.t);
-  return gcodeLines(r.mv, d, { ...est, t: r.t! }, job.air, header);
+  return gcodeLines(r.mv, d, { ...est, t: r.t! }, job.air, header, annotate);
 }
 
 /** Kopf des G-Codes: Kommentare, Einheiten, absolute Koordinaten, Laser im Lasermodus an */
@@ -2177,12 +2201,19 @@ export function scriptLines(s: string | undefined): string[] {
   return (s ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
 
+/** Ende des Jobs als Teile mit Herkunft: Ausgänge/Firmwareschluss = footer, eigenes End-Skript = end */
+function footerParts(d: Device): { line: string; origin: GCodeOrigin }[] {
+  const f = FIRMWARES[d.fw].footer;
+  const end = [...jobOutputsOff(d).map((line) => ({ line, origin: 'footer' as GCodeOrigin })), ...scriptLines(d.endScript).map((line) => ({ line, origin: 'end' as GCodeOrigin }))];
+  const k = f.indexOf('M5');
+  const pre = (k < 0 ? f : f.slice(0, k + 1)).map((line) => ({ line, origin: 'footer' as GCodeOrigin }));
+  const post = (k < 0 ? [] : f.slice(k + 1)).map((line) => ({ line, origin: 'footer' as GCodeOrigin }));
+  return [...pre, ...end, ...post];
+}
+
 /** Ende des Jobs: Laser aus, Ausgänge aus, dann das eigene End-Skript, dann Programmende der Steuerung (M2, M400) */
 export function gcodeFooter(d: Device): string[] {
-  const f = FIRMWARES[d.fw].footer;
-  const end = [...jobOutputsOff(d), ...scriptLines(d.endScript)];
-  const k = f.indexOf('M5');
-  return k < 0 ? [...f, ...end] : [...f.slice(0, k + 1), ...end, ...f.slice(k + 1)];
+  return footerParts(d).map((p) => p.line);
 }
 
 /**
@@ -2208,9 +2239,24 @@ export function zInserts(mv: Moves, d: Device): { at: [number, string[]][]; end:
   return { at, end: num(z) === '0' ? [] : move(-z) };
 }
 
-export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[], header: string[]): GCode {
+/**
+ * Präfix eigener Metadaten-Kommentarzeilen (ASCII, versioniert). Sie stehen auf eigenen `;`-Zeilen,
+ * ändern keine ausführbaren Befehle und lassen sich für den Maschinenvergleich exakt entfernen.
+ */
+export const META_PREFIX = '; KZB1';
+
+export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[], header: string[], annotate = false): GCode {
   const lines: string[] = [...header];
   const times: number[] = header.map(() => 0);
+  // Die Kopfzeilen enden mit dem Start-Skript; dessen Zeilen gehören zum Startabschnitt.
+  const startCount = scriptLines(d.startScript).length;
+  const origins: GCodeOrigin[] = header.map((_, k) => (k >= header.length - startCount && startCount > 0 ? 'start' : 'header'));
+  if (annotate && startCount > 0) {
+    const at = lines.length - startCount;
+    lines.splice(at, 0, `${META_PREFIX} start`);
+    times.splice(at, 0, 0);
+    origins.splice(at, 0, 'meta');
+  }
   const zs = zInserts(mv, d);
   let zk = 0;
   let g = -1,
@@ -2222,6 +2268,9 @@ export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[
   const airLayers = new Set(airList);
   const axis = outAxis(d);
   let air = false;
+  const subAt = (i: number) => (mv.sub && i < mv.sub.length ? mv.sub[i] : -1);
+  let bodyStarted = false;
+  let lastGroup = '';
   for (let i = 0; i < mv.n; i++) {
     const x = mv.x[i],
       y = mv.y[i];
@@ -2230,6 +2279,7 @@ export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[
       for (const l of zs.at[zk][1]) {
         lines.push(l);
         times.push(i ? est.t[i - 1] : 0);
+        origins.push('z');
       }
       g = -1;
     }
@@ -2238,6 +2288,7 @@ export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[
       air = wantAir;
       lines.push(air ? d.airCmd || 'M8' : 'M9');
       times.push(i ? est.t[i - 1] : 0);
+      origins.push('air');
     }
     const rapid = mv.f[i] === 0;
     const xs = num(x),
@@ -2264,14 +2315,57 @@ export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[
     }
     cx = x;
     cy = y;
+    if (annotate && mv.layer[i] >= 0) {
+      const key = `${mv.layer[i]}:${subAt(i)}`;
+      if (!bodyStarted) {
+        bodyStarted = true;
+        const t0 = i ? est.t[i - 1] : 0;
+        lines.push(`${META_PREFIX} job`);
+        times.push(t0);
+        origins.push('meta');
+      }
+      if (key !== lastGroup) {
+        lastGroup = key;
+        lines.push(`${META_PREFIX} layer ${mv.layer[i]} sub ${subAt(i)}`);
+        times.push(i ? est.t[i - 1] : 0);
+        origins.push('meta');
+      }
+    }
     lines.push(l.trim());
     times.push(est.t[i]);
+    origins.push('move');
   }
-  for (const l of [...(air ? ['M9'] : []), ...zs.end, ...gcodeFooter(d)]) {
-    lines.push(l);
+  if (air) {
+    lines.push('M9');
     times.push(est.total);
+    origins.push('air');
   }
-  return { lines, times: Float64Array.from(times), total: est.total };
+  for (const z of zs.end) {
+    lines.push(z);
+    times.push(est.total);
+    origins.push('z');
+  }
+  const foot = footerParts(d);
+  let endMarked = false;
+  let footerMarked = false;
+  for (const p of foot) {
+    if (annotate && p.origin === 'end' && !endMarked) {
+      endMarked = true;
+      lines.push(`${META_PREFIX} end`);
+      times.push(est.total);
+      origins.push('meta');
+    }
+    if (annotate && p.origin === 'footer' && endMarked && !footerMarked) {
+      footerMarked = true;
+      lines.push(`${META_PREFIX} footer`);
+      times.push(est.total);
+      origins.push('meta');
+    }
+    lines.push(p.line);
+    times.push(est.total);
+    origins.push(p.origin);
+  }
+  return { lines, times: Float64Array.from(times), total: est.total, origins };
 }
 
 /**

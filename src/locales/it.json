@@ -5059,5 +5059,17 @@
   "Stromtarif ({cur}/kWh)": "Tariffa elettrica ({cur}/kWh)",
   "Geben Sie einen nicht negativen Preis pro kWh ein (Punkt oder Komma). Bei unbekanntem Tarif leer lassen; 0 bedeutet kostenlosen Strom. Ungültige oder fehlende Werte blenden die Kosten aus, nicht die Energie.": "Inserire un prezzo non negativo per kWh (punto o virgola). Lasciare vuoto se sconosciuto; 0 significa elettricità gratuita. Valori non validi o mancanti nascondono i costi, non l’energia.",
   "Der Stromtarif muss eine endliche, nicht negative Zahl sein. Geben Sie 0 oder einen positiven Preis pro kWh ein (Punkt oder Komma), oder leeren Sie das Feld bei unbekanntem Tarif.": "La tariffa elettrica deve essere un numero finito non negativo. Inserire 0 o un prezzo positivo per kWh (punto o virgola), oppure svuotare il campo se sconosciuto.",
-  "Kosten ({cur})": "Costo ({cur})"
+  "Kosten ({cur})": "Costo ({cur})",
+  "Bei Prozesswechsel pausieren": "Metti in pausa al cambio di processo",
+  "Prozessarten angleichen": "Uniforma i tipi di processo",
+  "Ziel pro Prozessart (s)": "Obiettivo per tipo di processo (s)",
+  "Ziel muss zwischen 1 und 600 Sekunden liegen.": "L'obiettivo deve essere compreso tra 1 e 600 secondi.",
+  "Faktor Gravieren {engrave}×, Schneiden {cut}×": "Fattore incisione {engrave}×, taglio {cut}×",
+  "Zeit je Layer und Prozessart": "Tempo per livello e tipo di processo",
+  "Laserlose Fahrzeit": "Tempo di spostamento senza laser",
+  "Zu Layer „{name}“ springen": "Vai al livello «{name}»",
+  "Bei Prozesswechsel pausiert": "In pausa al cambio di processo",
+  "Prozesswechsel": "Cambio di processo",
+  "Zu Layer springen": "Vai al livello",
+  "Sublayer {n}": "Sublivello {n}"
 }

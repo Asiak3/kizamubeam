@@ -5059,5 +5059,17 @@
   "Stromtarif ({cur}/kWh)": "Tarifa de eletricidade ({cur}/kWh)",
   "Geben Sie einen nicht negativen Preis pro kWh ein (Punkt oder Komma). Bei unbekanntem Tarif leer lassen; 0 bedeutet kostenlosen Strom. Ungültige oder fehlende Werte blenden die Kosten aus, nicht die Energie.": "Informe um preço não negativo por kWh (ponto ou vírgula). Deixe vazio se desconhecido; 0 significa eletricidade gratuita. Valores inválidos ou ausentes ocultam os custos, não a energia.",
   "Der Stromtarif muss eine endliche, nicht negative Zahl sein. Geben Sie 0 oder einen positiven Preis pro kWh ein (Punkt oder Komma), oder leeren Sie das Feld bei unbekanntem Tarif.": "A tarifa de eletricidade deve ser um número finito não negativo. Informe 0 ou um preço positivo por kWh (ponto ou vírgula), ou limpe o campo se desconhecido.",
-  "Kosten ({cur})": "Custo ({cur})"
+  "Kosten ({cur})": "Custo ({cur})",
+  "Bei Prozesswechsel pausieren": "Pausar na troca de processo",
+  "Prozessarten angleichen": "Suavizar tipos de processo",
+  "Ziel pro Prozessart (s)": "Meta por tipo de processo (s)",
+  "Ziel muss zwischen 1 und 600 Sekunden liegen.": "A meta deve ficar entre 1 e 600 segundos.",
+  "Faktor Gravieren {engrave}×, Schneiden {cut}×": "Fator gravação {engrave}×, corte {cut}×",
+  "Zeit je Layer und Prozessart": "Tempo por camada e tipo de processo",
+  "Laserlose Fahrzeit": "Tempo de deslocamento sem laser",
+  "Zu Layer „{name}“ springen": "Ir para a camada “{name}”",
+  "Bei Prozesswechsel pausiert": "Pausado na troca de processo",
+  "Prozesswechsel": "Troca de processo",
+  "Zu Layer springen": "Ir para a camada",
+  "Sublayer {n}": "Subcamada {n}"
 }
