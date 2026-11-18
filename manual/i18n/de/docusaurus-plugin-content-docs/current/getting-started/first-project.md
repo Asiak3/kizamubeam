@@ -18,7 +18,7 @@ flowchart LR
 ```
 
 :::info Bevor du anfängst
-Dein Laser sollte verbunden und eingerichtet sein, siehe [Laser verbinden](connect-laser.md). Ohne Laser kannst du trotzdem mitmachen und vor dem letzten Schritt aufhören, oder den Job mit der [KizamuBeam Virtual Machine](https://github.com/KizamuBeam/kizamubeam/releases?q=vm-v) ausprobieren, einem virtuellen Laser zum Testen.
+Dein Laser sollte verbunden und eingerichtet sein, siehe [Laser verbinden](connect-laser.md). Ohne Laser kannst du trotzdem mitmachen und vor dem letzten Schritt aufhören, oder den Job mit der [KizamuBeam Virtual Machine](https://github.com/KizamuBeam/kizamubeam-vm/releases) ausprobieren, einem virtuellen Laser zum Testen.
 :::
 
 ## 1. Das Schild zeichnen

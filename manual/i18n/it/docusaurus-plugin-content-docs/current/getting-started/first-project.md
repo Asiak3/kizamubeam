@@ -18,7 +18,7 @@ flowchart LR
 ```
 
 :::info Prima di iniziare
-Il laser dovrebbe essere collegato e configurato, vedi [Collegare un laser](connect-laser.md). Senza laser puoi seguire comunque e fermarti prima dell’ultimo passo, oppure provare il lavoro con la [KizamuBeam Virtual Machine](https://github.com/KizamuBeam/kizamubeam/releases?q=vm-v), un laser virtuale per i test.
+Il laser dovrebbe essere collegato e configurato, vedi [Collegare un laser](connect-laser.md). Senza laser puoi seguire comunque e fermarti prima dell’ultimo passo, oppure provare il lavoro con la [KizamuBeam Virtual Machine](https://github.com/KizamuBeam/kizamubeam-vm/releases), un laser virtuale per i test.
 :::
 
 ## 1. Disegna la targhetta

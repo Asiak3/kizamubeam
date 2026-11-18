@@ -18,7 +18,7 @@ flowchart LR
 ```
 
 :::info Before you start
-Your laser should be connected and set up, see [Connecting a laser](connect-laser.md). Without a laser you can follow along anyway and stop before the last step, or try the job on the [KizamuBeam Virtual Machine](https://github.com/KizamuBeam/kizamubeam/releases?q=vm-v), a virtual laser for testing.
+Your laser should be connected and set up, see [Connecting a laser](connect-laser.md). Without a laser you can follow along anyway and stop before the last step, or try the job on the [KizamuBeam Virtual Machine](https://github.com/KizamuBeam/kizamubeam-vm/releases), a virtual laser for testing.
 :::
 
 ## 1. Draw the tag
