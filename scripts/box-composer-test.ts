@@ -121,6 +121,7 @@ const viaHost = (name: string) => (input: unknown) => {
 };
 (globalThis as Record<string, unknown>).host = { joints: viaHost('joints'), offset: viaHost('offset'), boolean: viaHost('boolean'), nest: viaHost('nest') };
 const { buildParts, withKerf, innerHeight } = await import('../plugins/box-composer/src/parts');
+const { fields, tenonStretches } = await import('../plugins/box-composer/src/joints');
 type Sub = { nodes: { x: number; y: number }[]; closed: boolean };
 type Dims = Parameters<typeof buildParts>[1];
 const DIMS: Dims = { W: 100, D: 200, H: 50, t: T, finger: 10, clearance: 0.1, kerf: 0, sides: { x0: true, x1: true, y0: true, y1: true }, lid: false, drop: 0 };
@@ -294,6 +295,51 @@ test('kerf widens every part by half of it on each side', () => {
       q = box(b[k] as Sub[]);
     assert.ok(Math.abs(q.x1 - q.x0 - (p.x1 - p.x0) - 0.2) < 1e-3, `${k}: width`);
   }
+});
+
+test('fields: the odd number nearest to length / finger, at least 3, all equally wide; tenons on every second field', () => {
+  assert.deepEqual(fields(47, 10), { n: 5, w: 9.4 });
+  assert.deepEqual(fields(44, 10), { n: 5, w: 8.8 });
+  assert.equal(fields(194, 10).n, 19);
+  assert.equal(fields(12, 10).n, 3);
+  assert.deepEqual(
+    tenonStretches(0, 47, 10).map((sp) => [sp.a, sp.b, sp.width].map((x) => +x.toFixed(6))),
+    [[4.7, 23.5, 9.4], [23.5, 42.3, 9.4]],
+  );
+});
+
+/** Inner field boundaries (sorted, rounded to µm) of the nodes of a part between lo and hi on one coordinate, near the line at */
+const bounds = (subs: Sub[], axis: 'x' | 'y', at: number[], lo: number, hi: number) => {
+  const other = axis === 'x' ? 'y' : 'x';
+  const vals = subs[0].nodes.filter((n) => at.some((a) => Math.abs(n[other] - a) < 1e-3) && n[axis] > lo + 1e-3 && n[axis] < hi - 1e-3).map((n) => +n[axis].toFixed(3));
+  return [...new Set(vals)].sort((a, b) => a - b);
+};
+const steps = (lo: number, w: number, n: number) => Array.from({ length: n - 1 }, (_, k) => +(lo + (k + 1) * w).toFixed(3));
+
+test('outer corners: without a lid the fingers reach the top edge (H − t), with a lid between both plates (H − 2t)', () => {
+  // Höhe 50, t 3, Zinke 10: ohne Deckel 47 / 10 → 5 Felder je 9,4; mit Deckel 44 / 10 → 5 Felder je 8,8
+  const open = parts({ clearance: 0 }).parts;
+  assert.deepEqual(bounds(open.front as Sub[], 'y', [-50, -47], -25, 22), steps(-25, 9.4, 5), 'front, left corner');
+  assert.deepEqual(bounds(open.right as Sub[], 'y', [100, 97], -25, 22), steps(-25, 9.4, 5), 'right wall, front corner');
+  const lid = parts({ clearance: 0, lid: true }).parts;
+  assert.deepEqual(bounds(lid.front as Sub[], 'y', [-50, -47], -22, 22), steps(-22, 8.8, 5), 'front with lid');
+  assert.deepEqual(bounds(lid.left as Sub[], 'y', [-100, -97], -22, 22), steps(-22, 8.8, 5), 'left wall with lid');
+});
+
+test('floor edges: the same equal fields on the floor and on the wall standing on it', () => {
+  // Rückwand 100 breit: 94 / 10 → 9 Felder je 10,44 auf beiden Teilen
+  const r = parts({ clearance: 0 }).parts;
+  const want = steps(-47, 94 / 9, 9);
+  assert.deepEqual(bounds(r.floor as Sub[], 'x', [-100, -97], -47, 47), want, 'floor, back edge');
+  assert.deepEqual(bounds(r.back as Sub[], 'x', [22, 25], -47, 47), want, 'back wall, bottom edge');
+});
+
+test('T joints: tenons on the 2nd and 4th of five fields, in line with the fingers of the outer corners', () => {
+  const r = parts({ clearance: 0 });
+  const p = r.walls.find((q) => q.it.end.kind === 'outer')!;
+  const tip = (p.e - p.s) / 2 + T;
+  const ys = bounds(r.parts[p.key] as Sub[], 'y', [tip], -p.h / 2, p.h / 2);
+  assert.deepEqual(ys, [-14.1, -4.7, 4.7, 14.1], 'two tenons, 9.4 wide, 9.4 apart');
 });
 
 test('pinwheel and closed cell build without joint errors', () => {
