@@ -375,6 +375,8 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
   const added: SubPath[] = [];
   const info: JointMsg[] = [];
 
+  /** Ends of finger edges: the old corner node may be left on the way back of the neighbouring edge (#401) */
+  const corners: { obj: K; sub: number; p: Pt }[] = [];
   if (o.kind === 'finger') {
     const pattern = Math.min(...geoms.map((g) => g.len));
     const n = fingerCount(pattern, o.fingerWidth);
@@ -384,6 +386,7 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
     geoms.forEach((g, i) => {
       const phase = ((i + (o.swap ? 1 : 0)) % 2) as 0 | 1;
       edits.push({ pick: picks[i], pts: fingerProfile(g.len, pattern, n, phase, vMat, vGap, adj).map((q) => at(g, q.x, q.y)) });
+      corners.push({ obj: picks[i].obj, sub: picks[i].sub, p: g.a }, { obj: picks[i].obj, sub: picks[i].sub, p: g.b });
     });
     info.push({ code: 'finger-info', values: { n, width: w } });
     if (geoms.length > 1 && Math.abs(geoms[0].len - geoms[1].len) > 0.01)
@@ -629,6 +632,30 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
     if (!sp) continue; // Hilfslinie wurde durch Schlitze ersetzt
     sp.nodes.splice(segments(sp)[e.pick.seg].ia + 1, 0, ...e.pts.map((p) => ({ x: p.x, y: p.y })));
   }
+  // Fingerzinken nach innen, die mit einer Lücke beginnen oder enden: die alte Ecke bliebe als Steg der Breite null
+  // stehen (die Kontur läuft hinein und auf derselben Linie zurück, der Laser schneidet die Strecke doppelt, #401)
+  for (const c of corners) {
+    const sp = changes.get(c.obj)?.[c.sub];
+    if (sp?.closed) dropBacktrack(sp, c.p);
+  }
   for (const [obj, slots] of extra) changes.get(obj)!.push(...slots);
   return { changes, added, info };
+}
+
+/**
+ * Remove the node at p when the outline runs into it and straight back on the same line (straight segments only):
+ * a zero-width spike. Any other node, also a real corner, stays.
+ */
+function dropBacktrack(sp: SubPath, p: Pt) {
+  const ns = sp.nodes;
+  const i = ns.findIndex((q) => Math.abs(q.x - p.x) < 1e-9 && Math.abs(q.y - p.y) < 1e-9);
+  if (i < 0 || ns.length < 4) return;
+  const a = ns[(i + ns.length - 1) % ns.length],
+    b = ns[i],
+    c = ns[(i + 1) % ns.length];
+  if (a.cout || b.cin || b.cout || c.cin) return;
+  const ux = b.x - a.x, uy = b.y - a.y, vx = c.x - b.x, vy = c.y - b.y;
+  const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
+  if (lu < 1e-12 || lv < 1e-12) return;
+  if (Math.abs(ux * vy - uy * vx) <= 1e-9 * lu * lv && ux * vx + uy * vy < 0) ns.splice(i, 1);
 }

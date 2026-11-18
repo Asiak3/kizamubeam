@@ -120,8 +120,73 @@ test('Deckel öffnet bis 100° ohne an Kasten-Knöcheln oder Rückwand anzustoß
   }
 });
 
+// --- Fingerzinken nach innen: keine Stege der Breite null an den Ecken (#401) ---
+const finger = (o: Partial<JointOptions> = {}): JointOptions => ({ ...DEFAULT_JOINT, kind: 'finger', thickness: 3, fingerWidth: 10, direction: 'in', ...o });
+/** Stellen, an denen die Kontur auf derselben Linie zurückläuft */
+function spikes(sp: SubPath): Pt[] {
+  const ns = sp.nodes, out: Pt[] = [];
+  ns.forEach((b, i) => {
+    const a = ns[(i + ns.length - 1) % ns.length], c = ns[(i + 1) % ns.length];
+    const cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x), dot = (b.x - a.x) * (c.x - b.x) + (b.y - a.y) * (c.y - b.y);
+    if (Math.abs(cross) < 1e-9 && dot < 0) out.push(b);
+  });
+  return out;
+}
+/** Knoten als Ring vergleichen (Anfang egal) */
+function sameRing(got: Pt[], want: [number, number][]) {
+  const s = (p: { x: number; y: number }) => `${Math.round(p.x * 1e6) / 1e6},${Math.round(p.y * 1e6) / 1e6}`;
+  const g = got.map(s), w = want.map(([x, y]) => s({ x, y }));
+  assert.equal(g.length, w.length, `nodes: ${g.join(' ')}`);
+  const k = g.indexOf(w[0]);
+  assert.ok(k >= 0, `nodes: ${g.join(' ')}`);
+  assert.deepEqual([...g.slice(k), ...g.slice(0, k)], w);
+}
+
+test('Fingerzinken nach innen: Gegenstück, das mit einer Lücke beginnt und endet, ohne Stege an den Ecken (#401)', () => {
+  // Beispiel aus #401: rechte Kante von a (50 × 50) und linke Kante von b (40 × 50)
+  const a = rect(0, 0, 50, 50), b = rect(0, 0, 40, 50);
+  const r = computeJoint([pick(a, 1), pick(b, 3)], finger());
+  assert.equal(r.error, undefined);
+  const sb = r.changes.get(b)!.subs[0];
+  assert.deepEqual(spikes(sb), []);
+  sameRing(sb.nodes, [[3, 0], [40, 0], [40, 50], [3, 50], [3, 40], [0, 40], [0, 30], [3, 30], [3, 20], [0, 20], [0, 10], [3, 10]]);
+  near(area(flatten(sb)), 40 * 50 - 3 * 10 * 3);
+  // a beginnt und endet mit einem Zinken: unverändert bis auf die Lücken
+  const sa = r.changes.get(a)!.subs[0];
+  assert.deepEqual(spikes(sa), []);
+  near(area(flatten(sa)), 50 * 50 - 2 * 10 * 3);
+  // swap: jetzt beginnt a mit einer Lücke, b mit einem Zinken
+  const s = computeJoint([pick(a, 1), pick(b, 3)], finger({ swap: true }));
+  for (const o of [a, b]) assert.deepEqual(spikes(s.changes.get(o)!.subs[0]), [], 'swap');
+  near(area(flatten(s.changes.get(a)!.subs[0])), 50 * 50 - 3 * 10 * 3);
+});
+
+test('Fingerzinken nach innen: Kanten verschiedener Länge (Rand > 0), Spiel und Schnittfuge, auch einzeln', () => {
+  // b ist länger: das Muster (50 mm) liegt mittig, die Endfelder sind um je 5 mm länger
+  const a = rect(0, 0, 50, 50), b = rect(0, 0, 40, 60);
+  for (const o of [finger(), finger({ clearance: 0.1, kerf: 0.15 }), finger({ swap: true, clearance: -0.1 })]) {
+    const r = computeJoint([pick(a, 1), pick(b, 3)], o);
+    assert.equal(r.error, undefined);
+    for (const obj of [a, b]) assert.deepEqual(spikes(r.changes.get(obj)!.subs[0]), [], JSON.stringify({ clearance: o.clearance, swap: o.swap }));
+  }
+  const r = computeJoint([pick(a, 1), pick(b, 3)], finger());
+  // b (Lücke am Anfang und Ende, je 15 mm lang): die Ecken rücken um die Materialdicke nach innen
+  const xs = r.changes.get(b)!.subs[0].nodes.filter((p) => p.y === 0 || p.y === 60).map((p) => p.x).sort((x, y) => x - y);
+  assert.deepEqual(xs, [3, 3, 40, 40]);
+  near(area(flatten(r.changes.get(b)!.subs[0])), 40 * 60 - (15 + 10 + 15) * 3);
+  // eine Kante allein (Zinken ohne Gegenstück), mit Lücke am Anfang
+  const one = computeJoint([pick(rect(0, 0, 40, 50), 3)], finger({ swap: true }));
+  assert.deepEqual(spikes([...one.changes.values()][0].subs[0]), []);
+});
+
+test('Fingerzinken nach außen bleiben, wie sie waren', () => {
+  const a = rect(0, 0, 50, 50), b = rect(0, 0, 40, 50);
+  const r = computeJoint([pick(a, 1), pick(b, 3)], finger({ direction: 'out' }));
+  sameRing(r.changes.get(b)!.subs[0].nodes, [[0, 0], [40, 0], [40, 50], [0, 50], [0, 40], [-3, 40], [-3, 30], [0, 30], [0, 20], [-3, 20], [-3, 10], [0, 10]]);
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
 }
-console.log('\nAlle Scharnier-Tests bestanden');
+console.log('\nAlle Verbindungs-Tests bestanden');
