@@ -7,13 +7,14 @@
 // selection and a right click the stretch under the pointer. Every edit goes through edit.ts: a dragged wall or end
 // goes to the nearest place where it may stand (it jumps over others and lines up with a wall it can be joined with),
 // anything else that would bring a new error is refused with a message. The measures of the selected wall are shown
-// as a line of text under the plan (the plan's own texts are small). While dragging, the walls live in the surface
+// as a line of text under the plan (the plan's own texts are small) and as fields beside the preview (newer apps, #411):
+// a typed clear space moves the selection, a typed length the free end. While dragging, the walls live in the surface
 // state; the parameters change only on release, so each edit is one change of the dialog.
 //
 // Surface coordinates are the inner rectangle of the box (mm): x to the right from the inside of the left wall, y to
 // the front from the inside of the back wall (the back is at the top).
 import { mm, type Drawing, type EventResult, type Item, type Pointer, type Surface, type Text } from '../../sdk/ts';
-import { addWall, current, deleteRuns, deleteWall, joinRuns, lineUp, moveRunsNear, neighbours, stretchEndNear, stretchOf, wallCentre, type EditResult, type Run } from './edit';
+import { addWall, current, deleteRuns, deleteWall, joinRuns, lineUp, moveRuns, moveRunsNear, moveWall, neighbours, stretchEnd, stretchEndNear, stretchOf, wallCentre, wholeWall, type EditResult, type Run } from './edit';
 import { buildModel, writeLayout, type Axis, type End, type Layout, type Limits, type Model, type Side, type Wall } from './model';
 
 /** What the plan needs: inner size, thickness, limits, the stored layout and which outer walls there are */
@@ -151,6 +152,8 @@ function splitAt(p: Plan, walls: Wall[], axis: Axis, x: number, y: number): Edit
 
 /** Id of the wall in row `row` of the stored list */
 const idAt = (p: Plan, row: number | undefined) => (row !== undefined && row >= 0 ? p.layout.walls[row]?.id : undefined);
+/** The wall selected in the list (its id), if any */
+export const selectedId = (p: Plan, s: Surface) => idAt(p, s.selected[LIST]);
 
 /** A rectangle as a closed line */
 const rect = (x0: number, y0: number, x1: number, y1: number): [number, number][] => [
@@ -204,6 +207,25 @@ function stretchMid(m: Model, x: Wall, along: number): number {
   const marks = [x.from, x.to, ...(it ? [...it.tees.map((q) => q.at), ...it.crosses.map((c) => c.at)] : [])].sort((a, b) => a - b);
   for (let i = 0; i + 1 < marks.length; i++) if (along >= marks[i] && along <= marks[i + 1]) return (marks[i] + marks[i + 1]) / 2;
   return along;
+}
+
+/** The end of wall x a typed length moves: a free one (the end when both are free); null when both ends are joined */
+function lengthEnd(m: Model, x: Wall): 'from' | 'to' | null {
+  const it = m.walls.find((q) => q.wall.id === x.id);
+  if (!it || it.end.kind === 'free') return 'to';
+  return it.start.kind === 'free' ? 'from' : null;
+}
+
+/** The measures of the selected wall as fields beside the preview (#411): clear space on both sides where they are
+ * taken, and its length (only with a free end) */
+function wallFields(p: Plan, walls: Wall[], m: Model, x: Wall, along: number): NonNullable<Drawing['fields']> {
+  const c = clear(p, walls, x, along);
+  const free = lengthEnd(m, x);
+  return [
+    { id: 'a', label: { code: `field.${x.axis}.a` }, value: r2(c.a), min: 0 },
+    { id: 'b', label: { code: `field.${x.axis}.b` }, value: r2(c.b), min: 0 },
+    { id: 'len', label: { code: 'field.len' }, value: r2(x.to - x.from), min: 0, ...(free ? {} : { readonly: true, title: { code: 'field.len.joined' } }) },
+  ];
 }
 
 /** The wall whose middle wall x stands on (nearest to `along` among those it ends on or crosses), if it does */
@@ -368,10 +390,12 @@ export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width:
     const [x0, y0, x1, y1] = st.draft;
     items.push({ type: 'line', pts: [[r1(x0), r1(y0)], [r1(x1), r1(y1)]], style: 'warn', dash: true, width: 1.5 });
   }
+  // The selected wall's measures as fields beside the preview, not while a new wall is drawn
+  const fields = x && st.drag?.kind !== 'draw' ? wallFields(p, walls, m, x, dimAt) : [];
   // The plan wants pointer moves without a button, for the target (Ctrl); Escape clears what is selected or shown and
   // otherwise closes the dialog (newer apps)
   // While Ctrl shows the target or the cross, the normal cursor everywhere (not the move cursor over walls)
-  return { frame, layers, items, track: true, escape: !!(pick || st.aim || st.free || st.drag), ...(st.aim || st.free ? { cursor: 'default' as const } : {}) };
+  return { frame, layers, items, track: true, escape: !!(pick || st.aim || st.free || st.drag), ...(st.aim || st.free ? { cursor: 'default' as const } : {}), fields };
 }
 
 // ---- Pointer and keys ----
@@ -576,6 +600,31 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
     if (hit[1] === 'e' || !x) return finish(p, deleteWall(p.layout, p.w, p.d, Number(hit[2])), undefined);
     const run = stretchOf(buildModel({ ref: [p.w, p.d], walls: base }, p.w, p.d, p.lim), x, x.axis === 'h' ? ev.x : ev.y);
     return finish(p, deleteRuns(p.layout, p.w, p.d, x.axis, x.pos, [run]), undefined);
+  }
+
+  // A measure typed beside the preview (#411): the selection moves to that clear space (where the measures are taken),
+  // a length moves the free end; refused like a drag that cannot go there
+  if (ev.type === 'field' && ev.value !== undefined && !st.drag) {
+    const x = base.find((q) => q.id === idAt(p, s.selected[LIST]));
+    if (!x) return null;
+    const m = buildModel(layout(base), p.w, p.d, p.lim);
+    const mid = stretchMid(m, x, alongOf(st, x));
+    if (ev.field === 'len') {
+      const which = lengthEnd(m, x);
+      if (!which) return null;
+      const r = stretchEnd(p.layout, p.w, p.d, p.lim, x.id, which, which === 'to' ? x.from + ev.value : x.to - ev.value, 0);
+      return r.ok ? commit(p, r.layout.walls, x.id) : { message: refusal(r) };
+    }
+    if (ev.field !== 'a' && ev.field !== 'b') return null;
+    const c = clear(p, base, x, mid);
+    const to = r2(ev.field === 'a' ? c.lo + p.t + ev.value : c.hi - p.t - ev.value);
+    const sel = selection(st, base, x.id) ?? whole(x);
+    const one = wholeWall(base, sel.axis, sel.pos, sel.runs);
+    const r = one !== null ? moveWall(p.layout, p.w, p.d, p.lim, one, to) : moveRuns(p.layout, p.w, p.d, p.lim, sel.axis, sel.pos, sel.runs, to);
+    if (!r.ok) return { message: refusal(r) };
+    const moved = { ...sel, pos: to };
+    const id = wallAt(r.layout.walls, moved, mid)?.id ?? x.id;
+    return commit(p, r.layout.walls, id, mid, one !== null ? undefined : moved);
   }
 
   // Escape: the target and the selection go (the plan asks for pointer moves, so the app sends it the key)
