@@ -1,7 +1,7 @@
 {
  "format": "kizamubeam-catalog",
  "version": 1,
- "generated": "2026-11-18T12:51:44.967Z",
+ "generated": "2026-11-18T16:30:21.798Z",
  "packs": [
   {
    "id": "org.kizamubeam.box-composer",
@@ -181,7 +181,7 @@
    "codeSize": 12700,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/layered-art",
    "file": "org.kizamubeam.layered-art.kzp",
-   "sha256": "f6291528150794654cd3e43e28c671dec79bbc027e3769bd7a7617d6f0ff58a3",
+   "sha256": "8974aea4468aaff4e26130b04db2826deccff8d5503ea875db669dc913ca22c0",
    "size": 25812
   },
   {
