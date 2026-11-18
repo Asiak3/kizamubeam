@@ -47,6 +47,12 @@ const isSuggested = (g: Generator, key: string, p: Params) => {
 
 /** Dauert eine Vorschau länger (große Baugruppen), wird sie erst kurz nach der letzten Eingabe neu berechnet */
 const SLOW_PREVIEW_MS = 40;
+/**
+ * A plugin that answers quickly is not announced: "being computed" (and its cancel button) shows only when the answer
+ * takes longer, so the foot of the dialog, and the surface that takes the room above it, does not jump with every
+ * change (#411)
+ */
+const PENDING_SHOW_MS = 400;
 const PREVIEW_DELAY_MS = 120;
 const fmtNum = (v: number) => (Number.isInteger(v) ? String(v) : f2(v));
 
@@ -284,12 +290,20 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
     if (rb.issues.some((i) => i.level === 'error')) r.parts = [];
     if (Object.keys(binds).length) for (const pt of r.parts) pt.shape.bind = { ...binds };
     built = r.parts.length ? r : null;
-    issuesEl.replaceChildren(...r.issues.map((i) => h('div', { class: i.level === 'error' ? 'error' : 'warn' }, i.msg)));
-    // A plugin still computing can be stopped; a stopped or timed-out run can be started again
-    if (g.cancel && r.issues.some((i) => i.code === PENDING))
-      issuesEl.append(h('button', { class: 'btn small', onclick: () => g.cancel!() }, t('Berechnung abbrechen')));
-    else if (g.recompute && r.issues.some((i) => i.code === 'plugin-cancelled' || i.code === 'plugin-timeout'))
-      issuesEl.append(h('button', { class: 'btn small', onclick: () => g.recompute!(np) }, t('Neu berechnen')));
+    const showIssues = () => {
+      issuesEl.replaceChildren(...r.issues.map((i) => h('div', { class: i.level === 'error' ? 'error' : 'warn' }, i.msg)));
+      // A plugin still computing can be stopped; a stopped or timed-out run can be started again
+      if (g.cancel && r.issues.some((i) => i.code === PENDING))
+        issuesEl.append(h('button', { class: 'btn small', onclick: () => g.cancel!() }, t('Berechnung abbrechen')));
+      else if (g.recompute && r.issues.some((i) => i.code === 'plugin-cancelled' || i.code === 'plugin-timeout'))
+        issuesEl.append(h('button', { class: 'btn small', onclick: () => g.recompute!(np) }, t('Neu berechnen')));
+    };
+    clearTimeout(pendingShow);
+    if (r.issues.some((i) => i.code === PENDING) && !pendingShown) pendingShow = window.setTimeout(() => ((pendingShown = true), showIssues()), PENDING_SHOW_MS);
+    else {
+      pendingShown = r.issues.some((i) => i.code === PENDING);
+      showIssues();
+    }
     for (const s of g.schema) {
       const bad = r.issues.some((i) => i.key === s.key && i.level === 'error');
       rows.get(s.key)!.forEach((el) => el.classList.toggle('invalid', bad));
@@ -365,6 +379,9 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
   // Vorschau sofort, außer die letzte Berechnung war langsam: dann nach einer kurzen Pause im Tippen. Vor jeder
   // Aktion (Klick, Enter, Übernehmen) wird eine ausstehende Berechnung nachgeholt, damit nichts mit alten Werten entsteht.
   let pending = 0;
+  /** "being computed" is waiting to be shown (timer), or shown */
+  let pendingShow = 0;
+  let pendingShown = false;
   let renderMs = 0;
   /** A question of the generator is open (OK and Add stay off) */
   let asking = false;
@@ -374,6 +391,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
   const flush = () => {
     if (pending) clearTimeout(pending);
     pending = 0;
+    clearTimeout(pendingShow);
     const t0 = performance.now();
     render();
     renderMs = performance.now() - t0;

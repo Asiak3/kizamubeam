@@ -167,7 +167,7 @@ export function ribsDraw(req: GenDrawRequest, p: Params): GenDrawing {
   };
   for (const i of order) axis(secs[i], i === sel, i, sectionName(secs[i], i));
   if (st.drawing) axis(st.drawing, true, null, sectionName(st.drawing, secs.length));
-  return { frame, layers, items, ...(st.drawing ? { track: true } : {}) };
+  return { frame, layers, items, ...(st.drawing ? { track: true, cursor: 'crosshair' } : {}) };
 }
 
 // ---- Pointer ----

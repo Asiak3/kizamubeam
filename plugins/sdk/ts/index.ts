@@ -188,8 +188,12 @@ export interface Drawing {
   frame: { x0: number; y0: number; x1: number; y1: number };
   layers?: { key: string; tris?: number[]; items?: Item[]; alpha?: number; regions?: Regions }[];
   items: Item[];
-  /** Send pointer moves without a pressed button (e.g. while drawing a line) */
+  /** Send pointer moves without a pressed button (e.g. while drawing a line), also when a modifier key changes */
   track?: boolean;
+  /** Cursor over the whole surface, also over shapes with an id (newer apps); without it, move over those, normal elsewhere */
+  cursor?: 'default' | 'crosshair';
+  /** Escape to the plugin (true) or closing the dialog (false); without it, to the plugin while track is on (newer apps) */
+  escape?: boolean;
 }
 /** A pointer or key event on the surface; select: a row of a selectable list was clicked */
 export interface Pointer {

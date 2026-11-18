@@ -447,6 +447,10 @@ export function checkDrawing(v: unknown): PluginDrawing {
   const count = { points: 0 };
   const out: PluginDrawing = { frame, items: checkItems(v.items ?? [], count) };
   if (v.track === true) out.track = true;
+  if (v.cursor === 'default' || v.cursor === 'crosshair') out.cursor = v.cursor;
+  else if (v.cursor !== undefined) fail('cursor');
+  if (typeof v.escape === 'boolean') out.escape = v.escape;
+  else if (v.escape !== undefined) fail('escape');
   if (v.layers !== undefined) {
     if (!Array.isArray(v.layers) || v.layers.length > LIMITS.layers) fail('layers');
     out.layers = (v.layers as unknown[]).map((l) => {

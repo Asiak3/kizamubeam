@@ -80,7 +80,7 @@ export interface DialogState {
   /** Message of an action or a surface event in this step (onEvent, onSurface) */
   message?: string;
   /** The drawing surface after the step: its view, state, selected rows and what draw() returned (counted) */
-  surface?: GenSurfaceState & { items: number; layers: number; track: boolean };
+  surface?: GenSurfaceState & { items: number; layers: number; track: boolean; cursor?: 'default' | 'crosshair'; escape?: boolean };
 }
 
 /** Thrown when a script step does not fit the schema (unknown key, wrong type, out of range) */
@@ -238,7 +238,7 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
         rows: g.view?.(p).rows ?? {},
         ...(ask ? { ask } : {}),
         ...(message !== undefined ? { message } : {}),
-        ...(drawn ? { surface: { ...surf, selected: { ...surf.selected }, items: drawn.items.length, layers: drawn.layers?.length ?? 0, track: !!drawn.track } } : {}),
+        ...(drawn ? { surface: { ...surf, selected: { ...surf.selected }, items: drawn.items.length, layers: drawn.layers?.length ?? 0, track: !!drawn.track, ...(drawn.cursor ? { cursor: drawn.cursor } : {}), ...(drawn.escape !== undefined ? { escape: drawn.escape } : {}) } } : {}),
       });
     }
     return out;

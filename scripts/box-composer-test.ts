@@ -503,6 +503,9 @@ await atest('plan: dragging a wall moves it, walls ending on it follow; one para
   const { runDialog } = await import('../src/plugins/headless');
   const [start, moved] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 107.4) }]);
   assert.ok(start.surface!.items > 10 && start.surface!.layers === 1, 'walls, ends and the outer box are drawn');
+  // Escape: closes the dialog while nothing is selected, clears the selection otherwise (#411)
+  assert.equal(start.surface!.escape, false);
+  assert.equal(moved.surface!.escape, true);
   assert.deepEqual(byId(moved, 1), { id: 1, axis: 'h', pos: 107, from: 0, to: 94 }, 'moved, rounded to whole mm');
   assert.equal(byId(moved, 4)!.from, 107, 'the T on it follows');
   assert.deepEqual(byId(moved, 2), byId(start, 2), 'the crossing wall stays');
@@ -554,6 +557,7 @@ await atest('plan: Ctrl shows a target on the selection; a click adds a wall fro
   const [, aimed] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), { type: 'move', x: 32, y: 103, ctrl: true }] }]);
   const aim = (aimed.surface!.state as { aim?: { along: number; side: number; sel: unknown } }).aim!;
   assert.deepEqual([aim.along, aim.side, aim.sel], [33.37, 1, { axis: 'h', pos: 97, runs: [[19.74, 47]] }]);
+  assert.equal(aimed.surface!.cursor, 'default', 'with the target the normal cursor, also over walls');
   const [, added] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), ...click(32, 103, 'w1').map((e) => ({ ...e, ctrl: true }))] }]);
   assert.deepEqual(byId(added, 5), { id: 5, axis: 'v', pos: 33.37, from: 97, to: 194 }, 'from wall 1 to the front wall');
   assert.deepEqual(added.issues, []);

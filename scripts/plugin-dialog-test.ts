@@ -262,7 +262,7 @@ await test('stage 4: a drawing surface with views, pointer events, selectable ro
           ...pts.map((q, i) => ({ type: 'handle', id: 'h' + i, x: q.x, y: q.y * flip, style: req.selected.pts === i ? 'accent' : 'normal' })),
           { type: 'text', x: 0, y: 0, text: { code: 'count', values: { n: pts.length } } },
         ],
-        ...(req.state && req.state.drawing ? { track: true } : {}),
+        ...(req.state && req.state.drawing ? { track: true, cursor: 'crosshair', escape: true } : {}),
       };
     },
     onSurface: ({ event, surface, params }) => {
@@ -327,6 +327,8 @@ await test('stage 4: a drawing surface with views, pointer events, selectable ro
   assert.equal(s[0].surface!.view, 'top');
   assert.equal(s[1].message, 'Click to add points (top)');
   assert.equal(s[1].surface!.track, true);
+  assert.deepEqual([s[1].surface!.cursor, s[1].surface!.escape], ['crosshair', true], 'cursor and Escape as the drawing asks (#411)');
+  assert.deepEqual([s[0].surface!.cursor, s[0].surface!.escape], [undefined, undefined]);
   assert.equal(s[2].message, 'Point added');
   assert.equal(s[2].parts.length, 1);
   assert.deepEqual(JSON.parse(String(s[3].params.pts))[1], { name: '', x: 30, y: 15 });
@@ -342,6 +344,10 @@ await test('stage 4: a drawing surface with views, pointer events, selectable ro
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, surface: { views: [] } } }), /dialog/);
   const { checkDrawing, checkEvent } = await import('../src/plugins/contract');
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [{ type: 'circle' }] }), /item type/);
+  assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], cursor: 'wait' }), /cursor/);
+  assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], escape: 'yes' }), /escape/);
+  assert.equal(checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], escape: false }).escape, false);
+  assert.equal(checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], cursor: 'default' }).cursor, 'default');
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], layers: [{ key: 'a', tris: [1, 2, 3] }] }), /tris/);
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [{ type: 'line', pts: [[0, 0]], style: 'pink' }] }), /style/);
   assert.throws(() => checkEvent({ select: { pts: 1.5 } }), /select/);
