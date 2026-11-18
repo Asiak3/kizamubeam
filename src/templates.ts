@@ -193,7 +193,7 @@ export function tableRows(rows: string[][], map: Record<string, number>, params:
       if (p.type === 'text') out[name] = cell;
       else if (p.type === 'bool') out[name] = TRUE_RE.test(cell.trim());
       else {
-        const n = Number(cell.trim().replace(/\s/g, '').replace(',', '.'));
+        const n = Number(cell.trim().replace(/\s/g, '').replace(/,/g, '.'));
         if (cell.trim() && isFinite(n)) out[name] = n;
       }
     }

@@ -94,7 +94,7 @@ export function openCalibrateDialog(ed: Editor) {
     const out = h('div', { class: 'note' });
     const sqIn = h('input', { type: 'text', id: 'cal-sq', placeholder: t('nicht gemessen'), title: t('Seitenlänge des gelaserten Quadrats, mit dem Messschieber gemessen') }) as HTMLInputElement;
     const result = () => {
-      const s = sqIn.value.trim().replace(',', '.');
+      const s = sqIn.value.trim().replace(/,/g, '.');
       square = s ? Number(s) : null;
       if (square !== null && !Number.isFinite(square)) square = NaN;
       const r = calibResult(test, square, bestPair, bestSlot);
