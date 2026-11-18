@@ -232,7 +232,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
   const surface: GenSurface | undefined = m.surface && {
     ...m.surface,
     views: m.surface.views.map((v) => ({ id: v.id, label: text(v.label) ?? v.id })),
-    ...(m.surface.help ? { help: text(m.surface.help) ?? '' } : {}),
+    ...(Array.isArray(m.surface.help) ? { help: m.surface.help.map((k) => text(k) ?? '') } : m.surface.help ? { help: text(m.surface.help) ?? '' } : {}),
   };
   /** An answer of onEvent or onSurface in the app's terms */
   const answer = (r: PluginEventResult): GenSurfaceResult => {
@@ -350,6 +350,8 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
               ...(d.track ? { track: true } : {}),
               ...(d.cursor ? { cursor: d.cursor } : {}),
               ...(d.escape !== undefined ? { escape: d.escape } : {}),
+              ...(d.fields ? { fields: d.fields.map(({ label, title, ...f }) => ({ ...f, label: render(label), ...(title !== undefined ? { title: render(title) } : {}) })) } : {}),
+              ...(d.highlight ? { highlight: d.highlight } : {}),
               ...(d.layers ? { layers: d.layers.map(({ items, ...l }) => ({ ...l, ...(items ? { items: items.map(item) } : {}) })) } : {}),
             };
           },

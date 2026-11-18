@@ -2,12 +2,12 @@
 // Experimental (pack version 0.x). All wood joints come from the app through host.joints.
 // Build: node scripts/plugin-pack.mjs --build plugins/box-composer
 // Check: npm run plugin:check plugins/box-composer
-import { definePlugin, host, mm, type Issue, type Part, type SubPath, type Text } from '../../sdk/ts';
+import { definePlugin, host, mm, type Drawing, type Issue, type Part, type SubPath, type Text } from '../../sdk/ts';
 import { JointError } from './joints';
 import { current, keepWalls } from './edit';
 import { buildModel, readLayout, scaleLayout, writeLayout, type Limits, type Model } from './model';
-import { buildParts, innerHeight, poses, withKerf, type Dims } from './parts';
-import { planDraw, planPointer, type Plan } from './surface';
+import { buildParts, floorSpans, innerHeight, poses, wallKey, withKerf, type Dims } from './parts';
+import { planDraw, planPointer, selectedId, type Plan } from './surface';
 
 interface P {
   [k: string]: number | string | boolean;
@@ -154,6 +154,40 @@ function fitsArea(parts: Part[]): boolean {
   return (w <= area.width && h <= area.height) || (h <= area.width && w <= area.height);
 }
 
+/** The parts last built for the marks in the preview, by parameters: draw is called with every pointer move */
+let marked: { key: string; built: { keys: string[]; walls: ReturnType<typeof buildParts>['walls']; d: Dims } | null } | null = null;
+
+/**
+ * The selected wall in the dialog's preview (#411): its part, and the slots of its teeth in the floor (rectangles in
+ * the floor's coordinates, as parts.ts places the teeth). The part numbers are the order of generate's parts.
+ */
+function highlight(p: P, id: number | undefined): NonNullable<Drawing['highlight']> {
+  if (id === undefined) return [];
+  const key = JSON.stringify(p);
+  if (marked?.key !== key) {
+    const c = compute(p);
+    marked = { key, built: c.built && c.d ? { keys: Object.keys(c.built.parts), walls: c.built.walls, d: c.d } : null };
+  }
+  const b = marked.built;
+  const part = b ? b.keys.indexOf(wallKey(id)) : -1;
+  if (!b || part < 0) return [];
+  const out: NonNullable<Drawing['highlight']> = [{ part }];
+  const floor = b.keys.indexOf('floor');
+  const panel = b.walls.find((q) => q.it.wall.id === id);
+  if (floor < 0 || !panel) return out;
+  const { t, W, D, clearance } = b.d;
+  const w = panel.it.wall;
+  const ht = (t + clearance) / 2;
+  const subs: SubPath[] = floorSpans(panel, b.d).map((sp) => {
+    const c = (sp.a + sp.b) / 2,
+      hl = (sp.width + clearance) / 2;
+    const corners: [number, number][] = [[c - hl, -ht], [c + hl, -ht], [c + hl, ht], [c - hl, ht]];
+    return { closed: true, nodes: corners.map(([a, s]) => (w.axis === 'h' ? { x: a + t - W / 2, y: w.pos + t - D / 2 + s } : { x: w.pos + t - W / 2 + s, y: a + t - D / 2 })) };
+  });
+  if (subs.length) out.push({ part: floor, subs });
+  return out;
+}
+
 definePlugin<P>({
   // "From material" switched on: take over thickness, kerf and play of the layer's material (those it has)
   onChange({ key, old, params }) {
@@ -168,11 +202,11 @@ definePlugin<P>({
     const l = readLayout(p.walls, p.wallsRef);
     return { rows: { walls: (l?.walls ?? []).map((w): Text => ({ code: w.axis === 'h' ? 'row.h' : 'row.v', values: { id: w.id } })) } };
   },
-  // The plan editor (#385)
+  // The plan editor (#385), with the selected wall marked in the preview (#411)
   draw({ params, ...s }) {
     const pl = plan(params);
     if (!pl) return { frame: { x0: 0, y0: 0, x1: 100, y1: 40 }, items: [{ type: 'text', x: 4, y: 20, text: { code: 'walls-bad' }, style: 'warn' }] };
-    return planDraw(pl, s);
+    return { ...planDraw(pl, s), highlight: highlight(params, selectedId(pl, s)) };
   },
   onSurface({ event, surface, params }) {
     const pl = plan(params);

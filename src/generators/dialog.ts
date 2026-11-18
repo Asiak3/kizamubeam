@@ -268,11 +268,68 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
   });
   // The panel of the lists under the steps grows only when a list is left in it (not all went into steps)
   if (lists?.el.querySelector('.gen-list')) lists.el.classList.add('gen-grow');
+  /** The step with the surface: what the surface puts in the right column is shown only with it */
+  const surfaceStep = (g.steps ?? []).findIndex((st) => st.items.includes('surface'));
   function showStep(i: number) {
     stepPanels.forEach((el, k) => (el.hidden = k !== i));
+    if (surface) surface.side.hidden = surfaceStep >= 0 && i !== surfaceStep;
     stepTabs.forEach((b, k) => b.classList.toggle('on', k === i));
   }
   if (stepPanels.length) showStep(0);
+
+  /** The preview: all parts at their suggested place, fitted together, and the marks the surface's drawing asks for */
+  const paintPreview = () => {
+    const ctx = canvas.getContext('2d')!;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!built) return;
+    // Alle Teile an ihrer vorgeschlagenen Lage, gemeinsam eingepasst
+    const pts = built.parts.flatMap((pt) => pt.shape.subs.flatMap((sp) => sp.nodes.map((q) => ({ x: q.x + pt.at.x, y: q.y + pt.at.y }))));
+    const minX = Math.min(...pts.map((q) => q.x)), maxX = Math.max(...pts.map((q) => q.x));
+    const minY = Math.min(...pts.map((q) => q.y)), maxY = Math.max(...pts.map((q) => q.y));
+    const centre = !!g.preview?.center && pts.length > 0;
+    const previewX = centre ? (minX + maxX) / 2 : 0;
+    const previewY = centre ? (minY + maxY) / 2 : 0;
+    const ext = Math.max(1e-6, ...pts.map((q) => Math.max(Math.abs(q.x - previewX), Math.abs(q.y - previewY))));
+    const k = (canvas.width / 2 - 6) / ext;
+    const css = getComputedStyle(canvas);
+    ctx.fillStyle = css.getPropertyValue('--accent-soft').trim() || 'rgba(80,140,220,0.18)';
+    ctx.strokeStyle = css.color || '#333';
+    ctx.lineWidth = 1 / k;
+    const parts = built.parts;
+    for (const pt of parts) {
+      ctx.setTransform(k, 0, 0, k, canvas.width / 2 + (pt.at.x - previewX) * k, canvas.height / 2 + (pt.at.y - previewY) * k);
+      const path = subsToPath2D(pt.shape.subs);
+      ctx.fill(path, 'evenodd');
+      ctx.stroke(path);
+      // Engraving on the part (labels, glue marks, a map) as thin lines
+      if (pt.marks?.length) {
+        ctx.save();
+        ctx.strokeStyle = css.getPropertyValue('--accent').trim() || '#2f6fd6';
+        ctx.lineWidth = 0.8 / k;
+        ctx.stroke(subsToPath2D(pt.marks));
+        ctx.restore();
+      }
+    }
+    const accent = css.getPropertyValue('--accent').trim() || '#2f6fd6';
+    for (const m of surface?.drawing()?.highlight ?? []) {
+      const pt = parts[m.part];
+      if (!pt) continue;
+      ctx.setTransform(k, 0, 0, k, canvas.width / 2 + (pt.at.x - previewX) * k, canvas.height / 2 + (pt.at.y - previewY) * k);
+      ctx.save();
+      ctx.strokeStyle = ctx.fillStyle = accent;
+      ctx.lineWidth = 2 / k;
+      const path = subsToPath2D(m.subs ?? pt.shape.subs);
+      if (!m.subs) {
+        ctx.globalAlpha = 0.3;
+        ctx.fill(path, 'evenodd');
+        ctx.globalAlpha = 1;
+      }
+      ctx.stroke(path);
+      ctx.restore();
+    }
+  };
+  surface?.onDrawing(paintPreview);
 
   const render = () => {
     // Werte für die Prüfung auf den gültigen Bereich bringen; die Eingabefelder behalten, was getippt wurde
@@ -314,37 +371,8 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
     okBtn.disabled = addBtn.disabled = !built || asking;
     surface?.refresh(np);
     lists?.refresh(np);
-    const ctx = canvas.getContext('2d')!;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    paintPreview();
     if (!built) return;
-    // Alle Teile an ihrer vorgeschlagenen Lage, gemeinsam eingepasst
-    const pts = built.parts.flatMap((pt) => pt.shape.subs.flatMap((sp) => sp.nodes.map((q) => ({ x: q.x + pt.at.x, y: q.y + pt.at.y }))));
-    const minX = Math.min(...pts.map((q) => q.x)), maxX = Math.max(...pts.map((q) => q.x));
-    const minY = Math.min(...pts.map((q) => q.y)), maxY = Math.max(...pts.map((q) => q.y));
-    const centre = !!g.preview?.center && pts.length > 0;
-    const previewX = centre ? (minX + maxX) / 2 : 0;
-    const previewY = centre ? (minY + maxY) / 2 : 0;
-    const ext = Math.max(1e-6, ...pts.map((q) => Math.max(Math.abs(q.x - previewX), Math.abs(q.y - previewY))));
-    const k = (canvas.width / 2 - 6) / ext;
-    const css = getComputedStyle(canvas);
-    ctx.fillStyle = css.getPropertyValue('--accent-soft').trim() || 'rgba(80,140,220,0.18)';
-    ctx.strokeStyle = css.color || '#333';
-    ctx.lineWidth = 1 / k;
-    for (const pt of built.parts) {
-      ctx.setTransform(k, 0, 0, k, canvas.width / 2 + (pt.at.x - previewX) * k, canvas.height / 2 + (pt.at.y - previewY) * k);
-      const path = subsToPath2D(pt.shape.subs);
-      ctx.fill(path, 'evenodd');
-      ctx.stroke(path);
-      // Engraving on the part (labels, glue marks, a map) as thin lines
-      if (pt.marks?.length) {
-        ctx.save();
-        ctx.strokeStyle = css.getPropertyValue('--accent').trim() || '#2f6fd6';
-        ctx.lineWidth = 0.8 / k;
-        ctx.stroke(subsToPath2D(pt.marks));
-        ctx.restore();
-      }
-    }
     if (old && matEntry) {
       const pt = calibPatch();
       const differs = !!pt && Object.entries(pt).some(([k, v]) => typeof v === 'number' ? Math.abs(v - Number(p[k])) > 1e-6 : v !== p[k]);
@@ -547,7 +575,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
           ...sectionEls,
           adv.length ? h('details', {}, h('summary', {}, t('Erweitert')), h('div', { class: 'form' }, ...adv)) : null,
         ),
-        h('div', { class: 'gen-side' }, canvas, infoEl),
+        h('div', { class: 'gen-side' }, canvas, infoEl, surface?.side ?? null),
       ),
       inStep.has('surface') ? null : (surface?.el ?? null),
       lists?.el ?? null,

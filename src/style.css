@@ -2864,6 +2864,8 @@ body.dock-resizing #canvas {
 }
 .gen-side {
   flex: none;
+  display: flex;
+  flex-direction: column;
 }
 /* Alle Schritte übereinander: der Dialog hat für jeden Schritt dieselbe Größe; verborgene bleiben unsichtbar */
 .gen-step-stack {
@@ -2928,9 +2930,53 @@ body.dock-resizing #canvas {
   max-width: 240px;
   line-height: 1.5;
 }
+/* What the surface puts in the right column (#411): the room under the preview and the info, scrolling there, so it
+   never makes the dialog taller; hidden in the other steps */
+.gen-side-surface {
+  flex: 1 1 auto;
+  position: relative;
+  width: 240px;
+  /* a few lines even where the left column is short (a surface below the steps) */
+  min-height: 60px;
+  margin-top: 8px;
+  font-size: calc(12px * var(--ty-supporting));
+  line-height: 1.45;
+}
+.gen-side-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+}
+.gen-side-surface[hidden] {
+  display: block;
+  visibility: hidden;
+}
+.gen-side-fields {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 4px 8px;
+  align-items: center;
+}
+.gen-side-fields:not(:empty) {
+  margin-bottom: 8px;
+}
+.gen-side-fields input[readonly] {
+  color: var(--muted, #777);
+}
+.gen-help {
+  margin: 0;
+  padding-left: 16px;
+  color: var(--muted, #777);
+}
+.gen-help li + li {
+  margin-top: 3px;
+}
 .gen-issues {
   max-width: 560px;
   margin-top: 8px;
+}
+.gen-issues:empty {
+  margin-top: 0;
 }
 .gen-issues .error {
   color: var(--danger, #c0392b);
@@ -2956,6 +3002,11 @@ body.dock-resizing #canvas {
 /* Drawing surface of a generator dialog (#335 stage 4) */
 .gen-surface-area {
   margin-top: 10px;
+}
+/* A surface at the top of a step starts level with the preview */
+.gen-step > .gen-surface-area:first-child,
+.gen-surface-area > .gen-surface-box:first-child {
+  margin-top: 0;
 }
 .gen-surface-box {
   position: relative;

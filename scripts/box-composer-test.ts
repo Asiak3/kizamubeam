@@ -650,6 +650,56 @@ await atest('plan: a wall dragged near the middle of the box snaps there, with a
   assert.match(s.message ?? '', /^Wall 2 · in the middle of the box · clear on the left 24 mm, on the right 45[.,]5 mm/);
 });
 
+await atest('plan: the selected wall\'s measures as fields beside the preview; a typed value moves it or sets its length (#411)', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const whole = (hit: string, x: number, y: number) => ({ type: 'dblclick', x, y, hit });
+  const field = (id: string, value: number) => ({ type: 'field', x: 0, y: 0, field: id, value });
+  const [start, one] = await runDialog(manifest, [{ $surface: [whole('w1', 20, 97)] }]);
+  assert.deepEqual(start.surface!.fields, [], 'nothing selected: no fields');
+  // Wall 1 runs from the left to the right outer wall: both ends joined, the length cannot be typed
+  assert.deepEqual(one.surface!.fields, [
+    { id: 'a', label: 'Clear behind', value: 95.5 },
+    { id: 'b', label: 'Clear in front', value: 95.5 },
+    { id: 'len', label: 'Length', value: 94, readonly: true },
+  ]);
+  const [, behind] = await runDialog(manifest, [{ $surface: [whole('w1', 20, 97), field('a', 80)] }]);
+  assert.equal(byId(behind, 1)!.pos, 81.5, '80 mm clear from the inside of the back wall');
+  assert.equal(byId(behind, 4)!.from, 81.5, 'the T on it follows, as when dragged');
+  assert.equal(behind.surface!.fields![0].value, 80);
+  const [, front] = await runDialog(manifest, [{ $surface: [whole('w1', 20, 97), field('b', 100)] }]);
+  assert.equal(byId(front, 1)!.pos, 92.5);
+  const [, far] = await runDialog(manifest, [{ $surface: [whole('w1', 20, 97), field('a', 300)] }]);
+  assert.equal(far.params.walls, start.params.walls, 'outside the box: refused');
+  assert.ok(far.message, 'with a message why');
+  const [, len] = await runDialog(manifest, [{ $surface: [whole('w1', 20, 97), field('len', 50)] }]);
+  assert.equal(len.params.walls, start.params.walls, 'a joined length is not changed');
+  // Wall 4 ends on wall 1 (T) and is free at the front: the length moves the free end
+  const [, four] = await runDialog(manifest, [{ $surface: [whole('w4', 19.74, 130)] }]);
+  assert.deepEqual(four.surface!.fields!.map((f) => [f.id, f.label, f.value, !!f.readonly]), [['a', 'Clear on the left', 18.24, false], ['b', 'Clear on the right', 24.26, false], ['len', 'Length', 72.75, false]]);
+  const [, shorter] = await runDialog(manifest, [{ $surface: [whole('w4', 19.74, 130), field('len', 60)] }]);
+  assert.deepEqual(byId(shorter, 4), { id: 4, axis: 'v', pos: 19.74, from: 97, to: 157 });
+  assert.deepEqual(shorter.issues, []);
+});
+
+await atest('plan: the selected wall is marked in the preview: its part and the slots of its teeth in the floor (#411)', async () => {
+  const p = G.normalizeParams(gen, G.defaultParams(gen));
+  const built = await G.buildGenAsync(gen, p);
+  const key = (i: number) => built.parts[i].shape.part;
+  const none = await gen.draw!({ view: 'plan', state: null, selected: { walls: -1 }, have: [] }, p);
+  assert.deepEqual(none.highlight, []);
+  const d = await gen.draw!({ view: 'plan', state: null, selected: { walls: 1 }, have: [] }, p);
+  const [wall, floor] = d.highlight!;
+  assert.equal(key(wall.part), 'wall-2');
+  assert.equal(wall.subs, undefined, 'the whole part');
+  assert.equal(key(floor.part), 'floor');
+  // Wall 2 (x = 47, 0 … 150.35) stands on the floor with its teeth: slots along x = 47 + 3 − 50 = 0 in the floor
+  assert.ok(floor.subs!.length >= 2);
+  for (const sp of floor.subs!) {
+    const xs = sp.nodes.map((n) => n.x);
+    assert.ok(Math.abs((Math.min(...xs) + Math.max(...xs)) / 2) < 1e-6, 'on the line of the wall');
+  }
+});
+
 await atest('plan: a new width asks whether the walls scale with the box or keep their mm', async () => {
   const { runDialog } = await import('../src/plugins/headless');
   const [, keep] = await runDialog(manifest, [{ width: 120, $answer: 1 }]);
