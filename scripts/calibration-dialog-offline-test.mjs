@@ -163,7 +163,7 @@ globalThis.__calibrationMocks = {
 const mocks = {
   './laser': ['device', 'onDeviceChange', 'runBlocker'], './machine': ['machine', 'isTauri'],
   './files': ['saveText', 'openText'], './model': ['defaultLayer', 'loadDoc', 'translate'],
-  './gcode': ['buildJob', 'estimate', 'writeGCode', 'FIRMWARES', 'jogLines', 'rotaryOn'],
+  './gcode': ['buildJob', 'estimate', 'writeGCode', 'FIRMWARES', 'jogLines', 'rotaryOn', 'moveLines'],
   './i18n': ['dec', 't', 'tn', 'tBackend'], './workpieceDialog': ['openWorkpieceDialog'], './native': ['hasNative', 'native'],
 };
 for (const mount of ['fixed', 'head']) storage.set('kizamubeam.camera', JSON.stringify({
