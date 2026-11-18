@@ -1101,7 +1101,9 @@ await test('Ruida: .rd Export, Layer-Parameter (Speed, Power, MinPower, Air) und
 });
 
 await test('Ruida: Nullpunkt-Ecken, relative Referenz (current/user) und Magic 0x11 / 0x38', async () => {
-  const { decodeRuida, toRuidaAbs, fromRuidaAbs, writeRuida } = await import('../src/ruida');
+  const { decodeRuida, toRuidaAbs, fromRuidaAbs, sanitizeRuidaFilename, writeRuida } = await import('../src/ruida');
+  assert.equal(sanitizeRuidaFilename('mein-job_12345.rd'), 'MEIN-JOB');
+  assert.equal(sanitizeRuidaFilename('...'), 'KIZAMU');
   for (const origin of ['top-right', 'top-left', 'bottom-left', 'bottom-right'] as const) {
     const [rx, ry] = toRuidaAbs(origin, 500, 300, 123.4, 56.7);
     const [bx, by] = fromRuidaAbs(origin, 500, 300, rx, ry);
@@ -1119,11 +1121,15 @@ await test('Ruida: Nullpunkt-Ecken, relative Referenz (current/user) und Magic 0
     startFrom: 'current',
     magic: 0x38,
     laser: 'both',
+    filename: 'testjob',
+    upload: true,
     layers: [{ index: 0, speed: 1200, power: 50, minPower: 0, color: 0xff0000 }],
   });
   const dec = decodeRuida(bytes);
   assert.equal(dec.magic, 0x38);
   assert.equal(dec.startFrom, 'current');
+  assert.equal(dec.filename, 'TESTJOB');
+  assert.equal(dec.upload, true);
   assert.equal(dec.cuts.length, 1);
   assert.deepEqual(dec.cuts[0].from, [0, 0]);
   assert.deepEqual(dec.cuts[0].to, [20, 0]);

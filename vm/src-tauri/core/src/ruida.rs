@@ -269,6 +269,12 @@ pub struct Ruida {
     power: f64,
     layers: HashMap<u8, LayerSettings>,
     air: bool,
+    /// file currently being uploaded to controller memory (`0xE8 0x02 name\0` .. `0xD7`)
+    uploading: Option<(String, Vec<Vec<u8>>)>,
+    /// files stored in controller memory `(name, commands)`
+    files: Vec<(String, Vec<Vec<u8>>)>,
+    /// 0-based index of a stored file explicitly selected via `0xE8 0x03`
+    selected_file: Option<usize>,
     /// a document arrived that we did not understand fully (for the console)
     pub unknown: usize,
 }
@@ -294,6 +300,9 @@ impl Ruida {
             power: 0.0,
             layers: HashMap::new(),
             air: false,
+            uploading: None,
+            files: Vec::new(),
+            selected_file: None,
             unknown: 0,
         }
     }
@@ -302,10 +311,17 @@ impl Ruida {
         self.in_job
     }
 
-    /// Everything stopped: forget what was planned
+    /// Names of files stored in the controller's memory
+    pub fn stored_files(&self) -> Vec<&str> {
+        self.files.iter().map(|(n, _)| n.as_str()).collect()
+    }
+
+    /// Everything stopped: forget what was planned (keep stored files in memory)
     pub fn reset(&mut self) {
         let magic = self.magic;
+        let files = std::mem::take(&mut self.files);
         *self = Ruida::new(magic);
+        self.files = files;
     }
 
     /// Ruida machine position of the head as far as planned
@@ -382,6 +398,14 @@ impl Ruida {
         }
     }
 
+    fn run_stored(&mut self, idx: usize, v: &View, out: &mut Vec<Action>) {
+        if let Some((_, cmds)) = self.files.get(idx).cloned() {
+            for cmd in cmds {
+                out.extend(self.command(&cmd, v));
+            }
+        }
+    }
+
     /// Read one command (unscrambled, from the data port or the keypad port)
     pub fn command(&mut self, c: &[u8], v: &View) -> Vec<Action> {
         let mut out = Vec::new();
@@ -390,6 +414,32 @@ impl Ruida {
         }
         let a = |i: usize| c.get(i).copied().unwrap_or(0);
         let d = |i: usize| c.get(i..).unwrap_or(&[]);
+
+        // While uploading a file to controller memory (`0xE8 0x02 .. 0xD7`), buffer commands
+        // without starting the laser (memory reads and emergency stop still work immediately).
+        if self.uploading.is_some() && !(a(0) == 0xDA && a(1) == 0x00) {
+            if a(0) == 0xD8 && a(1) == 0x01 {
+                self.uploading = None;
+                self.reset();
+                out.push(Action::Stop);
+                return out;
+            }
+            if a(0) == 0xD7 {
+                let (name, mut cmds) = self.uploading.take().unwrap();
+                cmds.push(vec![0xD7]);
+                if let Some(pos) = self.files.iter().position(|(n, _)| *n == name) {
+                    self.files[pos].1 = cmds;
+                    self.selected_file = Some(pos);
+                } else {
+                    self.files.push((name, cmds));
+                    self.selected_file = Some(self.files.len() - 1);
+                }
+            } else if let Some((_, cmds)) = &mut self.uploading {
+                cmds.push(c.to_vec());
+            }
+            return out;
+        }
+
         match a(0) {
             // ----- moves and cuts -----
             0x88 | 0xA8 => {
@@ -490,7 +540,17 @@ impl Ruida {
             // ----- job control -----
             0xD7 => self.end_job(&mut out),
             0xD8 => match a(1) {
-                0x00 => self.begin_job(v, &mut out),
+                0x00 => {
+                    if !self.in_job {
+                        if let Some(idx) = self.selected_file.take() {
+                            self.run_stored(idx, v, &mut out);
+                        } else {
+                            self.begin_job(v, &mut out);
+                        }
+                    } else {
+                        self.begin_job(v, &mut out);
+                    }
+                }
                 0x01 => {
                     self.reset();
                     out.push(Action::Stop);
@@ -563,12 +623,17 @@ impl Ruida {
                 }
                 (0x51, 0x01..=0x04) => out.push(Action::Realtime(0x85)),
                 (0x50, 0x06) => {
-                    // start/pause key
-                    out.push(Action::Realtime(if v.snap.state.starts_with("Hold") {
-                        b'~'
+                    // start/pause key: if idle and a stored file exists, start it; otherwise pause/resume
+                    if !self.in_job && v.idle && !self.files.is_empty() {
+                        let idx = self.selected_file.take().unwrap_or(self.files.len() - 1);
+                        self.run_stored(idx, v, &mut out);
                     } else {
-                        b'!'
-                    }));
+                        out.push(Action::Realtime(if v.snap.state.starts_with("Hold") {
+                            b'~'
+                        } else {
+                            b'!'
+                        }));
+                    }
                 }
                 (0x50, 0x09) | (0x50, 0x07) => {
                     self.reset();
@@ -580,9 +645,36 @@ impl Ruida {
                 }
                 _ => {}
             },
-            // file sums, bounding boxes, file names, element tables, upload bookkeeping, keep-alive:
+            // ----- controller memory files (`0xE8`) -----
+            0xE8 => match a(1) {
+                0x00 => {
+                    self.files.clear();
+                    self.selected_file = None;
+                }
+                0x02 => {
+                    let bytes = d(2);
+                    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+                    let s = String::from_utf8_lossy(&bytes[..end]).trim().to_string();
+                    let name = if s.is_empty() { "KIZAMU".into() } else { s };
+                    self.uploading = Some((name, Vec::new()));
+                }
+                0x01 | 0x03 => {
+                    if let Some(num) = u14(d(2)) {
+                        let idx = (num as usize).saturating_sub(1);
+                        if idx < self.files.len() {
+                            self.selected_file = Some(idx);
+                            if a(1) == 0x01 && !self.in_job {
+                                let i = self.selected_file.take().unwrap();
+                                self.run_stored(i, v, &mut out);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            },
+            // file sums, bounding boxes, file names, element tables, keep-alive:
             // nothing to do for the simulation
-            0xCC..=0xCF | 0xD0 | 0xE5..=0xE8 | 0xEA | 0xEB | 0xF0..=0xF2 | 0xDA => {}
+            0xCC..=0xCF | 0xD0 | 0xE5..=0xE7 | 0xEA | 0xEB | 0xF0..=0xF2 | 0xDA => {}
             _ => self.unknown += 1,
         }
         out
@@ -864,6 +956,54 @@ mod tests {
         );
         assert_eq!(r.command(&[0xD8, 0x01], &v), [Action::Stop]);
         assert_eq!(r.command(&[0xD8, 0x02], &v), [Action::Realtime(b'!')]);
+    }
+
+    #[test]
+    fn upload_stores_file_and_runs_when_selected() {
+        let cfg = Config {
+            bed_w: 400.0,
+            bed_h: 300.0,
+            s_max: 1000.0,
+            ..Config::default()
+        };
+        let snap = Snapshot::default();
+        let v = view(&cfg, &snap);
+        let mut r = Ruida::new(0x88);
+
+        let mut upload = vec![0xE8, 0x02];
+        upload.extend_from_slice(b"BOX1\0");
+        upload.extend([0xE7, 0x01]);
+        upload.extend_from_slice(b"BOX1\0");
+        upload.extend([0xD8, 0x10]);
+        upload.extend([0xC9, 0x02]);
+        upload.extend(encode_i35(20_000));
+        upload.extend([0xC6, 0x02]);
+        upload.extend(encode_power(50.0));
+        upload.extend(xy(0x88, 10.0, 20.0));
+        upload.extend(xy(0xA8, 30.0, 20.0));
+        upload.push(0xD7);
+
+        // Uploading produces no immediate motion
+        assert!(run(&mut r, &upload, &v).is_empty());
+        assert_eq!(r.stored_files(), ["BOX1"]);
+        assert!(!r.in_job());
+
+        // Selecting file 1 (`0xE8 0x03 <u14(1)>`) and starting (`0xD8 0x00`) executes the stored job
+        let [hi, lo] = encode_i14(1);
+        let start_acts = run(&mut r, &[0xE8, 0x03, hi, lo, 0xD8, 0x00], &v);
+        assert_eq!(
+            lines(&start_acts),
+            [
+                "G90 G21 M5 M9",
+                "G53 G0 X390.000 Y280.000",
+                "G53 G1 X370.000 Y280.000 F1200 S500 M4",
+                "M5 M9",
+            ]
+        );
+
+        // Deleting all files (`0xE8 0x00 0x00 0x00`) clears controller memory
+        let _ = run(&mut r, &[0xE8, 0x00, 0x00, 0x00], &v);
+        assert!(r.stored_files().is_empty());
     }
 
     /// Check real .rd files without committing them: `RUIDA_RD_FILES=a.rd:b.rd cargo test -- --ignored rd_files`.

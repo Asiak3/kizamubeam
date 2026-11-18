@@ -12,7 +12,8 @@ import { dedupPolys } from './dedup';
 import { jobOutputsOff, jobOutputsOn } from './fluidnc';
 import { parkedObjs } from './parking';
 import { addPt, boxesOf, buildContainment, containsStrict, emptyBox } from './polyTopology';
-import { ruidaParamsForJob, writeRuida } from './ruida';
+import { ruidaParamsForJob, sanitizeRuidaFilename, writeRuida } from './ruida';
+export { sanitizeRuidaFilename };
 
 // ---------- Geräte und Firmware ----------
 
@@ -2292,10 +2293,11 @@ export async function prepareGCode(
   est: Estimate,
   name = 'KizamuBeam',
   layerOf?: (i: number) => Layer,
+  ruidaOpts?: { filename?: string; upload?: boolean },
 ): Promise<PreparedGCode> {
   if (d.fw === 'ruida') {
     const { mv, t } = rotaryMoves(job.moves, d, job.bounds, est.t);
-    const rParams = ruidaParamsForJob({ ...job, moves: mv }, d, layerOf);
+    const rParams = ruidaParamsForJob({ ...job, moves: mv }, d, layerOf, ruidaOpts);
     if (hasNative()) {
       try {
         const buf = await native<ArrayBuffer>('ruida_prepare', packMoves(mv, t!, JSON.stringify(rParams)));

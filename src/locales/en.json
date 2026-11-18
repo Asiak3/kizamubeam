@@ -5006,5 +5006,8 @@
   "UDP-Tastenport": "UDP keypad port",
   "Ruida-Steuerungen verwenden binäre .rd-Aufträge statt G-Code. Start- und Endskripte entfallen.": "Ruida controllers use binary .rd jobs instead of G-code. Start and end scripts do not apply.",
   "Netzwerk (UDP)": "Network (UDP)",
-  ".rd speichern": "Save .rd"
+  ".rd speichern": "Save .rd",
+  "Dateiname im Ruida-Speicher (max. 8 Zeichen, A–Z / 0–9):": "Filename in Ruida memory (max. 8 characters, A–Z / 0–9):",
+  "Job als benannte Datei im internen Speicher der Ruida-Steuerung ablegen (ohne sofortigen Start)": "Store job as a named file in the Ruida controller's internal memory (without starting immediately)",
+  "In Steuerung speichern …": "Save to controller …"
 }

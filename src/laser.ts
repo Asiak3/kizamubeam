@@ -6,7 +6,7 @@ import { saveBinary, saveText } from './files';
 import { native } from './native';
 import {
   anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, liveStatus, formatDuration, frameGCode, Job, jogLines, jogToLines, LASER_TYPES, moveLines, LaserModule, LaserType, loadDevices, Moves, newDevice,
-  posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, RuidaLaser, RuidaMagic, RuidaOrigin, sameMoves, saveDevices, StartFrom, startHere, zJogLines,
+  posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, RuidaLaser, RuidaMagic, RuidaOrigin, sameMoves, sanitizeRuidaFilename, saveDevices, StartFrom, startHere, zJogLines,
 } from './gcode';
 import { isTauri, machine, PortInfo } from './machine';
 import type { PreparedGCode } from './gcode';
@@ -370,7 +370,14 @@ export async function saveGCode(ed: Editor, src?: JobSource) {
   const job = await makeJob(ed, false, src);
   if (nothingToDo(job)) return;
   if (device.startFrom === 'current') notify(t('Hinweis: Die Datei enthält die aktuelle Laserposition als Startpunkt.'));
-  const g = await prepareGCode(job, device, estimate(job.moves, device), src?.name, src?.layer ?? ((i) => ed.layer(i)));
+  const g = await prepareGCode(
+    job,
+    device,
+    estimate(job.moves, device),
+    src?.name,
+    src?.layer ?? ((i) => ed.layer(i)),
+    device.fw === 'ruida' ? { filename: src?.name || 'KIZAMU' } : undefined,
+  );
   const slug = src ? src.name.toLowerCase().replace(/[^a-z0-9äöüß]+/g, '-') : 'projekt';
   if (device.fw === 'ruida') {
     const name = `${slug}.rd`;
@@ -385,6 +392,21 @@ export async function saveGCode(ed: Editor, src?: JobSource) {
     ? await saveText(name, 'G-Code', 'gcode', 'text/plain', g.lines.join('\n') + '\n')
     : (await native<string | null>('gcode_save', { id: g.id, defaultName: name, filterName: 'G-Code' })) !== null;
   if (saved && !src) ed.afterJob();
+}
+
+export async function uploadRuidaToController(ed: Editor, src?: JobSource) {
+  if (!canRun()) return;
+  const job = await makeJob(ed, false, src);
+  if (nothingToDo(job) || (!src && !designOk(ed)) || !boundsOk(ed, job) || !airOk(job)) return;
+  const defName = sanitizeRuidaFilename(src?.name || 'KIZAMU');
+  const raw = prompt(t('Dateiname im Ruida-Speicher (max. 8 Zeichen, A–Z / 0–9):'), defName);
+  if (!raw) return;
+  const fname = sanitizeRuidaFilename(raw);
+  job.warnings.forEach((w) => notify(w));
+  const est = estimate(job.moves, device);
+  const g = await prepareGCode(job, device, est, fname, src?.layer ?? ((i) => ed.layer(i)), { filename: fname, upload: true });
+  const ok = await machine.runPrepared(g);
+  if (ok && !src) ed.afterJob();
 }
 
 /** Job und Zeitschätzung des Dokuments ohne Ausgabe (für KI-Agenten) */
@@ -496,6 +518,11 @@ function laserTab(ed: Editor): HTMLElement {
   const originB = big('origin', t('Ursprung'), t('Zum Nullpunkt fahren'), () => sendAll(moveLines(device, 'X0 Y0')));
   const previewB = big('preview', t('Vorschau'), t('Vorschau mit Zeitschätzung (Alt+P)'), () => openPreview(ed));
   const saveB = big('gcode', 'G-Code', t('G-Code speichern'), () => saveGCode(ed));
+  const ruidaMemB = h('button', {
+    class: 'btn',
+    title: t('Job als benannte Datei im internen Speicher der Ruida-Steuerung ablegen (ohne sofortigen Start)'),
+    onclick: () => uploadRuidaToController(ed),
+  }, t('In Steuerung speichern …')) as HTMLButtonElement;
   const bar = h('div', { class: 'progress' }, h('div', { class: 'fill' }));
   const progTxt = h('div', { class: 'progress-text' });
   const msg = h('div', { class: 'note laser-msg' });
@@ -568,6 +595,7 @@ function laserTab(ed: Editor): HTMLElement {
     pinTxt,
     h('div', { class: 'conn-row' }, portSel, refreshBtn, connBtn),
     h('div', { class: 'laser-grid' }, startB, pauseB, stopB, frameB, contourB, homeB, originB, previewB, saveB),
+    ruidaMemB,
     frameViewRow,
     bar,
     progTxt,
@@ -658,6 +686,8 @@ function laserTab(ed: Editor): HTMLElement {
     stopB.disabled = !on;
     saveB.lastChild!.textContent = device.fw === 'ruida' ? '.rd' : 'G-Code';
     saveB.title = device.fw === 'ruida' ? t('Als Ruida-Datei (.rd) speichern') : t('G-Code speichern');
+    ruidaMemB.hidden = device.fw !== 'ruida';
+    ruidaMemB.disabled = !on || busy;
     const hold = machine.status.state.startsWith('Hold');
     pauseB.lastChild!.textContent = hold ? t('Weiter') : t('Pause');
     setIcon(pauseB.firstChild as HTMLElement, hold ? 'play' : 'pause');

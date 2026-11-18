@@ -12,7 +12,7 @@ Yes. KizamuBeam is licensed GPL-3.0-or-later: no license fee, no subscription, n
 
 ## Will it work with my laser?
 
-If it runs FluidNC, GRBL, grblHAL, Marlin or Smoothieware, very likely; that covers most diode lasers. Galvo lasers and Ruida/DSP controllers are not supported. See [Machine compatibility](machine-compatibility.md).
+If it runs FluidNC, GRBL, grblHAL, Marlin, Smoothieware or a Ruida DSP controller, very likely; that covers most diode and Ruida CO₂ lasers. Galvo lasers are not supported. See [Machine compatibility](machine-compatibility.md).
 
 ## Why does my computer warn me when I install it?
 

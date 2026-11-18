@@ -6,7 +6,7 @@ description: Which lasers and controllers work with KizamuBeam.
 
 # Machine compatibility
 
-KizamuBeam talks directly to the controller of your laser and sends G-code. It works with most diode lasers and other machines whose controller runs one of these firmwares:
+KizamuBeam talks directly to the controller of your laser and sends G-code or binary Ruida `.rd` jobs. It works with most diode lasers and CO₂ lasers whose controller runs one of these firmwares:
 
 | Firmware | Connection | Notes |
 |---|---|---|
@@ -16,16 +16,17 @@ KizamuBeam talks directly to the controller of your laser and sends G-code. It w
 | **Marlin** | USB | Sent line by line; position via M114 |
 | **Smoothieware** | USB | Sent line by line; power from 0 to 1 |
 | **xTool (USB)** | USB | xTool D1 family; detected by the setup wizard. Status is read only while idle, so the job counts as finished when the last line is accepted. Not yet tested on hardware |
+| **Ruida DSP** | Network (UDP 50200/50207), USB serial, `.rd` file export | RDC6442G/S, RDC6445G, RDC6332G, KT332N and compatible CO₂ controllers; binary `.rd` export/import, direct job streaming, saving named jobs to controller memory, framing and jogging |
 
 Rotary attachments (roller or chuck, on the Y port or as a separate axis), a motorized Z axis and air assist are supported.
 
 ## Device templates
 
-When you create a device, templates for common lasers fill in the work area and settings, for example Swiitol, Ortur, Atomstack, Sculpfun, xTool, Creality Falcon, Two Trees, Longer and Comgrow. For any other laser, choose the generic template for its controller. The [setup wizard](../getting-started/connect-laser.md) then reads the real values from the machine.
+When you create a device, templates for common lasers fill in the work area and settings, for example Swiitol, Ortur, Atomstack, Sculpfun, xTool, Creality Falcon, Two Trees, Longer, Comgrow, OMTech and Ruida. For any other laser, choose the generic template for its controller. The [setup wizard](../getting-started/connect-laser.md) then reads the real values from the machine.
 
 ## Not supported (yet)
 
-- **Ruida and other DSP controllers** (most CO₂ lasers): not supported yet.
+- **Other DSP controllers** (such as Trocen/AWC, TopWisdom or Leetro): not supported yet.
 - **Galvo lasers**: not supported.
 - **Lasers with proprietary protocols**, such as some xTool models that only talk over the manufacturer’s network protocol.
 

@@ -5006,5 +5006,8 @@
   "UDP-Tastenport": "Puerto de teclado UDP",
   "Ruida-Steuerungen verwenden binäre .rd-Aufträge statt G-Code. Start- und Endskripte entfallen.": "Los controladores Ruida utilizan trabajos binarios .rd en lugar de código G. Los scripts de inicio y fin no se aplican.",
   "Netzwerk (UDP)": "Red (UDP)",
-  ".rd speichern": "Guardar .rd"
+  ".rd speichern": "Guardar .rd",
+  "Dateiname im Ruida-Speicher (max. 8 Zeichen, A–Z / 0–9):": "Nombre de archivo en la memoria Ruida (máx. 8 caracteres, A–Z / 0–9):",
+  "Job als benannte Datei im internen Speicher der Ruida-Steuerung ablegen (ohne sofortigen Start)": "Guardar el trabajo como archivo con nombre en la memoria interna del controlador Ruida (sin iniciar de inmediato)",
+  "In Steuerung speichern …": "Guardar en controlador …"
 }

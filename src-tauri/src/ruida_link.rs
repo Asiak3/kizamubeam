@@ -496,6 +496,21 @@ impl<T: RuidaTransport, E: Events> RuidaStreamer<T, E> {
             self.events.line("ok");
             return;
         }
+        if let Some(rest) = line.strip_prefix("RUIDA_START_FILE ") {
+            if let Ok(num) = rest.trim().parse::<u16>() {
+                let cmd = ruida::select_and_start_file_cmd(num);
+                let _ = self.transport.send_cmd(&cmd, self.magic, PACKET_TIMEOUT);
+                self.poll_status();
+            }
+            self.events.line("ok");
+            return;
+        }
+        if line == "RUIDA_DELETE_FILES" {
+            let cmd = ruida::delete_all_files_cmd();
+            let _ = self.transport.send_cmd(&cmd, self.magic, PACKET_TIMEOUT);
+            self.events.line("ok");
+            return;
+        }
         if let Some(rest) = line.strip_prefix("RUIDA_KEY ") {
             let bytes: Vec<u8> = rest
                 .split_whitespace()
@@ -543,11 +558,14 @@ impl<T: RuidaTransport, E: Events> RuidaStreamer<T, E> {
     }
 
     fn execute_ruida_plain(&mut self, plain: &[u8], rx: &Receiver<Cmd>) {
+        let upload_name = ruida::upload_filename(plain);
         let chunks = split_plain_chunks(plain, MAX_UDP_PAYLOAD);
         let total = chunks.len().max(1);
         self.busy.store(true, Ordering::SeqCst);
-        self.state_name = "Run";
-        self.emit_status();
+        if upload_name.is_none() {
+            self.state_name = "Run";
+            self.emit_status();
+        }
         self.events.progress(0, 0, total, 0);
 
         for (i, chunk) in chunks.iter().enumerate() {
@@ -582,6 +600,16 @@ impl<T: RuidaTransport, E: Events> RuidaStreamer<T, E> {
                 return;
             }
             self.events.progress(i + 1, i + 1, total, 0);
+        }
+
+        if let Some(fname) = upload_name {
+            self.busy.store(false, Ordering::SeqCst);
+            self.state_name = "Idle";
+            self.emit_status();
+            self.events
+                .line(&format!("[Ruida] Datei {fname} im Controller-Speicher abgelegt."));
+            self.events.done(true, "");
+            return;
         }
 
         // Warten, bis die Steuerung den Auftrag abgearbeitet hat

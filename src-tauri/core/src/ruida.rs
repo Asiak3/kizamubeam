@@ -297,6 +297,71 @@ pub struct RuidaParams {
     pub air: Vec<i16>,
     #[serde(default)]
     pub layers: Vec<RuidaLayer>,
+    /// Optional 8-character document name (`0xE7 0x01`)
+    #[serde(default)]
+    pub filename: Option<String>,
+    /// Upload into internal controller memory (`0xE8 0x02`) without immediate execution
+    #[serde(default)]
+    pub upload: bool,
+}
+
+/// Sanitize a document name to a valid Ruida 8-character uppercase ASCII identifier (`[A-Z0-9_-]`).
+pub fn sanitize_filename(name: &str) -> String {
+    let base = name
+        .trim()
+        .strip_suffix(".rd")
+        .or_else(|| name.trim().strip_suffix(".RD"))
+        .or_else(|| name.trim().strip_suffix(".kzb"))
+        .or_else(|| name.trim().strip_suffix(".KZB"))
+        .unwrap_or(name.trim());
+    let mut out = String::with_capacity(8);
+    for ch in base.chars() {
+        if out.len() >= 8 {
+            break;
+        }
+        let c = match ch {
+            'a'..='z' => ch.to_ascii_uppercase(),
+            'A'..='Z' | '0'..='9' | '_' | '-' => ch,
+            'ä' | 'Ä' => 'A',
+            'ö' | 'Ö' => 'O',
+            'ü' | 'Ü' => 'U',
+            'ß' => 'S',
+            ' ' | '.' => '_',
+            _ => continue,
+        };
+        out.push(c);
+    }
+    let trimmed = out.trim_matches(|c| c == '_' || c == '-');
+    if trimmed.is_empty() {
+        "KIZAMU".into()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// If `plain` starts with `0xE8 0x02 <filename> 0x00` (upload to controller memory), returns the filename.
+pub fn upload_filename(plain: &[u8]) -> Option<String> {
+    if plain.len() < 4 || plain[0] != 0xE8 || plain[1] != 0x02 {
+        return None;
+    }
+    let end = plain[2..]
+        .iter()
+        .position(|&b| b == 0 || b >= 0x80)
+        .unwrap_or(plain.len() - 2);
+    let s = String::from_utf8_lossy(&plain[2..2 + end]).trim().to_string();
+    Some(if s.is_empty() { "KIZAMU".into() } else { s })
+}
+
+/// Build unscrambled Ruida command to select stored file `file_num` (`1..=99`) and start it (`0xE8 0x03 <u14> 0xD8 0x00`).
+pub fn select_and_start_file_cmd(file_num: u16) -> Vec<u8> {
+    let num = file_num.clamp(1, 99) as i32;
+    let [hi, lo] = encode_i14(num);
+    vec![0xE8, 0x03, hi, lo, 0xD8, 0x00]
+}
+
+/// Build unscrambled Ruida command to delete all stored files in controller memory (`0xE8 0x00 0x00 0x00`).
+pub fn delete_all_files_cmd() -> [u8; 4] {
+    [0xE8, 0x00, 0x00, 0x00]
 }
 
 fn default_origin() -> String {
@@ -400,6 +465,22 @@ fn push_cut_power(out: &mut Vec<u8>, min_14: i32, max_14: i32, laser: &str) {
 pub fn write_plain(mv: &Moves, p: &RuidaParams) -> Vec<u8> {
     let n = mv.x.len();
     let mut out = Vec::with_capacity(n * 8 + 128);
+
+    // 0. Optional controller memory upload (`0xE8 0x02`) and/or document filename (`0xE7 0x01`)
+    if p.upload {
+        let fname = sanitize_filename(p.filename.as_deref().unwrap_or("KIZAMU"));
+        out.extend([0xE8, 0x02]);
+        out.extend_from_slice(fname.as_bytes());
+        out.push(0x00);
+        out.extend([0xE7, 0x01]);
+        out.extend_from_slice(fname.as_bytes());
+        out.push(0x00);
+    } else if let Some(raw_name) = p.filename.as_deref().filter(|s| !s.trim().is_empty()) {
+        let fname = sanitize_filename(raw_name);
+        out.extend([0xE7, 0x01]);
+        out.extend_from_slice(fname.as_bytes());
+        out.push(0x00);
+    }
 
     // 1. Reference point mode
     let ref_code = match p.start_from.as_str() {
@@ -652,6 +733,8 @@ pub struct DecodedJob {
     pub cuts: Vec<DecodedCut>,
     pub rapids: usize,
     pub eof: bool,
+    pub filename: Option<String>,
+    pub upload: bool,
 }
 
 /// Decode a scrambled `.rd` buffer into layer settings and cutting segments (in Ruida coordinates, mm).
@@ -665,6 +748,8 @@ pub fn decode_rd(raw: &[u8], magic_hint: Option<u8>) -> DecodedJob {
     let mut cuts = Vec::new();
     let mut rapids = 0usize;
     let mut eof = false;
+    let mut filename: Option<String> = None;
+    let mut upload = false;
 
     let mut pos = [0.0f64, 0.0f64];
     let mut cur_layer = 0u8;
@@ -840,6 +925,14 @@ pub fn decode_rd(raw: &[u8], magic_hint: Option<u8>) -> DecodedJob {
                 _ => {}
             },
             0xE7 => match a(1) {
+                0x01 => {
+                    let bytes = d(2);
+                    let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+                    let s = String::from_utf8_lossy(&bytes[..end]).trim().to_string();
+                    if !s.is_empty() {
+                        filename = Some(s);
+                    }
+                }
                 0x03 => {
                     if let (Some(x), Some(y)) = (mm(d(2)), mm(d(7))) {
                         min_bound = Some([x, y]);
@@ -852,6 +945,15 @@ pub fn decode_rd(raw: &[u8], magic_hint: Option<u8>) -> DecodedJob {
                 }
                 _ => {}
             },
+            0xE8 if a(1) == 0x02 => {
+                upload = true;
+                let bytes = d(2);
+                let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
+                let s = String::from_utf8_lossy(&bytes[..end]).trim().to_string();
+                if !s.is_empty() {
+                    filename = Some(s);
+                }
+            }
             0xD8 => match a(1) {
                 0x10 => start_from = "absolute",
                 0x11 => start_from = "user",
@@ -876,6 +978,8 @@ pub fn decode_rd(raw: &[u8], magic_hint: Option<u8>) -> DecodedJob {
         cuts,
         rapids,
         eof,
+        filename,
+        upload,
     }
 }
 
@@ -1187,12 +1291,16 @@ mod tests {
                 min_power: 20.0,
                 color: 0xFF0000,
             }],
+            filename: None,
+            upload: false,
         };
 
         let rd = write(&mv, &params);
         assert_eq!(magic_for_file(&rd), 0x88);
         let dec = decode_rd(&rd, None);
         assert!(dec.eof);
+        assert!(!dec.upload);
+        assert_eq!(dec.filename, None);
         assert_eq!(dec.start_from, "absolute");
         assert_eq!(dec.bounds, Some([370.0, 275.0, 390.0, 280.0]));
         assert_eq!(dec.cuts.len(), 4);
@@ -1209,6 +1317,19 @@ mod tests {
         assert!((p0[0] - 10.0).abs() < 1e-3 && (p0[1] - 20.0).abs() < 1e-3);
         assert!((p1[0] - 30.0).abs() < 1e-3 && (p1[1] - 20.0).abs() < 1e-3);
         assert!((p2[0] - 30.0).abs() < 1e-3 && (p2[1] - 25.0).abs() < 1e-3);
+
+        // Upload mode (`0xE8 0x02` + `0xE7 0x01`) with filename sanitization
+        assert_eq!(sanitize_filename("Gehäuse-Test 123.kzb"), "GEHAUSE");
+        let mut up_params = params.clone();
+        up_params.filename = Some("TestJob.kzb".into());
+        up_params.upload = true;
+        let up_plain = write_plain(&mv, &up_params);
+        assert_eq!(upload_filename(&up_plain), Some("TESTJOB".to_string()));
+        let up_rd = swizzle(&up_plain, 0x88);
+        let up_dec = decode_rd(&up_rd, None);
+        assert!(up_dec.upload);
+        assert_eq!(up_dec.filename.as_deref(), Some("TESTJOB"));
+        assert_eq!(up_dec.cuts.len(), 4);
     }
 
     #[test]
