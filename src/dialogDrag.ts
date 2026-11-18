@@ -7,7 +7,8 @@
 // und bei Größenänderungen des Fensters wird neu begrenzt, damit der Titel immer erreichbar bleibt.
 
 // Dialoge, deren Inhalt nicht hineinpasst (sie oder ein Bereich in ihnen scrollen), bekommen unten rechts
-// einen Griff zum Vergrößern. Die Größe wird je Dialog gemerkt (eigener Schlüssel, nicht je Gruppe) und
+// einen Griff zum Vergrößern; Dialoge mit der Klasse dlg-resizable haben ihn immer (z. B. Generatoren mit
+// Zeichenfläche, #411). Die Größe wird je Dialog gemerkt (eigener Schlüssel, nicht je Gruppe) und
 // immer auf das Fenster begrenzt: wird es kleiner, rückt der Dialog erst nach und schrumpft dann mit;
 // wird es wieder größer, kehrt die gemerkte Größe zurück. Doppelklick auf den Griff: Standardgröße.
 
@@ -332,7 +333,8 @@ function initSize(dlg: HTMLDialogElement, key: string) {
   if (st.want) {
     addGrip(dlg, st);
     applySize(dlg, st);
-  } else watchOverflow(dlg, st);
+  } else if (dlg.classList.contains('dlg-resizable')) addGrip(dlg, st);
+  else watchOverflow(dlg, st);
 }
 
 function startResize(e: PointerEvent, dlg: HTMLDialogElement, grip: HTMLElement) {

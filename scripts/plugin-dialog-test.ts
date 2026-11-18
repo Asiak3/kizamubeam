@@ -254,7 +254,8 @@ await test('stage 4: a drawing surface with views, pointer events, selectable ro
       const pts = (req.state && req.state.pts) || JSON.parse(req.params.pts);
       const flip = req.view === 'side' ? -1 : 1;
       return {
-        frame: { x0: -50, y0: -50, x1: 50, y1: 50 },
+        // The surface size in pixels (#411), when the app gives it: the frame widens with it here
+        frame: { x0: -50, y0: -50, x1: req.size ? req.size.width / 10 : 50, y1: 50 },
         layers: [{ key: 'grid', ...(req.have.includes('grid') ? {} : { items: [{ type: 'line', pts: [[-50, 0], [50, 0]], style: 'muted' }] }) }],
         items: [
           { type: 'line', pts: pts.map((q) => [q.x, q.y * flip]) },
@@ -308,6 +309,8 @@ await test('stage 4: a drawing surface with views, pointer events, selectable ro
     assert.deepEqual(d.items[3], { type: 'text', x: 0, y: 0, text: '2 points' });
     assert.equal(d.layers![0].items!.length, 1);
     assert.equal((await g.draw!({ view: 'top', state: null, selected: {}, have: ['grid'] }, p)).layers![0].items, undefined);
+    assert.equal(d.frame.x1, 50, 'without a size');
+    assert.equal((await g.draw!({ view: 'top', state: null, selected: {}, have: ['grid'], size: { width: 700, height: 500 } }, p)).frame.x1, 70, 'the size reaches the plugin');
     await g.prepare(p);
     assert.deepEqual(g.view!(p).rowAuto, { pts: ['Point 1', 'Point 2'] });
   } finally {

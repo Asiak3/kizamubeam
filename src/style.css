@@ -2799,10 +2799,73 @@ body.dock-resizing #canvas {
   font-variant-numeric: tabular-nums;
 }
 
-/* Generatoren (Zahnrad …) */
+/* Generatoren (Zahnrad …). Aufbau (#411): Kopf, Körper (wächst, scrollt), Fuß (Frage, Hinweise, Knöpfe) immer unten */
 .offset-dialog.gen-dialog {
   max-height: calc(100vh - 130px);
+  overflow: hidden;
+}
+.offset-dialog.gen-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.gen-dialog > h3,
+.gen-dialog > .gen-steps,
+.gen-foot {
+  flex: none;
+}
+.gen-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.gen-main {
+  flex: 1 0 auto;
+  align-items: stretch;
+}
+.gen-fields {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.gen-side {
+  flex: none;
+}
+/* Alle Schritte übereinander: der Dialog hat für jeden Schritt dieselbe Größe; verborgene bleiben unsichtbar */
+.gen-step-stack {
+  flex: 1 0 auto;
+  display: grid;
+}
+.gen-step-stack > .gen-step {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gen-step-stack > .gen-step[hidden] {
+  display: flex;
+  visibility: hidden;
+}
+/* Zeichenfläche und Listen nehmen den Platz, den der Dialog bekommt */
+.gen-step > .gen-surface-area,
+.gen-body > .gen-surface-area,
+.gen-step > .gen-lists,
+.gen-body > .gen-lists.gen-grow {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.gen-lists .gen-list {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.gen-dialog .gen-lists .jig-list {
+  flex: 1 1 260px;
+  max-height: none;
+  min-height: 120px;
 }
 .gen-dialog .form {
   grid-template-columns: 170px 150px;
@@ -2862,17 +2925,25 @@ body.dock-resizing #canvas {
 .gen-surface-area {
   margin-top: 10px;
 }
+.gen-surface-box {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 320px;
+  margin-top: 4px;
+}
 .gen-surface-area .conn-row button.on {
   background: var(--accent-soft);
   border-color: var(--accent);
 }
 .gen-surface {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
   width: 100%;
-  min-width: 320px;
+  height: 100%;
   border: 1px solid var(--line);
   background: var(--surface);
   display: block;
-  margin-top: 4px;
 }
 .gen-surface:focus {
   outline: 1px solid var(--accent);
