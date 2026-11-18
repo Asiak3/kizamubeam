@@ -907,6 +907,55 @@ table.layers select {
 .form label {
   color: var(--muted);
 }
+.energy-control {
+  min-height: 24px;
+  min-width: 24px;
+}
+.energy-breakdown {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-variant-numeric: tabular-nums;
+}
+.energy-breakdown th,
+.energy-breakdown td {
+  padding: 3px 8px;
+  text-align: right;
+  vertical-align: top;
+}
+.energy-breakdown th:first-child {
+  text-align: left;
+  padding-left: 0;
+  min-width: 14em;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.energy-breakdown tbody th {
+  font-weight: normal;
+}
+.energy-breakdown td:not(.energy-state) {
+  white-space: nowrap;
+}
+.energy-breakdown thead,
+.energy-breakdown tfoot {
+  border-bottom: 1px solid var(--line);
+}
+.energy-breakdown tfoot {
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+  font-weight: bold;
+}
+.energy-caveat {
+  margin: 6px 0 2px;
+}
+.energy-help summary {
+  min-height: 24px;
+  cursor: pointer;
+}
+.energy-help summary:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
 .form input,
 .form select {
   width: 100%;
@@ -1093,6 +1142,19 @@ dialog > .dlg-grip {
 }
 dialog > .dlg-grip:hover {
   opacity: 0.8;
+}
+dialog[data-dialog-resize='true'] > .dlg-grip {
+  width: 24px;
+  height: 24px;
+  background-size: 12px 12px;
+  background-position: right bottom;
+  background-repeat: no-repeat;
+}
+dialog[data-dialog-resize='true'] > .dlg-grip:focus-visible,
+.preview-splitter:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: -2px;
+  opacity: 1;
 }
 dialog table td {
   padding: 2px 10px 2px 0;
@@ -1581,12 +1643,26 @@ label.check {
 .preview-canvas {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   cursor: grab;
 }
+.preview-splitter {
+  flex: 0 0 24px;
+  cursor: col-resize;
+  touch-action: none;
+  background: linear-gradient(to right, transparent 11px, var(--line) 11px 12px, transparent 12px);
+}
+.preview-splitter:hover,
+.preview-splitter:focus-visible {
+  background: linear-gradient(to right, transparent 11px, var(--accent) 11px 12px, transparent 12px);
+}
 .preview-side {
-  width: 260px;
+  width: 420px;
+  flex: 0 0 auto;
+  max-width: calc(100% - 24px);
+  min-width: 0;
+  box-sizing: border-box;
   padding: 12px 14px;
-  border-left: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1594,6 +1670,7 @@ label.check {
 }
 .preview-side .dialog-buttons {
   margin-top: auto;
+  flex-wrap: wrap;
 }
 .preview-stats {
   display: grid;
@@ -1611,6 +1688,7 @@ label.check {
 }
 .preview-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding: 8px 12px;
@@ -1618,6 +1696,7 @@ label.check {
 }
 .preview-bar input[type='range'] {
   flex: 1;
+  min-width: 80px;
 }
 .preview-bar .btn svg {
   width: 14px;

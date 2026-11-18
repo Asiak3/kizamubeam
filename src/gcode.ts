@@ -2,6 +2,7 @@
 // Maschinenausgabe: aus dem Dokument einen Job berechnen (Linien, Füllen, Bilder), G-Code schreiben,
 // Laufzeit schätzen und Rahmenfahrten erzeugen. Alles in Maschinenkoordinaten (mm, Ursprung unten links, y nach oben).
 import ClipperLib from 'clipper-lib';
+import type { EnergySettings } from './energy';
 import { apply, CutSettings, Doc, ImageLayer, ImageOutput, imageOutput, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, outputLeaves, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
 import { bezierPt, segments, shapeSubs } from './geom';
 import { loadFont, textToSubs } from './fonts';
@@ -147,6 +148,7 @@ export interface Rotary {
 export const DEFAULT_ROTARY: Rotary = { enabled: false, kind: 'roller', axis: 'Y', perRev: 360, rollerDiam: 25, objectDiam: 80, mirror: false, taper: false, taperLeft: 80, taperRight: 70 };
 
 export interface Device {
+  energy?: EnergySettings;
   id: string;
   name: string;
   fw: Firmware;

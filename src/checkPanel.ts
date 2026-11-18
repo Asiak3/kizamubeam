@@ -49,7 +49,7 @@ export function buildCheckPanel(ed: Editor) {
     const s = loadCheckSettings();
     const inp = h('input', { type: 'number', min: '0', step: String(step), value: String(get(s)), title });
     inp.addEventListener('change', () => {
-      const v = Number(inp.value.replace(',', '.'));
+      const v = Number(inp.value.replace(/,/g, '.'));
       if (!Number.isFinite(v) || v < 0) return;
       const cur = loadCheckSettings();
       set(cur, v);

@@ -25,6 +25,7 @@ import { agentLevels, agentSettings, configureAgent, openAgentDialog } from '../
 import { configureHost, hostSettings, openRemoteHostDialog } from '../remoteHost';
 import { registerSettingsSection } from './registry';
 import { typographySettingsFields } from './typography';
+import { electricityCurrencyField, electricityTariffField } from '../energyUi';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -47,6 +48,8 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
     order: 10,
     note: appNote,
     fields: [
+      electricityTariffField(),
+      electricityCurrencyField(),
       {
         kind: 'select', id: 'general.lang', label: t('Sprache'), keywords: 'language lingua idioma português portuguese', late: true, def: 'system',
         options: () => [['system', t('Wie System|Sprache')], ...LANGUAGES],

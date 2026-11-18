@@ -24,6 +24,9 @@ import { dec, locale, t, tBackend, tn } from './i18n';
 import { getTypography, groupFactor, onTypographyChange, resolveTypography } from './uiTypography';
 import { isNightly } from './updates';
 import { version as APP_VERSION } from '../package.json';
+import { electricityTariffText, energyDraft, estimateEnergy, parseEnergyNumber } from './energy';
+import { energyPreview, energySettingsRows, saveEnergySettings } from './energyUi';
+import { previewSplitter } from './previewLayout';
 
 const store = loadDevices();
 /** Das gewählte Gerät (live gebunden: wechselt mit der Auswahl) */
@@ -167,7 +170,7 @@ function nothingToDo(job: Job): boolean {
 /** Fahrwege des Jobs gegen den Arbeitsbereich prüfen, mit dem Werkstück-Nullpunkt, den die Steuerung meldet */
 export const bedCheck = (ed: Editor, job: Job): BedCheck => checkBed(job.travel, ed.doc.bed, device, machine.workOffset());
 
-const mm = (v: number) => v.toFixed(1);
+const mm = (v: number) => dec(v.toFixed(1));
 const range = (b: Box) => ({ x0: mm(b.x0), x1: mm(b.x1), y0: mm(b.y0), y1: mm(b.y1) });
 
 /** Warnung zur Prüfung (null = alles im Arbeitsbereich) */
@@ -674,7 +677,7 @@ function laserTab(ed: Editor): HTMLElement {
     stTxt.textContent = stateLabel + (machine.connected ? ` · ${machine.where}` : '');
     dot.className = `dot ${cls}`;
     const p = machine.connected ? machine.status.wpos : null;
-    posTxt.textContent = p ? `X ${p[0].toFixed(2)}  Y ${p[1].toFixed(2)}` : '';
+    posTxt.textContent = p ? `X ${dec(p[0].toFixed(2))}  Y ${dec(p[1].toFixed(2))}` : '';
     devSel.disabled = machine.connected || machine.connecting;
     const on = machine.connected,
       busy = machine.running || !!uploading;
@@ -854,7 +857,7 @@ function moveTab(ed: Editor): HTMLElement {
   const refresh = () => {
     const s = machine.status;
     pos.textContent = machine.connected && s.wpos
-      ? t('Position X {x}  Y {y} mm', { x: s.wpos[0].toFixed(2), y: s.wpos[1].toFixed(2) }) + (device.zAxis && Number.isFinite(s.wpos[2]) ? `  Z ${s.wpos[2].toFixed(2)}` : '') + (s.mpos && (Math.abs(s.mpos[0] - s.wpos[0]) > 1e-3 || Math.abs(s.mpos[1] - s.wpos[1]) > 1e-3) ? t(' (Maschine {x} / {y})', { x: s.mpos[0].toFixed(2), y: s.mpos[1].toFixed(2) }) : '')
+      ? t('Position X {x}  Y {y} mm', { x: dec(s.wpos[0].toFixed(2)), y: dec(s.wpos[1].toFixed(2)) }) + (device.zAxis && Number.isFinite(s.wpos[2]) ? `  Z ${dec(s.wpos[2].toFixed(2))}` : '') + (s.mpos && (Math.abs(s.mpos[0] - s.wpos[0]) > 1e-3 || Math.abs(s.mpos[1] - s.wpos[1]) > 1e-3) ? t(' (Maschine {x} / {y})', { x: dec(s.mpos[0].toFixed(2)), y: dec(s.mpos[1].toFixed(2)) }) : '')
       : t('Nicht verbunden');
     root.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = !machine.connected || machine.running));
     zSection.hidden = !device.zAxis;
@@ -934,7 +937,7 @@ let lastDeviceTab = 0;
 
 /** Einstellungen eines Geräts bearbeiten (ohne Angabe: das gewählte) */
 export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: () => void) {
-  const d = { ...target };
+  const d = { ...target, energy: energyDraft(target.energy) };
   const bed = { w: d.bedW, h: d.bedH };
   const isCurrent = target === device;
   // FR #235: Tabs statt Scroll-Liste — gleiche Felder, gleiche Speicherung, nur sortiert.
@@ -1031,7 +1034,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     ));
     const opt = (label: string, get: () => number | undefined, set: (v: number | undefined) => void) => {
       const el = h('input', { type: 'text', inputmode: 'decimal', value: String(get() ?? ''), placeholder: t('unbekannt'), oninput: (e: Event) => {
-        const v = parseFloat((e.target as HTMLInputElement).value.replace(',', '.'));
+        const v = parseFloat((e.target as HTMLInputElement).value.replace(/,/g, '.'));
         set(Number.isFinite(v) && v > 0 ? v : undefined);
       } });
       rows.push(h('label', { title: laserTip }, label), el);
@@ -1239,10 +1242,10 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     const el = numInput('', (v) => {
       if (!Number.isFinite(v)) return;
       set(Math.max(-max, Math.min(max, v)));
-      el.value = get().toFixed(2);
+      el.value = dec(get().toFixed(2));
       updatePointer();
     }, title);
-    el.value = get().toFixed(2);
+    el.value = dec(get().toFixed(2));
     rows.push(h('label', { title }, label), el);
   };
   poNum(t('Versatz X (mm)'), t('Lage des Strahls gegenüber dem Zeigerpunkt in X, aus der Kalibrierung (Position Strahl minus Position Zeiger)'), () => d.pointerOffset.x, (v) => (d.pointerOffset.x = v));
@@ -1252,6 +1255,10 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   updatePointer();
   // Typografie live nachführen, beim Schließen abmelden
   const offTypo = onTypographyChange(() => updatePointer());
+  newTab(t('Energie'));
+  const energyTabIndex = tabs.length - 1;
+  const energyRows = energySettingsRows(d.energy);
+  rows.push(...energyRows);
   newTab(t('G-Code'));
   {
     const fncHead = head('FluidNC');
@@ -1387,11 +1394,13 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
         onclick: () => {
           // Felder, die noch den Fokus haben, zuerst übernehmen
           (document.activeElement as HTMLElement | null)?.blur();
-          Object.assign(target, d, { bedW: bed.w, bedH: bed.h });
-          if (isCurrent) applyBed(ed);
-          deviceChanged();
-          dlg.close();
-          onDone?.();
+          saveEnergySettings(energyRows, () => selectTab(energyTabIndex), () => {
+            Object.assign(target, d, { bedW: bed.w, bedH: bed.h });
+            if (isCurrent) applyBed(ed);
+            deviceChanged();
+            dlg.close();
+            onDone?.();
+          });
         },
       }, t('Übernehmen')),
     ),
@@ -1452,10 +1461,10 @@ export function openRotaryDialog() {
   const perRev = numField(() => r.perRev, (v) => (r.perRev = v), t('Achsweg, den die Steuerung für eine volle Umdrehung der Walze bzw. des Futters fährt'));
   rows.push(h('label', {}, perRevLabel), perRev);
   const [rollerLab, rollerEl] = row(t('Walzendurchmesser (mm)'), numField(() => r.rollerDiam, (v) => (r.rollerDiam = v)), t('Durchmesser der angetriebenen Walze'));
-  const objDiam = numField(() => r.objectDiam, (v) => ((r.objectDiam = v), (circ.value = (Math.PI * v).toFixed(2))), t('Am breitesten Punkt der Gravur messen'));
+  const objDiam = numField(() => r.objectDiam, (v) => ((r.objectDiam = v), (circ.value = dec((Math.PI * v).toFixed(2)))), t('Am breitesten Punkt der Gravur messen'));
   row(t('Objektdurchmesser (mm)'), objDiam);
-  const circ = numInput('', (v) => v > 0 && ((r.objectDiam = v / Math.PI), (objDiam.value = r.objectDiam.toFixed(2)), update()), t('Umfang statt Durchmesser eingeben, z. B. mit einem Maßband gemessen'));
-  circ.value = (Math.PI * r.objectDiam).toFixed(2);
+  const circ = numInput('', (v) => v > 0 && ((r.objectDiam = v / Math.PI), (objDiam.value = dec(r.objectDiam.toFixed(2))), update()), t('Umfang statt Durchmesser eingeben, z. B. mit einem Maßband gemessen'));
+  circ.value = dec((Math.PI * r.objectDiam).toFixed(2));
   row(t('Objektumfang (mm)'), circ);
   const taper = h('input', { type: 'checkbox', checked: r.taper, onchange: (e: Event) => ((r.taper = (e.target as HTMLInputElement).checked), update()) });
   row(t('Konisches Objekt'), h('span', {}, taper), t('Für Becher und andere Objekte, die zu einem Ende dünner werden: die Gravur bleibt überall maßhaltig'));
@@ -1623,22 +1632,23 @@ export async function openPreview(ed: Editor, src?: JobSource) {
   const b = job.bounds!;
   const info = h('dl', { class: 'preview-stats' },
     ...stat(t('Geschätzte Dauer'), formatDuration(est.total)),
-    ...stat(t('Laserweg'), `${(est.cutLength / 1000).toFixed(2)} m`),
-    ...stat(t('Leerweg'), `${(est.rapidLength / 1000).toFixed(2)} m`),
-    ...stat(t('Bereich'), `${(b.x1 - b.x0).toFixed(1)} × ${(b.y1 - b.y0).toFixed(1)} mm`),
+    ...stat(t('Laserweg'), `${dec((est.cutLength / 1000).toFixed(2))} m`),
+    ...stat(t('Leerweg'), `${dec((est.rapidLength / 1000).toFixed(2))} m`),
+    ...stat(t('Bereich'), `${dec((b.x1 - b.x0).toFixed(1))} × ${dec((b.y1 - b.y0).toFixed(1))} mm`),
     ...stat(t('Bewegungen'), mv.n.toLocaleString(locale)),
-    ...(rotaryOn(device) ? stat(t('Drehachse'), t('Achse {axis}, Umfang {c} mm', { axis: device.rotary.axis, c: (Math.PI * device.rotary.objectDiam).toFixed(1) })) : []),
+    ...(rotaryOn(device) ? stat(t('Drehachse'), t('Achse {axis}, Umfang {c} mm', { axis: device.rotary.axis, c: dec((Math.PI * device.rotary.objectDiam).toFixed(1)) })) : []),
     ...((job.dedup?.length
-      ? stat(t('Doppelte Linien'), t('{len} mm zusammengefasst', { len: job.dedup.reduce((s, d) => s + d.len, 0).toFixed(1) }))
+      ? stat(t('Doppelte Linien'), t('{len} mm zusammengefasst', { len: dec(job.dedup.reduce((s, d) => s + d.len, 0).toFixed(1)) }))
       : [])),
   );
   const warn = h('div', { class: 'note' }, ...job.warnings.map((w) => h('div', {}, w)));
-  const dlg = h('dialog', { class: 'preview-dialog' },
+  const dlg = h('dialog', { class: 'preview-dialog', 'data-dialog-resize': 'true', 'data-dialog-min-width': '480', 'data-dialog-min-height': '360' },
     h('h3', {}, t('Vorschau')),
     h('div', { class: 'preview-main' },
       cv,
       h('div', { class: 'preview-side' },
         info,
+        energyPreview(estimateEnergy(mv, est, job.air, energyDraft(device.energy)), parseEnergyNumber(electricityTariffText())),
         h('label', { class: 'check' }, rapidChk, t('Leerwege zeigen')),
         h('label', { class: 'check' }, shadeChk, t('Nach Leistung schattieren')),
         warn,
@@ -1651,6 +1661,9 @@ export async function openPreview(ed: Editor, src?: JobSource) {
     ),
     h('div', { class: 'preview-bar' }, playBtn, slider, timeTxt, speedSel, hereBtn),
   );
+  const main = dlg.querySelector<HTMLElement>('.preview-main')!;
+  const side = dlg.querySelector<HTMLElement>('.preview-side')!;
+  main.insertBefore(previewSplitter(main, side, t('Breite der Vorschauinformationen')), side);
   document.body.append(dlg);
   dlg.addEventListener('keydown', (e) => e.stopPropagation());
   dlg.showModal();
