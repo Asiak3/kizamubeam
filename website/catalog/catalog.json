@@ -1,7 +1,7 @@
 {
  "format": "kizamubeam-catalog",
  "version": 1,
- "generated": "2026-11-18T10:23:33.978Z",
+ "generated": "2026-11-18T11:21:14.333Z",
  "packs": [
   {
    "id": "org.kizamubeam.box-composer",
@@ -34,7 +34,7 @@
    "codeSize": 38230,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/box-composer",
    "file": "org.kizamubeam.box-composer.kzp",
-   "sha256": "3cce29d8d22b1cec17306f5b54040e452c3a3d58ed65163eefc0752b6187356e",
+   "sha256": "b7aea8c3931ce41c8b0ccf47db9bc2cf18ca4f5f4aced151a62c2b90187bea9e",
    "size": 74062
   },
   {
@@ -151,7 +151,7 @@
    "codeSize": 6149,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/jigsaw",
    "file": "org.kizamubeam.jigsaw.kzp",
-   "sha256": "28d94a76efbca25e791056fe787b0ef31573d65c83f54f94bf0c0c8ef3b9bff4",
+   "sha256": "c340c7e9457e0be9c2a96f11cb93d709a59fc75e4a8d2d849bf80ed1879ec894",
    "size": 14060
   },
   {
@@ -213,7 +213,7 @@
    "codeSize": 7441,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/ruler",
    "file": "org.kizamubeam.ruler.kzp",
-   "sha256": "b6e7264d865117346c08ac70fdb791f011d8d1f1d17d2d6418b3b435133cf370",
+   "sha256": "4ddcbc0734654c5dd2479ca91fea32f333011ac2f711276984406c88a2d39ede",
    "size": 21288
   },
   {
