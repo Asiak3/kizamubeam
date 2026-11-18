@@ -4,8 +4,10 @@
 // Check: npm run plugin:check plugins/box-composer
 import { definePlugin, host, mm, type Issue, type Part, type SubPath, type Text } from '../../sdk/ts';
 import { JointError } from './joints';
-import { buildModel, readLayout, type Model } from './model';
+import { current, keepWalls } from './edit';
+import { buildModel, readLayout, scaleLayout, writeLayout, type Limits, type Model } from './model';
 import { buildParts, innerHeight, poses, withKerf, type Dims } from './parts';
+import { planDraw, planPointer, type Plan } from './surface';
 
 interface P {
   [k: string]: number | string | boolean;
@@ -59,6 +61,48 @@ function dims(p: P): { d: Dims | null; issues: Issue[]; material: string | null 
   return { d, issues, material };
 }
 
+/** Smallest sizes (user, 17 nov 2026; to be reviewed after the test cuts): one thickness of clear space between walls
+ * and joints, walls and free ends two thicknesses long */
+const limits = (t: number): Limits => ({ t, gap: t, minLen: 2 * t, freeLen: 2 * t });
+
+/** What the plan editor needs, from the fields; null when the walls cannot be shown */
+function plan(p: P): Plan | null {
+  const t = p.thickness;
+  const w = p.width - 2 * t,
+    d = p.depth - 2 * t;
+  const layout = readLayout(p.walls, p.wallsRef);
+  if (!(w > 0 && d > 0) || !layout) return null;
+  return { w, d, t, lim: limits(t), layout, sides: { x0: p.wallLeft, x1: p.wallRight, y0: p.wallBack, y1: p.wallFront } };
+}
+
+/**
+ * Width or depth changed in the dialog while there are walls: ask whether they grow and shrink with the box or keep
+ * their distances in mm (ends at the right or front wall stay there)
+ */
+function resized(key: string, old: unknown, p: P) {
+  if ((key !== 'width' && key !== 'depth') || typeof old !== 'number') return null;
+  const l = readLayout(p.walls, p.wallsRef);
+  if (!l || !l.walls.length) return null;
+  const t = p.thickness;
+  const ow = (key === 'width' ? old : p.width) - 2 * t,
+    od = (key === 'depth' ? old : p.depth) - 2 * t,
+    nw = p.width - 2 * t,
+    nd = p.depth - 2 * t;
+  if (!(ow > 0 && od > 0 && nw > 0 && nd > 0) || (Math.abs(ow - nw) < 1e-9 && Math.abs(od - nd) < 1e-9)) return null;
+  const walls = current(l, ow, od);
+  const scaled = writeLayout({ ref: [nw, nd], walls: scaleLayout({ ref: [ow, od], walls }, nw, nd) });
+  const kept = writeLayout({ ref: [nw, nd], walls: keepWalls(walls, ow, od, nw, nd) });
+  return {
+    ask: {
+      question: { code: 'ask.resize' },
+      options: [
+        { label: { code: 'ask.scale' }, patch: { ...scaled } },
+        { label: { code: 'ask.keep' }, patch: { ...kept } },
+      ],
+    },
+  };
+}
+
 /** The checked wall model, or the issue that keeps it from being built */
 function model(p: P, d: Dims): Model | Issue {
   const t = d.t;
@@ -68,9 +112,7 @@ function model(p: P, d: Dims): Model | Issue {
   if (innerHeight(d) < 2 * t) return { key: 'height', level: 'error', code: 'walls-low', values: { min: 2 * t } };
   const l = readLayout(p.walls, p.wallsRef);
   if (!l) return { key: 'walls', level: 'error', code: 'walls-bad' };
-  // Smallest sizes (user, 17 nov 2026; to be reviewed after the test cuts): one thickness of clear space between
-  // walls and joints, walls and free ends two thicknesses long
-  return buildModel(l, w, dd, { t, gap: t, minLen: 2 * t, freeLen: 2 * t });
+  return buildModel(l, w, dd, limits(t));
 }
 const isIssue = (m: Model | Issue): m is Issue => 'code' in m;
 
@@ -114,11 +156,27 @@ function fitsArea(parts: Part[]): boolean {
 
 definePlugin<P>({
   // "From material" switched on: take over thickness, kerf and play of the layer's material (those it has)
-  onChange({ key, params }) {
+  onChange({ key, old, params }) {
+    if (key === 'width' || key === 'depth') return resized(key, old, params);
     if (key !== 'fromMaterial' || !params.fromMaterial) return null;
     const m = fromMaterial();
     if (!m) return null;
     return { patch: { thickness: m.thickness, ...(m.kerf != null ? { kerf: m.kerf } : {}), ...(m.clearance != null ? { clearance: m.clearance } : {}) } };
+  },
+  // A name per row of the wall list: its number and which way it runs
+  view(p) {
+    const l = readLayout(p.walls, p.wallsRef);
+    return { rows: { walls: (l?.walls ?? []).map((w): Text => ({ code: w.axis === 'h' ? 'row.h' : 'row.v', values: { id: w.id } })) } };
+  },
+  // The plan editor (#385)
+  draw({ params, ...s }) {
+    const pl = plan(params);
+    if (!pl) return { frame: { x0: 0, y0: 0, x1: 100, y1: 40 }, items: [{ type: 'text', x: 4, y: 20, text: { code: 'walls-bad' }, style: 'warn' }] };
+    return planDraw(pl, s);
+  },
+  onSurface({ event, surface, params }) {
+    const pl = plan(params);
+    return pl ? planPointer(pl, event, surface) : null;
   },
   validate(p) {
     const c = compute(p);

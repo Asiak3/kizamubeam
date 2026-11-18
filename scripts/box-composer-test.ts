@@ -375,7 +375,10 @@ const { assemblyReport } = await import('../src/asmcheck');
 const { asmSolids, findOverlaps } = await import('../src/view3d/solids');
 
 execFileSync('node', ['scripts/plugin-pack.mjs', '--build', 'plugins/box-composer'], { stdio: 'ignore' });
-const manifest = parsePack(buildPluginPack('plugins/box-composer')).plugins[0];
+const pack = parsePack(buildPluginPack('plugins/box-composer')).plugins[0];
+// A new box starts without inner walls; the tests work on the sketch from #327 in the inner rectangle 94 × 194
+const SKETCH = '[{"id":1,"axis":"h","pos":97,"from":0,"to":94},{"id":2,"axis":"v","pos":47,"from":0,"to":150.35},{"id":3,"axis":"h","pos":150.35,"from":47,"to":94},{"id":4,"axis":"v","pos":19.74,"from":97,"to":169.75}]';
+const manifest = { ...pack, schema: pack.schema.map((q) => (q.key === 'walls' ? { ...q, def: SKETCH } : q.key === 'wallsRef' ? { ...q, def: '[94,194]' } : q)) };
 const ctx: Record<string, unknown> = {};
 const gen = pluginGenerator(manifest, { id: 'box-composer', name: 'Box composer' }, { context: (w: string) => (ctx[w] ?? null) as never });
 G.register(gen);
@@ -387,6 +390,17 @@ await atest('pack: catalogue check without errors or warnings', async () => {
   assert.deepEqual(r.errors, []);
   assert.deepEqual(r.warnings, []);
   assert.equal(manifest.fit?.kind, 'slot', 'clearance is the total play, like the slot play of a material (#402)');
+});
+
+await atest('pack: a new box starts with the outer walls only', async () => {
+  const w = pack.schema.find((q) => q.key === 'walls')!,
+    r = pack.schema.find((q) => q.key === 'wallsRef')!;
+  assert.deepEqual([w.def, w.resetOnNew, r.def, r.resetOnNew], ['[]', true, '', true]);
+  const empty = pluginGenerator(pack, { id: 'box-composer-new', name: 'Box composer' }, { context: (k: string) => (ctx[k] ?? null) as never });
+  Object.assign(ctx, { material: PLY, workArea: { width: 400, height: 300 } });
+  const out = await G.buildGenAsync(empty, G.normalizeParams(empty, G.defaultParams(empty)));
+  assert.deepEqual(out.issues, []);
+  assert.deepEqual(out.parts.map((x) => x.shape.part).sort(), ['back', 'floor', 'front', 'left', 'right']);
 });
 
 await atest('pack: the sketch from the material, parts named, one assembly that fits together without overlaps', async () => {
@@ -452,12 +466,196 @@ await atest('pack: "From material" copies the material into the fields and warns
   assert.deepEqual(ch && 'patch' in ch ? ch.patch : null, { thickness: 4, kerf: 0.12, clearance: 0.15 });
   const synced = { ...p, thickness: 4, kerf: 0.12, clearance: 0.15 };
   assert.deepEqual((await G.buildGenAsync(gen, synced)).issues, [], 'in step with the material');
-  assert.deepEqual((await gen.onChange!('width', 100, synced)) ?? null, null, 'other fields: nothing to take over');
+  assert.deepEqual((await gen.onChange!('height', 40, synced)) ?? null, null, 'other fields: nothing to take over');
+  assert.deepEqual((await gen.onChange!('width', 100, synced)) ?? null, null, 'the same width again: no question');
   ctx.material = { ...ctx.material as object, thickness: 6 };
   const changed = (await G.buildGenAsync(gen, synced)).issues;
   assert.deepEqual(changed.map((i) => i.code), ['material-changed']);
   assert.match(changed[0].msg, /\(6 mm\)/, 'names the thickness of the new material');
   ctx.material = PLY;
+});
+
+await atest('pack: the wall list names every row; a row removed in the list removes the wall', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const rows = JSON.parse(String(G.defaultParams(gen).walls)) as Wall[];
+  const [first, after] = await runDialog(manifest, [{ walls: JSON.stringify(rows.filter((r) => r.id !== 4)) }]);
+  assert.deepEqual(first.rows.walls, ['1 · X', '2 · Y', '3 · X', '4 · Y']);
+  assert.deepEqual(first.issues, []);
+  assert.deepEqual(after.rows.walls, ['1 · X', '2 · Y', '3 · X']);
+  assert.deepEqual(after.issues, []);
+  assert.ok(!after.parts.some((p) => p.key.endsWith('4')) && first.parts.length === after.parts.length + 1, 'one part less');
+});
+
+// --- Plan editor (#385): pointer events on the drawing surface, through the headless runner -------------------------
+// The sketch in the inner rectangle 94 × 194: 1 = h at 97 (0–94), 2 = v at 47 (0–150.35), 3 = h at 150.35 (47–94),
+// 4 = v at 19.74 (97–169.75, a T on wall 1)
+const wallsOf = (s: { params: Record<string, unknown> }) => JSON.parse(String(s.params.walls)) as Wall[];
+const byId = (s: { params: Record<string, unknown> }, id: number) => wallsOf(s).find((w) => w.id === id);
+const drag = (hit: string | undefined, x0: number, y0: number, x1: number, y1: number, extra: Record<string, unknown> = {}) => [
+  { type: 'down', x: x0, y: y0, ...(hit ? { hit } : {}), ...extra },
+  { type: 'move', x: x1, y: y1, drag: true, from: { x: x0, y: y0 }, ...extra },
+  { type: 'up', x: x1, y: y1, from: { x: x0, y: y0 }, ...extra },
+];
+/** A double click on the wall first (the whole wall), then the drag */
+const dragWhole = (hit: string, x0: number, y0: number, x1: number, y1: number) => [{ type: 'dblclick', x: x0, y: y0, hit }, ...drag(hit, x0, y0, x1, y1)];
+
+await atest('plan: dragging a wall moves it, walls ending on it follow; one parameter change on release', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const [start, moved] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 107.4) }]);
+  assert.ok(start.surface!.items > 10 && start.surface!.layers === 1, 'walls, ends and the outer box are drawn');
+  assert.deepEqual(byId(moved, 1), { id: 1, axis: 'h', pos: 107, from: 0, to: 94 }, 'moved, rounded to whole mm');
+  assert.equal(byId(moved, 4)!.from, 107, 'the T on it follows');
+  assert.deepEqual(byId(moved, 2), byId(start, 2), 'the crossing wall stays');
+  assert.equal(moved.params.wallsRef, '[94,194]');
+  assert.equal(moved.surface!.selected.walls, 0, 'the moved wall is selected');
+  assert.deepEqual(moved.surface!.state, { at: { id: 1, along: 20 }, sel: { axis: 'h', pos: 107, runs: [[0, 94]] } }, 'after the release where its measures are taken and the selection');
+  // Measured where the pointer held it (x = 20): from the inside of the back wall 107 − 1.5, to the front wall
+  // 195.5 − 107 − 3 (wall 3 is not there; numbers in the system's format)
+  assert.match(moved.message ?? '', /^Wall 1 · clear behind 105[.,]5 mm, in front 85[.,]5 mm · length 94 mm$/, 'the measures under the plan');
+  assert.deepEqual(moved.issues, []);
+});
+
+await atest('plan: a dragged wall goes to the nearest place where it may stand; a wall that cannot be added is refused', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const [start, held] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 150) }]);
+  assert.equal(byId(held, 1)!.pos, 144, 'not onto wall 3');
+  const [, past] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 156) }]);
+  assert.equal(byId(past, 1)!.pos, 157, 'over wall 3 to below it');
+  assert.deepEqual(past.issues, []);
+  const [, short] = await runDialog(manifest, [{ $surface: drag('e4.to', 19.74, 169.75, 19.74, 99) }]);
+  assert.equal(byId(short, 4)!.to, 105, 'as short as a free end may be');
+  const [, close] = await runDialog(manifest, [{ $surface: [{ type: 'dblclick', x: 70, y: 99 }] }]);
+  assert.equal(close.params.walls, start.params.walls);
+  assert.match(close.message ?? '', /closer than 3 mm/);
+});
+
+await atest('plan: a click takes the stretch under the pointer; dragged, it leaves its wall (a U); Shift adds stretches', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const shape = (st: { params: Record<string, unknown> }) => wallsOf(st).map((w) => [w.axis, w.pos, w.from, w.to].join(' ')).sort();
+  // Wand 1 zwischen Wand 4 (19.74) und Wand 2 (47) nach hinten: Wand 4 kommt von vorne und wird länger, der Rest bleibt
+  const [, u] = await runDialog(manifest, [{ $surface: drag('w1', 30, 97, 30, 85.2) }]);
+  assert.deepEqual(shape(u), ['h 150.35 47 94', 'h 85 19.74 47', 'h 97 0 19.74', 'h 97 47 94', 'v 19.74 85 169.75', 'v 47 0 150.35']);
+  assert.deepEqual(u.issues, []);
+  assert.deepEqual((u.surface!.state as { sel?: unknown }).sel, { axis: 'h', pos: 85, runs: [[19.74, 47]] }, 'the stretch stays selected where it is now');
+  // Mit Umschalt das Stück rechts dazu (bis zur rechten Außenwand), beide zusammen nach hinten
+  const click = (x: number, y: number, hit: string) => [{ type: 'down', x, y, hit }, { type: 'up', x, y, from: { x, y } }];
+  const [, two] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), ...drag('w1', 60, 97, 60, 85.2, { shift: true })] }]);
+  assert.deepEqual(shape(two), ['h 150.35 47 94', 'h 85 19.74 94', 'h 97 0 19.74', 'v 19.74 85 169.75', 'v 47 0 150.35']);
+  assert.deepEqual(two.issues, []);
+  // Rechtsklick löscht nur das Stück unter dem Zeiger
+  const [, cut] = await runDialog(manifest, [{ $surface: [{ type: 'context', x: 30, y: 97, hit: 'w1' }] }]);
+  assert.deepEqual(shape(cut), ['h 150.35 47 94', 'h 97 0 19.74', 'h 97 47 94', 'v 19.74 97 169.75', 'v 47 0 150.35']);
+});
+
+await atest('plan: Ctrl shows a target on the selection; a click adds a wall from there across the compartment, a drag draws it', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const click = (x: number, y: number, hit: string) => [{ type: 'down', x, y, hit }, { type: 'up', x, y, from: { x, y } }];
+  // Stück 19.74 … 47 von Wand 1 gewählt, Strg vor der Wand: Ziel in seiner Mitte (33.37), Seite vorne
+  const [, aimed] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), { type: 'move', x: 32, y: 103, ctrl: true }] }]);
+  const aim = (aimed.surface!.state as { aim?: { along: number; side: number; sel: unknown } }).aim!;
+  assert.deepEqual([aim.along, aim.side, aim.sel], [33.37, 1, { axis: 'h', pos: 97, runs: [[19.74, 47]] }]);
+  const [, added] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), ...click(32, 103, 'w1').map((e) => ({ ...e, ctrl: true }))] }]);
+  assert.deepEqual(byId(added, 5), { id: 5, axis: 'v', pos: 33.37, from: 97, to: 194 }, 'from wall 1 to the front wall');
+  assert.deepEqual(added.issues, []);
+  const [, drawn] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), ...drag(undefined, 32, 103, 32, 150, { ctrl: true })] }]);
+  assert.deepEqual(byId(drawn, 5), { id: 5, axis: 'v', pos: 33.37, from: 97, to: 150 }, 'drawn from the target to the pointer');
+  // Ohne Auswahl, nahe an Wand 4 (x 19.74): das Ziel auf ihr, in der Mitte ihres Stücks; der Klick setzt eine Wand nach rechts bis Wand 2
+  const [, near] = await runDialog(manifest, [{ $surface: [{ type: 'move', x: 23, y: 130, ctrl: true }] }]);
+  const a4 = (near.surface!.state as { aim?: { along: number; side: number; sel: unknown } }).aim!;
+  assert.deepEqual([a4.along, a4.side, a4.sel], [133.38, 1, { axis: 'v', pos: 19.74, runs: [[97, 169.75]] }], 'wall 4 preselected');
+  const [, fromFour] = await runDialog(manifest, [{ $surface: [{ type: 'down', x: 23, y: 130, ctrl: true }, { type: 'up', x: 23, y: 130, from: { x: 23, y: 130 }, ctrl: true }] }]);
+  assert.deepEqual(byId(fromFour, 5), { id: 5, axis: 'h', pos: 133.38, from: 19.74, to: 47 });
+  assert.deepEqual(fromFour.issues, []);
+  // Ohne Strg verschwindet das Ziel
+  const [, gone] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), { type: 'move', x: 32, y: 103, ctrl: true }, { type: 'move', x: 32, y: 104 }] }]);
+  assert.equal((gone.surface!.state as { aim?: unknown }).aim, undefined);
+  // Strg im leeren Raum: ein Kreuz, Ziehen zeichnet eine freie Wand (das Ende rastet an der rechten Außenwand ein)
+  const [, cross] = await runDialog(manifest, [{ $surface: [{ type: 'move', x: 60.3, y: 120, ctrl: true }] }]);
+  assert.deepEqual((cross.surface!.state as { free?: unknown }).free, [60, 120]);
+  const [, free] = await runDialog(manifest, [{ $surface: drag(undefined, 60, 120, 92, 121, { ctrl: true }) }]);
+  assert.deepEqual(byId(free, 5), { id: 5, axis: 'h', pos: 120, from: 60, to: 94 }, 'drawn left to right, the end snapped to the right wall');
+  assert.deepEqual(free.issues, []);
+});
+
+await atest('plan: double click adds a wall across the compartment (Shift: the other way); Ctrl+Shift+click takes the whole wall', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const [, across] = await runDialog(manifest, [{ $surface: [{ type: 'dblclick', x: 70, y: 40.3 }] }]);
+  assert.deepEqual(byId(across, 5), { id: 5, axis: 'h', pos: 40, from: 47, to: 94 }, 'from wall 2 to the right wall');
+  assert.equal(across.surface!.selected.walls, 4, 'the new wall is selected');
+  assert.deepEqual(across.issues, []);
+  const [, deep] = await runDialog(manifest, [{ $surface: [{ type: 'dblclick', x: 70, y: 40, shift: true }] }]);
+  assert.deepEqual(byId(deep, 5), { id: 5, axis: 'v', pos: 71.25, from: 0, to: 97 }, 'from the back wall to wall 1, near the middle: in the middle');
+  const [, mid] = await runDialog(manifest, [{ $surface: [{ type: 'dblclick', x: 70, y: 45 }] }]);
+  assert.deepEqual(byId(mid, 5), { id: 5, axis: 'h', pos: 47.75, from: 47, to: 94 }, 'near the middle: in the middle');
+  const [, all] = await runDialog(manifest, [{ $surface: drag('w1', 20, 97, 20, 107.4, { ctrl: true, shift: true }) }]);
+  assert.deepEqual(byId(all, 1), { id: 1, axis: 'h', pos: 107, from: 0, to: 94 }, 'the whole wall moved');
+  assert.equal(byId(all, 4)!.from, 107, 'the T on it follows');
+  assert.deepEqual(all.issues, []);
+});
+
+await atest('plan: Delete removes the selected wall, a right click the one under the pointer; ends snap when stretched', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const [, del] = await runDialog(manifest, [{ $surface: [{ type: 'down', x: 19.74, y: 130, hit: 'w4' }, { type: 'up', x: 19.74, y: 130, from: { x: 19.74, y: 130 } }, { type: 'key', x: 0, y: 0, key: 'Delete' }] }]);
+  assert.deepEqual(wallsOf(del).map((w) => w.id), [1, 2, 3]);
+  assert.equal(del.surface!.selected.walls, -1);
+  const [, ctx] = await runDialog(manifest, [{ $surface: [{ type: 'context', x: 70, y: 150.35, hit: 'w3' }] }]);
+  assert.deepEqual(wallsOf(ctx).map((w) => w.id), [1, 2, 4]);
+  assert.deepEqual(ctx.issues, [], 'wall 2 keeps a free end where wall 3 was');
+  const [, long] = await runDialog(manifest, [{ $surface: drag('e4.to', 19.74, 169.75, 19.74, 191) }]);
+  assert.equal(byId(long, 4)!.to, 194, 'snapped to the front wall');
+  assert.deepEqual(long.issues, []);
+});
+
+await atest('plan: a wall dragged near the middle between its neighbours snaps there, for even divisions', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  // Wand 4 zwischen der linken Außenwand (Innenseite bei 0) und Wand 2 (bei 47): Mitte (−1.5 + 47) / 2 = 22.75
+  const [, mid] = await runDialog(manifest, [{ $surface: drag('w4', 19.74, 130, 21, 130) }]);
+  assert.equal(byId(mid, 4)!.pos, 22.75);
+  assert.match(mid.message ?? '', /^Wall 4 · centred · clear on the left 21[.,]25 mm, on the right 21[.,]25 mm/);
+  const [, off] = await runDialog(manifest, [{ $surface: drag('w4', 19.74, 130, 31, 130) }]);
+  assert.equal(byId(off, 4)!.pos, 31, 'further away: no snap');
+  assert.doesNotMatch(off.message ?? '', /centred/);
+});
+
+await atest('plan: measured and centred where the pointer holds the wall; the middle of a wall it crosses', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  // Wand 1 (quer bei 97) kreuzt Wand 2 (0–150.35): deren Mitte 75.175; der Zeiger bei x = 20
+  const [, onWall] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 78) }]);
+  assert.equal(byId(onWall, 1)!.pos, 75.175);
+  assert.match(onWall.message ?? '', /^Wall 1 · in the middle of wall 2 · /);
+  // Wand 2 (längs bei 47) zwischen linker Außenwand und Wand 4 nur unten (97–169.75): oben gefasst ist die Mitte die
+  // ganze Breite, unten zwischen Wand 4 und der rechten Außenwand
+  const [, low] = await runDialog(manifest, [{ $surface: dragWhole('w2', 47, 120, 55, 120) }]);
+  assert.equal(byId(low, 2)!.pos, 57.62, 'pointer at y = 120: the middle between wall 4 (19.74) and the right wall');
+  assert.match(low.message ?? '', /^Wall 2 · centred · /);
+});
+
+await atest('plan: with the side open, the middle and the measures go to the edge of the floor', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  // Linke Seite offen: der Boden reicht bis −3; Mitte zwischen −4.5 (als Mittellinie) und Wand 2 (47) = 21.25
+  const [, open] = await runDialog(manifest, [{ wallLeft: false, $surface: drag('w4', 19.74, 130, 21, 130) }]);
+  assert.equal(byId(open, 4)!.pos, 21.25);
+  assert.match(open.message ?? '', /^Wall 4 · centred · clear on the left 22[.,]75 mm, on the right 22[.,]75 mm/);
+});
+
+await atest('plan: a wall dragged near the middle of the box snaps there, with a guide and the measures', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const walls = JSON.stringify([{ id: 1, axis: 'h', pos: 97, from: 0, to: 94 }, { id: 2, axis: 'v', pos: 70, from: 97, to: 194 }, { id: 3, axis: 'v', pos: 20, from: 97, to: 194 }]);
+  const [, s] = await runDialog(manifest, [{ walls, $surface: drag('w2', 70, 150, 50, 150) }]);
+  assert.equal(byId(s, 2)!.pos, 47);
+  assert.match(s.message ?? '', /^Wall 2 · in the middle of the box · clear on the left 24 mm, on the right 45[.,]5 mm/);
+});
+
+await atest('plan: a new width asks whether the walls scale with the box or keep their mm', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const [, keep] = await runDialog(manifest, [{ width: 120, $answer: 1 }]);
+  assert.equal(keep.ask?.options.length, 2);
+  assert.deepEqual([byId(keep, 1)!.to, byId(keep, 2)!.pos, byId(keep, 3)!.to, byId(keep, 4)!.pos], [114, 47, 114, 19.74]);
+  assert.equal(keep.params.wallsRef, '[114,194]');
+  const [, scale] = await runDialog(manifest, [{ width: 120, $answer: 0 }]);
+  assert.deepEqual([byId(scale, 1)!.to, byId(scale, 2)!.pos, byId(scale, 4)!.pos], [114, 57, 23.94]);
+  const [, cancel] = await runDialog(manifest, [{ width: 120 }]);
+  assert.equal(cancel.params.width, 100, 'cancelled: the width goes back');
 });
 
 if (failed) {
