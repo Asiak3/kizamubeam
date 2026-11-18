@@ -11,7 +11,7 @@ import { region } from '../ops';
 import ClipperLib from 'clipper-lib';
 import { Path, Paths, SCALE } from '../clip';
 import { h } from '../dom';
-import { t, tn } from '../i18n';
+import { locale, t, tn } from '../i18n';
 import { dockWindow, isShown, onWindowShow } from '../dock';
 import { objLabel } from '../objectsPanel';
 import { genLabel } from '../generators';
@@ -37,7 +37,7 @@ const BG_NAMES: Record<MockupBg, string> = { studio: 'Studio', white: 'Weiß', g
 // i18n-keys-end
 
 const KEY = 'kizamubeam.view3d';
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 interface Settings {
   th: number;

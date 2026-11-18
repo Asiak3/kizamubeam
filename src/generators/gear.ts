@@ -9,7 +9,7 @@
 // Beides wird schon beim Erzeugen berücksichtigt: Das Werkzeugprofil wird um die halbe Fuge verkleinert,
 // die Hüllkurve des verkleinerten Werkzeugs ist genau die versetzte Kontur.
 import type { Pt, SubPath } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { flipY, PathBuilder } from './build';
 import { boreIssues, boreOutline, boreSchema } from './bore';
 import type { Generator, Issue, Params } from './types';
@@ -190,7 +190,7 @@ function gearOutline(g: GearGeometry): SubPath {
 }
 
 const P = (p: Params) => p as unknown as GearParams;
-const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 export const GEAR: Generator = {
   id: 'gear',

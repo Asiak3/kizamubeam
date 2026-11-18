@@ -3,7 +3,7 @@
 // Seite nach vorne zeigt (Breite × Tiefe × Höhe vertauscht), der Schubkasten eine oben offene Box.
 // Maße: Außenmaß des Korpus; der Schubkasten bekommt seitlich, oben und hinten Luft.
 import type { Pt, SubPath } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { arrangeParts, flipY, PathBuilder, polySub } from './build';
 import { BoxParams, panelPolys } from './box';
 import type { Generator, Issue, Params } from './types';
@@ -30,7 +30,7 @@ export interface DrawerParams {
 }
 
 const P = (p: Params) => p as unknown as DrawerParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 /** Maße von Korpus, Schubkasten und Blende (Außenmaße) */
 export function drawerDims(p: DrawerParams) {

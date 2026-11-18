@@ -17,7 +17,7 @@
 // jedes Rückgrat reicht nur so weit wie der Schlauch um seine Achsen (an den Enden um „Rückgrat verlängern“ länger,
 // damit z. B. die Beinplatte in den Rumpf reicht).
 import type { Pt, SubPath } from '../model';
-import { t, tn } from '../i18n';
+import { t, tn, locale } from '../i18n';
 import { fitPolyline } from '../fit';
 import { arrangeParts } from './build';
 import type { GenAction, Generator, GenList, GenPart, Issue, Params, PlanSheet, Rule } from './types';
@@ -82,7 +82,7 @@ export interface Section {
 }
 
 const P = (p: Params) => p as unknown as RibsParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 const UNIT: Record<string, V3> = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
 const neg = (a: V3): V3 => [-a[0], -a[1], -a[2]];

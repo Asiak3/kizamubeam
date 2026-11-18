@@ -3,7 +3,7 @@
 // Flankenspiel macht die Zähne um die Hälfte des Spiels dünner (die andere Hälfte trägt das Rad), die Schnittfuge
 // versetzt die ganze Kontur um die halbe Fuge nach außen (Flanken parallel, Fußrundung kleiner).
 import type { Pt, SubPath } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { flipY, PathBuilder } from './build';
 import type { Generator, Issue, Params } from './types';
 
@@ -72,7 +72,7 @@ function rackOutline(p: RackParams): SubPath {
 }
 
 const P = (p: Params) => p as unknown as RackParams;
-const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 /** Lage der Teilungslinie und der ersten Lückenmitte im Teil (Mitte des Teils = Ursprung, y nach oben) */
 export function rackOrigin(p: RackParams): Pt {

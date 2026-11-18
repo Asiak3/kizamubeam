@@ -6,7 +6,7 @@
 // Welcher Querschnitt sie bildet, wählt „Querschnitt“: Mitte der Schicht, außen (Vereinigung von Unter- und
 // Oberkante: nichts fehlt, Stufen stehen über, zum Abschleifen) oder innen (Schnittmenge: nichts steht über).
 import type { Pt, SubPath } from '../model';
-import { t, tn } from '../i18n';
+import { t, tn, locale } from '../i18n';
 import { fitPolyline } from '../fit';
 import { arrangeParts } from './build';
 import type { Generator, GenPart, Issue, Params } from './types';
@@ -29,7 +29,7 @@ export interface StackParams {
 }
 
 const P = (p: Params) => p as unknown as StackParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 /** Achsensysteme je Schichtrichtung: (u, v) = Ebene der Scheibe wie in der Ansicht von dort, w = Stapelrichtung */
 export const FRAMES: Record<string, { u: V3; v: V3; w: V3 }> = {

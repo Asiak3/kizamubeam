@@ -2,7 +2,7 @@
 // beiden Achslöchern. Die Räder kommen aus dem Zahnradgenerator; Profilverschiebung wird als x₁ = −x₂ verteilt,
 // damit der Achsabstand m·(z₁ + z₂)/2 bleibt.
 import type { SubPath } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { flipY, layoutParts, PathBuilder } from './build';
 import { boreIssues, boreSchema } from './bore';
 import { GEAR, gearGeometry, GearParams } from './gear';
@@ -25,7 +25,7 @@ export interface GearPairParams {
 }
 
 const P = (p: Params) => p as unknown as GearPairParams;
-const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 /** Parameter des Zahnradgenerators für Rad i (1 oder 2) */
 export function pairGear(raw: Params, i: 1 | 2): Params {

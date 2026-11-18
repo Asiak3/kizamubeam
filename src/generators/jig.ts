@@ -7,7 +7,7 @@
 // des Werkstücks und die Außenkontur der Platte um kerf/2 außerhalb.
 import ClipperLib from 'clipper-lib';
 import type { Pt, SubPath } from '../model';
-import { t, tn } from '../i18n';
+import { t, tn, locale } from '../i18n';
 import { flattenSub, SCALE } from '../clip';
 import { fitPolyline } from '../fit';
 import { IDENT } from '../model';
@@ -47,7 +47,7 @@ export interface JigParams {
 }
 
 const P = (p: Params) => p as unknown as JigParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 // ---------- Formen ----------
 

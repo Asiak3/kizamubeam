@@ -17,7 +17,7 @@
 // „so weit wie möglich, ohne dass sich drei Scheiben in einem Punkt treffen“. Beide Grenzen hängen von Dicke,
 // Spiel und Durchmesser ab und werden numerisch gesucht.
 import type { Pt, SubPath } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { arrangeParts, PathBuilder } from './build';
 import type { Generator, Issue, Params } from './types';
 import { pose, type AsmPoses, type Pose } from './pose';
@@ -36,7 +36,7 @@ export interface DiscSphereParams {
 }
 
 const P = (p: Params) => p as unknown as DiscSphereParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const scale = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k];

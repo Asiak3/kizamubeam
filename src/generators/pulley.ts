@@ -5,7 +5,7 @@
 // üblichen Werten je Profil; das Spiel der Zahnlücke macht sie breiter, damit der Riemen leicht einläuft.
 // Ergebnis ist eine Näherung des Normprofils, die mit gedruckten und gelaserten Scheiben gut läuft.
 import type { SubPath } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { flipY, PathBuilder } from './build';
 import { boreIssues, boreOutline, boreSchema } from './bore';
 import type { Generator, Issue, Params } from './types';
@@ -117,7 +117,7 @@ export function pulleyOutline(p: PulleyParams): SubPath {
 }
 
 const P = (p: Params) => p as unknown as PulleyParams;
-const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 const PROFILE_NAMES: Record<string, string> = { gt2_2: 'GT2 2 mm', gt2_3: 'GT2 3 mm', gt2_5: 'GT2 5 mm', htd_3: 'HTD 3M', htd_5: 'HTD 5M' };
 
 export const PULLEY: Generator = {

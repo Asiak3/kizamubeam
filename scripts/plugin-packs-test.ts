@@ -163,11 +163,11 @@ await test('plugin generator: labels and texts computed by the plugin (codes, va
   const p = G.normalizeParams(g, { size: 22 });
   assert.equal(g.label(p), 'Quadrat', 'not computed yet: the manifest text');
   const r = await G.buildGenAsync(g, p);
-  assert.deepEqual(r.info, [['Seite', 'Zu groß: höchstens Seite mm / 2,952 mm / M3000']]);
+  assert.deepEqual(r.info, [['Seite', 'Zu groß: höchstens Seite mm / 2.952 mm / M3000']], 'German numbers for the German interface');
   assert.equal(g.label(p), 'Zu groß: höchstens 22 mm', 'whole numbers as they are, like t()');
-  assert.equal(g.label(p, 'a'), '#Seite 5.5');
+  assert.equal(g.label(p, 'a'), '#Seite 5,5');
   const w = await G.buildGenAsync(g, G.normalizeParams(g, { size: 60 }));
-  assert.deepEqual(w.issues.map((i) => i.msg), ['(Seite) 1,234.5']);
+  assert.deepEqual(w.issues.map((i) => i.msg), ['(Seite) 1.234,5']);
   assert.equal(w.parts.length, 1);
   // Labels outlive the result cache
   for (let i = 1; i <= 30; i++) await g.prepare(G.normalizeParams(g, { size: i }));

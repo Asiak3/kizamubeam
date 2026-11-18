@@ -2,7 +2,7 @@
 // einen Ordner synchronisieren. Dazu der Hinweis „Neu laden“, wenn ein anderer Rechner etwas geändert hat.
 import { h, showDialog } from './dom';
 import { openText, saveText } from './files';
-import { t, tn } from './i18n';
+import { locale, t, tn } from './i18n';
 import type { Editor } from './editor';
 import { BUNDLE_EXT, Bundle, LOCAL_ONLY, parseBundle, SectionId, SECTIONS } from './syncCore';
 import {
@@ -56,7 +56,7 @@ function sectionChecks(sections: readonly SectionId[], checked: (s: SectionId) =
   return { list, chosen: () => sections.filter((s) => boxes.get(s)!.checked) };
 }
 
-const fmtTime = (ms: number) => (ms ? new Date(ms).toLocaleString() : '–');
+const fmtTime = (ms: number) => (ms ? new Date(ms).toLocaleString(locale) : '–');
 
 export async function openSyncDialog(ed: Editor) {
   const desktop = isDesktop();
@@ -245,7 +245,7 @@ function openImportDialog(ed: Editor, file: string, b: Bundle) {
   };
   const dlg = h('dialog', { class: 'sync-dialog' },
     h('h3', {}, t('Einstellungen importieren')),
-    h('p', {}, h('b', {}, file), h('span', { class: 'muted' }, ` · ${[b.machine, b.created ? new Date(b.created).toLocaleString() : '', b.app ? `KizamuBeam ${b.app}` : ''].filter(Boolean).join(' · ')}`)),
+    h('p', {}, h('b', {}, file), h('span', { class: 'muted' }, ` · ${[b.machine, b.created ? new Date(b.created).toLocaleString(locale) : '', b.app ? `KizamuBeam ${b.app}` : ''].filter(Boolean).join(' · ')}`)),
     present.length ? pick.list : h('p', { class: 'note' }, t('Die Datei enthält keine Einstellungen.')),
     h('div', { class: 'sync-mode' },
       h('label', {}, merge, ' ', h('b', {}, t('Zusammenführen')), h('small', { class: 'muted' }, ' · ', t('Einträge aus der Datei kommen dazu oder ersetzen gleichnamige, alle anderen bleiben'))),

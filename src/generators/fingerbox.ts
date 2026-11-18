@@ -1,5 +1,5 @@
 // Experimenteller separater Generator; die vorhandene Box bleibt unverändert.
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import type { GenPart, Generator, Issue, Params } from './types';
 import { fingerboxParts, fingerboxSegments, horizontalSegments, type FingerboxParams } from './fingerbox-experiment';
 import { defaultDistribution, distributeGaps } from './fingerbox-distribution';
@@ -59,7 +59,7 @@ const issueOf = (e: unknown, level: Issue['level'], key?: string): Issue => {
 };
 const dividerParams = (p: FingerParams): DividerParams => ({ ...p, dividerHeight: p.height - p.dividerDrop });
 const hasDividers = (p: FingerParams) => p.compartmentsX > 1 || p.compartmentsY > 1;
-const fmt = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString(undefined, { maximumFractionDigits: 3 });
+const fmt = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString(locale, { maximumFractionDigits: 3 });
 
 // offsetOrtho rechnet nur mit 90°-Ecken: ein Zwischenpunkt auf einer Geraden würde doppelt versetzt (schiefe Kante).
 function dropCollinear<T extends { x: number; y: number }>(pts: T[]): T[] {

@@ -12,7 +12,7 @@ import type { PluginContext, PluginManifest } from './manifest';
 import { appCodeText, localNumbers, PENDING, pluginWords } from './words';
 import { netKey } from './hostfns';
 import { pluginFetch } from './net';
-import { t } from '../i18n';
+import { locale, t } from '../i18n';
 import { ICONS } from '../icons';
 
 export { appCodeText, localNumbers, PENDING };
@@ -387,7 +387,7 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
       const own = known && (part ? known.parts?.[part] : known.label);
       if (own !== undefined) return render(own);
       const values = Object.fromEntries(
-        m.schema.map((s) => [s.key, typeof p[s.key] === 'number' ? (p[s.key] as number).toLocaleString(undefined, { maximumFractionDigits: 3 }) : String(p[s.key])]),
+        m.schema.map((s) => [s.key, typeof p[s.key] === 'number' ? (p[s.key] as number).toLocaleString(locale, { maximumFractionDigits: 3 }) : String(p[s.key])]),
       );
       const base = text('label', values) ?? name;
       return part ? `${base} · ${text(`part.${part}`) ?? part}` : base;

@@ -2,7 +2,7 @@
 // Die Seiten haben Schlitze von der Rückkante bis zur halben Tiefe, die Böden Schlitze von der Vorderkante bis
 // zur halben Tiefe; der Boden wird von vorne über die Seiten geschoben. Die Böden stehen um den Überstand über.
 import type { Pt } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { arrangeParts, polySub } from './build';
 import { cleanup, offsetOrtho } from './panelJoints';
 import type { Generator, Issue, Params } from './types';
@@ -22,7 +22,7 @@ export interface ShelfParams {
 }
 
 const P = (p: Params) => p as unknown as ShelfParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 /** Höhe der Bodenunterkanten über dem Fußboden, von unten nach oben */
 export function shelfHeights(p: ShelfParams): number[] {

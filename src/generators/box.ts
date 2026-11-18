@@ -7,7 +7,7 @@
 // - Die Schnittfuge versetzt danach die ganze Kontur um die halbe Fuge nach außen, wie beim Zahnrad.
 // Alle Kanten sind gerade Linien; Lage und Drehung der Teile bleiben beim Neuberechnen erhalten.
 import type { Pt, SubPath } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import type { Generator, GenPart, Issue, Params } from './types';
 import { layoutParts } from './build';
 import { neg, pose, X, Y, Z, type Pose } from './pose';
@@ -35,7 +35,7 @@ export function boxOuter(p: BoxParams) {
 }
 
 const P = (p: Params) => p as unknown as BoxParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 /** Platten der Box mit Kantenmustern */
 export function boxPanels(p: BoxParams): PanelSpec[] {

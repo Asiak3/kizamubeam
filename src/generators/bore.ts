@@ -1,11 +1,11 @@
 // Achsbohrungen für runde Bauteile (Zahnrad, Riemenscheibe, Nocken, Zahnradpaar): rund, D-Profil, Passfedernut.
 // Felder, Prüfung und Kontur an einer Stelle; mit suffix bekommen Baugruppen getrennte Bohrungen ('1', '2').
 import type { SubPath } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { PathBuilder } from './build';
 import type { Issue, Params, ParamSpec } from './types';
 
-const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 /** Felder der Bohrung; label ergänzt die Beschriftung (z. B. „Rad 1“) */
 export function boreSchema(suffix = '', label = '', def: 'none' | 'round' = 'round', dia = 6): ParamSpec[] {

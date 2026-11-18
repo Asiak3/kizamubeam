@@ -3,7 +3,7 @@
 import type { Issue, ParamSpec } from '../generators/types';
 import type { PluginIssue, PluginText } from './contract';
 import { pluginText, type PluginManifest } from './manifest';
-import { lang, t } from '../i18n';
+import { lang, locale, t } from '../i18n';
 import { checkCodeText } from '../checkText';
 import { jointText } from '../jointText';
 
@@ -62,10 +62,10 @@ export function appCodeText(code: string, name: string): string | undefined {
  */
 export function localNumbers(s: string): string {
   // Decimal numbers, and whole numbers from 1000 (digit grouping); not inside words or codes like „M3000“
-  return s.replace(/(?<![\w.,])-?(?:\d+\.\d+|\d{4,})(?![\w.,]?\w)/g, (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 6 }));
+  return s.replace(/(?<![\w.,])-?(?:\d+\.\d+|\d{4,})(?![\w.,]?\w)/g, (n) => Number(n).toLocaleString(locale, { maximumFractionDigits: 6 }));
 }
 /** Number values: whole numbers as they are (like t() in the app: „z=1000“), decimals in the user's format */
-const localNumber = (x: number) => (Number.isInteger(x) ? String(x) : x.toLocaleString(undefined, { maximumFractionDigits: 6 }));
+const localNumber = (x: number) => (Number.isInteger(x) ? String(x) : x.toLocaleString(locale, { maximumFractionDigits: 6 }));
 
 /** Text of a message of host.joints (code joint-…, #398) with its raw values; undefined for other codes */
 function jointCode(code: string, v?: Record<string, unknown>): string | undefined {

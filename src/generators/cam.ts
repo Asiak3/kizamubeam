@@ -5,7 +5,7 @@
 // Versatz um die halbe Fuge (Kontur wächst nach außen), die Bohrung wird kleiner.
 // Winkel θ zählt im Uhrzeigersinn ab der Spitze oben (0° = Stößel ganz unten, Beginn des Hubs).
 import type { Pt } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { flipY, PathBuilder } from './build';
 import { boreIssues, boreOutline, boreSchema } from './bore';
 import type { Generator, Issue, Params } from './types';
@@ -104,7 +104,7 @@ export function camAnalysis(p: CamParams) {
 }
 
 const P = (p: Params) => p as unknown as CamParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 export const CAM: Generator = {
   id: 'cam',

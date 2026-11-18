@@ -2,7 +2,7 @@
 // Stege in Längsrichtung (teilen die Breite) haben Schlitze von oben, Stege in Querrichtung Schlitze von unten,
 // jeweils bis zur halben Höhe. Die Fächer sind gleich groß. Die Stege sind um die Endluft kürzer als das Innenmaß.
 import type { Pt } from '../model';
-import { t } from '../i18n';
+import { t, locale } from '../i18n';
 import { arrangeParts, polySub } from './build';
 import { offsetOrtho } from './panelJoints';
 import type { Generator, Issue, Params } from './types';
@@ -21,7 +21,7 @@ export interface InsertParams {
 }
 
 const P = (p: Params) => p as unknown as InsertParams;
-const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+const fmt = (v: number, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { maximumFractionDigits: d });
 
 /** Lage der Stegmitten über eine Innenlänge L bei n gleichen Fächern (Stege der Dicke th) */
 export function dividerCenters(L: number, n: number, th: number): number[] {
