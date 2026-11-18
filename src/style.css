@@ -3110,6 +3110,24 @@ body.dock-resizing #canvas {
 .gen-surface:focus {
   outline: 1px solid var(--accent);
 }
+/* Fits the drawing again; shown only while the surface is zoomed or moved (#411) */
+.gen-surface-fit {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+}
+.gen-surface-fit[hidden] {
+  display: none;
+}
+.gen-surface-fit svg {
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
 /* The message line under the surface keeps its room (two lines) even when empty: the surface takes the rest of the
    height, so a message that comes or goes must not make it jump (#411) */
 .gen-surface-area > .note:not(.muted) {
