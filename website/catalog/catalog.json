@@ -1,11 +1,11 @@
 {
  "format": "kizamubeam-catalog",
  "version": 1,
- "generated": "2026-11-18T07:20:32.048Z",
+ "generated": "2026-11-18T09:28:29.460Z",
  "packs": [
   {
    "id": "org.kizamubeam.box-composer",
-   "version": "0.1.0",
+   "version": "0.1.1",
    "minApp": "2.9.0-rc.3",
    "name": {
     "en": "Box composer",
@@ -31,11 +31,11 @@
     "js"
    ],
    "pluginApi": 1,
-   "codeSize": 13362,
+   "codeSize": 14101,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/box-composer",
    "file": "org.kizamubeam.box-composer.kzp",
-   "sha256": "a529bf8cee63499ad2de3d89550c8b952efb0c65f73446fe1356a070fc4ca5f1",
-   "size": 32915
+   "sha256": "ae884667cd4de7676b71d5c49c5a31c6fa7c29f4ed49747ab71d2531c0d06d0d",
+   "size": 33668
   },
   {
    "id": "org.kizamubeam.example",
