@@ -61,6 +61,28 @@ const rightPan = () => {
   }
 };
 
+/**
+ * A text of the surface at its point (x, y in screen pixels, #412): 6 px after and above the point, or centred on it
+ * (align "center"), turned by its angle (degrees, counter-clockwise on the screen; 90 = read from bottom to top).
+ */
+export function drawText(ctx: CanvasRenderingContext2D, it: Extract<GenItem, { type: 'text' }>, x: number, y: number) {
+  ctx.font = '11px system-ui, sans-serif';
+  const center = it.align === 'center';
+  if (!it.angle && !center) {
+    ctx.fillText(it.text, x + 6, y - 6);
+    return;
+  }
+  ctx.save();
+  ctx.translate(x, y);
+  if (it.angle) ctx.rotate((-it.angle * Math.PI) / 180);
+  if (center) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+  }
+  ctx.fillText(it.text, center ? 0 : 6, center ? 0 : -6);
+  ctx.restore();
+}
+
 export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => void, isOpen: () => boolean): SurfaceArea | null {
   const spec = g.surface;
   if (!spec || !g.draw || !spec.views.length) return null;
@@ -138,10 +160,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
         ctx.beginPath();
         ctx.arc(sx(it.x), sy(it.y), it.size ?? 3.5, 0, Math.PI * 2);
         ctx.fill();
-      } else {
-        ctx.font = '11px system-ui, sans-serif';
-        ctx.fillText(it.text, sx(it.x) + 6, sy(it.y) - 6);
-      }
+      } else drawText(ctx, it, sx(it.x), sy(it.y));
     }
     ctx.globalAlpha = 1;
   };

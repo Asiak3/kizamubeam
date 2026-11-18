@@ -260,11 +260,17 @@ export interface GenSurface {
 
 export type GenStyle = 'normal' | 'muted' | 'accent' | 'warn';
 
+/**
+ * Where a text stands at its point (#412): start = 6 px after and above it (the default), center = centred on it in
+ * both directions. Both follow the text's angle (degrees, counter-clockwise; 90 = read from bottom to top).
+ */
+export type GenTextAlign = 'start' | 'center';
+
 /** A shape on the surface. Handles and lines with an id can be hit by the pointer (topmost first, handles before lines) */
 export type GenItem =
   | { type: 'line'; pts: [number, number][]; closed?: boolean; style?: GenStyle; width?: number; dash?: boolean; alpha?: number; id?: string }
   | { type: 'handle'; x: number; y: number; id: string; style?: GenStyle; size?: number }
-  | { type: 'text'; x: number; y: number; text: string; style?: GenStyle };
+  | { type: 'text'; x: number; y: number; text: string; style?: GenStyle; angle?: number; align?: GenTextAlign };
 
 /**
  * A layer that rarely changes (the silhouette of a model, the outlines of the parts): the app keeps it as a
