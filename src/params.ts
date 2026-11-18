@@ -41,7 +41,7 @@ export const defaultValue = (type: ParamType): Value => (type === 'number' ? 10 
 export function coerce(p: ProjectParam, v: unknown): Value {
   if (p.type === 'bool') return v === true || v === 'true' || v === 1;
   if (p.type === 'text') return v == null ? '' : String(v);
-  let n = typeof v === 'number' ? v : Number(String(v).replace(',', '.'));
+  let n = typeof v === 'number' ? v : Number(String(v).replace(/,/g, '.'));
   if (!isFinite(n)) n = typeof p.value === 'number' ? p.value : 0;
   if (p.min !== undefined) n = Math.max(p.min, n);
   if (p.max !== undefined) n = Math.min(p.max, n);
@@ -64,7 +64,7 @@ export function scopeOf(params: ProjectParam[] = projectParams()): Scope {
 export class ExprError extends Error {}
 
 const deg = Math.PI / 180;
-const num = (v: Value) => (typeof v === 'number' ? v : typeof v === 'boolean' ? Number(v) : Number(v.replace(',', '.')));
+const num = (v: Value) => (typeof v === 'number' ? v : typeof v === 'boolean' ? Number(v) : Number(v.replace(/,/g, '.')));
 const FUNCS: Record<string, (...a: Value[]) => Value> = {
   min: (...a) => Math.min(...a.map(num)),
   max: (...a) => Math.max(...a.map(num)),
@@ -108,7 +108,7 @@ function tokenize(src: string): Tok[] {
     // Zahl; ein Komma zwischen Ziffern ist ein Dezimalkomma (Argumente trennt ; oder „, “)
     const m = /^(\d+([.,]\d+)?|[.,]\d+)(e[-+]?\d+)?/i.exec(src.slice(i));
     if (m && !(src[i] === ',' && out.length && out[out.length - 1].k !== 'op')) {
-      let v = parseFloat(m[0].replace(',', '.'));
+      let v = parseFloat(m[0].replace(/,/g, '.'));
       const at = i;
       i += m[0].length;
       const u = /^(mm|cm|in)(?![\p{L}\p{N}_])/u.exec(src.slice(i));

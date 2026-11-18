@@ -53,9 +53,15 @@ export function showDialog(dlg: HTMLDialogElement, onClose: () => void = () => {
   dlg.showModal();
 }
 
-/** Zahlenfeld-Auswertung mit Einheiten und Grundrechenarten: „5in“, „100/3“, „2*(3+4)cm“. */
+/** Zahlenfeld-Auswertung mit Einheiten und Grundrechenarten: „5in“, „100/3“, „2*(3+4)cm“. Dezimaltrennzeichen ist je Eingabe Punkt oder Komma (beide akzeptiert); stehen beide drin, ist das letzte das Dezimalzeichen und die anderen Tausendertrennung (z. B. „1.234,56“ oder „1,234.56“ → 1234.56). Leerzeichen/’ zwischen Ziffern gelten als Tausendertrennung. */
 export function evalExpr(src: string): number | null {
-  const s = src.replace(/,/g, '.').trim().toLowerCase();
+  let s = src.replace(/[\s'’]/g, '').trim().toLowerCase();
+  const lastDot = s.lastIndexOf('.');
+  const lastComma = s.lastIndexOf(',');
+  if (lastDot >= 0 && lastComma >= 0) {
+    if (lastComma > lastDot) s = s.replace(/\./g, '').replace(/,/g, '.');
+    else s = s.replace(/,/g, '');
+  } else s = s.replace(/,/g, '.');
   let i = 0;
   const peek = () => s[i];
   const ws = () => {

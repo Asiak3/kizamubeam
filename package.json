@@ -34,6 +34,7 @@
     "test:outline": "node scripts/vector-offline-test.mjs scripts/outline-test.ts",
     "test:contour-offset": "node scripts/vector-offline-test.mjs scripts/contour-offset-test.ts && node scripts/vector-offline-test.mjs scripts/contour-offset-exclusions-test.ts && node scripts/vector-offline-test.mjs scripts/contour-offset-curved-exclusion-test.ts && node scripts/vector-offline-test.mjs scripts/contour-offset-section-test.ts && node scripts/vector-offline-test.mjs scripts/contour-offset-validation-test.ts && node scripts/vector-offline-test.mjs scripts/contour-offset-assembly-test.ts",
     "test:canvas-zoom": "node scripts/run-ts.mjs scripts/canvas-zoom-test.ts",
+    "test:surface-view": "node scripts/run-ts.mjs scripts/surface-view-test.ts",
     "test:file-drop": "node scripts/run-ts.mjs scripts/native-file-drop-test.ts",
     "test:slot-placement": "node scripts/vector-offline-test.mjs scripts/slot-placement-test.ts",
     "test:contour-slots": "node scripts/vector-offline-test.mjs scripts/contour-slot-test.ts",
