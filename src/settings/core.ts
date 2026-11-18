@@ -15,7 +15,7 @@ import { defaultUpdateChannel, openUpdateDialog, setUpdateAutoCheck, setUpdateCh
 import type { Channel } from '../updates';
 import { resetDialogPositions } from '../dialogDrag';
 import { resetLayout } from '../dock';
-import { openToolbarDialog, showAllBars } from '../toolbars';
+import { openToolbarDialog, setAllToolbarIconSizes, showAllBars, toolbarIconSize } from '../toolbars';
 import { openDeviceDialog, openDevicesDialog, openRotaryDialog } from '../laser';
 import { openSetupWizard } from '../setupWizard';
 import { openSyncDialog } from '../syncDialog';
@@ -85,6 +85,12 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         options: () => [['system', t('Wie System|Design')], ['light', t('Hell|Design')], ['dark', t('Dunkel|Design')]],
         get: () => hooks.theme(),
         set: (v) => hooks.setTheme(v as ThemeMode),
+      },
+      {
+        kind: 'select', id: 'appearance.toolbarIconSize', label: t('Symbolgröße'), def: 'm',
+        options: () => [['s', t('Klein|Symbole')], ['m', t('Normal|Symbole')], ['l', t('Groß|Symbole')]],
+        get: () => toolbarIconSize(),
+        set: (v) => setAllToolbarIconSizes(v as 's' | 'm' | 'l'),
       },
       {
         kind: 'action', id: 'appearance.toolbars', group: t('Fenster und Leisten'), label: t('Funktionsleisten'), hint: t('Knöpfe und Reihenfolge der Leisten wählen.'),

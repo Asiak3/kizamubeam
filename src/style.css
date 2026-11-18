@@ -325,9 +325,254 @@ select:focus {
   max-width: 220px;
 }
 /* Bogen-Optionen: Zielgröße 24 px für die nativen Auswahlfelder */
-#arcbar select {
+#arcbar select,
+.arcbar select {
   height: 24px;
 }
+.toolbar-view {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(var(--toolbar-rows, 1), max-content);
+  grid-auto-columns: max-content;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.toolbar-view[data-orientation='vertical'] {
+  grid-auto-flow: row;
+  grid-template-rows: none;
+  grid-template-columns: repeat(var(--toolbar-columns, 1), max-content);
+  justify-items: center;
+}
+.toolbar-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.toolbar-view[data-orientation='vertical'] .toolbar-section {
+  flex-direction: column;
+}
+.toolbar-view[data-orientation='vertical'] .field {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.toolbar-view button:not(.ib-more),
+.toolbar-view input:not([type='checkbox']):not([type='radio']),
+.toolbar-view select {
+  min-width: 24px;
+  min-height: 24px;
+}
+.toolbar-view .sep {
+  width: 1px;
+  height: 24px;
+  background: var(--line);
+}
+.toolbar-view[data-orientation='vertical'] .sep {
+  width: 24px;
+  height: 1px;
+}
+.toolbar-popup {
+  z-index: 1000;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+  max-width: calc(100vw - 8px);
+  max-height: calc(100vh - 8px);
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 12px #0004;
+}
+.toolbar-popup button {
+  min-width: 24px;
+  min-height: 24px;
+}
+.toolbar-popup.toolbar-menu {
+  min-width: 220px;
+  width: max-content;
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+  padding: 4px;
+}
+.toolbar-popup .toolbar-menu-list {
+  min-height: 0;
+  overflow: auto;
+}
+.toolbar-popup .toolbar-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.toolbar-popup .toolbar-menu-item:hover {
+  background: var(--accent-soft);
+}
+.toolbar-popup .toolbar-menu-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.toolbar-popup .toolbar-menu-item .menu-check {
+  width: 1.2em;
+  flex: none;
+  text-align: center;
+  color: var(--accent);
+}
+.toolbar-popup .toolbar-menu-item .menu-icon {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.toolbar-popup .toolbar-menu-item .menu-icon[hidden] {
+  display: none;
+}
+.toolbar-popup .toolbar-menu-item .menu-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.toolbar-popup .toolbar-menu-item .menu-label {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.toolbar-popup .toolbar-menu-item kbd {
+  color: var(--muted);
+  font: inherit;
+  margin-left: 16px;
+}
+.toolbar-popup .sep {
+  width: auto;
+  height: 1px;
+  margin: 4px 2px;
+}
+/* Durchgehender Abreißgriff rechts; Zeilen scrollen unabhängig davon. */
+.toolbar-popup .toolbar-grip {
+  min-width: 24px;
+  flex: none;
+  cursor: grab;
+  touch-action: none;
+  border-left: 1px solid var(--line);
+  margin: 0;
+  position: relative;
+}
+.toolbar-popup .toolbar-grip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 32px;
+  max-height: 80%;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: var(--muted);
+  opacity: 0.6;
+}
+.toolbar-popup .toolbar-grip:active {
+  cursor: grabbing;
+}
+/* Schwebende abgerissene Gruppen */
+.toolbar-float-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 900;
+}
+.toolbar-float {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 12px #0004;
+  border-radius: 4px;
+  padding: 2px;
+}
+.toolbar-float-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: grab;
+  touch-action: none;
+  min-height: 24px;
+  padding: 0 2px 0 6px;
+}
+.toolbar-float-head:active {
+  cursor: grabbing;
+}
+.toolbar-float-title {
+  flex: 1;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.toolbar-float-close {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  min-width: 24px;
+  min-height: 24px;
+  cursor: pointer;
+}
+.toolbar-float.flash {
+  outline: 2px solid var(--accent);
+}
+.toolbar-layout-app#app {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas: 'menu menu menu' 'top top top' 'left main right' 'bottom bottom bottom' 'palette palette palette' 'status status status';
+}
+.toolbar-layout-app > #menubar { grid-area: menu; }
+.toolbar-layout-app > #main { grid-area: main; grid-template-columns: auto minmax(0, 1fr) auto; min-width: 0; }
+.toolbar-layout-app > #main > #dock-left { grid-column: 1; }
+.toolbar-layout-app > #main > #center { grid-column: 2; }
+.toolbar-layout-app > #main > #dock-right { grid-column: 3; }
+.toolbar-layout-app > #palette { grid-area: palette; }
+.toolbar-layout-app > #status { grid-area: status; }
+.toolbar-dock-zone { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; max-height: 35vh; background: var(--panel); }
+.toolbar-dock-zone[data-edge='top'] { grid-area: top; }
+.toolbar-dock-zone[data-edge='bottom'] { grid-area: bottom; }
+.toolbar-dock-zone[data-edge='left'] { grid-area: left; }
+.toolbar-dock-zone[data-edge='right'] { grid-area: right; }
+.toolbar-dock-zone[data-edge='left'], .toolbar-dock-zone[data-edge='right'] { flex-direction: row; max-width: 35vw; max-height: none; }
+.toolbar-dock-lane { display: flex; align-items: stretch; min-width: 0; min-height: 0; flex: 0 0 auto; background: var(--panel); }
+.toolbar-dock-zone[data-edge='top'] .toolbar-dock-lane { border-bottom: 1px solid var(--line); }
+.toolbar-dock-zone[data-edge='bottom'] .toolbar-dock-lane { border-top: 1px solid var(--line); }
+.toolbar-dock-zone[data-edge='left'] .toolbar-dock-lane { border-right: 1px solid var(--line); }
+.toolbar-dock-zone[data-edge='right'] .toolbar-dock-lane { border-left: 1px solid var(--line); }
+.toolbar-dock-zone[data-edge='left'] .toolbar-dock-lane,
+.toolbar-dock-zone[data-edge='right'] .toolbar-dock-lane { flex-direction: column; }
+.toolbar-dock-lane:empty { display: none; }
+.toolbar-layout-shell { display: flex; align-items: center; min-width: 0; min-height: 0; max-width: 100%; max-height: 100%; gap: 2px; }
+.toolbar-layout-shell[hidden] { display: none !important; }
+.toolbar-layout-shell[data-orientation='horizontal'] { flex-direction: row; }
+.toolbar-layout-shell[data-orientation='vertical'] { flex-direction: column; }
+.toolbar-layout-shell > .toolbar-view, .toolbar-float-body { overflow: auto; min-width: 0; min-height: 0; max-width: calc(100vw - 32px); max-height: calc(100vh - 64px); }
+.toolbar-layout-shell.toolbar-float { flex-direction: column; }
+.toolbar-layout-shell > .toolbar-float-head { min-width: 0; max-width: 100%; flex-shrink: 0; }
+.toolbar-layout-shell .toolbar-float-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.toolbar-layout-shell .toolbar-float-close { flex: 0 0 24px; }
+.toolbar-layout-floating { position: absolute; pointer-events: auto; background: var(--panel); border: 1px solid var(--line); box-shadow: 0 4px 12px #0004; max-width: 100vw; max-height: 100vh; }
+.toolbar-layout-shell#toolbar, .toolbar-layout-shell#numbar, .toolbar-layout-shell#textbar, .toolbar-layout-shell#tools { width: auto; height: auto; overflow: visible; flex-wrap: nowrap; padding: 2px; }
+.toolbar-layout-shell#tools { min-width: 28px; }
+.toolbar-layout-shell > .toolbar-grip { flex: 0 0 24px; align-self: stretch; min-width: 24px; min-height: 24px; display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; color: var(--text); }
+.toolbar-grip-mark { display: inline-block; }
+.toolbar-layout-shell > .toolbar-grip[aria-disabled='true'], .toolbar-float-head[aria-disabled='true'] { cursor: default; }
+.toolbar-layout-shell > .toolbar-grip:focus-visible, .toolbar-float-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.toolbar-drop-preview { position: fixed; pointer-events: none; outline: 2px dashed var(--accent); background: var(--accent-soft); opacity: .4; z-index: 2000; }
+.toolbar-dragging { opacity: .85; }
 .group-disabled {
   opacity: 0.4;
   pointer-events: none;
@@ -349,6 +594,11 @@ select:focus {
 .anchor button.on {
   background: var(--accent);
   border-color: var(--accent);
+}
+/* Anker-Raster behalten die 9-px-Basis (kein 24-px-Touch-Minimum der Leisten-Views) */
+.toolbar-view .anchor button {
+  min-width: 0;
+  min-height: 0;
 }
 .toggle {
   border: 1px solid var(--line);
@@ -379,11 +629,10 @@ select:focus {
   background: var(--panel);
   border-right: 1px solid var(--line);
   display: flex;
-  flex-direction: column;
-  align-items: center;
   padding: 4px 0;
   gap: 2px;
 }
+#tools:not(.toolbar-layout-shell) { flex-direction: column; align-items: center; }
 #tools .sep {
   width: 24px;
   height: 1px;
@@ -2240,21 +2489,26 @@ body.dock-resizing #canvas {
   font: inherit;
   color: var(--icon);
 }
+.toolbar-view .ib.toolbar-text-align { width: 24px; height: 24px; }
+.toolbar-view[data-size='s'] .ib:not(.text),
 .bar[data-size='s'] .ib:not(.text),
 #tools[data-size='s'] .ib:not(.text) {
   width: 24px;
   height: 24px;
 }
+.toolbar-view[data-size='s'] .ib svg,
 .bar[data-size='s'] .ib svg,
 #tools[data-size='s'] .ib svg {
   width: 16px;
   height: 16px;
 }
+.toolbar-view[data-size='l'] .ib:not(.text),
 .bar[data-size='l'] .ib:not(.text),
 #tools[data-size='l'] .ib:not(.text) {
   width: 40px;
   height: 40px;
 }
+.toolbar-view[data-size='l'] .ib svg,
 .bar[data-size='l'] .ib svg,
 #tools[data-size='l'] .ib svg {
   width: 28px;
@@ -2338,13 +2592,18 @@ body.dock-resizing #canvas {
   opacity: 0.4;
   background: none;
 }
-/* Knopfgruppen in den Funktionsleisten: Hauptknopf + schmaler Pfeil */
-.ib-group {
+/* Knopfgruppen in den Funktionsleisten: Hauptknopf + überlagerter Eck-Pfeil
+   (einheitlich für alle Leisten, wie im VectorCraft-Vorbild) */.ib-group {
   display: inline-flex;
   align-items: stretch;
   flex: none;
+  position: relative;
 }
 .ib-more {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  height: 12px;
   width: 12px;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -2356,16 +2615,6 @@ body.dock-resizing #canvas {
 .ib-more:hover {
   background: var(--surface);
   border-color: var(--line);
-}
-#tools .ib-group {
-  position: relative;
-}
-#tools .ib-more {
-  position: absolute;
-  right: -4px;
-  bottom: 0;
-  height: 12px;
-  width: 12px;
 }
 .group-menu button {
   align-items: center;
@@ -2454,6 +2703,11 @@ body.dock-resizing #canvas {
 }
 .tb-row.drop-after {
   border-bottom-color: var(--accent);
+}
+/* Lesbare Mitglieder eingebauter Gruppen: Anzeige ohne Auswahl/Drag. */
+.tb-row.tb-readonly {
+  opacity: 0.8;
+  cursor: default;
 }
 .tb-icon {
   width: 22px;

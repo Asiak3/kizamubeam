@@ -4,6 +4,8 @@
   "author": "Hanjo Winter (https://github.com/negurvulkan)",
   "description": "Freie Laser-Software, angelehnt an die Bedienung von LightBurn (Prototyp)",
   "scripts": {
+    "test:toolbar-layout": "node scripts/run-ts.mjs scripts/toolbar-layout-test.ts && node scripts/run-ts.mjs scripts/toolbar-runtime-test.ts && node scripts/run-ts.mjs scripts/toolbar-legacy-test.ts && node scripts/toolbar-custom-bar-test.mjs",
+    "build:toolbar-fixtures": "node scripts/toolbar-renderer-browser-fixture.mjs && node scripts/toolbar-system-browser-fixture.mjs && node scripts/toolbar-controls-browser-fixture.mjs && node scripts/toolbar-flyout-browser-fixture.mjs && node scripts/toolbar-docking-browser-fixture.mjs && node scripts/toolbar-motion-browser-fixture.mjs",
     "test:freehand-edit": "node scripts/vector-offline-test.mjs scripts/freehand-edit-test.ts",
     "test:component-selection": "node scripts/vector-offline-test.mjs scripts/component-selection-test.ts",
     "test:curvature": "node scripts/vector-offline-test.mjs scripts/curvature-test.ts",

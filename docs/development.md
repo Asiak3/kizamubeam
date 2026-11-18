@@ -126,6 +126,15 @@ UI texts are written in German in the code inside `t('…')` (placeholders in cu
 
 Internally the editor works in mm with y pointing down; the display uses machine coordinates (origin at the bottom left).
 
+## Toolbar integration
+
+Use the native DOM [toolbar framework integration notes](toolbar-layout-core.md)
+for stable IDs, action/control factories, inline sections and detachable flyouts,
+shared feature state, lifecycle cleanup, layout operations and persistence.
+`src/toolbars.ts` is the app facade; `src/toolbars/` owns the common runtime,
+registry, renderer and docking implementation. Menus and panel docking remain
+separate. Typography PR #360 is independent, not a toolbar dependency.
+
 ## Generators
 
 A generator declares everything the app needs to know about it on its `Generator` object (`src/generators/types.ts`); the core never branches on generator ids (issue #341, checked by `npm run test:gen-decoupling`):

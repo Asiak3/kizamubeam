@@ -30,7 +30,18 @@ The dividers between windows can be dragged. ▾ or a double-click on a header c
 
 ## Toolbars
 
-**Window → Toolbars** (or a right-click on the main or tools toolbar) customizes the toolbars: add actions from every area, remove them, reorder them by dragging, insert separators and choose the icon size. Button groups (zoom, mirror and rotate, align, Boolean operations, path tools, arrays) take one slot: the button runs the action you chose last, the ▾ next to it shows all of them. **Restore defaults** resets a toolbar.
+Open **Window → Toolbars**, or right-click a toolbar shell, to customize the existing toolbars: add or remove available items, reorder them, insert separators and choose the icon size. The Numeric Edits and Text toolbars also use this layout system; their fields still edit the same feature values.
+
+Drag a toolbar's grip to move it, dock it at any of the four edges or float it inside the app. The edge determines its orientation: horizontal at the top/bottom, vertical at the sides. Floating bars keep their last orientation. Drop near a row boundary to insert a new row between existing rows. Adjust the number of rows or columns inside a bar in the customizer; content that does not fit scrolls internally. Other bars and the workspace settle over 150 ms, unless reduced motion is enabled.
+
+Button groups take one slot. Click the primary button to use the current action; open the group with ▾, a right-click or a **350 ms hold** on the primary button. Drag the open group's grip to detach it. The detached group and its source share the current choice; opening it again raises the existing detached group. Its **×** returns it to the source toolbar. Hiding the source toolbar also hides its detached groups; showing it restores them.
+
+**Lock toolbar layout** prevents layout changes and is saved globally (off by default). A completed drop is saved immediately. **Esc**, loss of window focus or pointer cancellation cancels a move or tear-off without saving it.
+
+- **Reset toolbar layout** restores positions, orientation, rows/columns and visibility and returns detached groups, keeping contents and icon sizes. It does not delete numeric, text or other feature values.
+- **Reset all contents** restores built-in contents and group choices, preserving custom bars/groups, positions and icon sizes. **Restore defaults** restores the selected toolbar's contents and its built-in groups' original members. Shared groups update in every toolbar that uses them.
+
+Create, rename or delete your own bars in the customizer; built-in bars cannot be deleted. Indent an action under the preceding action to create a flat button group. Built-in and custom groups support the same member editing: add/remove, indent/outdent and reorder. Feature-control sections are not action groups. Floating toolbars stay inside the app, not in separate OS windows. Workspace profiles and icon/font redesign are not included.
 
 **Window → Reset Windows and Toolbars** brings back the initial layout.
 

@@ -126,6 +126,16 @@ Texte stehen im Code auf Deutsch in `t('…')` (Platzhalter in geschweiften Klam
 
 Intern rechnet der Editor in mm mit y nach unten; angezeigt wird in Maschinenkoordinaten (Ursprung unten links).
 
+## Integration von Funktionsleisten
+
+Die technischen [Integrationshinweise zum Leistenframework](toolbar-layout-core.md)
+beschreiben stabile IDs, Aktions-/Control-Factories, sichtbare Abschnitte und
+ablösbare Gruppen, gemeinsame Funktionswerte, Lebenszyklus und Aufräumen sowie
+Layoutoperationen und Speicherung mit nativen DOM-APIs. `src/toolbars.ts` ist die
+App-Fassade; `src/toolbars/` enthält gemeinsame Laufzeit, Registry, Renderer und
+Andocklogik. Menüs und das Andocken von Fenstern bleiben getrennt. Typografie-PR
+#360 ist unabhängig und keine Voraussetzung für die Leistenintegration.
+
 ## Generatoren
 
 Ein Generator gibt alles, was die App über ihn wissen muss, an seinem `Generator`-Objekt an (`src/generators/types.ts`); der Kern verzweigt nie nach Generator-Kennungen (Issue #341, geprüft mit `npm run test:gen-decoupling`):

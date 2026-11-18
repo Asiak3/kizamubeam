@@ -190,6 +190,13 @@ const listListeners: (() => void)[] = [];
 /** Wird aufgerufen, wenn Schriften dazukommen oder entfernt werden (Font-Manager) */
 export function onFontListChanged(cb: () => void) {
   listListeners.push(cb);
+  let active = true;
+  return () => {
+    if (!active) return;
+    active = false;
+    const index = listListeners.indexOf(cb);
+    if (index !== -1) listListeners.splice(index, 1);
+  };
 }
 
 /**

@@ -4,19 +4,15 @@ import { canEnterIsolation } from './isolation';
 import { Editor, Tool } from './editor';
 import { initSync, openSyncDialog } from './syncDialog';
 import type { CornerMode } from './corners';
-import { ICONS } from './icons';
-import { ImageAdjust, ImageShape, Layer, layerLabel, Obj, ObjBindKey, pageName, PALETTE, SubPath, TextShape, BarcodeShape, GenShape } from './model';
-import { evaluate, formatNumber, namesIn } from './params';
+import { ImageAdjust, ImageShape, Layer, layerLabel, Obj, pageName, PALETTE, SubPath } from './model';
 import { deletePreset, loadPresets, presetOutput, savePreset } from './imagePresets';
 import { openFillDialog, openSaveTemplateDialog, openSeriesDialog, openTemplateLibrary } from './templateDialogs';
 import { exportDxf, exportPdf, exportSvg, importFile, installDropAndPaste, openProject, saveProcessedBitmap, saveProject } from './files';
 import { onMeshReady } from './model3d/store';
 import { onImageResourceReady } from './plugins/imageResource';
-import { assetImage, displayCanvas, onImageReady, outputGrid } from './images';
-import { onFontListChanged, refreshFonts, requestLocalFonts, systemFonts } from './fonts';
+import { assetImage, displayCanvas, onImageReady } from './images';
 import { openFontManager } from './fontManager';
-import { createFontPicker } from './fontPicker';
-import { $, evalExpr, f2, h, iconBtn, numInput, sep, setIcon, setVal } from './dom';
+import { $, evalExpr, h, numInput } from './dom';
 import { openCircularArrayDialog, openGridArrayDialog } from './arrayDialogs';
 import { openNestDialog } from './nestDialog';
 import { openWorkpieceDialog } from './workpieceDialog';
@@ -37,10 +33,9 @@ import { installEditorContext } from './editorContext';
 import { commandKey, commandMatches } from './commandKeys';
 import { openQrDialog, openVarTextDialog } from './qrDialog';
 import { openBarcodeDialog } from './barcodeDialog';
-import { LINEAR_NAMES } from './barcode1d';
 import { askGenConvert, openGenDialog } from './generators/dialog';
 import { assignLayerAsk, needsChildLayersQuestion } from './layerAssign';
-import { GENERATORS, genLabel, getGenerator } from './generators';
+import { GENERATORS } from './generators';
 import { maybeOfferSetup, openSetupWizard } from './setupWizard';
 import { maybeCheckForUpdates, nightlyBuild, nightlyWarning, openUpdateDialog } from './updateDialog';
 import { openPacksDialog } from './packsDialog';
@@ -73,42 +68,17 @@ import { buildAppsPanel, openAppsPanel } from './appsPanel';
 import { installSketchPanel } from './sketchPanel';
 import { isSketchObj } from './editor/sketch';
 import { loadRightPan } from './editor/pointer';
-import { shaperName } from './editor/shaper';
-import type { ShaperKind } from './shaper';
 import { dockWindow, initDock, isHidden, resetLayout, toggleWindow, showWindow, windowList } from './dock';
 
 import { REL_HINTS, REL_LABELS, REL_MODES, RelMode } from './relations';
-import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, showAllBars, toggleBar } from './toolbars';
+import { Action, BarKey, barNames, initToolbars, isBarHidden, openToolbarDialog, refreshBars, SEP, setToolbarControls, showAllBars, toggleBar } from './toolbars';
+import { bindEditorToolbarDialogs, createEditorToolbarControls } from './toolbars/controls';
 import { dec, LangPref, langPref, LANGUAGES, setLangPref, t, tn } from './i18n';
 import { version as APP_VERSION } from '../package.json';
 import symbolLight from './assets/brand/symbol-64.png';
 import symbolDark from './assets/brand/symbol-64-dark.png';
 import logoLight from './assets/brand/logo-stacked.png';
 import logoDark from './assets/brand/logo-stacked-dark.png';
-
-const FONT_CANDIDATES = [
-  'Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Segoe UI', 'Calibri', 'Times New Roman', 'Georgia',
-  'Garamond', 'Courier New', 'Consolas', 'Impact', 'Comic Sans MS', 'DejaVu Sans', 'DejaVu Serif', 'DejaVu Sans Mono',
-  'Liberation Sans', 'Liberation Serif', 'Liberation Mono', 'Noto Sans', 'Noto Serif', 'Ubuntu', 'Cantarell',
-  'Roboto', 'Open Sans', 'Helvetica Neue', 'Menlo', 'Monaco', 'Avenir', 'Futura', 'Gill Sans',
-];
-
-function availableFonts(): string[] {
-  const c = document.createElement('canvas').getContext('2d')!;
-  const sample = 'abcdefghijklmnopqrstuvwxyzWMI0123456789';
-  const widths = (fb: string) => {
-    c.font = `40px ${fb}`;
-    return c.measureText(sample).width;
-  };
-  const base = { monospace: widths('monospace'), serif: widths('serif'), 'sans-serif': widths('sans-serif') };
-  const found = FONT_CANDIDATES.filter((f) =>
-    (Object.keys(base) as (keyof typeof base)[]).some((fb) => {
-      c.font = `40px "${f}", ${fb}`;
-      return c.measureText(sample).width !== base[fb];
-    }),
-  );
-  return [...found, 'sans-serif', 'serif', 'monospace'];
-}
 
 // ======================================================================
 
@@ -160,8 +130,11 @@ export function buildUI(ed: Editor) {
   initTheme(ed);
   dockWindow('cuts', t('Schnitte / Layer'), { bodyId: 'layers' });
   dockWindow('objects', t('Objekte'), { bodyId: 'objects' });
+  bindEditorToolbarDialogs(ed, {
+    corner: () => openCornerDialog(ed), adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed),
+  });
+  setToolbarControls(createEditorToolbarControls(ed, refreshBars));
   buildBars(ed);
-  buildNumbar(ed);
   buildLayers(ed);
   const contextCallbacks = {
     adjust: () => openAdjustDialog(ed), trace: () => openTraceDialog(ed), background: () => openBackgroundDialog(ed),
@@ -639,424 +612,6 @@ function showHelp() {
 }
 
 // ---------- Numerik- und Formleiste, Textleiste ----------
-
-function buildNumbar(ed: Editor) {
-  const bar = $('#numbar');
-  let ax = 0.5,
-    ay = 0.5,
-    lock = true;
-  const bed = () => ed.doc.bed;
-  // Formeln mit Projekt-Parametern: statt einer Zahl z. B. „Breite + 10“ eintragen (nur bei einem Objekt)
-  const single = () => (ed.sel.length === 1 ? ed.sel[0] : null);
-  const say = (msg: string) => ((ed.hint = msg), ed.emit('tool'));
-  const formula = (key: ObjBindKey) => (src: string): boolean => {
-    const o = single();
-    if (!src) {
-      if (!o?.bind?.[key]) return false;
-      ed.setObjBind(o, key, '');
-      return true;
-    }
-    if (!namesIn(src).length) return false;
-    if (!o) return say(t('Formeln gehen nur bei einem einzelnen Objekt. Mehrere Objekte vorher gruppieren.')), false;
-    if ((key === 'w' || key === 'h') && o.shape.kind === 'gen') return say(t('Die Größe parametrischer Bauteile kommt aus ihren Parametern; dort eine Formel eintragen.')), false;
-    const issues = ed.setObjBind(o, key, src, { anchor: [ax, ay], lock });
-    say(issues.length ? issues.map((i) => i.msg).join('; ') : t('Formel gesetzt: ändert sich ein Parameter, wird der Wert neu berechnet. Eine Zahl eintragen löst die Formel.'));
-    return true;
-  };
-  /** Feld mit Formel: Eine eingetippte Zahl löst die Formel (nach dem Undo-Schritt der Änderung) */
-  const plain = (keys: ObjBindKey[], f: (v: number) => void) => (v: number) => {
-    f(v);
-    ed.dropObjBind(ed.sel, keys);
-    refresh();
-  };
-  const bindField = (el: HTMLInputElement, key: ObjBindKey, fallback: string, objOk: (o: Obj) => boolean = () => true) => {
-    const o = single();
-    const src = o && objOk(o) ? o.bind?.[key] : undefined;
-    el.classList.toggle('bound', !!src);
-    if (!el.dataset.title) el.dataset.title = el.title;
-    if (src) {
-      setVal(el, src);
-      let v = '';
-      try {
-        const r = evaluate(src);
-        v = typeof r === 'number' ? formatNumber(r) : String(r);
-      } catch (e) {
-        v = e instanceof Error ? e.message : String(e);
-      }
-      el.title = `${el.dataset.title}\n${t('Formel: {src} = {v}', { src, v })}`;
-    } else {
-      setVal(el, fallback);
-      el.title = el.dataset.title;
-    }
-  };
-  const fx = numInput('num', plain(['x'], (v) => ed.setSelBox({ x: v }, ax, ay, lock)), t('X-Position (mm)'), formula('x'));
-  const fy = numInput('num', plain(['y'], (v) => ed.setSelBox({ y: bed().h - v }, ax, ay, lock)), t('Y-Position (mm, Ursprung unten links)'), formula('y'));
-  const fw = numInput('num', plain(['w', 'h'], (v) => ed.setSelBox({ w: v }, ax, ay, lock)), t('Breite (mm)'), formula('w'));
-  const fh = numInput('num', plain(['w', 'h'], (v) => ed.setSelBox({ h: v }, ax, ay, lock)), t('Höhe (mm)'), formula('h'));
-  const fwp = numInput('small', (v) => {
-    const b = ed.selBounds();
-    if (b) ed.setSelBox({ w: (b.w * v) / 100 }, ax, ay, lock);
-  }, t('Breite in %'));
-  const fhp = numInput('small', (v) => {
-    const b = ed.selBounds();
-    if (b) ed.setSelBox({ h: (b.h * v) / 100 }, ax, ay, lock);
-  }, t('Höhe in %'));
-  const currentRot = () => {
-    if (ed.sel.length !== 1) return 0;
-    const m = ed.sel[0].m;
-    return (-Math.atan2(m[1], m[0]) * 180) / Math.PI;
-  };
-  const fr = numInput('small', plain(['rot'], (v) => {
-    const b = ed.selBounds();
-    if (!b) return;
-    ed.rotateBy(v - currentRot(), { x: b.x + ax * b.w, y: b.y + ay * b.h });
-  }), t('Drehung in Grad (gegen den Uhrzeigersinn)'), formula('rot'));
-  const lockBtn = h('button', { class: 'ib on', title: t('Seitenverhältnis sperren'), icon: 'lock' });
-  lockBtn.addEventListener('click', () => {
-    lock = !lock;
-    lockBtn.classList.toggle('on', lock);
-    setIcon(lockBtn, lock ? 'lock' : 'unlock');
-  });
-  const anchor = h('div', { class: 'anchor', title: t('Bezugspunkt') });
-  const anchorBtns: HTMLButtonElement[] = [];
-  for (let r = 0; r < 3; r++)
-    for (let c = 0; c < 3; c++) {
-      const b = h('button', {
-        onclick: () => {
-          ax = c / 2;
-          ay = r / 2;
-          anchorBtns.forEach((x) => x.classList.remove('on'));
-          b.classList.add('on');
-          refresh();
-        },
-      });
-      if (r === 1 && c === 1) b.classList.add('on');
-      anchorBtns.push(b);
-      anchor.append(b);
-    }
-  const geo = h(
-    'div',
-    { class: 'field' },
-    h('label', {}, 'X', fx), h('label', {}, 'Y', fy), anchor,
-    h('label', {}, t('B'), fw), h('label', {}, t('H'), fh), lockBtn,
-    h('label', {}, fwp, '%'), h('label', {}, fhp, '%'),
-    h('label', {}, '↻', fr, '°'), h('span', { class: 'toggle', title: t('Einheit') }, 'mm'),
-  );
-
-  // Formeigenschaften
-  const fRad = numInput('small', plain(['r'], (v) => ed.updateShapes('rect', { r: Math.max(0, v) })), t('Eckenradius (mm)'), formula('r'));
-  const fSides = numInput('small', plain(['sides'], (v) => ed.updateShapes('polygon', { sides: Math.max(3, Math.min(64, Math.round(v))) })), t('Anzahl Ecken'), formula('sides'));
-  const starBtn = h('button', { class: 'toggle', title: t('Stern') }, t('Stern'));
-  starBtn.addEventListener('click', () => ed.updateShapes('polygon', { star: !starBtn.classList.contains('on') }));
-  const rectProps = h('label', {}, t('Radius'), fRad);
-  const polyProps = h('span', { class: 'field' }, h('label', {}, t('Ecken'), fSides), starBtn);
-
-  // Text — Schriften-Dropdown mit Hover-Vorschau (Prototyp, siehe fontPicker.ts)
-  let fontNames = availableFonts();
-  const fontPicker = createFontPicker(ed, {
-    initial: fontNames,
-    current: () => {
-      const ts = ed.selTexts();
-      return ts.length ? (ts[0].shape as TextShape).font : ed.textDefaults.font;
-    },
-    commit: (family) => {
-      ed.updateTexts({ font: family });
-      // Browser: beim Schriftwechsel einmalig den Zugriff auf lokale Schriften anfordern (Nutzer-Geste).
-      // Wird er erteilt, lädt refreshFonts() alles, wofür bisher Roboto eingesprungen ist, mit echten Binaries neu.
-      void requestLocalFonts().then((ok) => {
-        if (ok) refreshFonts();
-      });
-    },
-    openManager: () => void openFontManager(ed),
-  });
-  const fontSel = fontPicker.el;
-  const loadFontList = () =>
-    systemFonts().then((list) => {
-      if (list?.length) fontNames = list;
-      fontPicker.rebuild(fontNames);
-    });
-  void loadFontList();
-  onFontListChanged(() => void loadFontList());
-  const fSize = numInput('small', plain(['size'], (v) => v > 0 && ed.updateTexts({ size: v })), t('Schriftgröße (mm)'), formula('size'));
-  const fHs = numInput('small', (v) => ed.updateTexts({ hSpace: v }), t('Zeichenabstand (mm)'));
-  const fVs = numInput('small', (v) => ed.updateTexts({ vSpace: v }), t('Zeilenabstand (mm)'));
-  const tog = (label: string, key: 'bold' | 'italic' | 'upper', title: string) => {
-    const b = h('button', { class: 'toggle', title }, label);
-    b.addEventListener('click', () => ed.updateTexts({ [key]: !b.classList.contains('on') } as Partial<TextShape>));
-    return b;
-  };
-  const bBold = tog(t('F'), 'bold', t('Fett'));
-  bBold.style.fontWeight = '700';
-  const bItal = tog(t('K'), 'italic', t('Kursiv'));
-  bItal.style.fontStyle = 'italic';
-  const bUp = tog('AB', 'upper', t('Großbuchstaben'));
-  const alignBtns = (['left', 'center', 'right'] as const).map((a) => {
-    const b = iconBtn(a === 'left' ? 'alignTextL' : a === 'center' ? 'alignTextC' : 'alignTextR', a === 'left' ? t('Ausrichtung links') : a === 'center' ? t('Ausrichtung mittig') : t('Ausrichtung rechts'), () => ed.updateTexts({ align: a }));
-    b.style.width = b.style.height = '24px';
-    b.dataset.align = a;
-    return b;
-  });
-  const bWeld = h('button', { class: 'toggle', title: t('Buchstaben schweißen: überlappende Zeichen zu einer Kontur verschmelzen') }, t('Schweißen'));
-  bWeld.addEventListener('click', () => ed.updateTexts({ weld: !bWeld.classList.contains('on') }));
-  // Text auf Pfad
-  const bOnPath = h('button', { class: 'toggle', title: t('Text folgt der gewählten Form (Text und eine Form auswählen)') }, t('Auf Pfad'));
-  bOnPath.addEventListener('click', () => ed.applyPathToText());
-  const fPOff = numInput('small', (v) => ed.updateTextPath({ offset: v }), t('Verschiebung entlang der Kurve (mm)'));
-  const fPDist = numInput('small', (v) => ed.updateTextPath({ dist: v }), t('Abstand der Grundlinie zur Kurve (mm)'));
-  const bPFlip = h('button', { class: 'toggle', title: t('Text auf die andere Seite der Kurve legen') }, t('Seite|Text auf Pfad'));
-  bPFlip.addEventListener('click', () => ed.updateTextPath({ flip: !bPFlip.classList.contains('on') }));
-  const bPOff = h('button', { class: 'toggle', title: t('Text wieder gerade setzen') }, t('Lösen'));
-  bPOff.addEventListener('click', () => ed.removePathFromText());
-  // Variabler Text und Höchstbreite
-  const bVar = h('button', { class: 'toggle', title: t('Variabler Text: Platzhalter wie %# (Seriennummer), %Y (Jahr) oder %0 (CSV-Spalte) ersetzen') }, t('Variabel'));
-  bVar.addEventListener('click', () => {
-    const on = !bVar.classList.contains('on');
-    ed.updateTexts({ vt: on ? { offset: 0 } : undefined });
-    if (on && !ed.selTexts().some((o) => /%/.test((o.shape as TextShape).text)))
-      (ed.hint = t('Variabler Text an. Platzhalter wie %# in den Text schreiben; Übersicht unter „Variabler Text …“.')), ed.emit('tool');
-  });
-  const fVtOff = numInput('small', (v) => ed.updateTexts({ vt: { offset: Math.round(v) } }), t('Versatz: wird zur aktuellen Nummer addiert'));
-  const bVtDlg = h('button', { class: 'toggle', title: t('Nummer, CSV-Datei und Platzhalter'), onclick: () => openVarTextDialog(ed) }, '…');
-  const vtProps = h('span', { class: 'field' }, h('label', {}, t('Versatz|Variabler Text'), fVtOff), bVtDlg);
-  const fMaxW = numInput('small', plain(['maxW'], (v) => ed.updateTexts({ maxW: Math.max(0, v) })), t('Höchstbreite (mm): breitere Zeilen werden gestaucht (mit „Verkleinern“ verkleinert, mit „Umbrechen“ umbrochen), 0 = aus'), formula('maxW'));
-  const fMaxH = numInput('small', plain(['maxH'], (v) => ed.updateTexts({ maxH: Math.max(0, v) })), t('Höchsthöhe (mm): ein höherer Textblock wird gleichmäßig verkleinert, 0 = aus'), formula('maxH'));
-  const bShrink = h('button', { class: 'toggle', title: t('Text in Rahmen einpassen: zu breiten Text gleichmäßig verkleinern statt stauchen') }, t('Verkleinern|Text einpassen'));
-  bShrink.addEventListener('click', () => ed.updateTexts({ fit: bShrink.classList.contains('on') ? undefined : 'shrink' }));
-  const bWrap = h('button', { class: 'toggle', title: t('Textrahmen: Zeilen an der Max. Breite umbrechen, die Höhe wächst mit (Rahmen auch mit dem Textwerkzeug aufziehen)') }, t('Umbrechen|Textrahmen'));
-  bWrap.addEventListener('click', () => ed.toggleTextWrap());
-  const pathProps = h('span', { class: 'field' }, h('label', {}, t('Versatz'), fPOff), h('label', {}, t('Abstand|Text auf Pfad'), fPDist), bPFlip, bPOff);
-  const textProps = h(
-    'div',
-    { class: 'field' },
-    h('span', { icon: 'text', class: 'icon-inline', style: 'color: var(--muted)', title: t('Textleiste') }),
-    h('label', {}, t('Schrift'), fontSel), h('label', {}, t('Höhe'), fSize), bBold, bItal, bUp, ...alignBtns, sep(),
-    h('label', {}, t('Abst. H'), fHs), h('label', {}, 'V', fVs), sep(),
-    h('label', {}, t('Max. Breite'), fMaxW), h('label', {}, t('Max. Höhe'), fMaxH), bShrink, bWrap, sep(),
-    bWeld, bOnPath, pathProps, bVar, vtProps,
-  );
-
-  // Knotenbearbeitung
-  const nodeBtn = (label: string, title: string, f: () => void) => h('button', { class: 'toggle', title, onclick: f }, label);
-  const nodeInfo = h('span', { class: 'muted' });
-  const nodeLassoButton=nodeBtn(t('Knoten-Lasso'),t('Lasso statt Rahmen für Knoten und Anfasser; Alt zieht auch direkt über einer Komponente'),()=>{ed.nodeLasso=!ed.nodeLasso;ed.emit('tool');});
-  const nodeProps = h(
-    'div',
-    { class: 'field' },
-    nodeInfo,
-    nodeLassoButton,
-    nodeBtn(t('Gerade'), t('Segmente zwischen den ausgewählten Knoten in Geraden umwandeln (L)'), () => ed.setSegmentType(false)),
-    nodeBtn(t('Kurve'), t('Segmente zwischen den ausgewählten Knoten in Kurven umwandeln (C)'), () => ed.setSegmentType(true)),
-    nodeBtn(t('Ecke'), t('Ausgewählte Knoten zu Ecken machen, Anfasser entfernen (E)'), () => ed.setNodeType(false)),
-    nodeBtn(t('Glatt'), t('Ausgewählte Knoten glätten (S)'), () => ed.setNodeType(true)),
-    nodeBtn(t('Löschen'), t('Ausgewählte Knoten löschen (Entf)'), () => ed.deleteNodes()),
-    nodeBtn(t('Ecken …'), t('Ausgewählte Ecken runden, innen runden oder fasen'), () => openCornerDialog(ed)),
-  );
-  const sepNode = sep();
-  const pencilTolerance = h('input', { type: 'number', min: 0.001, max: 100, step: 0.01, value: String(ed.pencilTolerance),
-    'aria-label': t('Freihandtoleranz in Millimetern'), style: 'width: 7ch' });
-  pencilTolerance.addEventListener('change', () => {
-    const v = pencilTolerance.valueAsNumber;
-    if (Number.isFinite(v) && v >= 0.001 && v <= 100) ed.pencilTolerance = v;
-    else pencilTolerance.value = String(ed.pencilTolerance);
-  });
-  const pencilClosed = h('input', { type: 'checkbox' });
-  pencilClosed.addEventListener('change', () => { ed.pencilClosed = pencilClosed.checked; });
-  const pencilProps = h('span', { class: 'field' }, h('label', {}, t('Anpassungstoleranz (mm)'), pencilTolerance),
-    h('label', { class: 'check' }, pencilClosed, t('Geschlossener Pfad')));
-
-  // Bogen: Modus und Richtung (natives Auswahlfeld: Tastatur und Fokus inklusive)
-  const arcModeSel = h('select', {
-    id: 'arc-mode', title: t('Modus: Mitte–Radius–Winkel oder drei Punkte'),
-    onchange: () => ed.setArcOptions({ mode: arcModeSel.value === '3point' ? '3point' : 'center' }),
-  }, h('option', { value: 'center' }, t('Mitte–Radius–Winkel')), h('option', { value: '3point' }, t('3-Punkt')));
-  const arcDirSel = h('select', {
-    id: 'arc-direction', title: t('Richtung: wählt im Mitte-Modus den Komplementärbogen, im 3-Punkt-Modus kehrt sie die Knotenreihenfolge um'),
-    onchange: () => ed.setArcOptions({ cw: arcDirSel.value === 'cw' }),
-  }, h('option', { value: 'ccw' }, t('Gegen den Uhrzeigersinn')), h('option', { value: 'cw' }, t('Im Uhrzeigersinn')));
-  const arcProps = h('span', { class: 'field', id: 'arcbar' },
-    h('label', {}, t('Bogen'), arcModeSel),
-    h('label', {}, t('Richtung'), arcDirSel));
-  const shaperRecognize = h('input', { type: 'checkbox' });
-  shaperRecognize.checked = ed.shaperRecognize;
-  shaperRecognize.addEventListener('change', () => { ed.shaperRecognize = shaperRecognize.checked; ed.shaperRebuild(); });
-  // Zahlenfeld, das die letzte Operation sofort neu berechnet
-  const shaperNum = (get: () => number, min: number, max: number, aria: string, set: (v: number) => void) => {
-    const input = h('input', { type: 'number', min, max, step: 0.1, value: String(get()), 'aria-label': aria, style: 'width: 7ch' });
-    input.addEventListener('change', () => {
-      const v = input.valueAsNumber;
-      if (Number.isFinite(v) && v >= min && v <= max) { set(v); ed.shaperRebuild(); }
-      else input.value = String(get());
-    });
-    return input;
-  };
-  const shaperClose = shaperNum(() => ed.shaperCloseGap, 0.2, 20, t('Schließabstand in Millimetern'), (v) => (ed.shaperCloseGap = v));
-  const shaperSmooth = shaperNum(() => ed.shaperSmoothing, 0, 20, t('Glättung in Millimetern'), (v) => (ed.shaperSmoothing = v));
-  const shaperTolerance = shaperNum(() => ed.shaperTolerance, 0.2, 20, t('Schnittbreite in Millimetern'), (v) => (ed.shaperTolerance = v));
-  const shaperPick = h('select', { 'aria-label': t('Formvorschlag der letzten Geste') });
-  shaperPick.addEventListener('change', () => {
-    const s = ed.shaperEdit;
-    if (!s) return;
-    s.pick = shaperPick.value as ShaperKind | 'freehand';
-    ed.shaperRebuild();
-  });
-  const shaperProps = h('span', { class: 'field' }, h('label', { class: 'check' }, shaperRecognize, t('Form erkennen')),
-    h('label', {}, t('Schließen (mm)'), shaperClose),
-    h('label', {}, t('Glättung (mm)'), shaperSmooth),
-    h('label', {}, t('Schnittbreite (mm)'), shaperTolerance),
-    shaperPick);
-
-  // Bilder
-  const imgInfo = h('span', { class: 'muted' });
-  const imgProps = h(
-    'div',
-    { class: 'field' },
-    h('span', { icon: 'image', class: 'muted icon-inline' }), imgInfo,
-    h('button', { class: 'toggle', title: t('Helligkeit, Kontrast, Gamma, Schärfen, Bildmodus'), onclick: () => openAdjustDialog(ed) }, t('Anpassen …')),
-    h('button', { class: 'toggle', title: t('Bild in Vektoren umwandeln (Alt+T)'), onclick: () => openTraceDialog(ed) }, t('Nachzeichnen …')),
-    h('button', { class: 'toggle', title: t('Hintergrund freistellen: ähnliche Farben werden transparent und nicht gelasert'), onclick: () => openBackgroundDialog(ed) }, t('Freistellen …')),
-  );
-  // Zuschneiden und Maske: nur sichtbar, wenn neben einem Bild auch Formen gewählt sind
-  const cropBtns = [
-    h('button', { class: 'toggle', title: t('Bild auf den Rahmen der gewählten Form zuschneiden'), onclick: () => ed.cropImageSel(false) }, t('Zuschneiden')),
-    h('button', { class: 'toggle', title: t('Nur das Innere der gewählten geschlossenen Formen vom Bild behalten'), onclick: () => ed.cropImageSel(true) }, t('Maske')),
-  ];
-  imgProps.append(...cropBtns);
-  const sepImg = sep();
-
-  // QR-Codes
-  const qrInfo = h('span', { class: 'muted' });
-  const qrProps = h('div', { class: 'field' },
-    h('span', { icon: 'qr', class: 'muted icon-inline' }), qrInfo,
-    h('button', { class: 'toggle', title: t('Inhalt, Größe und Einstellungen ändern (Doppelklick)'), onclick: () => ed.selBarcodes()[0] && editBarcode(ed, ed.selBarcodes()[0]) }, t('Bearbeiten …')),
-  );
-  const sepQr = sep();
-
-  // Parametrische Bauteile
-  const genInfo = h('span', { class: 'muted' });
-  const genIcon = h('span', { icon: 'gear', class: 'muted icon-inline' });
-  const genProps = h('div', { class: 'field' },
-    genIcon, genInfo,
-    h('button', { class: 'toggle', title: t('Parameter ändern, die Kontur wird neu berechnet (Doppelklick)'), onclick: () => ed.selGens()[0] && ed.onGenEdit?.(ed.selGens()[0]) }, t('Parameter …')),
-    h('button', { class: 'toggle', title: t('In gewöhnliche Pfade umwandeln; die Parameter gehen verloren (Ctrl+Shift+C)'), onclick: () => ed.convertSelToPath() }, t('In Pfade umwandeln')),
-  );
-  const sepGen = sep();
-
-  const sepShape = sep();
-  bar.append(geo, pencilProps, arcProps, shaperProps, sepNode, nodeProps, sepImg, imgProps, sepQr, qrProps, sepGen, genProps, sepShape, rectProps, polyProps);
-  // Text options get their own bar below the properties bar (can be hidden in the Window menu)
-  $('#textbar').append(textProps);
-
-  const refresh = () => {
-    const b = ed.selBounds();
-    geo.classList.toggle('group-disabled', !b);
-    if (b) {
-      bindField(fx, 'x', f2(b.x + ax * b.w));
-      bindField(fy, 'y', f2(bed().h - (b.y + ay * b.h)));
-      bindField(fw, 'w', f2(b.w));
-      bindField(fh, 'h', f2(b.h));
-      setVal(fwp, '100');
-      setVal(fhp, '100');
-      bindField(fr, 'rot', f2(currentRot()));
-    } else [fx, fy, fw, fh, fwp, fhp, fr].forEach((f) => setVal(f, ''));
-
-    nodeProps.hidden = sepNode.hidden = ed.tool !== 'node';
-    pencilProps.hidden = ed.tool !== 'pencil';
-    arcProps.hidden = ed.tool !== 'arc';
-    arcModeSel.value = ed.arcMode;
-    arcDirSel.value = ed.arcCw ? 'cw' : 'ccw';
-    shaperProps.hidden = ed.tool !== 'shaper';
-    shaperClose.value = String(ed.shaperCloseGap);
-    shaperSmooth.value = String(ed.shaperSmoothing);
-    shaperTolerance.value = String(ed.shaperTolerance);
-    const sk = ed.shaperEditValid() ? ed.shaperEdit : null;
-    shaperPick.hidden = !sk || sk.op === 'union' || sk.op === 'subtract';
-    if (sk && !shaperPick.hidden) {
-      const key = [...sk.cands.map((c) => `${c.kind}:${shaperName(c)}`), 'freehand'].join('|');
-      if (shaperPick.dataset.key !== key) {
-        shaperPick.replaceChildren(
-          ...sk.cands.map((c) => h('option', { value: c.kind }, shaperName(c))),
-          h('option', { value: 'freehand' }, t('Freihand')),
-        );
-        shaperPick.dataset.key = key;
-      }
-      if (shaperPick.value !== sk.pick) shaperPick.value = sk.pick;
-    }
-    nodeLassoButton.setAttribute('aria-pressed',String(ed.nodeLasso));nodeLassoButton.classList.toggle('active',ed.nodeLasso);
-    const imgs = ed.selImages();
-    imgProps.hidden = sepImg.hidden = !imgs.length;
-    const canCrop = imgs.length === 1 && ed.sel.length > 1;
-    cropBtns.forEach((b) => (b.hidden = !canCrop));
-    if (imgs.length) {
-      const o = imgs[0],
-        s = o.shape as ImageShape;
-      const L = ed.imgOutput(o.layer);
-      const g = outputGrid(s, o.m, L.interval);
-      imgInfo.textContent = imgs.length > 1 ? t('{n} Bilder', { n: imgs.length }) : t('{pxW} × {pxH} px → {cols} × {rows} Punkte ({dpi} DPI)', { pxW: s.pxW, pxH: s.pxH, cols: g.cols, rows: g.rows, dpi: Math.round(25.4 / L.interval) });
-    }
-    const qrs = ed.selBarcodes();
-    qrProps.hidden = sepQr.hidden = !qrs.length;
-    if (qrs.length) {
-      const q = qrs[0].shape as BarcodeShape;
-      qrInfo.textContent = qrs.length > 1 ? t('{n} Codes', { n: qrs.length }) : `${q.type === 'qr' ? t('QR-Code') : LINEAR_NAMES[q.type]}${q.vt ? ` (${t('variabel')})` : ''}`;
-    }
-    const gens = ed.selGens();
-    genProps.hidden = sepGen.hidden = !gens.length;
-    if (gens.length) {
-      const gs = gens[0].shape as GenShape;
-      genInfo.textContent = gens.length > 1 ? t('{n} Bauteile', { n: gens.length }) : genLabel(gs);
-      {
-        const gi = getGenerator(gs.gen)?.icon ?? '';
-        setIcon(genIcon, ICONS[gi] ? gi : 'gear');
-      }
-    }
-    const nn = ed.nodeSelCount;
-    const ns = ed.nodeTargets().reduce((n, o) => n + ed.segmentSelection(o).size, 0);
-    nodeInfo.textContent = [tn('{n} Knoten|one', '{n} Knoten', nn), tn('{n} Segment', '{n} Segmente', ns), tn('{n} Objekt', '{n} Objekte', ed.nodeTargets().length)].join(' · ');
-    nodeProps.classList.toggle('group-disabled', ed.tool === 'node' && !ed.sel.length);
-
-    const rect = ed.sel.find((o) => o.shape.kind === 'rect');
-    const poly = ed.sel.find((o) => o.shape.kind === 'polygon');
-    rectProps.hidden = !(rect || ed.tool === 'rect');
-    polyProps.hidden = !(poly || ed.tool === 'polygon');
-    sepShape.hidden = rectProps.hidden && polyProps.hidden;
-    bindField(fRad, 'r', f2(rect && rect.shape.kind === 'rect' ? rect.shape.r : ed.rectRadius), (o) => o.shape.kind === 'rect');
-    const pv = poly && poly.shape.kind === 'polygon' ? poly.shape : { sides: ed.polySides, star: ed.polyStar };
-    bindField(fSides, 'sides', String(pv.sides), (o) => o.shape.kind === 'polygon');
-    starBtn.classList.toggle('on', pv.star);
-
-    const ts = ed.selTexts();
-    const tx = ts.length ? (ts[0].shape as TextShape) : ed.textDefaults;
-    textProps.classList.toggle('group-disabled', !ts.length && ed.tool !== 'text');
-    fontPicker.sync(tx.font);
-    bindField(fSize, 'size', f2(tx.size), (o) => o.shape.kind === 'text');
-    setVal(fHs, f2(tx.hSpace));
-    setVal(fVs, f2(tx.vSpace));
-    bBold.classList.toggle('on', tx.bold);
-    bItal.classList.toggle('on', tx.italic);
-    bUp.classList.toggle('on', tx.upper);
-    alignBtns.forEach((b) => b.classList.toggle('on', b.dataset.align === tx.align));
-    bWeld.classList.toggle('on', !!tx.weld);
-    const tvt = ts.length ? (ts[0].shape as TextShape).vt : undefined;
-    bVar.classList.toggle('on', !!tvt);
-    bVar.hidden = vtProps.hidden = !ts.length;
-    vtProps.hidden = !tvt;
-    if (tvt) setVal(fVtOff, String(tvt.offset));
-    bindField(fMaxW, 'maxW', f2(ts.length ? (ts[0].shape as TextShape).maxW ?? 0 : 0), (o) => o.shape.kind === 'text');
-    bindField(fMaxH, 'maxH', f2(ts.length ? (ts[0].shape as TextShape).maxH ?? 0 : 0), (o) => o.shape.kind === 'text');
-    bShrink.classList.toggle('on', ts.length > 0 && (ts[0].shape as TextShape).fit === 'shrink');
-    bWrap.classList.toggle('on', ts.length > 0 && (ts[0].shape as TextShape).fit === 'wrap');
-    bOnPath.hidden = !ed.canApplyPathToText();
-    const tp = ts.length ? (ts[0].shape as TextShape).path : undefined;
-    pathProps.hidden = !tp;
-    if (tp) {
-      setVal(fPOff, f2(tp.offset));
-      setVal(fPDist, f2(tp.dist));
-      bPFlip.classList.toggle('on', tp.flip);
-    }
-  };
-  ed.on((w) => w !== 'view' && refresh());
-  refresh();
-}
 
 // ---------- Funktionsleisten (anpassbar, siehe toolbars.ts) ----------
 

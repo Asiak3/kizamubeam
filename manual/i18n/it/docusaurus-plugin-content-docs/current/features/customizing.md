@@ -30,7 +30,18 @@ I divisori tra le finestre si possono trascinare. ▾ o un doppio clic su un’i
 
 ## Barre degli strumenti
 
-**Finestra → Barre degli strumenti** (o un clic destro sulla barra principale o sulla barra Strumenti) personalizza le barre: aggiungi azioni da ogni area, rimuovile, riordinale trascinandole, inserisci separatori e scegli la dimensione delle icone. I gruppi di pulsanti (zoom, specchia e ruota, allinea, operazioni booleane, strumenti per i percorsi, array) occupano un solo posto: il pulsante esegue l’azione scelta per ultima, la ▾ accanto le mostra tutte. **Ripristina predefiniti** riporta una barra allo stato iniziale.
+Apri **Finestra → Barre degli strumenti**, oppure fai clic destro sulla cornice di una barra, per personalizzare le barre esistenti: aggiungi o rimuovi gli elementi disponibili, riordinali, inserisci separatori e scegli la dimensione delle icone. Anche le barre delle modifiche numeriche e del testo usano questo sistema di disposizione; i campi modificano sempre gli stessi valori delle funzioni.
+
+Trascina la maniglia di una barra per spostarla, agganciarla a uno dei quattro bordi o lasciarla libera dentro l'app. Il bordo determina l'orientamento: orizzontale in alto/in basso, verticale ai lati. Le barre libere mantengono l'ultimo orientamento. Rilascia vicino al confine tra due righe per inserire una nuova riga. Nella finestra di personalizzazione regola il numero di righe o colonne interne; il contenuto che non entra scorre internamente. Le altre barre e l'area di lavoro raggiungono la nuova posizione in 150 ms, salvo quando è attiva la riduzione del movimento.
+
+I gruppi di pulsanti occupano un posto. Il pulsante principale esegue l'azione corrente; apri il gruppo con ▾, clic destro o tenendo premuto il pulsante principale per **350 ms**. Trascina la maniglia del gruppo aperto per staccarlo. Il gruppo staccato e la sorgente condividono la scelta corrente; riaprirlo porta in primo piano il gruppo esistente. La sua **×** lo riporta nella barra sorgente. Nascondere la barra sorgente nasconde anche i gruppi staccati; mostrarla li ripristina.
+
+**Blocca disposizione delle barre** impedisce modifiche alla disposizione ed è salvato globalmente (disattivato all'inizio). Un rilascio completato viene salvato subito. **Esc**, perdita del focus della finestra o annullamento del puntatore annullano spostamento o distacco senza salvare.
+
+- **Ripristina disposizione delle barre** ripristina posizioni, orientamento, righe/colonne e visibilità e riporta i gruppi staccati alla sorgente, mantenendo contenuti e dimensioni delle icone. Non elimina i valori numerici, del testo o delle altre funzioni.
+- **Ripristina tutti i contenuti** ripristina contenuti integrati e scelte dei gruppi, mantenendo barre/gruppi personalizzati, posizioni e dimensioni delle icone. **Ripristina predefiniti** ripristina il contenuto della barra selezionata e i membri originali dei suoi gruppi integrati. I gruppi condivisi si aggiornano in tutte le barre che li usano.
+
+Nella finestra di personalizzazione puoi creare, rinominare o eliminare le tue barre; le barre integrate non sono eliminabili. Rientra un'azione sotto quella precedente per creare un gruppo di pulsanti piatto. I gruppi integrati e personalizzati consentono le stesse modifiche ai membri: aggiungere/rimuovere, rientrare/sporgere e riordinare. Le sezioni con campi delle funzioni non sono gruppi di azioni. Le barre libere restano dentro l'app, non in finestre separate del sistema operativo. Non sono inclusi profili dell'area di lavoro né una riprogettazione di icone o font.
 
 **Finestra → Ripristina finestre e barre degli strumenti** ripristina la disposizione iniziale.
 

@@ -30,7 +30,18 @@ Die Trennlinien zwischen Fenstern lassen sich ziehen. ▾ oder ein Doppelklick a
 
 ## Funktionsleisten
 
-**Fenster → Funktionsleisten** (oder ein Rechtsklick auf die Haupt- oder Werkzeugleiste) passt die Leisten an: Aktionen aus allen Bereichen hinzufügen, entfernen, durch Ziehen umsortieren, Trennlinien einfügen und die Symbolgröße wählen. Schaltflächengruppen (Zoom, Spiegeln und Drehen, Ausrichten, boolesche Operationen, Pfadwerkzeuge, Arrays) belegen einen Platz: Die Schaltfläche führt die zuletzt gewählte Aktion aus, das ▾ daneben zeigt alle. **Standard wiederherstellen** setzt eine Leiste zurück.
+Öffne **Fenster → Funktionsleisten** oder klicke mit rechts auf den Rahmen einer Leiste, um vorhandene Leisten anzupassen: verfügbare Einträge hinzufügen oder entfernen, umsortieren, Trennlinien einfügen und die Symbolgröße wählen. Auch Eigenschaften- und Textleiste nutzen dieses Layoutsystem; ihre Felder bearbeiten weiterhin dieselben Funktionswerte.
+
+Ziehe eine Leiste am Griff, um sie zu verschieben, an einem der vier Ränder anzudocken oder innerhalb der App frei zu platzieren. Die Kante bestimmt ihre Ausrichtung: oben/unten waagerecht, seitlich senkrecht. Schwebende Leisten behalten ihre letzte Ausrichtung. Lege sie nahe einer Zeilengrenze ab, um eine neue Zeile zwischen vorhandenen Zeilen einzufügen. Die Zeilen- oder Spaltenzahl innerhalb einer Leiste stellst du im Anpassen-Dialog ein; nicht passender Inhalt scrollt intern. Andere Leisten und der Arbeitsbereich gleiten innerhalb von 150 ms an ihre Position, sofern reduzierte Bewegung nicht aktiviert ist.
+
+Knopfgruppen belegen einen Platz. Der Hauptknopf führt die aktuelle Aktion aus; ▾, Rechtsklick oder **350 ms Gedrückthalten** des Hauptknopfs öffnen die Gruppe. Ziehe die offene Gruppe am Griff heraus, um sie abzulösen. Abgelöste Gruppe und Quelle teilen sich die aktuelle Auswahl; erneutes Öffnen holt die vorhandene Gruppe nach vorn. Ihr **×** bringt sie in die Quellleiste zurück. Ausblenden der Quellleiste blendet auch ihre abgelösten Gruppen aus; Einblenden stellt sie wieder her.
+
+**Leistenlayout sperren** verhindert Layoutänderungen und wird global gespeichert (anfangs ausgeschaltet). Ein abgeschlossener Ablegevorgang wird sofort gespeichert. **Esc**, Verlust des Fensterfokus oder Abbruch der Zeigereingabe brechen Verschieben oder Ablösen ohne Speichern ab.
+
+- **Leistenlayout zurücksetzen** stellt Positionen, Ausrichtung, Zeilen/Spalten und Sichtbarkeit wieder her und bringt abgelöste Gruppen zurück; Belegungen und Symbolgrößen bleiben erhalten. Zahlen-, Text- und andere Funktionswerte werden nicht gelöscht.
+- **Alle Belegungen zurücksetzen** stellt eingebaute Belegungen und Gruppenauswahl wieder her; eigene Leisten/Gruppen, Positionen und Symbolgrößen bleiben erhalten. **Standard wiederherstellen** stellt die Belegung der ausgewählten Leiste und die ursprünglichen Mitglieder ihrer eingebauten Gruppen wieder her. Gemeinsam verwendete Gruppen ändern sich in allen beteiligten Leisten.
+
+Eigene Leisten kannst du im Anpassen-Dialog erstellen, umbenennen oder löschen; eingebaute Leisten sind nicht löschbar. Rücke eine Aktion unter die vorherige Aktion ein, um eine flache Knopfgruppe zu bilden. Eingebaute und eigene Gruppen bieten dieselbe Mitgliederbearbeitung: hinzufügen/entfernen, ein-/ausrücken und umsortieren. Abschnitte mit Funktionsfeldern sind keine Aktionsgruppen. Freie Leisten bleiben innerhalb der App statt in eigenen Betriebssystemfenstern. Arbeitsbereichsprofile und eine Neugestaltung von Symbolen oder Schriften sind nicht enthalten.
 
 **Fenster → Fenster und Leisten zurücksetzen** stellt die ursprüngliche Anordnung wieder her.
 
