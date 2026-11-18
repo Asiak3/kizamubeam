@@ -164,7 +164,11 @@ export type Style = 'normal' | 'muted' | 'accent' | 'warn';
 export type Item =
   | { type: 'line'; pts: [number, number][]; closed?: boolean; style?: Style; width?: number; dash?: boolean; alpha?: number; id?: string }
   | { type: 'handle'; x: number; y: number; id: string; style?: Style; size?: number }
-  | { type: 'text'; x: number; y: number; text: Text; style?: Style };
+  /**
+   * angle: degrees, counter-clockwise (90 = read from bottom to top); align: "start" (default) = 6 px after and above
+   * the point, "center" = centred on it in both directions; both follow the angle (#412)
+   */
+  | { type: 'text'; x: number; y: number; text: Text; style?: Style; angle?: number; align?: 'start' | 'center' };
 /**
  * A region map on the surface: width × height cells over frame (mm), one byte per cell as base64 (0 = none,
  * n = region n − 1), filled with colors[n − 1] ("#rrggbb"). A click on a region arrives as hit "<layer key>:<region>";
