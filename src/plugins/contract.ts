@@ -346,7 +346,7 @@ export interface PluginEventResult extends PluginSurfaceChange {
 export type PluginSurfaceResult = PluginEventResult;
 
 /** Answer of draw(): texts on the surface are plain (names the user typed, numbers) or codes */
-export type PluginItem = Exclude<GenItem, { type: 'text' }> | { type: 'text'; x: number; y: number; text: PluginText; style?: GenStyle };
+export type PluginItem = Exclude<GenItem, { type: 'text' }> | (Omit<Extract<GenItem, { type: 'text' }>, 'text'> & { text: PluginText });
 export interface PluginDrawing extends Omit<GenDrawing, 'items' | 'layers' | 'fields'> {
   layers?: (Omit<GenLayer, 'items'> & { items?: PluginItem[] })[];
   items: PluginItem[];
@@ -438,7 +438,12 @@ function checkItems(v: unknown, count: { points: number }): PluginItem[] {
     }
     if (it.type === 'handle')
       return { type: 'handle', x: num(it.x, 'handle'), y: num(it.y, 'handle'), id: str(it.id, 'handle id', 80), ...style(it.style), ...(it.size !== undefined ? { size: Math.max(1, Math.min(10, num(it.size, 'size'))) } : {}) };
-    if (it.type === 'text') return { type: 'text', x: num(it.x, 'text'), y: num(it.y, 'text'), text: checkText(it.text), ...style(it.style) };
+    if (it.type === 'text')
+      return {
+        type: 'text', x: num(it.x, 'text'), y: num(it.y, 'text'), text: checkText(it.text), ...style(it.style),
+        ...(it.angle !== undefined ? { angle: num(it.angle, 'text angle') } : {}),
+        ...(it.align !== undefined ? { align: it.align === 'start' || it.align === 'center' ? it.align : fail('text align') } : {}),
+      };
     return fail('item type');
   });
 }
