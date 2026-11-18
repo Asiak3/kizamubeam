@@ -18,6 +18,7 @@ description: Welche Dateien KizamuBeam öffnet, importiert und exportiert.
 | PDF | Pfade bleiben Kurven, Farben werden Layern zugeordnet, eingebettete Bilder und Text (als Umrisse). Jede Seite kommt auf eine eigene Projektseite. |
 | Adobe Illustrator (`.ai`) | Dateien ab Illustrator 9 (sie enthalten eine PDF-Fassung); Import wie PDF. |
 | LightBurn-Projekte (`.lbrn2`) | Formen, Bilder, Gruppen und Layer-Einstellungen. **Datei → Öffnen** erstellt ein neues Projekt, **Importieren** fügt ins aktuelle ein. |
+| Ruida-Aufträge (`.rd`) | Binäre Ruida-Dateien (`0x88`, `0x11`, `0x38`): Vektorpfade, Layer-Geschwindigkeit, Min.-/Max.-Leistung und Air Assist. |
 | 3D-Modelle: STL, OBJ | Werden zu einem Schicht- oder Rippenmodell aus flachen Teilen. |
 
 ## Export
@@ -31,6 +32,7 @@ description: Welche Dateien KizamuBeam öffnet, importiert und exportiert.
 | PDF | Alle Seiten in Bettgröße 1:1, eine PDF-Ebene pro KizamuBeam-Layer, Bilder eingebettet |
 | Adobe Illustrator (`.ai`) | Dieselbe PDF-kompatible Datei; öffnet in Illustrator, Inkscape und Affinity |
 | G-Code (`.gcode`, `.nc`) | **Laser → G-Code speichern …** für das gewählte Gerät |
+| Ruida (`.rd`) | **Laser → .rd speichern …**, wenn ein Ruida-Gerät gewählt ist |
 | PNG | **Bearbeitetes Bild speichern …**: ein Bild genau so, wie es gelasert würde |
 
 Texte werden als Umrisse exportiert.

@@ -1,12 +1,12 @@
 ---
 sidebar_position: 4
 title: Connecting a laser
-description: Connect a GRBL, grblHAL, FluidNC, Marlin or Smoothieware laser over USB or Wi-Fi with the setup wizard.
+description: Connect a GRBL, grblHAL, FluidNC, Marlin, Smoothieware or Ruida laser over USB or network with the setup wizard.
 ---
 
 # Connecting a laser
 
-KizamuBeam works with lasers whose controller runs **FluidNC, GRBL, grblHAL, Marlin or Smoothieware**. That covers most diode lasers. See [Machine compatibility](../reference/machine-compatibility.md) for details.
+KizamuBeam works with lasers whose controller runs **FluidNC, GRBL, grblHAL, Marlin, Smoothieware or Ruida DSP**. That covers most diode lasers and Ruida CO₂ lasers. See [Machine compatibility](../reference/machine-compatibility.md) for details.
 
 ## The Laser Setup wizard
 
@@ -33,23 +33,24 @@ Connect the laser with a USB cable, choose **USB** in the wizard or in the Laser
 - **Windows**: some controllers need a USB driver (often CH340 or CP210x) from the laser’s manufacturer.
 - **Linux**: your user needs access to serial ports, see [Installation](installation.md#linux).
 
-## Wi-Fi
+## Wi-Fi / Network
 
-Controllers with Wi-Fi, such as FluidNC, are reached over the network:
+Controllers with Wi-Fi or Ethernet, such as FluidNC or Ruida DSP, are reached over the network:
 
-- **Telnet** on port 23, or
-- **WebSocket** on port 81 (FluidNC; port 80 is tried if 81 does not answer).
+- **Telnet** on port 23,
+- **WebSocket** on port 81 (FluidNC; port 80 is tried if 81 does not answer), or
+- **UDP** on port 50200 (Ruida DSP; keypad port 50207).
 
 Enter the address of the controller, for example `192.168.1.50` or `fluidnc.local`. **Search …** next to the address field finds FluidNC controllers on your local network.
 
 :::tip Unstable Wi-Fi
-With FluidNC, a job can be uploaded to the controller’s SD card or flash and run from there (**Laser → FluidNC**). A Wi-Fi dropout then no longer stops the job.
+With FluidNC, a job can be uploaded to the controller’s SD card or flash and run from there (**Laser → FluidNC**). With Ruida, **Save to controller …** stores a named `.rd` job in the controller’s internal memory. A network dropout then no longer stops the job.
 :::
 
 ## Several devices
 
-Each laser is stored as a device with its own work area, connection and settings. Switch between them at the top of the Laser window or under **Laser → Device → Devices …**. Device templates exist for many common lasers (for example Swiitol, Ortur, Atomstack, Sculpfun, xTool, Creality Falcon, Two Trees, Longer and Comgrow); the workspace always shows the bed of the selected device.
+Each laser is stored as a device with its own work area, connection and settings. Switch between them at the top of the Laser window or under **Laser → Device → Devices …**. Device templates exist for many common lasers (for example Swiitol, Ortur, Atomstack, Sculpfun, xTool, Creality Falcon, Two Trees, Longer, Comgrow, OMTech and Ruida); the workspace always shows the bed of the selected device.
 
 ## Without a laser
 
-The **KizamuBeam Virtual Machine** is a separate program that behaves like a FluidNC or GRBL controller and shows the job in 3D, burning into virtual material. Download it from the [releases page](https://github.com/KizamuBeam/kizamubeam/releases?q=vm-v) and connect with the device template “KizamuBeam Virtual Machine”.
+The **KizamuBeam Virtual Machine** is a separate program that behaves like a FluidNC, GRBL or Ruida controller and shows the job in 3D, burning into virtual material. Download it from the [releases page](https://github.com/KizamuBeam/kizamubeam/releases?q=vm-v) and connect with the device template “KizamuBeam Virtual Machine”.

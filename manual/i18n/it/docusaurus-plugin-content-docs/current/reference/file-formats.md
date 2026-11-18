@@ -18,6 +18,7 @@ description: Quali file KizamuBeam apre, importa ed esporta.
 | PDF | I percorsi restano curve, i colori vengono assegnati ai livelli, immagini incorporate e testo (come contorni). Ogni pagina finisce su una pagina di progetto propria. |
 | Adobe Illustrator (`.ai`) | File da Illustrator 9 in poi (contengono una versione PDF); importati come PDF. |
 | Progetti LightBurn (`.lbrn2`) | Forme, immagini, gruppi e impostazioni dei livelli. **File → Apri** crea un nuovo progetto, **Importa** inserisce in quello attuale. |
+| Lavori Ruida (`.rd`) | File binari Ruida (`0x88`, `0x11`, `0x38`): percorsi vettoriali, velocità, potenza min/max e assistenza aria dei livelli. |
 | Modelli 3D: STL, OBJ | Diventano un modello a strati o a costole fatto di parti piane. |
 
 ## Esportazione
@@ -31,6 +32,7 @@ description: Quali file KizamuBeam apre, importa ed esporta.
 | PDF | Tutte le pagine in scala 1:1 del piano, un livello PDF per ogni livello di KizamuBeam, immagini incorporate |
 | Adobe Illustrator (`.ai`) | Lo stesso file compatibile PDF; si apre in Illustrator, Inkscape e Affinity |
 | G-code (`.gcode`, `.nc`) | **Laser → Salva GCode …** per il dispositivo selezionato |
+| Ruida (`.rd`) | **Laser → Salva .rd …** quando è selezionato un dispositivo Ruida |
 | PNG | **Salva bitmap elaborato …**: un’immagine esattamente come verrebbe incisa |
 
 I testi vengono esportati come contorni.

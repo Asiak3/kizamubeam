@@ -1,12 +1,12 @@
 ---
 sidebar_position: 4
 title: Laser verbinden
-description: Einen Laser mit GRBL, grblHAL, FluidNC, Marlin oder Smoothieware per USB oder WLAN mit dem Assistenten verbinden.
+description: Einen Laser mit GRBL, grblHAL, FluidNC, Marlin, Smoothieware oder Ruida per USB oder Netzwerk mit dem Assistenten verbinden.
 ---
 
 # Laser verbinden
 
-KizamuBeam arbeitet mit Lasern, deren Controller **FluidNC, GRBL, grblHAL, Marlin oder Smoothieware** nutzt. Das sind die meisten Diodenlaser. Einzelheiten unter [Maschinenkompatibilität](../reference/machine-compatibility.md).
+KizamuBeam arbeitet mit Lasern, deren Controller **FluidNC, GRBL, grblHAL, Marlin, Smoothieware oder Ruida DSP** nutzt. Das sind die meisten Diodenlaser und Ruida-CO₂-Laser. Einzelheiten unter [Maschinenkompatibilität](../reference/machine-compatibility.md).
 
 ## Der Assistent „Laser einrichten“
 
@@ -33,23 +33,24 @@ Verbinde den Laser per USB-Kabel, wähle im Assistenten oder im Fenster Laser **
 - **Windows**: Manche Controller brauchen einen USB-Treiber (oft CH340 oder CP210x) vom Hersteller des Lasers.
 - **Linux**: Dein Benutzer braucht Zugriff auf serielle Schnittstellen, siehe [Installation](installation.md#linux).
 
-## WLAN
+## WLAN / Netzwerk
 
-Controller mit WLAN, etwa FluidNC, erreichst du übers Netzwerk:
+Controller mit WLAN oder Ethernet, etwa FluidNC oder Ruida DSP, erreichst du übers Netzwerk:
 
-- **Telnet** auf Port 23 oder
-- **WebSocket** auf Port 81 (FluidNC; antwortet 81 nicht, wird Port 80 versucht).
+- **Telnet** auf Port 23,
+- **WebSocket** auf Port 81 (FluidNC; antwortet 81 nicht, wird Port 80 versucht) oder
+- **UDP** auf Port 50200 (Ruida DSP; Tastenport 50207).
 
 Gib die Adresse des Controllers ein, zum Beispiel `192.168.1.50` oder `fluidnc.local`. **Suchen …** neben dem Adressfeld findet FluidNC-Controller in deinem Netzwerk.
 
 :::tip Wackeliges WLAN
-Bei FluidNC kannst du einen Job auf die SD-Karte oder den Flash-Speicher des Controllers laden und dort starten (**Laser → FluidNC**). Ein WLAN-Abbruch stoppt den Job dann nicht mehr.
+Bei FluidNC kannst du einen Job auf die SD-Karte oder den Flash-Speicher des Controllers laden und dort starten (**Laser → FluidNC**). Bei Ruida legt **In Steuerung speichern …** einen benannten `.rd`-Job im internen Speicher des Controllers ab. Ein Netzwerkabbruch stoppt den Job dann nicht mehr.
 :::
 
 ## Mehrere Geräte
 
-Jeder Laser wird als Gerät mit eigenem Arbeitsbereich, eigener Verbindung und eigenen Einstellungen gespeichert. Du wechselst oben im Fenster Laser oder unter **Laser → Gerät → Geräte …**. Gerätevorlagen gibt es für viele verbreitete Laser (zum Beispiel Swiitol, Ortur, Atomstack, Sculpfun, xTool, Creality Falcon, Two Trees, Longer und Comgrow); die Arbeitsfläche zeigt immer das Bett des gewählten Geräts.
+Jeder Laser wird als Gerät mit eigenem Arbeitsbereich, eigener Verbindung und eigenen Einstellungen gespeichert. Du wechselst oben im Fenster Laser oder unter **Laser → Gerät → Geräte …**. Gerätevorlagen gibt es für viele verbreitete Laser (zum Beispiel Swiitol, Ortur, Atomstack, Sculpfun, xTool, Creality Falcon, Two Trees, Longer, Comgrow, OMTech und Ruida); die Arbeitsfläche zeigt immer das Bett des gewählten Geräts.
 
 ## Ohne Laser
 
-Die **KizamuBeam Virtual Machine** ist ein eigenes Programm, das sich wie ein FluidNC- oder GRBL-Controller verhält und den Job in 3D zeigt, eingebrannt in virtuelles Material. Lade sie von der [Release-Seite](https://github.com/KizamuBeam/kizamubeam/releases?q=vm-v) und verbinde dich über die Gerätevorlage „KizamuBeam Virtual Machine“.
+Die **KizamuBeam Virtual Machine** ist ein eigenes Programm, das sich wie ein FluidNC-, GRBL- oder Ruida-Controller verhält und den Job in 3D zeigt, eingebrannt in virtuelles Material. Lade sie von der [Release-Seite](https://github.com/KizamuBeam/kizamubeam/releases?q=vm-v) und verbinde dich über die Gerätevorlage „KizamuBeam Virtual Machine“.

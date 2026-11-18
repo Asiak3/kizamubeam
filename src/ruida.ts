@@ -207,6 +207,26 @@ export interface RuidaParams {
   returnHome: boolean;
   air: number[];
   layers: RuidaLayerParam[];
+  filename?: string;
+  upload?: boolean;
+}
+
+/** Bereinigt einen Dateinamen auf max. 8 Großbuchstaben/Ziffern (`[A-Z0-9_-]`) für den Ruida-Speicher */
+export function sanitizeRuidaFilename(name: string): string {
+  const base = name.trim().replace(/\.(rd|kzb)$/i, '');
+  let out = '';
+  for (const ch of base) {
+    if (out.length >= 8) break;
+    if (ch >= 'a' && ch <= 'z') out += ch.toUpperCase();
+    else if ((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch === '_' || ch === '-') out += ch;
+    else if (ch === 'ä' || ch === 'Ä') out += 'A';
+    else if (ch === 'ö' || ch === 'Ö') out += 'O';
+    else if (ch === 'ü' || ch === 'Ü') out += 'U';
+    else if (ch === 'ß') out += 'S';
+    else if (ch === ' ' || ch === '.') out += '_';
+  }
+  const trimmed = out.replace(/^[_-]+|[_-]+$/g, '');
+  return trimmed || 'KIZAMU';
 }
 
 export function hexToBgr(hex: string): number {
@@ -247,7 +267,12 @@ export function ruidaLayersFromMoves(mv: Moves, layerOf?: (i: number) => Layer):
   return out;
 }
 
-export function ruidaParamsForJob(job: Job, d: Device, layerOf?: (i: number) => Layer): RuidaParams {
+export function ruidaParamsForJob(
+  job: Job,
+  d: Device,
+  layerOf?: (i: number) => Layer,
+  opts?: { filename?: string; upload?: boolean },
+): RuidaParams {
   return {
     x0: job.moves.x0,
     y0: job.moves.y0,
@@ -260,6 +285,8 @@ export function ruidaParamsForJob(job: Job, d: Device, layerOf?: (i: number) => 
     returnHome: d.returnHome,
     air: job.air,
     layers: ruidaLayersFromMoves(job.moves, layerOf),
+    ...(opts?.filename ? { filename: opts.filename } : {}),
+    ...(opts?.upload ? { upload: true } : {}),
   };
 }
 
@@ -305,6 +332,18 @@ function pushCutPower(out: number[], min14: number, max14: number, laser: RuidaL
 export function writeRuidaPlain(mv: Moves, p: RuidaParams): Uint8Array {
   const n = mv.n;
   const out: number[] = [];
+
+  // 0. Optionaler Upload in den Controller-Speicher (`0xE8 0x02`) bzw. Dateiname (`0xE7 0x01`)
+  if (p.upload) {
+    const fname = sanitizeRuidaFilename(p.filename || 'KIZAMU');
+    const bytes = Array.from(fname, (c) => c.charCodeAt(0) & 0x7f);
+    out.push(0xe8, 0x02, ...bytes, 0x00);
+    out.push(0xe7, 0x01, ...bytes, 0x00);
+  } else if (p.filename && p.filename.trim().length > 0) {
+    const fname = sanitizeRuidaFilename(p.filename);
+    const bytes = Array.from(fname, (c) => c.charCodeAt(0) & 0x7f);
+    out.push(0xe7, 0x01, ...bytes, 0x00);
+  }
 
   // 1. Referenzpunkt
   const refCode = p.startFrom === 'user' ? 0x11 : p.startFrom === 'current' ? 0x12 : 0x10;
@@ -460,6 +499,18 @@ export interface DecodedRuidaJob {
   cuts: DecodedRuidaCut[];
   rapids: number;
   eof: boolean;
+  filename?: string;
+  upload: boolean;
+}
+
+function readAsciiZ(c: Uint8Array, off: number): string {
+  let out = '';
+  for (let i = off; i < c.length; i++) {
+    const b = c[i];
+    if (b === 0 || b >= 0x80) break;
+    out += String.fromCharCode(b);
+  }
+  return out.trim();
 }
 
 export function decodeRuida(raw: Uint8Array, magicHint?: number): DecodedRuidaJob {
@@ -472,6 +523,8 @@ export function decodeRuida(raw: Uint8Array, magicHint?: number): DecodedRuidaJo
   const cuts: DecodedRuidaCut[] = [];
   let rapids = 0;
   let eof = false;
+  let filename: string | undefined;
+  let upload = false;
 
   let pos: [number, number] = [0, 0];
   let curLayer = 0;
@@ -602,7 +655,10 @@ export function decodeRuida(raw: Uint8Array, magicHint?: number): DecodedRuidaJo
         break;
       }
       case 0xe7: {
-        if (b1 === 0x03) {
+        if (b1 === 0x01) {
+          const s = readAsciiZ(c, 2);
+          if (s) filename = s;
+        } else if (b1 === 0x03) {
           const x = mm(c, 2);
           const y = mm(c, 7);
           if (x !== null && y !== null) minBound = [x, y];
@@ -610,6 +666,14 @@ export function decodeRuida(raw: Uint8Array, magicHint?: number): DecodedRuidaJo
           const x = mm(c, 2);
           const y = mm(c, 7);
           if (x !== null && y !== null) maxBound = [x, y];
+        }
+        break;
+      }
+      case 0xe8: {
+        if (b1 === 0x02) {
+          upload = true;
+          const s = readAsciiZ(c, 2);
+          if (s) filename = s;
         }
         break;
       }
@@ -628,7 +692,7 @@ export function decodeRuida(raw: Uint8Array, magicHint?: number): DecodedRuidaJo
   const bounds: [number, number, number, number] | null =
     minBound && maxBound ? [minBound[0], minBound[1], maxBound[0], maxBound[1]] : null;
 
-  return { magic, startFrom, bounds, layers, cuts, rapids, eof };
+  return { magic, startFrom, bounds, layers, cuts, rapids, eof, ...(filename ? { filename } : {}), upload };
 }
 
 /**
