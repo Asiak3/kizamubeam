@@ -9,6 +9,7 @@ import './core-fixtures-env';
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const { setQuickJSWasm } = await import('../src/plugins/engine');
 const qjs = readFileSync(new URL('../node_modules/@jitl/quickjs-wasmfile-release-sync/dist/emscripten-module.wasm', import.meta.url));
@@ -22,7 +23,7 @@ const { loadNetFixtures } = await import('./net-fixtures.mjs');
 const out = process.argv[3];
 const noBuild = process.argv.includes('--no-build');
 if (!out) throw new Error('Aufruf: node scripts/run-ts.mjs scripts/build-catalog.ts <Zielordner> [--no-build]');
-const root = new URL('../', import.meta.url).pathname;
+const root = fileURLToPath(new URL('../', import.meta.url));
 const REPO = 'https://github.com/KizamuBeam/kizamubeam/tree/main';
 
 const files: [string, string][] = [];

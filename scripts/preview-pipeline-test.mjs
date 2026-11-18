@@ -2,8 +2,9 @@
 // No app bootstrap, native calls, transport, hardware, or network.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
-const source = new URL('../src/', import.meta.url).pathname;
+const source = fileURLToPath(new URL('../src/', import.meta.url));
 const observers = [];
 const forbidden = [];
 const deny = (name) => () => { forbidden.push(name); throw Error(`Forbidden offline operation: ${name}`); };
@@ -87,7 +88,7 @@ const job = { moves: { n: 2, x0: 10, y0: 20, x: [30, 60], y: [40, 70], s: [50, 5
 const device = { energy: {}, cutSelected: false };
 const ed = { doc: { bed: { w: 200, h: 100 } }, layerDrawColor: () => '#123456' };
 const immutable = JSON.stringify({ job, device, doc: ed.doc });
-const mocks = { h, setIcon() {}, t: (s) => s, locale: 'en', loadDevices: () => ({ devices: [device] }),
+const mocks = { h, setIcon() {}, t: (s) => s, dec: (s) => s, locale: 'en', loadDevices: () => ({ devices: [device] }),
   buildJob: async () => job, estimate: () => ({ total: 10, t: [5, 10], cutLength: 80, rapidLength: 0 }),
   rotaryOn: () => false, formatDuration: String, energyDraft: () => ({}), estimateEnergy: () => ({}),
   electricityTariffText: () => '', parseEnergyNumber: () => null, energyPreview: () => h('section'),
