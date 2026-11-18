@@ -152,9 +152,10 @@ export class ManifestError extends Error {}
  * (selection, an image file, the camera image) and a number field next to a button. Version 3: a drawing surface
  * (draw, onSurface) with views, selectable rows and row buttons in lists, placeholders for number columns, and
  * conditions on action buttons. A plugin that needs a newer schema is refused with an update hint instead of being
- * shown half-broken.
+ * shown half-broken. Version 6: the surface help as a list of texts in the right column.
  */
-export const DIALOG_VERSION = 5;
+export const DIALOG_VERSION = 6;
+const MAX_HELP = 12;
 const MAX_STEPS = 8;
 const MAX_VIEWS = 6;
 const MAX_ROW_ACTIONS = 4;
@@ -311,7 +312,7 @@ function column(v: unknown, at: string): GenColumn {
 
 /**
  * Lists, actions (schema version 2), the surface (version 3), images kept with the project (version 4), steps,
- * sortable lists and colour columns (version 5) of a dialog
+ * sortable lists and colour columns (version 5), the surface help as a list (version 6) of a dialog
  */
 function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<string>): { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface; steps?: GenStep[] } {
   const out: { lists?: GenList[]; actions?: GenAction[]; surface?: GenSurface; steps?: GenStep[] } = {};
@@ -400,7 +401,11 @@ function dialogParts(d: Record<string, unknown>, schema: ParamSpec[], keys: Set<
       if (!isNum(sf.height) || sf.height < 100 || sf.height > 800) throw new ManifestError(t('ungültige Angabe „dialog“'));
       surface.height = Math.round(sf.height);
     }
-    if (sf.help !== undefined) surface.help = textKey(sf.help, 'surface');
+    if (Array.isArray(sf.help)) {
+      needs(6, 'surface.help');
+      if (!sf.help.length || sf.help.length > MAX_HELP) throw new ManifestError(t('ungültige Angabe „dialog“'));
+      surface.help = sf.help.map((x) => textKey(x, 'surface.help'));
+    } else if (sf.help !== undefined) surface.help = textKey(sf.help, 'surface');
     out.surface = surface;
   }
   if (d.steps !== undefined) {

@@ -80,7 +80,7 @@ export interface DialogState {
   /** Message of an action or a surface event in this step (onEvent, onSurface) */
   message?: string;
   /** The drawing surface after the step: its view, state, selected rows and what draw() returned (counted) */
-  surface?: GenSurfaceState & { items: number; layers: number; track: boolean; cursor?: 'default' | 'crosshair'; escape?: boolean };
+  surface?: GenSurfaceState & { items: number; layers: number; track: boolean; cursor?: 'default' | 'crosshair'; escape?: boolean; fields?: { id: string; label: string; value: number; readonly?: true }[]; highlight?: number };
 }
 
 /** Thrown when a script step does not fit the schema (unknown key, wrong type, out of range) */
@@ -96,7 +96,8 @@ export class ScriptError extends Error {}
  * `inputs` name. `$image` is the picked (or selected) image of an action, { name?, width, height, data } with RGBA as
  * base64; an action with `store` keeps it in that parameter like the app does. `$move: { list, from, to }` drags a
  * row of a sortable list to another place. `$row` with `$action` clicks a button of that list row. `$view` switches the drawing surface to a
- * view, `$surface` sends it a list of pointer events ({ type, x, y, hit?, from?, drag?, key? }, mm in the view).
+ * view, `$surface` sends it a list of pointer events ({ type, x, y, hit?, from?, drag?, key? }, mm in the view; a value typed
+ * into a field of the drawing is { type: "field", x: 0, y: 0, field, value }).
  */
 export async function runDialog(m: PluginManifest, steps: Record<string, unknown>[] = [], opts: { context?: HeadlessContext } = {}): Promise<DialogState[]> {
   const models = new Map<string, string>();
@@ -238,7 +239,7 @@ export async function runDialog(m: PluginManifest, steps: Record<string, unknown
         rows: g.view?.(p).rows ?? {},
         ...(ask ? { ask } : {}),
         ...(message !== undefined ? { message } : {}),
-        ...(drawn ? { surface: { ...surf, selected: { ...surf.selected }, items: drawn.items.length, layers: drawn.layers?.length ?? 0, track: !!drawn.track, ...(drawn.cursor ? { cursor: drawn.cursor } : {}), ...(drawn.escape !== undefined ? { escape: drawn.escape } : {}) } } : {}),
+        ...(drawn ? { surface: { ...surf, selected: { ...surf.selected }, items: drawn.items.length, layers: drawn.layers?.length ?? 0, track: !!drawn.track, ...(drawn.cursor ? { cursor: drawn.cursor } : {}), ...(drawn.escape !== undefined ? { escape: drawn.escape } : {}), ...(drawn.fields ? { fields: drawn.fields.map((f) => ({ id: f.id, label: f.label, value: f.value, ...(f.readonly ? { readonly: true as const } : {}) })) } : {}), ...(drawn.highlight ? { highlight: drawn.highlight.length } : {}) } } : {}),
       });
     }
     return out;

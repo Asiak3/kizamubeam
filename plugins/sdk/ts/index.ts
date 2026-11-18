@@ -194,10 +194,17 @@ export interface Drawing {
   cursor?: 'default' | 'crosshair';
   /** Escape to the plugin (true) or closing the dialog (false); without it, to the plugin while track is on (newer apps) */
   escape?: boolean;
+  /**
+   * Number fields in the right column of the dialog, e.g. the measures of the selected shape (mm; newer apps). A typed
+   * value arrives as a "field" event with the field's id and the value.
+   */
+  fields?: { id: string; label: Text; value: number; min?: number; max?: number; readonly?: boolean; title?: Text }[];
+  /** Parts of the preview to mark, by index in generate's parts: the whole part, or only subs in its coordinates (newer apps) */
+  highlight?: { part: number; subs?: SubPath[] }[];
 }
-/** A pointer or key event on the surface; select: a row of a selectable list was clicked */
+/** A pointer or key event on the surface; select: a row of a selectable list was clicked; field: a value typed into a field of the drawing */
 export interface Pointer {
-  type: 'down' | 'move' | 'up' | 'dblclick' | 'context' | 'key' | 'select';
+  type: 'down' | 'move' | 'up' | 'dblclick' | 'context' | 'key' | 'select' | 'field';
   x: number;
   y: number;
   hit?: string;
@@ -206,6 +213,8 @@ export interface Pointer {
   key?: string;
   list?: string;
   row?: number;
+  field?: string;
+  value?: number;
   /** Modifier keys held during the event (only present when held); ctrl is Cmd on macOS */
   shift?: true;
   alt?: true;

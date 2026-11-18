@@ -113,6 +113,13 @@ export function listsArea(g: Generator, p: Params, set: (patch: Params) => void,
       if (list.sort) cells.unshift(h('span', { class: 'gen-grip' + (fixed ? ' off' : ''), title: fixed ? '' : t('Ziehen oder Alt+↑/↓ zum Umsortieren'), draggable: fixed ? 'false' : 'true' }, '⋮⋮'));
       const rowEl = h('div', { class: 'jig-row', ...(list.sort ? { tabindex: '-1' } : {}) }, ...cells);
       if (list.sort) sortable(list, rowEl, i, i0);
+      // Typing in a field of a row selects the row, so the row being edited is the one marked (#411)
+      if (list.select)
+        rowEl.addEventListener('focusin', (e) => {
+          if (!(e.target as HTMLElement).matches('input, select') || !surface || surface.state().selected[list.param] === i) return;
+          surface.selectRow(list.param, i);
+          mark();
+        });
       // A click on the row (not on its fields and buttons) selects it
       if (list.select)
         rowEl.addEventListener('click', (e) => {

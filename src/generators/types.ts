@@ -251,8 +251,11 @@ export interface GenSurface {
   views: { id: string; label: string }[];
   /** Height in CSS pixels; the width follows the dialog */
   height?: number;
-  /** Help line under the surface */
-  help?: string;
+  /**
+   * Help for the surface: one text is a line under the surface, a list of texts a short list in the right column
+   * (under the preview and the info), shown while the step with the surface is shown
+   */
+  help?: string | string[];
 }
 
 export type GenStyle = 'normal' | 'muted' | 'accent' | 'warn';
@@ -282,6 +285,31 @@ export interface GenLayer {
   alpha?: number;
 }
 
+/**
+ * A number field the drawing puts in the right column, under the preview (#411): for example a measure of the selected
+ * shape. A typed value goes to the generator as a "field" event; the field shows the drawing's value again after it.
+ */
+export interface GenSideField {
+  id: string;
+  label: string;
+  /** mm */
+  value: number;
+  min?: number;
+  max?: number;
+  /** Shown but not editable (e.g. a length whose ends are both fixed) */
+  readonly?: boolean;
+  title?: string;
+}
+
+/**
+ * A part of the preview drawn in the accent colour (#411), by its index in the generated parts: the whole part, or
+ * only `subs` (in the part's coordinates, like its outline)
+ */
+export interface GenHighlight {
+  part: number;
+  subs?: SubPath[];
+}
+
 export interface GenDrawing {
   /** Area of the view (mm) that is fitted into the surface */
   frame: { x0: number; y0: number; x1: number; y1: number };
@@ -299,6 +327,10 @@ export interface GenDrawing {
   cursor?: 'default' | 'crosshair';
   /** Escape goes to the generator (true) or closes the dialog (false); without it, it goes to the generator while track is on */
   escape?: boolean;
+  /** Number fields in the right column (e.g. the measures of the selected shape) */
+  fields?: GenSideField[];
+  /** Parts of the preview to mark (e.g. what the selected row is in the box) */
+  highlight?: GenHighlight[];
 }
 
 /** What the surface shows now: the view, free data of the generator (kept by the app) and the selected rows */
@@ -319,7 +351,7 @@ export interface GenDrawRequest extends GenSurfaceState {
 
 /** A pointer or key event on the surface, in mm of the view */
 export interface GenPointer {
-  type: 'down' | 'move' | 'up' | 'dblclick' | 'context' | 'key' | 'select';
+  type: 'down' | 'move' | 'up' | 'dblclick' | 'context' | 'key' | 'select' | 'field';
   x: number;
   y: number;
   /** Id of the handle or line under the pointer (down, dblclick, context) */
@@ -333,6 +365,9 @@ export interface GenPointer {
   /** select: the list and row that was clicked */
   list?: string;
   row?: number;
+  /** field: the field of the drawing that was typed in (its id) and the new value */
+  field?: string;
+  value?: number;
   /** Modifier keys held during the event (only present when held): Shift, Alt (Option), Ctrl (Cmd on macOS) */
   shift?: true;
   alt?: true;

@@ -67,7 +67,7 @@ await test('schema v1: sections are translated, advanced wins, a newer dialog sc
   assert.equal(g.schema[4].advanced, true);
   assert.equal(g.schema[2].options[1][1], 'Sliding');
   g.dispose();
-  assert.throws(() => manifest(TRAY, { dialog: { version: 6 } }), /neuere Version|newer version/);
+  assert.throws(() => manifest(TRAY, { dialog: { version: 7 } }), /neuere Version|newer version/);
   assert.throws(() => manifest(TRAY, { dialog: 'big' }), /dialog/);
   assert.throws(() => manifest(TRAY, { params: [{ key: 'a', type: 'bool', def: true, section: '<b>' }] }), /Abschnitt|section/);
 });
@@ -342,12 +342,31 @@ await test('stage 4: a drawing surface with views, pointer events, selectable ro
   // The surface and the new list and button features need dialog version 3; bad drawings are refused
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, version: 2 } }), /Version 3|version 3/);
   assert.throws(() => manifest(code, { params, texts, dialog: { ...dialog, surface: { views: [] } } }), /dialog/);
+  // The help as a list (#411) needs dialog version 6; its texts are looked up like the single one
+  const listHelp = { ...dialog, surface: { ...dialog.surface, help: ['help', 'added'] } };
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...listHelp, version: 5 } }), /Version 6|version 6/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...listHelp, version: 6, surface: { ...listHelp.surface, help: [] } } }), /dialog/);
+  assert.throws(() => manifest(code, { params, texts, dialog: { ...listHelp, version: 6, surface: { ...listHelp.surface, help: ['help', 3] } } }), /Textschlüssel|text key/);
+  const g6 = pluginGenerator(manifest(code, { params, texts, dialog: { ...listHelp, version: 6 } }), { id: 'p6', name: 'P' });
+  assert.deepEqual(g6.surface!.help, ['Click to add', 'Point added']);
+  g6.dispose();
   const { checkDrawing, checkEvent } = await import('../src/plugins/contract');
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [{ type: 'circle' }] }), /item type/);
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], cursor: 'wait' }), /cursor/);
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], escape: 'yes' }), /escape/);
   assert.equal(checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], escape: false }).escape, false);
   assert.equal(checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], cursor: 'default' }).cursor, 'default');
+  // Fields for the right column and marks in the preview (#411)
+  const F = { x0: 0, y0: 0, x1: 1, y1: 1 };
+  const tri = [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }] }];
+  const side = checkDrawing({ frame: F, items: [], fields: [{ id: 'len', label: { code: 'len' }, value: 5, min: 0, readonly: true }], highlight: [{ part: 1 }, { part: 0, subs: tri }] });
+  assert.deepEqual(side.fields, [{ id: 'len', label: { code: 'len' }, value: 5, min: 0, readonly: true }]);
+  assert.deepEqual(side.highlight, [{ part: 1 }, { part: 0, subs: [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }] }] }]);
+  assert.throws(() => checkDrawing({ frame: F, items: [], fields: [{ id: 'a', label: 'A', value: '5' }] }), /field value/);
+  assert.throws(() => checkDrawing({ frame: F, items: [], fields: [{ id: 'a', label: 'A', value: 1 }, { id: 'a', label: 'B', value: 2 }] }), /twice/);
+  assert.throws(() => checkDrawing({ frame: F, items: [], fields: Array.from({ length: 9 }, (_, i) => ({ id: 'f' + i, label: 'F', value: i })) }), /fields/);
+  assert.throws(() => checkDrawing({ frame: F, items: [], highlight: [{ part: -1 }] }), /highlight/);
+  assert.throws(() => checkDrawing({ frame: F, items: [], highlight: [{ part: 0, subs: 'x' }] }), /highlight/);
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [], layers: [{ key: 'a', tris: [1, 2, 3] }] }), /tris/);
   assert.throws(() => checkDrawing({ frame: { x0: 0, y0: 0, x1: 1, y1: 1 }, items: [{ type: 'line', pts: [[0, 0]], style: 'pink' }] }), /style/);
   assert.throws(() => checkEvent({ select: { pts: 1.5 } }), /select/);

@@ -7,7 +7,7 @@
 // No DOM, no Editor, so the same checks run in the Worker, in the app and in Node tests.
 import type { Node, Pt, SubPath } from '../model';
 import { fromBase64, toBase64 } from '../base64';
-import type { GenDrawing, GenEvent, GenItem, GenLayer, GenStyle, Params, PlanSheet } from '../generators/types';
+import type { GenDrawing, GenEvent, GenItem, GenLayer, GenSideField, GenStyle, Params, PlanSheet } from '../generators/types';
 import type { AsmPoses, Pose, V3 } from '../generators/pose';
 
 /** Version of the call protocol; a plugin built for a newer one is refused with an update hint */
@@ -50,6 +50,9 @@ export const LIMITS = {
   points: 1_000_000,
   tris: 2_000_000,
   layers: 4,
+  /** Fields a drawing puts in the right column, parts it marks in the preview (#411) */
+  sideFields: 8,
+  highlight: 64,
   /** Cells of a region map on the drawing surface (2000 × 2000) */
   regionCells: 4_000_000,
   /** Size of the surface state as JSON */
@@ -344,9 +347,10 @@ export type PluginSurfaceResult = PluginEventResult;
 
 /** Answer of draw(): texts on the surface are plain (names the user typed, numbers) or codes */
 export type PluginItem = Exclude<GenItem, { type: 'text' }> | { type: 'text'; x: number; y: number; text: PluginText; style?: GenStyle };
-export interface PluginDrawing extends Omit<GenDrawing, 'items' | 'layers'> {
+export interface PluginDrawing extends Omit<GenDrawing, 'items' | 'layers' | 'fields'> {
   layers?: (Omit<GenLayer, 'items'> & { items?: PluginItem[] })[];
   items: PluginItem[];
+  fields?: (Omit<GenSideField, 'label' | 'title'> & { label: PluginText; title?: PluginText })[];
 }
 
 /** Answer of onChange(): parameters to change as well, or a question whose options each carry a patch */
@@ -451,6 +455,32 @@ export function checkDrawing(v: unknown): PluginDrawing {
   else if (v.cursor !== undefined) fail('cursor');
   if (typeof v.escape === 'boolean') out.escape = v.escape;
   else if (v.escape !== undefined) fail('escape');
+  // Fields for the right column and marks in the preview (#411)
+  if (v.fields !== undefined) {
+    if (!Array.isArray(v.fields) || v.fields.length > LIMITS.sideFields) fail('fields');
+    const ids = new Set<string>();
+    out.fields = (v.fields as unknown[]).map((x) => {
+      if (!isObj(x)) return fail('field');
+      const id = str(x.id, 'field id', 80);
+      if (ids.has(id)) fail('field id twice');
+      ids.add(id);
+      const f: NonNullable<PluginDrawing['fields']>[number] = { id, label: checkText(x.label), value: num(x.value, 'field value') };
+      if (x.min !== undefined) f.min = num(x.min, 'field min');
+      if (x.max !== undefined) f.max = num(x.max, 'field max');
+      if (x.readonly === true) f.readonly = true;
+      else if (x.readonly !== undefined && x.readonly !== false) fail('field readonly');
+      if (x.title !== undefined) f.title = checkText(x.title);
+      return f;
+    });
+  }
+  if (v.highlight !== undefined) {
+    if (!Array.isArray(v.highlight) || v.highlight.length > LIMITS.highlight) fail('highlight');
+    const nodes = { nodes: 0 };
+    out.highlight = (v.highlight as unknown[]).map((x) => {
+      if (!isObj(x) || !Number.isInteger(x.part) || (x.part as number) < 0) return fail('highlight part');
+      return { part: x.part as number, ...(x.subs !== undefined ? { subs: subs(x.subs, 'highlight subs', nodes) } : {}) };
+    });
+  }
   if (v.layers !== undefined) {
     if (!Array.isArray(v.layers) || v.layers.length > LIMITS.layers) fail('layers');
     out.layers = (v.layers as unknown[]).map((l) => {
