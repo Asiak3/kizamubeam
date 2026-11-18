@@ -681,6 +681,45 @@ await atest('plan: the selected wall\'s measures as fields beside the preview; a
   assert.deepEqual(shorter.issues, []);
 });
 
+await atest('plan: the length shown is that of the selected stretch: in the drawing (turned along a vertical wall), the field and the message', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  // Wall 2 (x = 47) from wall 1 (y = 97) to a free end at 180, crossed by wall 3 (y = 140): stretches 97–140 and 140–180
+  const walls = JSON.stringify([{ id: 1, axis: 'h', pos: 97, from: 0, to: 94 }, { id: 2, axis: 'v', pos: 47, from: 97, to: 180 }, { id: 3, axis: 'h', pos: 140, from: 0, to: 94 }]);
+  const click = (x: number, y: number, hit: string) => [{ type: 'down', x, y, hit }, { type: 'up', x, y, from: { x, y } }];
+  const field = (id: string, value: number) => ({ type: 'field', x: 0, y: 0, field: id, value });
+  const len = (s: Awaited<ReturnType<typeof runDialog>>[number]) => s.surface!.fields!.find((f) => f.id === 'len')!;
+  const texts = async (s: Awaited<ReturnType<typeof runDialog>>[number]) => {
+    const { view, state, selected } = s.surface!;
+    const d = await gen.draw!({ view, state, selected, have: [], size: { width: 560, height: 300 } }, G.normalizeParams(gen, s.params));
+    return d.items.filter((i) => i.type === 'text') as { text: string; angle?: number; align?: string }[];
+  };
+  const [, free] = await runDialog(manifest, [{ walls, $surface: click(47, 160, 'w2') }]);
+  assert.deepEqual(free.issues, []);
+  assert.deepEqual(len(free), { id: 'len', label: 'Length', value: 40 }, 'the stretch up to the free end: its length can be typed');
+  assert.match(free.message ?? '', /length 40 mm$/);
+  const shown = (await texts(free)).find((i) => i.text.startsWith('↔'));
+  assert.deepEqual(shown, { type: 'text', x: shown && (shown as { x: number }).x, y: 160, text: '↔ 40 mm', style: 'accent', align: 'center', angle: 90, bubble: true }, 'centred on the stretch 140–180, on a bubble');
+  assert.ok((shown as unknown as { x: number }).x < 47 - 1.5, 'beside the wall, on the side without its number');
+  for (const i of await texts(free)) assert.equal(i.align, 'center', `centred: ${i.text}`);
+  assert.ok((await texts(free)).filter((i) => / mm$/.test(i.text)).every((i) => (i as { bubble?: boolean }).bubble), 'every measure on a bubble');
+  const [, joined] = await runDialog(manifest, [{ walls, $surface: click(47, 120, 'w2') }]);
+  assert.deepEqual(len(joined), { id: 'len', label: 'Length', value: 43, readonly: true }, 'between two joints: follows them');
+  assert.match(joined.message ?? '', /length 43 mm$/);
+  const [, wholeWall] = await runDialog(manifest, [{ walls, $surface: [{ type: 'dblclick', x: 47, y: 160, hit: 'w2' }] }]);
+  assert.equal(len(wholeWall).value, 83, 'the whole wall');
+  // Typed: the free end moves, the stretch stays selected with its new length
+  const [, typed] = await runDialog(manifest, [{ walls, $surface: [...click(47, 160, 'w2'), field('len', 50)] }]);
+  assert.deepEqual(byId(typed, 2), { id: 2, axis: 'v', pos: 47, from: 97, to: 190 });
+  assert.equal(len(typed).value, 50);
+  const [, still] = await runDialog(manifest, [{ walls, $surface: [...click(47, 120, 'w2'), field('len', 60)] }]);
+  assert.equal(still.params.walls, walls, 'a stretch joined at both ends is not changed');
+  // A horizontal wall: its length reads normally, the numbers of the dimension lines (vertical) are turned
+  const [, h] = await runDialog(manifest, [{ walls, $surface: click(20, 140, 'w3') }]);
+  const ht = await texts(h);
+  assert.equal(ht.find((i) => i.text.startsWith('↔'))?.angle, undefined);
+  assert.deepEqual(ht.filter((i) => / mm$/.test(i.text) && !i.text.startsWith('↔')).map((i) => i.angle), [90, 90]);
+});
+
 await atest('plan: the selected wall is marked in the preview: its part and the slots of its teeth in the floor (#411)', async () => {
   const p = G.normalizeParams(gen, G.defaultParams(gen));
   const built = await G.buildGenAsync(gen, p);

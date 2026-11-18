@@ -443,6 +443,7 @@ function checkItems(v: unknown, count: { points: number }): PluginItem[] {
         type: 'text', x: num(it.x, 'text'), y: num(it.y, 'text'), text: checkText(it.text), ...style(it.style),
         ...(it.angle !== undefined ? { angle: num(it.angle, 'text angle') } : {}),
         ...(it.align !== undefined ? { align: it.align === 'start' || it.align === 'center' ? it.align : fail('text align') } : {}),
+        ...(it.bubble !== undefined ? (typeof it.bubble === 'boolean' ? (it.bubble ? { bubble: true } : {}) : fail('text bubble')) : {}),
       };
     return fail('item type');
   });

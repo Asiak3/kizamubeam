@@ -66,7 +66,7 @@
         { "key": "dividerDrop", "type": "length", "min": 0, "max": 500, "def": 0, "showIf": { "or": [{ "eq": ["wallFront", true] }, { "eq": ["wallBack", true] }, { "eq": ["wallLeft", true] }, { "eq": ["wallRight", true] }] } },
         { "key": "fromMaterial", "type": "bool", "def": false },
         { "key": "thickness", "type": "length", "min": 1, "max": 20, "def": 3, "showIf": { "eq": ["fromMaterial", false] } },
-        { "key": "clearance", "type": "length", "min": -1, "max": 2, "def": 0.1, "showIf": { "eq": ["fromMaterial", false] } },
+        { "key": "clearance", "type": "length", "min": -1, "max": 2, "def": 0, "showIf": { "eq": ["fromMaterial", false] } },
         { "key": "kerf", "type": "length", "min": 0, "max": 1, "def": 0, "showIf": { "eq": ["fromMaterial", false] } },
         { "key": "finger", "type": "length", "min": 2, "max": 100, "def": 10, "advanced": true },
         { "key": "walls", "type": "data", "def": "[]", "resetOnNew": true },

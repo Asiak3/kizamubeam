@@ -209,22 +209,38 @@ function stretchMid(m: Model, x: Wall, along: number): number {
   return along;
 }
 
-/** The end of wall x a typed length moves: a free one (the end when both are free); null when both ends are joined */
-function lengthEnd(m: Model, x: Wall): 'from' | 'to' | null {
+/** The selected stretch of wall x at `along` (the nearest one), cut to the wall; the whole wall without a selection */
+function runOn(sel: Sel | undefined, x: Wall, along: number): Run {
+  let best: Run = [x.from, x.to],
+    dist = Infinity;
+  if (sel && onLine(x, sel))
+    for (const [a0, b0] of sel.runs) {
+      const a = Math.max(a0, x.from),
+        b = Math.min(b0, x.to);
+      if (b - a < 0.01) continue;
+      const dd = Math.abs(Math.min(b, Math.max(a, along)) - along);
+      if (dd < dist) (dist = dd), (best = [a, b]);
+    }
+  return best;
+}
+
+/** The end of wall x a typed length of its stretch `run` moves: a free end of the wall that the stretch reaches (the
+ * end when both are free); null when the stretch is joined at both ends */
+function lengthEnd(m: Model, x: Wall, run: Run): 'from' | 'to' | null {
   const it = m.walls.find((q) => q.wall.id === x.id);
-  if (!it || it.end.kind === 'free') return 'to';
-  return it.start.kind === 'free' ? 'from' : null;
+  if (run[1] >= x.to - 0.01 && (!it || it.end.kind === 'free')) return 'to';
+  return run[0] <= x.from + 0.01 && it?.start.kind === 'free' ? 'from' : null;
 }
 
 /** The measures of the selected wall as fields beside the preview (#411): clear space on both sides where they are
- * taken, and its length (only with a free end) */
-function wallFields(p: Plan, walls: Wall[], m: Model, x: Wall, along: number): NonNullable<Drawing['fields']> {
+ * taken, and the length of the selected stretch there (only when it reaches a free end) */
+function wallFields(p: Plan, walls: Wall[], m: Model, x: Wall, along: number, run: Run): NonNullable<Drawing['fields']> {
   const c = clear(p, walls, x, along);
-  const free = lengthEnd(m, x);
+  const free = lengthEnd(m, x, run);
   return [
     { id: 'a', label: { code: `field.${x.axis}.a` }, value: r2(c.a), min: 0 },
     { id: 'b', label: { code: `field.${x.axis}.b` }, value: r2(c.b), min: 0 },
-    { id: 'len', label: { code: 'field.len' }, value: r2(x.to - x.from), min: 0, ...(free ? {} : { readonly: true, title: { code: 'field.len.joined' } }) },
+    { id: 'len', label: { code: 'field.len' }, value: r2(run[1] - run[0]), min: 0, ...(free ? {} : { readonly: true, title: { code: 'field.len.joined' } }) },
   ];
 }
 
@@ -260,13 +276,15 @@ export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width:
   const items: Item[] = [];
   const info = new Map(m.walls.map((it) => [it.wall.id, it]));
   // The app fits the frame into the surface (its size in px from newer apps, otherwise about 560 × 480, see
-  // dialogSurface.ts) and writes a text 6 px right of and 6 px above its point; with the scale, a text can be centred
+  // dialogSurface.ts); with the scale, a few pixels are known in mm to place a text beside a line
   const sw = s.size?.width || 560,
     sh = s.size?.height || 480;
   const k = Math.min((0.92 * sw) / (frame.x1 - frame.x0), (0.9 * sh) / (frame.y1 - frame.y0));
   const px = (n: number) => n / k;
-  const label = (cx: number, cy: number, text: string, style: 'accent' | 'muted') =>
-    items.push({ type: 'text', x: r1(cx - px(text.length * 3.1 + 6)), y: r1(cy + px(10)), text, style });
+  // Texts centred on their point (#412); along a vertical line turned to read from bottom to top (angle 90); measures
+  // on a bubble, readable over the lines they cross
+  const label = (cx: number, cy: number, text: string, style: 'accent' | 'muted', angle = 0, bubble = false) =>
+    items.push({ type: 'text', x: r1(cx), y: r1(cy), text, style, align: 'center', ...(angle ? { angle } : {}), ...(bubble ? { bubble } : {}) });
   const width = (text: string) => px(text.length * 6.2);
   // The selected wall last: drawn on top and hit first
   const order = [...walls].sort((a, b) => Number(a.id === sel) - Number(b.id === sel));
@@ -301,7 +319,8 @@ export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width:
   // the selected wall's number moves away from its dimension lines
   const selX = walls.find((q) => q.id === sel);
   const dimAt = selX ? stretchMid(m, selX, alongOf(st, selX)) : NaN;
-  const aside = (x: Wall, a: number) => (x.id === sel && Math.abs(a - dimAt) < px(18) ? dimAt + (dimAt - x.from > x.to - dimAt ? -px(18) : px(18)) : a);
+  // (the texts of the dimension lines lie just before dimAt along the wall)
+  const aside = (x: Wall, a: number) => (x.id === sel && Math.abs(a - dimAt) < px(24) ? dimAt + (dimAt - x.from > x.to - dimAt ? -px(24) : px(18)) : a);
   for (const x of walls) {
     const text = String(x.id);
     const a = aside(x, (x.from + x.to) / 2);
@@ -315,11 +334,12 @@ export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width:
       const r = t * 0.9;
       items.push({ type: 'line', closed: true, style: 'accent', alpha: 0.6, width: 1, pts: [[jx - r, jy], [jx, jy - r], [jx + r, jy], [jx, jy + r]] });
     }
-  // The selected wall: clear space on both sides as dimension lines with their numbers (beside the line, the app
-  // writes texts above and to the right of their point), its length near its end, a mark when it stands in the middle
+  // The selected wall: clear space on both sides as dimension lines with their numbers, the length of the selected
+  // stretch, a mark when it stands in the middle
   const x = selX;
   if (x) {
-    // Dimension lines in the middle of the stretch the pointer holds (not on a joint), texts centred beside them
+    // Dimension lines in the middle of the stretch the pointer holds (not on a joint), each text centred before its
+    // line, turned with a vertical line
     const mid = dimAt;
     const c = clear(p, walls, x, mid);
     for (const [a, b] of [[c.lo + t / 2, x.pos - t / 2], [x.pos + t / 2, c.hi - t / 2]]) {
@@ -327,14 +347,17 @@ export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width:
       items.push({ type: 'line', pts: [at(x.axis, mid, a), at(x.axis, mid, b)], style: 'accent', dash: true, width: 1 });
       for (const e of [a, b]) items.push({ type: 'line', pts: [at(x.axis, mid - 1.5, e), at(x.axis, mid + 1.5, e)], style: 'accent', width: 1 });
       const text = `${mm(r2(b - a))} mm`;
-      if (x.axis === 'h') label(mid + width(text) / 2 + px(6), (a + b) / 2, text, 'accent');
-      else label((a + b) / 2, mid - px(9), text, 'accent');
+      if (x.axis === 'h') label(mid - px(9), (a + b) / 2, text, 'accent', 90, true);
+      else label((a + b) / 2, mid - px(9), text, 'accent', 0, true);
     }
-    // Length on the other side of the wall than its number
-    const len = `${x.axis === 'h' ? '↔' : '↕'} ${mm(r2(x.to - x.from))} mm`;
-    const la = aside(x, (x.from + x.to) / 2);
-    if (x.axis === 'h') label(la, x.pos + t / 2 + px(9), len, 'accent');
-    else label(x.pos - t / 2 - width(len) / 2 - px(4), la, len, 'accent');
+    // Length of the selected stretch on the other side of the wall than its number, along the wall, centred on the
+    // stretch (its bubble covers the dimension line there)
+    const run = runOn(pick, x, mid);
+    const len = `↔ ${mm(r2(run[1] - run[0]))} mm`;
+    const la = (run[0] + run[1]) / 2;
+    // (its bubble is 15 px high: about 6 px clear of the wall)
+    if (x.axis === 'h') label(la, x.pos + t / 2 + px(14), len, 'accent', 0, true);
+    else label(x.pos - t / 2 - px(14), la, len, 'accent', 90, true);
     // Lined up with a wall in the same direction: a guide between them
     const q = walls.find((z) => z.id === lineUp(walls, x));
     if (q) {
@@ -391,7 +414,7 @@ export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width:
     items.push({ type: 'line', pts: [[r1(x0), r1(y0)], [r1(x1), r1(y1)]], style: 'warn', dash: true, width: 1.5 });
   }
   // The selected wall's measures as fields beside the preview, not while a new wall is drawn
-  const fields = x && st.drag?.kind !== 'draw' ? wallFields(p, walls, m, x, dimAt) : [];
+  const fields = x && st.drag?.kind !== 'draw' ? wallFields(p, walls, m, x, dimAt, runOn(pick, x, dimAt)) : [];
   // The plan wants pointer moves without a button, for the target (Ctrl); Escape clears what is selected or shown and
   // otherwise closes the dialog (newer apps)
   // While Ctrl shows the target or the cross, the normal cursor everywhere (not the move cursor over walls)
@@ -404,15 +427,16 @@ const refusal = (r: Extract<EditResult, { ok: false }>): Text => ({ code: r.code
 
 /**
  * The measures of wall id for the line under the plan, at `along` on it (default its middle): clear space on both
- * sides, its length, and whether it stands in the middle of that space, of the whole box or of a wall it ends on or
+ * sides, the length of the selected stretch there, and whether it stands in the middle of that space, of the whole box or of a wall it ends on or
  * crosses
  */
-function measures(p: Plan, walls: Wall[], id: number | undefined, along?: number): Text | '' {
+function measures(p: Plan, walls: Wall[], id: number | undefined, along?: number, sel?: Sel): Text | '' {
   const x = walls.find((q) => q.id === id);
   if (!x) return '';
   const a = along === undefined ? (x.from + x.to) / 2 : Math.min(x.to, Math.max(x.from, along));
   const c = clear(p, walls, x, a);
-  const values = { id: x.id, a: r2(c.a), b: r2(c.b), len: r2(x.to - x.from) };
+  const run = runOn(sel, x, a);
+  const values = { id: x.id, a: r2(c.a), b: r2(c.b), len: r2(run[1] - run[0]) };
   if (centred(c)) return { code: `plan.info.${x.axis}.c`, values };
   if (boxCentred(p, x)) return { code: `plan.info.${x.axis}.b`, values };
   const on = onCentre(buildModel({ ref: [p.w, p.d], walls }, p.w, p.d, p.lim), x, a);
@@ -428,7 +452,7 @@ function commit(p: Plan, walls: Wall[], id: number | undefined, along?: number, 
   const rows = JSON.parse(stored.walls) as Wall[];
   const row = id === undefined ? -1 : rows.findIndex((q) => q.id === id);
   const state = id !== undefined && along !== undefined ? { at: { id, along }, ...(sel ? { sel } : {}) } : sel ? { sel } : null;
-  return { patch: { walls: stored.walls, wallsRef: stored.wallsRef }, state, message: measures(p, walls, id, along), select: { [LIST]: row } };
+  return { patch: { walls: stored.walls, wallsRef: stored.wallsRef }, state, message: measures(p, walls, id, along, sel), select: { [LIST]: row } };
 }
 const finish = (p: Plan, r: EditResult, id: number | undefined): EventResult => (r.ok ? commit(p, r.layout.walls, id) : { state: null, message: refusal(r) });
 
@@ -507,7 +531,7 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
         sel = { ...same, runs };
       } else sel = same && covers(same.runs, run) ? same : { axis: x.axis, pos: x.pos, runs: [run] };
       const drag: Drag = { kind: 'move', id, base, x0: ev.x, y0: ev.y, sel };
-      return { state: { drag, sel, at: { id, along } }, select: { [LIST]: row }, message: measures(p, base, id, along) };
+      return { state: { drag, sel, at: { id, along } }, select: { [LIST]: row }, message: measures(p, base, id, along, sel) };
     }
     return { state: null, select: { [LIST]: -1 }, message: '' };
   }
@@ -554,7 +578,7 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
       const sel = { ...g.sel, pos: m.pos ?? to };
       const id = wallAt(m.layout.walls, sel, along)?.id;
       const at = id !== undefined ? { at: { id, along } } : {};
-      return { state: { drag: g, walls: m.layout.walls, sel, ...at }, message: measures(p, m.layout.walls, id, along) };
+      return { state: { drag: g, walls: m.layout.walls, sel, ...at }, message: measures(p, m.layout.walls, id, along, sel) };
     }
     const along: number | undefined = undefined;
     r = stretchEndNear(L, p.w, p.d, p.lim, g.id, g.which!, Math.round(x.axis === 'h' ? ev.x : ev.y), snapOf(p));
@@ -610,10 +634,16 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
     const m = buildModel(layout(base), p.w, p.d, p.lim);
     const mid = stretchMid(m, x, alongOf(st, x));
     if (ev.field === 'len') {
-      const which = lengthEnd(m, x);
+      // The length of the selected stretch: its free end moves; the stretch stays selected with its new length
+      const run = runOn(selection(st, base, x.id), x, mid);
+      const which = lengthEnd(m, x, run);
       if (!which) return null;
-      const r = stretchEnd(p.layout, p.w, p.d, p.lim, x.id, which, which === 'to' ? x.from + ev.value : x.to - ev.value, 0);
-      return r.ok ? commit(p, r.layout.walls, x.id) : { message: refusal(r) };
+      const end = which === 'to' ? run[0] + ev.value : run[1] - ev.value;
+      const r = stretchEnd(p.layout, p.w, p.d, p.lim, x.id, which, end, 0);
+      if (!r.ok) return { message: refusal(r) };
+      const now: Run = which === 'to' ? [run[0], end] : [end, run[1]];
+      const keep = st.sel && onLine(x, st.sel) ? { ...st.sel, runs: joinRuns([...without(st.sel.runs, run), now]) } : undefined;
+      return commit(p, r.layout.walls, x.id, (now[0] + now[1]) / 2, keep);
     }
     if (ev.field !== 'a' && ev.field !== 'b') return null;
     const c = clear(p, base, x, mid);
