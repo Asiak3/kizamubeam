@@ -32,11 +32,14 @@ interface Run {
   corner: boolean;
 }
 
-/** Felder einer Kante der Länge L als Abschnitte (Ecke, Felder, Ecke), gleiche Nachbarn zusammengefasst, mit Spiel */
-export function edgeRuns(L: number, th: number, e: EdgeSpec, cornerFull: boolean, finger: number, clearance: number): Run[] {
+/**
+ * Felder einer Kante der Länge L als Abschnitte (Ecke, Felder, Ecke), gleiche Nachbarn zusammengefasst, mit Spiel.
+ * play: total play of the joint (#402): each finger gets play/2 narrower, each gap play/2 wider.
+ */
+export function edgeRuns(L: number, th: number, e: EdgeSpec, cornerFull: boolean, finger: number, play: number): Run[] {
   const n = fieldCount(L - 2 * th, finger);
   // An geraden Kanten liegt nur die Ecke der Nachbarplatte an: kein Steckspiel
-  if (e.pattern === 'flat') clearance = 0;
+  if (e.pattern === 'flat') play = 0;
   const w = (L - 2 * th) / n;
   const raw: Run[] = [{ s0: 0, s1: th, full: cornerFull, corner: true }];
   for (let i = 0; i < n; i++) {
@@ -52,9 +55,10 @@ export function edgeRuns(L: number, th: number, e: EdgeSpec, cornerFull: boolean
       last.corner ||= r.corner;
     } else runs.push({ ...r });
   }
-  // Übergänge um das halbe Spiel in das Materialfeld verschieben
+  // Übergänge um ein Viertel des Gesamtspiels in das Materialfeld verschieben: jede Zinke wird an beiden Seiten so
+  // viel schmaler, jede Lücke so viel breiter
   for (let i = 0; i + 1 < runs.length; i++) {
-    const d = runs[i].full ? -clearance / 2 : clearance / 2;
+    const d = runs[i].full ? -play / 4 : play / 4;
     runs[i].s1 += d;
     runs[i + 1].s0 += d;
   }
@@ -65,8 +69,9 @@ export function edgeRuns(L: number, th: number, e: EdgeSpec, cornerFull: boolean
  * Umriss einer Platte (lokal 0..a × 0..b, y nach unten) ohne Schnittfuge: Rechteck minus die Bereiche, in denen die
  * Nachbarplatten liegen (jeder ausgesparte Abschnitt einer Kante = Rechteck mit der Materialdicke als Tiefe).
  * Gerechnet wird auf dem Raster aller Abschnittsgrenzen, der Rand der Materialzellen ergibt den Umriss.
+ * play: total play of the joints (#402).
  */
-export function panelOutline(P: PanelSpec, th: number, finger: number, clearance: number): Pt[] {
+export function panelOutline(P: PanelSpec, th: number, finger: number, play: number): Pt[] {
   const { a, b } = P;
   const C: Pt[] = [{ x: 0, y: 0 }, { x: a, y: 0 }, { x: a, y: b }, { x: 0, y: b }];
   const U: Pt[] = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
@@ -76,13 +81,13 @@ export function panelOutline(P: PanelSpec, th: number, finger: number, clearance
   const at = (i: number, s: number, d: number): Pt => ({ x: C[i].x + U[i].x * s + N[i].x * d, y: C[i].y + U[i].y * s + N[i].y * d });
   const cuts: { x0: number; x1: number; y0: number; y1: number }[] = [];
   P.edges.forEach((e, i) => {
-    const runs = edgeRuns(lens[i], th, e, P.corners, finger, clearance);
+    const runs = edgeRuns(lens[i], th, e, P.corners, finger, play);
     // Negatives Steckspiel (Presspassung): Die Eckabschnitte beider Kanten werden kürzer und ließen ein
-    // |Spiel|/2-Quadrat stehen, das unter der Nachbarwand liegt (Stufe/Überlappung). Die ausgesparte Ecke wird deshalb
+    // |Spiel|/4-Quadrat stehen, das unter der Nachbarwand liegt (Stufe/Überlappung). Die ausgesparte Ecke wird deshalb
     // als volles Quadrat weggeschnitten. Nur Muster A: Es beginnt mit einer Zinke, die Ecke ist ein eigener Abschnitt;
     // bei B ist sie mit dem ersten Feld verschmolzen. Bei positivem Spiel bleibt die Stufe bewusst erhalten: Sie ist
     // Bodenmaterial im Innenwinkel, das keine Wand abdeckt.
-    if (clearance < 0 && !P.corners && e.pattern === 'A') {
+    if (play < 0 && !P.corners && e.pattern === 'A') {
       for (const s0 of [0, lens[i] - th]) {
         const p = at(i, s0, 0), q = at(i, s0 + th, th);
         cuts.push({ x0: Math.min(p.x, q.x), x1: Math.max(p.x, q.x), y0: Math.min(p.y, q.y), y1: Math.max(p.y, q.y) });
@@ -237,8 +242,8 @@ export function offsetOrtho(pts: Pt[], d: number): Pt[] {
 
 /**
  * Outline of a panel centred on the origin (y down), with the kerf: what box panels are cut along. edges: top, right,
- * bottom, left.
+ * bottom, left. play: total play of the joints (#402).
  */
-export function panelCut(P: PanelSpec, th: number, finger: number, clearance: number, kerf: number): Pt[] {
-  return offsetOrtho(panelOutline(P, th, finger, clearance), kerf / 2).map((q) => ({ x: q.x - P.a / 2, y: q.y - P.b / 2 }));
+export function panelCut(P: PanelSpec, th: number, finger: number, play: number, kerf: number): Pt[] {
+  return offsetOrtho(panelOutline(P, th, finger, play), kerf / 2).map((q) => ({ x: q.x - P.a / 2, y: q.y - P.b / 2 }));
 }

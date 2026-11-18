@@ -5,8 +5,24 @@
 import type { Node, Pt, SubPath } from './model';
 import { bezierPt, segments } from './curves';
 
-/** Version of the joint geometry; a change to the shapes gets a new version so older results can be reproduced */
-export const JOINT_GEOMETRY_VERSION = 1;
+/**
+ * Version of the joint geometry; a change to the shapes gets a new version so older results can be reproduced.
+ * 1: clearance is the play per side along fingers and tenons (the joint gets twice the clearance there) and the whole
+ * play elsewhere. 2 (#402): clearance is the total play of the joint everywhere.
+ */
+export type JointGeometryVersion = 1 | 2;
+/** The newest version */
+export const JOINT_GEOMETRY_VERSION: JointGeometryVersion = 2;
+
+/**
+ * Kerf minus play, for the two kinds of fit. gap: where the play is one gap (slot width over the thickness, lap, wedge
+ * hole, T-slot): the hole gets that much bigger. along: fingers and tenons along the edge, where the play is split over
+ * the two sides: each finger or tenon gets that much wider (and the gap or slot narrower), so the joint gets twice the
+ * play of `along`.
+ */
+export function jointAdjust(o: Pick<JointOptions, 'kerf' | 'clearance'>, v: JointGeometryVersion): { gap: number; along: number } {
+  return { gap: o.kerf - o.clearance, along: o.kerf - (v === 1 ? o.clearance : o.clearance / 2) };
+}
 
 /** A problem or note of a joint: code and numbers for its text */
 export interface JointMsg {
@@ -59,11 +75,14 @@ export interface JointOptions {
   hingeWall: number;
   /** Schnittbreite des Lasers in mm: Zinken/Zapfen werden um so viel breiter, Lücken/Schlitze schmaler gezeichnet */
   kerf: number;
-  /** Spiel in mm: positiv = lockerer, negativ = strammer (Press-Fit) */
+  /**
+   * Spiel in mm: positiv = lockerer, negativ = strammer (Press-Fit). Version 2: the total play of the joint; version 1:
+   * per side along fingers and tenons (see JointGeometryVersion).
+   */
   clearance: number;
   /**
-   * Tenon family: play across the slot (slot width over the thickness) in mm. Not set = clearance, as before. Lets a
-   * caller set the play along and across the slot separately (#402), like slotClearance of the box with dividers.
+   * Tenon family: play across the slot (slot width over the thickness) in mm. Not set = clearance. Lets a caller set
+   * the play along and across the slot separately (#402), like slotClearance of the box with dividers.
    */
   slotClearance?: number;
 }
@@ -182,7 +201,7 @@ export function fingerCount(len: number, width: number): number {
 /**
  * Profil einer Fingerzinken-Kante im Kantensystem (ohne die Endpunkte a und b).
  * Das Muster (n gleiche Felder) liegt mittig auf der Kante; ist die Kante länger als pattern, verlängern sich die Endfelder.
- * Feld i ist Material, wenn (i + phase) gerade ist. adj verbreitert jedes Materialfeld insgesamt um adj (Kerf − Spiel).
+ * Feld i ist Material, wenn (i + phase) gerade ist. adj verbreitert jedes Materialfeld insgesamt um adj (jointAdjust().along).
  */
 export function fingerProfile(len: number, pattern: number, n: number, phase: 0 | 1, vMat: number, vGap: number, adj: number): Pt[] {
   const w = pattern / n;
@@ -251,9 +270,9 @@ const circleSub = (cx: number, cy: number, r: number) => new PathBuilder().line(
  * Die Achse sitzt hinter der Rückwand auf halber Deckeldicke: so bewegt sich die Deckelkante beim Öffnen erst
  * nach vorn und oben und streift die Kasten-Knöchel nicht.
  */
-export function lidHingeDims(o: JointOptions) {
+export function lidHingeDims(o: JointOptions, v: JointGeometryVersion) {
   const th = o.thickness;
-  const adj = o.kerf - o.clearance;
+  const adj = jointAdjust(o, v).along;
   /** Radius des Auges um den Stift */
   const R = o.pinDia / 2 + o.pinPlay / 2 + o.hingeWall;
   /** Luft zwischen Auge und Rückwand bzw. Deckelkante */
@@ -276,8 +295,8 @@ export function lidHingeDims(o: JointOptions) {
 }
 
 /** Profile der beiden Knöchel-Arten im Profilsystem von lidHingeDims, jeweils Umriss + Stiftloch */
-export function lidHingeProfiles(o: JointOptions): { box: SubPath[]; lid: SubPath[] } {
-  const d = lidHingeDims(o);
+export function lidHingeProfiles(o: JointOptions, v: JointGeometryVersion): { box: SubPath[]; lid: SubPath[] } {
+  const d = lidHingeDims(o, v);
   const { th, R, gap, ax, ay, mid, tenonHalf } = d;
   const PI = Math.PI;
   const yTop = -mid + tenonHalf,
@@ -353,14 +372,14 @@ export function jointMate(picks: JointEdge[], o: JointOptions): MateWorld | null
  * Verbindung berechnen. Fingerzinken: eine oder zwei Kanten (die zweite bekommt das Gegenstück).
  * Schlitz und Zapfen: erste Kante bekommt die Zapfen, die zweite Linie (Kante oder einzelne Hilfslinie) die Schlitze.
  */
-export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): JointGeomResult<K> {
+export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions, v: JointGeometryVersion): JointGeomResult<K> {
   const changes = new Map<K, SubPath[]>();
   const fail = (code: string): JointGeomResult<K> => ({ changes: new Map(), added: [], info: [], error: { code } });
   if (!picks.length) return fail('no-edge');
   if (picks.length > 1 && sameEdge(picks[0], picks[1])) return fail('same-edge');
   const th = o.thickness;
   if (!(th > 0)) return fail('thickness');
-  const adj = o.kerf - o.clearance;
+  const { gap: adj, along } = jointAdjust(o, v);
 
   const subsOf = (p: JointEdge<K>) => {
     let c = changes.get(p.obj);
@@ -381,11 +400,11 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
     const pattern = Math.min(...geoms.map((g) => g.len));
     const n = fingerCount(pattern, o.fingerWidth);
     const w = pattern / n;
-    if (w - Math.abs(adj) <= 0.05) return fail('fingers-narrow');
+    if (w - Math.abs(along) <= 0.05) return fail('fingers-narrow');
     const [vMat, vGap] = o.direction === 'in' ? [0, -th] : [th, 0];
     geoms.forEach((g, i) => {
       const phase = ((i + (o.swap ? 1 : 0)) % 2) as 0 | 1;
-      edits.push({ pick: picks[i], pts: fingerProfile(g.len, pattern, n, phase, vMat, vGap, adj).map((q) => at(g, q.x, q.y)) });
+      edits.push({ pick: picks[i], pts: fingerProfile(g.len, pattern, n, phase, vMat, vGap, along).map((q) => at(g, q.x, q.y)) });
       corners.push({ obj: picks[i].obj, sub: picks[i].sub, p: g.a }, { obj: picks[i].obj, sub: picks[i].sub, p: g.b });
     });
     info.push({ code: 'finger-info', values: { n, width: w } });
@@ -426,7 +445,7 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
     if (picks[0].obj === picks[1].obj) return fail('hinge-same');
     if (!(o.pinDia > 0)) return fail('pin-dia');
     if (!(o.hingeWall > 0)) return fail('hinge-wall');
-    const d = lidHingeDims(o);
+    const d = lidHingeDims(o, v);
     if (d.hole <= 0) return fail('pin-hole');
     if (d.slotHalf <= 0 || th - adj <= 0) return fail('slots-small');
     if (d.R - th / 2 < 1) return fail('eye-weak');
@@ -454,7 +473,7 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
     }
     // Knöchel rechts neben Rückwand und Deckel legen, in einer Reihe (erst die für den Kasten, dann die für den Deckel),
     // „oben“ im Profil zeigt auf der Arbeitsfläche nach oben
-    const prof = lidHingeProfiles(o);
+    const prof = lidHingeProfiles(o, v);
     const plates = [...changes.values()].flat().flatMap((sp) => sp.nodes);
     let px = Math.max(...plates.map((p) => p.x)) + 5;
     const py = Math.min(...plates.map((p) => p.y));
@@ -484,7 +503,7 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
     // Zapfen-Familie: einfacher Zapfen, Schnappzapfen mit Rasthaken, L-förmiger Haken, Keilzapfen, Zapfen mit T-Slots dazwischen
     const g = geoms[0];
     const n = Math.max(1, Math.round(o.tenonCount));
-    const tw = o.tenonWidth + adj;
+    const tw = o.tenonWidth + along;
     const hw = tw / 2;
     const centers = tenonCenters(g.len, n);
     /** Seitlicher Platzbedarf je Zapfen über die Zapfenbreite hinaus */
@@ -579,7 +598,7 @@ export function computeJointGeom<K>(picks: JointEdge<K>[], o: JointOptions): Joi
       const s = geoms[1];
       // Schlitzmitte: um slotOffset von der Linie versetzt, bei Kanten geschlossener Formen ins Material hinein
       const sideIn = s.closed ? -1 : 1;
-      const sl = o.tenonWidth - adj,
+      const sl = o.tenonWidth - along,
         sw = th - o.kerf + (o.slotClearance ?? o.clearance);
       if (sl <= 0 || sw <= 0) return fail('slots-small');
       const mid = s.len / 2;

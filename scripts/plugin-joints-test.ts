@@ -87,6 +87,71 @@ await test('edge: slotClearance sets the play across the slot on its own (#402)'
   assert.deepEqual(call({ op: 'edge', options: { kind: 'tenon', slotClearance: 9 }, parts: { a: [a] }, edges: [{ part: 'a', seg: 2 }] }), { error: 'host-bad-input' });
 });
 
+// The shapes of v: 1 as they were before v: 2 (#402), as hashes of the rounded answers: v: 1 and no v must keep them
+const KINDS = ['finger', 'tenon', 'lap', 'snap', 'hook', 'wedge', 'tslot', 'lidhinge'] as const;
+const pinPanels = (v?: number, scale = 1) => {
+  const out: unknown[] = [];
+  for (const clearance of [0, 0.1, -0.1, 0.5])
+    for (const kerf of [0, 0.15])
+      for (const [edges, corners] of [[['B', 'A', 'B', 'A'], true], [['A', 'A', 'A', 'A'], false], [['B', 'B', 'B', 'B'], false], [['A', 'flat', 'B', 'A'], false]] as const)
+        out.push(call({ op: 'panel', ...(v ? { v } : {}), width: 120, height: 60, thickness: 3, finger: 10, clearance: clearance * scale, kerf, edges, corners }));
+  return round(out);
+};
+type Opts = Record<string, unknown>;
+const pinEdges = (kind: (typeof KINDS)[number], v?: number, tweak = (o: Opts) => o) => {
+  const a = rectSub(0, 0, 100, 50), b = rectSub(0, 60, 100, 50);
+  const out: unknown[] = [];
+  for (const clearance of [0.1, -0.1, 0.4])
+    for (const kerf of [0, 0.1])
+      for (const slotClearance of [undefined, 0.2]) {
+        const options = { kind, thickness: 3, tenonCount: 2, tenonWidth: 15, slotOffset: 5, clearance, kerf, ...(slotClearance === undefined ? {} : { slotClearance }) };
+        out.push(call({ op: 'edge', ...(v ? { v } : {}), options: tweak(options), parts: { a: [a], b: [b] }, edges: [{ part: 'a', seg: 2 }, { part: 'b', seg: 0 }] }));
+      }
+  return round(out);
+};
+const hash = (x: unknown) => createHash('sha256').update(JSON.stringify(x)).digest('hex').slice(0, 16);
+const PINS: Record<string, string> = {
+  panel: '1619b1dba7e70257', finger: '4dd8c9e0bcb56485', tenon: '32753d139f0f4813', lap: 'f8311c26911e37f7', snap: '8e64dac4c1e0e0fb',
+  hook: '074246e29ad99763', wedge: '5ed54e03843a34bd', tslot: '795d5839fa53c6ab', lidhinge: '019fb4f2f2f27fcf',
+};
+
+await test('v: 1 and no v keep the shapes from before v: 2 (#402)', () => {
+  const got: Record<string, string> = { panel: hash(pinPanels(1)) };
+  for (const kind of KINDS) got[kind] = hash(pinEdges(kind, 1));
+  assert.deepEqual(got, PINS);
+  assert.equal(hash(pinPanels()), PINS.panel, 'no v = 1');
+  for (const kind of KINDS) assert.equal(hash(pinEdges(kind)), PINS[kind], `no v = 1: ${kind}`);
+});
+
+/** The answers without their version, to compare shapes of v: 1 and v: 2 */
+const shapes = (answers: unknown) => (answers as { ok: Record<string, unknown> }[]).map(({ ok: { v, ...rest } }) => (assert.ok(v === 1 || v === 2), rest));
+
+await test('v: 2: clearance is the total play of the joint (#402)', () => {
+  // Box panels and finger joints: v: 2 with twice the clearance gives the shapes of v: 1 (per side there)
+  assert.deepEqual(shapes(pinPanels(2, 2)), shapes(pinPanels(1)));
+  const twice = (o: Opts) => ({ ...o, clearance: 2 * (o.clearance as number) });
+  assert.deepEqual(shapes(pinEdges('finger', 2, twice)), shapes(pinEdges('finger', 1)));
+  // Tenons: along the slot twice, across it (slotClearance, by default the clearance) the same
+  assert.deepEqual(shapes(pinEdges('tenon', 2, (o) => ({ ...twice(o), slotClearance: o.slotClearance ?? o.clearance }))), shapes(pinEdges('tenon', 1)));
+  // Lap: one gap, the same in both versions
+  assert.deepEqual(shapes(pinEdges('lap', 2)), shapes(pinEdges('lap', 1)));
+  // Measured: 0.1 total play along and across the slot, without kerf
+  const a = rectSub(0, 0, 100, 50), b = rectSub(0, 60, 100, 50);
+  const r = call({ op: 'edge', v: 2, options: { kind: 'tenon', thickness: 3, tenonCount: 1, tenonWidth: 20, slotOffset: 10, clearance: 0.1 }, parts: { a: [a], b: [b] }, edges: [{ part: 'a', seg: 2 }, { part: 'b', seg: 0 }] });
+  const parts = r.ok!.parts as Record<string, SubPath[]>;
+  const span = (pts: { x: number; y: number }[], k: 'x' | 'y') => Math.max(...pts.map((p) => p[k])) - Math.min(...pts.map((p) => p[k]));
+  const tenon = parts.a[0].nodes.filter((p) => p.y > 50 + 1e-9);
+  const slot = parts.b[1].nodes;
+  assert.ok(Math.abs(span(slot, 'x') - span(tenon, 'x') - 0.1) < 1e-9, `along: ${span(slot, 'x')} − ${span(tenon, 'x')}`);
+  assert.ok(Math.abs(span(slot, 'y') - 3 - 0.1) < 1e-9, `across: ${span(slot, 'y')}`);
+  // Fingers: each finger 0.05 narrower, each gap 0.05 wider: 0.1 between a finger and its gap
+  const f = (v: number, clearance: number) => call({ op: 'edge', v, options: { kind: 'finger', thickness: 3, fingerWidth: 10, clearance }, parts: { a: [a] }, edges: [{ part: 'a', seg: 2 }] });
+  const xs = (ans: ReturnType<typeof call>) => (ans.ok!.parts as Record<string, SubPath[]>).a[0].nodes.map((p) => p.x).sort((u, w) => u - w);
+  const moved = xs(f(2, 0.1)).map((x, i) => Math.abs(x - xs(f(2, 0))[i])).filter((d) => d > 1e-9);
+  assert.ok(moved.length > 0 && moved.every((d) => Math.abs(d - 0.025) < 1e-9), JSON.stringify(moved));
+  assert.deepEqual(round(f(2, 0.2).ok!.parts), round(f(1, 0.1).ok!.parts));
+});
+
 await test('edge: a joint that does not fit answers with an error code; the app writes the text', () => {
   const r = call({ op: 'edge', options: { kind: 'finger', thickness: 3, fingerWidth: 0.5, kerf: 1 }, parts: { a: [rectSub(0, 0, 20, 20)] }, edges: [{ part: 'a', seg: 0 }] });
   assert.deepEqual(r.ok, { v: 1, error: { code: 'joint-fingers-narrow' } });
@@ -96,7 +161,7 @@ await test('bad input is refused', () => {
   const a = [rectSub(0, 0, 50, 50)];
   const curved: SubPath = { closed: true, nodes: [{ x: 0, y: 0, cout: { x: 10, y: -10 } }, { x: 50, y: 0, cin: { x: 40, y: -10 } }, { x: 50, y: 50 }] };
   for (const input of [
-    null, { op: 'nope' }, { op: 'panel', v: 2, width: 10, height: 10, thickness: 1, finger: 2, edges: ['A', 'A', 'A', 'A'] },
+    null, { op: 'nope' }, { op: 'panel', v: 3, width: 10, height: 10, thickness: 1, finger: 2, edges: ['A', 'A', 'A', 'A'] },
     { op: 'panel', width: 10, height: 10, thickness: 6, finger: 2, edges: ['A', 'A', 'A', 'A'] },
     { op: 'panel', width: 10, height: 10, thickness: 1, finger: 2, edges: ['A', 'A', 'A'] },
     { op: 'panel', width: 10, height: 10, thickness: 1, finger: 2, edges: ['A', 'A', 'A', 'X'] },

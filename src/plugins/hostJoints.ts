@@ -3,12 +3,13 @@
 //   generators, src/generators/panelJoints.ts)
 // - edge: the joints of the Joint tool (finger, tenon, lap, snap, hook, wedge, T-slot, lid hinge) on one or two
 //   straight edges of the plugin's outlines (src/jointsGeom.ts)
-// v is the version of the joint geometry: the same input and version always give the same shapes. Problems and
-// notes come back as codes joint-… with numbers; the app writes their texts (jointText.ts, plugins/words.ts).
+// v is the version of the joint geometry: the same input and version always give the same shapes. Without v it is 1,
+// so plugins written before version 2 keep their shapes; in 2 the clearance is the total play of the joint (#402).
+// Problems and notes come back as codes joint-… with numbers; the app writes their texts (jointText.ts, plugins/words.ts).
 // Runs inside the plugin Worker: no i18n here.
 import type { SubPath } from '../model';
 import { segments } from '../curves';
-import { computeJointGeom, DEFAULT_JOINT, JOINT_GEOMETRY_VERSION, type JointKind, type JointMsg, type JointOptions } from '../jointsGeom';
+import { computeJointGeom, DEFAULT_JOINT, type JointGeometryVersion, type JointKind, type JointMsg, type JointOptions } from '../jointsGeom';
 import { fieldCount, panelCut, type Pattern } from '../generators/panelJoints';
 
 type Bad = (what: string) => never;
@@ -32,9 +33,9 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 
 export function jointsFn(input: unknown, subsOf: Subs, num: Num, bad: Bad): unknown {
   if (!isObj(input)) return bad('joints');
-  const v = input.v === undefined ? JOINT_GEOMETRY_VERSION : input.v;
+  const v = input.v === undefined ? 1 : input.v;
   // Only versions this app knows; a newer plugin on an older app fails clearly instead of getting other shapes
-  if (v !== 1) return bad('v');
+  if (v !== 1 && v !== 2) return bad('v');
   if (input.op === 'panel') {
     const a = num(input.width, 'width', 0.1, 1e5), b = num(input.height, 'height', 0.1, 1e5);
     const th = num(input.thickness, 'thickness', 0.1, 100);
@@ -45,7 +46,9 @@ export function jointsFn(input: unknown, subsOf: Subs, num: Num, bad: Bad): unkn
     if (!Array.isArray(input.edges) || input.edges.length !== 4 || !input.edges.every((e) => (PATTERNS as unknown[]).includes(e))) return bad('edges');
     if (fieldCount(a - 2 * th, finger) + fieldCount(b - 2 * th, finger) > MAX_FIELDS) return bad('finger');
     const edges = (input.edges as Pattern[]).map((pattern) => ({ pattern })) as [{ pattern: Pattern }, { pattern: Pattern }, { pattern: Pattern }, { pattern: Pattern }];
-    const pts = panelCut({ key: '', a, b, edges, corners: input.corners === true }, th, finger, clearance, kerf);
+    // Version 1: clearance per side, so the joints get twice that
+    const play = v === 1 ? 2 * clearance : clearance;
+    const pts = panelCut({ key: '', a, b, edges, corners: input.corners === true }, th, finger, play, kerf);
     return { v, outline: { closed: true, nodes: pts } };
   }
   if (input.op === 'edge') {
@@ -73,7 +76,7 @@ export function jointsFn(input: unknown, subsOf: Subs, num: Num, bad: Bad): unkn
       if (!s || s.curve || Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) < 1e-6) return bad(`edges[${i}].seg`);
       return { obj: e.part, subs, sub, seg };
     });
-    const r = computeJointGeom(edges, o);
+    const r = computeJointGeom(edges, o, v as JointGeometryVersion);
     if (r.error) return { v, error: msg(r.error) };
     const out: Record<string, SubPath[]> = {};
     for (const k of keys) out[k] = r.changes.get(k) ?? parts.get(k)!;

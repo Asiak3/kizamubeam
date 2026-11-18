@@ -329,16 +329,19 @@ export interface Host {
    * joints on its edges top, right, bottom, left (A starts with a finger, B with a gap, flat = none), like the box
    * generators. edge: a joint of the Joint tool on one or two straight edges (segment seg of sub-path sub) of the
    * outlines in parts; answers the changed outlines, added parts (wedges, hinge knuckles), info codes and, when the
-   * joint does not fit, an error code instead. v is the version of the joint geometry (1): the same input and version
-   * always give the same shapes. Info and error codes (joint-…) have their texts in the app: pass them on as issue
+   * joint does not fit, an error code instead. v is the version of the joint geometry: the same input and version
+   * always give the same shapes. In 2 the clearance is the total play of the joint (#402); 1, the default, takes it
+   * per side along fingers and tenons (see docs/plugins.md). Info and error codes (joint-…) have their texts in the app: pass them on as issue
    * codes or info texts with their values.
    */
-  joints(input: { op: 'panel'; v?: 1; width: number; height: number; thickness: number; finger: number; clearance?: number; kerf?: number; edges: [JointPattern, JointPattern, JointPattern, JointPattern]; corners?: boolean }): { v: 1; outline: SubPath };
-  joints(input: { op: 'edge'; v?: 1; options: JointOptions; parts: Record<string, SubPath[]>; edges: { part: string; sub?: number; seg: number }[] }): JointAnswer;
+  joints(input: { op: 'panel'; v?: JointVersion; width: number; height: number; thickness: number; finger: number; clearance?: number; kerf?: number; edges: [JointPattern, JointPattern, JointPattern, JointPattern]; corners?: boolean }): { v: JointVersion; outline: SubPath };
+  joints(input: { op: 'edge'; v?: JointVersion; options: JointOptions; parts: Record<string, SubPath[]>; edges: { part: string; sub?: number; seg: number }[] }): JointAnswer;
   /** Report progress 0 … 1 of a long computation, optionally with a short text */
   progress(done: number, text?: string): void;
 }
 export type JointPattern = 'A' | 'B' | 'flat';
+/** Version of the joint geometry: 2 = clearance is the total play of the joint; 1 (default) = per side along fingers and tenons */
+export type JointVersion = 1 | 2;
 /** Options of a joint, as in the Joint tool (mm unless noted); only kind is required */
 export interface JointOptions {
   kind: 'finger' | 'tenon' | 'lap' | 'snap' | 'hook' | 'wedge' | 'tslot' | 'lidhinge';
@@ -378,8 +381,8 @@ export interface JointMessage {
   values?: Record<string, number | string>;
 }
 export type JointAnswer =
-  | { v: 1; parts: Record<string, SubPath[]>; added: SubPath[]; info: JointMessage[]; error?: undefined }
-  | { v: 1; error: JointMessage };
+  | { v: JointVersion; parts: Record<string, SubPath[]>; added: SubPath[]; info: JointMessage[]; error?: undefined }
+  | { v: JointVersion; error: JointMessage };
 /** host.context("material"): values from the material library entry on the layer, each null when unknown (mm) */
 export interface MaterialContext {
   name: string | null;

@@ -9,12 +9,12 @@
 import { Mat, Obj, SubPath } from './model';
 import { segments, shapeSubs } from './geom';
 import { transformSubs } from './importers';
-import { computeJointGeom, jointMate as mateGeom, type JointOptions, type MateWorld } from './jointsGeom';
+import { computeJointGeom, jointMate as mateGeom, type JointGeometryVersion, type JointOptions, type MateWorld } from './jointsGeom';
 import { jointInfoText, jointText } from './jointText';
 
 export {
-  DEFAULT_JOINT, fingerCount, fingerProfile, JOINT_GEOMETRY_VERSION, lapCenters, lidHingeDims, lidHingeProfiles, tenonCenters,
-  type JointKind, type JointMsg, type JointOptions, type MateWorld,
+  DEFAULT_JOINT, fingerCount, fingerProfile, JOINT_GEOMETRY_VERSION, jointAdjust, lapCenters, lidHingeDims, lidHingeProfiles, tenonCenters,
+  type JointGeometryVersion, type JointKind, type JointMsg, type JointOptions, type MateWorld,
 } from './jointsGeom';
 
 /** Gewählte gerade Kante: Blatt-Objekt, seine Weltmatrix und das Segment in shapeSubs(obj.shape) */
@@ -65,9 +65,10 @@ export function jointMate(picks: EdgePick[], o: JointOptions): MateWorld | null 
 /**
  * Verbindung berechnen. Fingerzinken: eine oder zwei Kanten (die zweite bekommt das Gegenstück).
  * Schlitz und Zapfen: erste Kante bekommt die Zapfen, die zweite Linie (Kante oder einzelne Hilfslinie) die Schlitze.
+ * v: version of the joint geometry; the Joint tool still uses 1 (clearance per side along fingers and tenons, #402).
  */
-export function computeJoint(picks: EdgePick[], o: JointOptions): JointResult {
-  const r = computeJointGeom(edges(picks), o);
+export function computeJoint(picks: EdgePick[], o: JointOptions, v: JointGeometryVersion = 1): JointResult {
+  const r = computeJointGeom(edges(picks), o, v);
   if (r.error) return { changes: new Map(), added: [], info: '', error: jointText(r.error) ?? r.error.code };
   const m = new Map(picks.map((p) => [p.obj, p.m]));
   return { changes: new Map([...r.changes].map(([obj, subs]) => [obj, { m: m.get(obj)!, subs }])), added: r.added, info: jointInfoText(r.info) };
