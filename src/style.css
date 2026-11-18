@@ -2948,8 +2948,10 @@ body.dock-resizing #canvas {
 .gen-surface:focus {
   outline: 1px solid var(--accent);
 }
-.gen-surface-area .note:empty {
-  display: none;
+/* The message line under the surface keeps its room (two lines) even when empty: the surface takes the rest of the
+   height, so a message that comes or goes must not make it jump (#411) */
+.gen-surface-area > .note:not(.muted) {
+  min-height: 2.9em;
 }
 
 /* Steps of a generator dialog (#211 stage 7): numbered tabs, one step at a time */

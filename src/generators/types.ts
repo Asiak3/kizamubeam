@@ -287,8 +287,18 @@ export interface GenDrawing {
   frame: { x0: number; y0: number; x1: number; y1: number };
   layers?: GenLayer[];
   items: GenItem[];
-  /** Pointer moves are sent even without a pressed button (e.g. while a line is being drawn) */
+  /**
+   * Pointer moves are sent even without a pressed button (e.g. while a line is being drawn), and a move at the pointer
+   * when a modifier key is pressed or released over the surface
+   */
   track?: boolean;
+  /**
+   * Cursor over the whole surface, also over shapes with an id (e.g. the normal one while a key shows something else
+   * than dragging); without it, "move" over shapes with an id and the normal cursor elsewhere
+   */
+  cursor?: 'default' | 'crosshair';
+  /** Escape goes to the generator (true) or closes the dialog (false); without it, it goes to the generator while track is on */
+  escape?: boolean;
 }
 
 /** What the surface shows now: the view, free data of the generator (kept by the app) and the selected rows */

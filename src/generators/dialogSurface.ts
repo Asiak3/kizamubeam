@@ -3,7 +3,9 @@
 // (Generator.onSurface). The app scales, draws, hit-tests and keeps the surface state; the generator only ever
 // changes parameters. Answers of a plugin arrive later: events are sent one after the other, moves are merged.
 // The surface fills the room the dialog gives it (the manifest's height is the smallest); the generator gets the size
-// in pixels with every draw and is asked again when it changes (#411).
+// in pixels with every draw and is asked again when it changes (#411). The cursor is the one the drawing asks for, over
+// the whole surface; without one, "move" over shapes with an id and the normal cursor elsewhere. With track on, pressing or releasing Shift, Ctrl or Alt over
+// the surface sends a move at the pointer, so the generator can show what the key does without the pointer moving.
 import { pointerMods } from './pointerMods';
 import { h } from '../dom';
 import type { GenDrawing, GenItem, GenLayer, Generator, GenPointer, GenStyle, GenSurfaceChange, GenSurfaceState, Params } from './types';
@@ -197,8 +199,9 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     }
     ctx.setTransform(r, 0, 0, r, 0, 0);
     drawItems(ctx, drawing.items, col);
-    canvas.style.cursor = drawing.track ? 'crosshair' : 'default';
+    canvas.style.cursor = cursorAt(pointer);
   };
+  const cursorAt = (q: { px: number; py: number } | null) => drawing?.cursor ?? (q && hit(q.px, q.py) ? 'move' : 'default');
 
   // ---- Calls to the generator, one after the other ----
   let drawSeq = 0;
@@ -329,6 +332,8 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     return undefined;
   };
   let down: { x: number; y: number } | null = null;
+  /** Where the pointer is over the surface (screen and mm), for the cursor and for moves on modifier keys */
+  let pointer: { px: number; py: number; x: number; y: number } | null = null;
   const ev = (type: GenPointer['type'], e: MouseEvent, extra: Partial<GenPointer> = {}): GenPointer => {
     const q = at(e);
     return { type, x: round(q.x), y: round(q.y), ...extra, ...pointerMods(e) };
@@ -343,12 +348,23 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   });
   canvas.addEventListener('mousemove', (e) => {
     const q = at(e);
-    if (!down && !drawing?.track) {
-      canvas.style.cursor = hit(q.px, q.py) ? 'move' : 'default';
-      return;
-    }
+    pointer = { px: q.px, py: q.py, x: round(q.x), y: round(q.y) };
+    if (!down) canvas.style.cursor = cursorAt(q);
+    if (!down && !drawing?.track) return;
     send(ev('move', e, down ? { drag: true, from: down } : {}));
   });
+  // A modifier key pressed or released over the surface (the dialog stops key events, so on the way down)
+  const modKey = (e: KeyboardEvent) => {
+    if (!canvas.isConnected) {
+      window.removeEventListener('keydown', modKey, true);
+      window.removeEventListener('keyup', modKey, true);
+      return;
+    }
+    if (e.repeat || !['Shift', 'Control', 'Alt', 'Meta'].includes(e.key) || !pointer || down || !drawing?.track || !isOpen()) return;
+    send({ type: 'move', x: pointer.x, y: pointer.y, ...pointerMods(e) });
+  };
+  window.addEventListener('keydown', modKey, true);
+  window.addEventListener('keyup', modKey, true);
   const up = (e: MouseEvent) => {
     if (!down) return;
     const from = down;
@@ -356,7 +372,10 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
     send(ev('up', e, { from }));
   };
   canvas.addEventListener('mouseup', up);
-  canvas.addEventListener('mouseleave', up);
+  canvas.addEventListener('mouseleave', (e) => {
+    pointer = null;
+    up(e);
+  });
   canvas.addEventListener('dblclick', (e) => {
     const q = at(e);
     const id = hit(q.px, q.py);
@@ -370,8 +389,9 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   });
   canvas.addEventListener('keydown', (e) => {
     if (!['Enter', 'Escape', 'Delete', 'Backspace'].includes(e.key)) return;
-    // Escape closes the dialog unless the surface is busy with something (e.g. drawing a line)
-    if (e.key === 'Escape' && !drawing?.track) return;
+    // Escape closes the dialog unless the generator wants it (escape), or, without that, while track is on (e.g.
+    // while drawing a line)
+    if (e.key === 'Escape' && !(drawing?.escape ?? drawing?.track)) return;
     e.preventDefault();
     e.stopPropagation();
     send({ type: 'key', x: 0, y: 0, key: e.key, ...pointerMods(e) });

@@ -348,6 +348,8 @@ export function pluginGenerator(m: PluginManifest, pack: { id: string; name: str
               frame: d.frame,
               items: d.items.map(item),
               ...(d.track ? { track: true } : {}),
+              ...(d.cursor ? { cursor: d.cursor } : {}),
+              ...(d.escape !== undefined ? { escape: d.escape } : {}),
               ...(d.layers ? { layers: d.layers.map(({ items, ...l }) => ({ ...l, ...(items ? { items: items.map(item) } : {}) })) } : {}),
             };
           },
