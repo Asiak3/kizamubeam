@@ -29,15 +29,18 @@
 
   // 3. Point the buttons straight at the installer files of the newest
   //    published releases (prereleases included; /releases/latest would skip
-  //    them). The Virtual Machine has its own vm-v* tags in the same repo, so
-  //    the list is split: app releases for #download, vm-v* for #vm. On any
-  //    failure the generic Releases links stay in place.
+  //    them). App releases come from KizamuBeam/kizamubeam, Virtual Machine
+  //    releases from KizamuBeam/kizamubeam-vm (with a fallback to legacy vm-v*
+  //    tags in KizamuBeam/kizamubeam while a first release is still building).
+  //    On any failure the generic Releases links stay in place.
   if (!window.fetch || !document.querySelector('[data-dl], [data-vm-dl]')) return;
   var API = 'https://api.github.com/repos/KizamuBeam/kizamubeam/releases?per_page=30';
+  var VM_API = 'https://api.github.com/repos/KizamuBeam/kizamubeam-vm/releases?per_page=10';
   var ctrl = window.AbortController ? new AbortController() : null;
   var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 6000);
   var isVm = function (x) { return /^vm-/i.test(String(x.tag_name || '')); };
   var safe = function (a) { return a && /^https:\/\/github\.com\//.test(a.browser_download_url); };
+  var usable = function (x) { return x && !x.draft && Array.isArray(x.assets) && x.assets.length; };
 
   // Installer files of one release: mac / win / linux plus extra Linux packages.
   var installers = function (assets) {
@@ -71,12 +74,24 @@
     }
   };
 
-  fetch(API, { headers: { Accept: 'application/vnd.github+json' }, signal: ctrl ? ctrl.signal : undefined })
-    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(function (list) {
+  var applyVm = function (vm) {
+    if (!vm) return;
+    setLinks('data-vm-dl', installers(vm.assets));
+    setVersion('[data-vm-lead]', vm, /^(?:vm-)?v/i);
+  };
+
+  var getJson = function (url) {
+    return fetch(url, { headers: { Accept: 'application/vnd.github+json' }, signal: ctrl ? ctrl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (list) { return Array.isArray(list) ? list : []; })
+      .catch(function () { return []; });
+  };
+
+  Promise.all([getJson(API), getJson(VM_API)])
+    .then(function (res) {
       clearTimeout(timer);
-      if (!Array.isArray(list)) return;
-      var usable = function (x) { return x && !x.draft && Array.isArray(x.assets) && x.assets.length; };
+      var list = res[0];
+      var vmList = res[1];
 
       // KizamuBeam itself
       var rel = list.find(function (x) { return usable(x) && !isVm(x); });
@@ -100,11 +115,8 @@
 
       // KizamuBeam Virtual Machine (a release still building has no assets yet
       // and is skipped, so the buttons fall back to the previous version)
-      var vm = list.find(function (x) { return usable(x) && isVm(x); });
-      if (vm) {
-        setLinks('data-vm-dl', installers(vm.assets));
-        setVersion('[data-vm-lead]', vm, /^vm-v/i);
-      }
+      var vm = vmList.find(usable) || list.find(function (x) { return usable(x) && isVm(x); });
+      applyVm(vm);
     })
     .catch(function () { clearTimeout(timer); });
 })();
