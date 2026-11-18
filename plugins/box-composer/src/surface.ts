@@ -1,6 +1,10 @@
-// Plan editor of the box composer (#385): the inner walls seen from above on the dialog's drawing surface. Dragging a
-// wall moves it, dragging an end point makes it longer or shorter, a double click in a compartment adds a wall across
-// it, Shift-drag draws one, Delete or a right click removes one. Every edit goes through edit.ts: a dragged wall or end
+// Plan editor of the box composer (#385): the inner walls seen from above on the dialog's drawing surface. A click on a
+// wall selects the stretch under the pointer (the piece between its ends and joints; Shift adds or removes stretches
+// of the same line, a double click or Ctrl+Shift+click selects the whole wall), dragging moves the selection (a
+// stretch is cut out of its wall), Ctrl shows a target on the wall at the pointer where a new wall starts (click:
+// across the compartment, drag: drawn) and in an empty space a cross for a free wall (drag: drawn), dragging an end
+// point makes a wall longer or shorter, a double click in a compartment adds a wall across it, Delete removes the
+// selection and a right click the stretch under the pointer. Every edit goes through edit.ts: a dragged wall or end
 // goes to the nearest place where it may stand (it jumps over others and lines up with a wall it can be joined with),
 // anything else that would bring a new error is refused with a message. The measures of the selected wall are shown
 // as a line of text under the plan (the plan's own texts are small). While dragging, the walls live in the surface
@@ -9,7 +13,7 @@
 // Surface coordinates are the inner rectangle of the box (mm): x to the right from the inside of the left wall, y to
 // the front from the inside of the back wall (the back is at the top).
 import { mm, type Drawing, type EventResult, type Item, type Pointer, type Surface, type Text } from '../../sdk/ts';
-import { addWall, current, deleteWall, lineUp, moveWallNear, neighbours, stretchEndNear, wallCentre, type EditResult } from './edit';
+import { addWall, current, deleteRuns, deleteWall, joinRuns, lineUp, moveRunsNear, neighbours, stretchEndNear, stretchOf, wallCentre, type EditResult, type Run } from './edit';
 import { buildModel, writeLayout, type Axis, type End, type Layout, type Limits, type Model, type Side, type Wall } from './model';
 
 /** What the plan needs: inner size, thickness, limits, the stored layout and which outer walls there are */
@@ -24,9 +28,26 @@ export interface Plan {
 
 const LIST = 'walls';
 
+/** Selected stretches: pieces (from, to along) of the walls on one line */
+interface Sel {
+  axis: Axis;
+  pos: number;
+  runs: Run[];
+}
+/** Where a new wall starts (Ctrl): the stretches it starts from, along their line, and the side the pointer is on */
+interface Aim {
+  sel: Sel;
+  along: number;
+  side: -1 | 1;
+}
 interface Drag {
   kind: 'move' | 'end' | 'draw';
   id: number;
+  /** move: the stretches being moved, where they were; draw from the target: the selection */
+  sel?: Sel;
+  /** draw from the target (Ctrl): the target and the direction of the new wall */
+  aim?: Aim;
+  axis?: Axis;
   which?: 'from' | 'to';
   /** The walls when the drag started (inner size, merged) */
   base: Wall[];
@@ -41,6 +62,12 @@ interface State {
   draft?: [number, number, number, number];
   /** Where on wall id the pointer took it: its measures are taken there (the space at the pointer) */
   at?: { id: number; along: number };
+  /** Selected stretches; without them the wall selected in the list is selected as a whole */
+  sel?: Sel;
+  /** The target shown while Ctrl is held near a wall */
+  aim?: Aim;
+  /** Ctrl in an empty space: where a free wall would start */
+  free?: [number, number];
 }
 
 const stateOf = (s: unknown): State => (s && typeof s === 'object' ? (s as State) : {});
@@ -48,6 +75,79 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 const r2 = (v: number) => Math.round(v * 100 + 1e-9) / 100;
 /** Ends snap to walls within this distance (mm) */
 const snapOf = (p: Plan) => 2 * p.t;
+
+const onLine = (q: Wall, s: Sel) => q.axis === s.axis && Math.abs(q.pos - s.pos) < 0.01;
+/** Does wall q hold a piece of the selection? */
+const touches = (q: Wall, s: Sel) => onLine(q, s) && s.runs.some(([a, b]) => Math.min(b, q.to) - Math.max(a, q.from) > 0.01);
+/** The selected stretches: those of the state while they still lie on a wall, otherwise the whole wall id */
+function selection(st: State, walls: Wall[], id: number | undefined): Sel | undefined {
+  const s = st.sel;
+  if (s && walls.some((q) => touches(q, s))) return s;
+  const x = walls.find((q) => q.id === id);
+  return x && whole(x);
+}
+const whole = (x: Wall): Sel => ({ axis: x.axis, pos: x.pos, runs: [[x.from, x.to]] });
+/** The wall of the line of s that holds `along` */
+const wallAt = (walls: Wall[], s: Sel, along: number) => walls.find((q) => onLine(q, s) && q.from <= along + 0.01 && q.to >= along - 0.01);
+/** Is run b inside the runs a? */
+const covers = (a: Run[], b: Run) => a.some(([p, q]) => p <= b[0] + 0.01 && q >= b[1] - 0.01);
+/** The runs a without run b */
+const without = (a: Run[], b: Run): Run[] =>
+  a.flatMap(([p, q]): Run[] => (q <= b[0] + 0.01 || p >= b[1] - 0.01 ? [[p, q]] : ([[p, b[0]], [b[1], q]] as Run[]).filter(([u, v]) => v - u > 0.01)));
+
+/**
+ * The target for a new wall on the selection: the pointer brought onto the nearest selected stretch, snapped to its
+ * middle (within snap) or to whole millimetres, and the side of the line the pointer is on
+ */
+function aimAt(p: Plan, sel: Sel, x: number, y: number): Aim | null {
+  const [along, across] = sel.axis === 'h' ? [x, y] : [y, x];
+  let best: Run | null = null,
+    dist = Infinity;
+  for (const r of sel.runs) {
+    const dd = Math.abs(Math.min(r[1], Math.max(r[0], along)) - along);
+    if (dd < dist) (dist = dd), (best = r);
+  }
+  if (!best) return null;
+  const mid = (best[0] + best[1]) / 2;
+  const a = Math.min(best[1], Math.max(best[0], along));
+  const snapped = Math.abs(a - mid) <= snapOf(p) ? mid : Math.min(best[1], Math.max(best[0], Math.round(a)));
+  return { sel, along: r2(snapped), side: across >= sel.pos ? 1 : -1 };
+}
+/** The target for Ctrl at (x, y): on the wall near the pointer (its stretch there is preselected; a selected stretch
+ * keeps the selection), or none */
+function aimFor(p: Plan, walls: Wall[], sel: Sel | undefined, x: number, y: number): Aim | null {
+  let best: Wall | null = null,
+    dist = 3 * p.t;
+  for (const q of walls) {
+    const [a, c] = q.axis === 'h' ? [x, y] : [y, x];
+    const dd = Math.hypot(Math.min(q.to, Math.max(q.from, a)) - a, c - q.pos);
+    if (dd <= dist) (dist = dd), (best = q);
+  }
+  if (!best) return null;
+  const along = Math.min(best.to, Math.max(best.from, best.axis === 'h' ? x : y));
+  const run = stretchOf(buildModel({ ref: [p.w, p.d], walls }, p.w, p.d, p.lim), best, along);
+  return aimAt(p, sel && onLine(best, sel) && covers(sel.runs, run) ? sel : { axis: best.axis, pos: best.pos, runs: [run] }, x, y);
+}
+/** The new wall from the target: across the compartment on the side of the pointer, from the selection to the next wall */
+function newAcross(p: Plan, walls: Wall[], sel: Sel, aim: Aim): { axis: Axis; pos: number; from: number; to: number } {
+  const axis: Axis = sel.axis === 'h' ? 'v' : 'h';
+  const off = sel.pos + aim.side * p.t;
+  const a = sel.axis === 'h' ? acrossAt(p, walls, axis, aim.along, off) : acrossAt(p, walls, axis, off, aim.along);
+  return { axis, pos: aim.along, from: a.from, to: a.to };
+}
+
+/**
+ * The wall a double click at (x, y) adds: across the compartment, from wall to wall, in its middle when the pointer is
+ * within snap of it (for even divisions), otherwise at the pointer (whole millimetres)
+ */
+function splitAt(p: Plan, walls: Wall[], axis: Axis, x: number, y: number): EditResult {
+  const [pos, along] = axis === 'v' ? [x, y] : [y, x];
+  const n = neighbours(walls, { id: -1, axis, pos, from: along, to: along }, p.w, p.d, p.t, along, p.sides);
+  const mid = r2((n.lo + n.hi) / 2);
+  const at = Math.abs(mid - pos) <= snapOf(p) ? mid : Math.round(pos);
+  const a = axis === 'v' ? acrossAt(p, walls, 'v', at, y) : acrossAt(p, walls, 'h', x, at);
+  return addWall({ ref: [p.w, p.d], walls }, p.w, p.d, p.lim, axis, at, a.from, a.to, snapOf(p));
+}
 
 /** Id of the wall in row `row` of the stored list */
 const idAt = (p: Plan, row: number | undefined) => (row !== undefined && row >= 0 ? p.layout.walls[row]?.id : undefined);
@@ -94,6 +194,8 @@ function clear(p: Plan, walls: Wall[], x: Wall, along: number): { a: number; b: 
   return { a: x.pos - lo - p.t, b: hi - x.pos - p.t, lo, hi };
 }
 const centred = (c: { a: number; b: number }) => Math.abs(c.a - c.b) < 0.005;
+/** Does wall x stand in the middle of the whole box (outer size, the same with or without outer walls)? */
+const boxCentred = (p: Plan, x: Wall) => Math.abs(x.pos - (x.axis === 'h' ? p.d : p.w) / 2) < 0.005;
 /** Where the measures of wall x are taken: where the pointer took it, otherwise its middle */
 const alongOf = (st: State, x: Wall) => (st.at && st.at.id === x.id ? Math.min(x.to, Math.max(x.from, st.at.along)) : (x.from + x.to) / 2);
 /** The middle of the stretch of wall x (between its ends and joints) that holds `along`: where its measures are drawn */
@@ -117,7 +219,16 @@ export function planDraw(p: Plan, s: Surface & { have: string[] }): Drawing {
   const m = buildModel({ ref: [w, d], walls }, w, d, p.lim);
   const bad = new Set<number>();
   for (const i of m.issues) if (i.level === 'error') for (const k of ['id', 'id2']) if (i.values?.[k] !== undefined) bad.add(i.values[k]);
-  const sel = st.drag && st.drag.kind !== 'draw' ? (st.walls ? dragged(st.walls, st.drag) : st.drag.id) : idAt(p, s.selected[LIST]);
+  const sel =
+    st.drag && st.drag.kind !== 'draw'
+      ? st.walls
+        ? st.drag.kind === 'move'
+          ? st.at?.id
+          : dragged(st.walls, st.drag)
+        : st.drag.id
+      : idAt(p, s.selected[LIST]);
+  const pick = selection(st, walls, sel);
+  const picked = (x: Wall) => (pick ? touches(x, pick) : x.id === sel);
   const margin = t + 4;
   const frame = { x0: -margin, y0: -margin, x1: w + margin, y1: d + margin };
 
@@ -137,17 +248,31 @@ export function planDraw(p: Plan, s: Surface & { have: string[] }): Drawing {
   const order = [...walls].sort((a, b) => Number(a.id === sel) - Number(b.id === sel));
   for (const x of order) {
     const it = info.get(x.id);
-    const style = x.id === sel ? 'accent' : bad.has(x.id) ? 'warn' : 'normal';
+    // A wall with selected stretches: the whole wall pale, the stretches strong (below)
+    const style = picked(x) || x.id === sel ? 'accent' : bad.has(x.id) ? 'warn' : 'normal';
+    const pale = picked(x) && pick!.runs.some(([a, b]) => a > x.from + 0.01 || b < x.to - 0.01);
     const a0 = x.from - (it ? endExtra(it.start, t) : 0),
       a1 = x.to + (it ? endExtra(it.end, t) : 0);
     const [p0, p1] = [at(x.axis, a0, x.pos - t / 2), at(x.axis, a1, x.pos + t / 2)];
-    items.push({ type: 'line', pts: rect(p0[0], p0[1], p1[0], p1[1]), closed: true, style, width: x.id === sel ? 2 : 1.2, id: `w${x.id}` });
+    items.push({ type: 'line', pts: rect(p0[0], p0[1], p1[0], p1[1]), closed: true, style, width: style === 'accent' ? 2 : 1.2, id: `w${x.id}`, ...(pale ? { alpha: 0.45 } : {}) });
     items.push({ type: 'line', pts: [at(x.axis, x.from, x.pos), at(x.axis, x.to, x.pos)], style, width: 1, alpha: 0.35, id: `w${x.id}` });
     const [hx, hy] = at(x.axis, x.from, x.pos),
       [ex, ey] = at(x.axis, x.to, x.pos);
     items.push({ type: 'handle', x: hx, y: hy, id: `e${x.id}.from`, style, size: x.id === sel ? 4 : 3 });
     items.push({ type: 'handle', x: ex, y: ey, id: `e${x.id}.to`, style, size: x.id === sel ? 4 : 3 });
   }
+  // The selected stretches: strong over their wall, a grip in the middle of each
+  if (pick)
+    for (const x of walls.filter((q) => touches(q, pick)))
+      for (const [a0, b0] of pick.runs) {
+        const a = Math.max(a0, x.from),
+          b = Math.min(b0, x.to);
+        if (b - a < 0.01) continue;
+        const [p0, p1] = [at(x.axis, a, x.pos - t / 2 - 0.4), at(x.axis, b, x.pos + t / 2 + 0.4)];
+        items.push({ type: 'line', pts: rect(p0[0], p0[1], p1[0], p1[1]), closed: true, style: 'accent', width: 2.5, id: `w${x.id}` });
+        const [mx, my] = at(x.axis, (a + b) / 2, x.pos);
+        items.push({ type: 'handle', x: mx, y: my, id: `w${x.id}`, style: 'accent', size: 5 });
+      }
   // Numbers of the walls (as in the list and the part names) in the middle of their length, above or right of the wall;
   // the selected wall's number moves away from its dimension lines
   const selX = walls.find((q) => q.id === sel);
@@ -192,6 +317,12 @@ export function planDraw(p: Plan, s: Surface & { have: string[] }): Drawing {
       const [e0, e1] = q.from > x.to ? [x.to, q.from] : [q.to, x.from];
       items.push({ type: 'line', pts: [at(x.axis, e0, x.pos), at(x.axis, e1, x.pos)], style: 'accent', dash: true, width: 1, alpha: 0.7 });
     }
+    // In the middle of the whole box: a guide on its line from outer edge to outer edge, with a mark at both edges
+    if (boxCentred(p, x)) {
+      const len = x.axis === 'h' ? w : d;
+      items.push({ type: 'line', pts: [at(x.axis, -t, x.pos), at(x.axis, len + t, x.pos)], style: 'accent', dash: true, width: 1, alpha: 0.5 });
+      for (const e of [-t, len + t]) items.push({ type: 'line', pts: [at(x.axis, e, x.pos - 2 * t), at(x.axis, e, x.pos + 2 * t)], style: 'accent', width: 1.5 });
+    }
     // In the middle of the space: a square on the wall; in the middle of a wall it ends on or crosses: one there
     const r = t * 1.2;
     const square = (a: Axis, along: number, across: number) => {
@@ -203,11 +334,40 @@ export function planDraw(p: Plan, s: Surface & { have: string[] }): Drawing {
     const host = on && walls.find((q) => q.id === on.id);
     if (host) square(x.axis, host.pos, x.pos);
   }
+  // The target (Ctrl): its stretches marked, a ring with a cross on them, the new wall dashed, "Start" beside it
+  if (st.aim && !st.drag) {
+    const g = st.aim.sel;
+    for (const x of walls.filter((q) => touches(q, g)))
+      for (const [a0, b0] of g.runs) {
+        const a = Math.max(a0, x.from),
+          b = Math.min(b0, x.to);
+        if (b - a < 0.01) continue;
+        const [p0, p1] = [at(x.axis, a, x.pos - t / 2 - 0.4), at(x.axis, b, x.pos + t / 2 + 0.4)];
+        items.push({ type: 'line', pts: rect(p0[0], p0[1], p1[0], p1[1]), closed: true, style: 'accent', width: 2.5, alpha: 0.7 });
+      }
+    const n = newAcross(p, walls, g, st.aim);
+    const [cx, cy] = at(g.axis, st.aim.along, g.pos);
+    const r = Math.max(2 * t, px(9));
+    const ring = Array.from({ length: 24 }, (_, i): [number, number] => [r1(cx + r * Math.cos((i * Math.PI) / 12)), r1(cy + r * Math.sin((i * Math.PI) / 12))]);
+    items.push({ type: 'line', pts: ring, closed: true, style: 'accent', width: 1.5 });
+    items.push({ type: 'line', pts: [[r1(cx - 1.6 * r), cy], [r1(cx + 1.6 * r), cy]], style: 'accent', width: 1 });
+    items.push({ type: 'line', pts: [[cx, r1(cy - 1.6 * r)], [cx, r1(cy + 1.6 * r)]], style: 'accent', width: 1 });
+    items.push({ type: 'line', pts: [at(n.axis, n.from, n.pos), at(n.axis, n.to, n.pos)], style: 'accent', dash: true, width: 1.5 });
+    items.push({ type: 'text', x: r1(cx + r), y: r1(cy - r), text: { code: 'plan.start' }, style: 'accent' });
+  }
+  // Ctrl in an empty space: a small cross where a free wall would start
+  if (st.free && !st.drag) {
+    const [fx, fy] = st.free;
+    const r = Math.max(1.5 * t, px(7));
+    items.push({ type: 'line', pts: [[r1(fx - r), fy], [r1(fx + r), fy]], style: 'accent', width: 1.5 });
+    items.push({ type: 'line', pts: [[fx, r1(fy - r)], [fx, r1(fy + r)]], style: 'accent', width: 1.5 });
+  }
   if (st.draft) {
     const [x0, y0, x1, y1] = st.draft;
     items.push({ type: 'line', pts: [[r1(x0), r1(y0)], [r1(x1), r1(y1)]], style: 'warn', dash: true, width: 1.5 });
   }
-  return { frame, layers, items };
+  // The plan wants pointer moves without a button, for the target (Ctrl)
+  return { frame, layers, items, track: true };
 }
 
 // ---- Pointer and keys ----
@@ -216,7 +376,8 @@ const refusal = (r: Extract<EditResult, { ok: false }>): Text => ({ code: r.code
 
 /**
  * The measures of wall id for the line under the plan, at `along` on it (default its middle): clear space on both
- * sides, its length, and whether it stands in the middle of that space or of a wall it ends on or crosses
+ * sides, its length, and whether it stands in the middle of that space, of the whole box or of a wall it ends on or
+ * crosses
  */
 function measures(p: Plan, walls: Wall[], id: number | undefined, along?: number): Text | '' {
   const x = walls.find((q) => q.id === id);
@@ -225,6 +386,7 @@ function measures(p: Plan, walls: Wall[], id: number | undefined, along?: number
   const c = clear(p, walls, x, a);
   const values = { id: x.id, a: r2(c.a), b: r2(c.b), len: r2(x.to - x.from) };
   if (centred(c)) return { code: `plan.info.${x.axis}.c`, values };
+  if (boxCentred(p, x)) return { code: `plan.info.${x.axis}.b`, values };
   const on = onCentre(buildModel({ ref: [p.w, p.d], walls }, p.w, p.d, p.lim), x, a);
   if (on) return { code: `plan.info.${x.axis}.w`, values: { ...values, wall: on.id } };
   const line = lineUp(walls, x);
@@ -233,11 +395,11 @@ function measures(p: Plan, walls: Wall[], id: number | undefined, along?: number
 
 /** An accepted edit becomes the new parameters (in the current inner size) with the wall `id` selected; its measures
  * stay where the pointer was (along) */
-function commit(p: Plan, walls: Wall[], id: number | undefined, along?: number): EventResult {
+function commit(p: Plan, walls: Wall[], id: number | undefined, along?: number, sel?: Sel): EventResult {
   const stored = writeLayout({ ref: [p.w, p.d], walls });
   const rows = JSON.parse(stored.walls) as Wall[];
   const row = id === undefined ? -1 : rows.findIndex((q) => q.id === id);
-  const state = id !== undefined && along !== undefined ? { at: { id, along } } : null;
+  const state = id !== undefined && along !== undefined ? { at: { id, along }, ...(sel ? { sel } : {}) } : sel ? { sel } : null;
   return { patch: { walls: stored.walls, wallsRef: stored.wallsRef }, state, message: measures(p, walls, id, along), select: { [LIST]: row } };
 }
 const finish = (p: Plan, r: EditResult, id: number | undefined): EventResult => (r.ok ? commit(p, r.layout.walls, id) : { state: null, message: refusal(r) });
@@ -274,21 +436,65 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
   const layout = (walls: Wall[]): Layout => ({ ref: [p.w, p.d], walls });
   const inside = ev.x >= 0 && ev.x <= p.w && ev.y >= 0 && ev.y <= p.d;
 
-  if (ev.type === 'select') return { message: measures(p, base, idAt(p, ev.row)) };
+  if (ev.type === 'select') {
+    const x = base.find((q) => q.id === idAt(p, ev.row));
+    return { state: x ? { sel: whole(x) } : null, message: measures(p, base, x?.id) };
+  }
 
   if (ev.type === 'down') {
     const end = /^e(\d+)\.(from|to)$/.exec(ev.hit ?? '');
     const wall = /^w(\d+)$/.exec(ev.hit ?? '');
     const id = Number((end ?? wall)?.[1]);
-    if (end || wall) {
-      const row = p.layout.walls.findIndex((q) => q.id === id);
-      const drag: Drag = { kind: end ? 'end' : 'move', id, base, x0: ev.x, y0: ev.y, ...(end ? { which: end[2] as 'from' | 'to' } : {}) };
-      const x = base.find((q) => q.id === id);
-      const along = x && !end ? (x.axis === 'h' ? ev.x : ev.y) : undefined;
-      return { state: { drag, ...(along !== undefined ? { at: { id, along } } : {}) }, select: { [LIST]: row }, message: measures(p, base, id, along) };
+    // Ctrl: a new wall from the target (a click adds it across the compartment, a drag draws it); its stretches become
+    // the selection
+    if (ev.ctrl && !ev.shift) {
+      const aim = aimFor(p, base, selection(st, base, idAt(p, s.selected[LIST])), ev.x, ev.y);
+      if (aim) {
+        const sel = aim.sel;
+        const [x0, y0] = sel.axis === 'h' ? [aim.along, sel.pos] : [sel.pos, aim.along];
+        const drag: Drag = { kind: 'draw', id: 0, base, x0, y0, sel, aim, axis: sel.axis === 'h' ? 'v' : 'h' };
+        return { state: { drag, sel, aim } };
+      }
+      // In an empty space: a free wall, drawn from here
+      if (inside && !ev.hit) return { state: { drag: { kind: 'draw', id: 0, base, x0: Math.round(ev.x), y0: Math.round(ev.y) } } };
     }
-    if (ev.shift && inside) return { state: { drag: { kind: 'draw', id: 0, base, x0: ev.x, y0: ev.y } } };
+    const x = base.find((q) => q.id === id);
+    const row = p.layout.walls.findIndex((q) => q.id === id);
+    if (end && x) {
+      const drag: Drag = { kind: 'end', id, base, x0: ev.x, y0: ev.y, which: end[2] as 'from' | 'to' };
+      return { state: { drag }, select: { [LIST]: row }, message: measures(p, base, id) };
+    }
+    if (wall && x) {
+      // The stretch under the pointer: alone, added to or taken from the selection (Shift, same line), the whole wall
+      // (Ctrl+Shift); a click on a selected stretch keeps the selection, so several are dragged together
+      const along = Math.min(x.to, Math.max(x.from, x.axis === 'h' ? ev.x : ev.y));
+      const run = stretchOf(buildModel({ ref: [p.w, p.d], walls: base }, p.w, p.d, p.lim), x, along);
+      const old = selection(st, base, idAt(p, s.selected[LIST]));
+      const same = old && onLine(x, old) ? old : undefined;
+      let sel: Sel;
+      if (ev.ctrl && ev.shift) sel = whole(x);
+      else if (ev.shift && same) {
+        const runs = covers(same.runs, run) ? without(same.runs, run) : joinRuns([...same.runs, run]);
+        if (!runs.length) return { state: null, select: { [LIST]: -1 }, message: '' };
+        sel = { ...same, runs };
+      } else sel = same && covers(same.runs, run) ? same : { axis: x.axis, pos: x.pos, runs: [run] };
+      const drag: Drag = { kind: 'move', id, base, x0: ev.x, y0: ev.y, sel };
+      return { state: { drag, sel, at: { id, along } }, select: { [LIST]: row }, message: measures(p, base, id, along) };
+    }
     return { state: null, select: { [LIST]: -1 }, message: '' };
+  }
+
+  if (ev.type === 'move' && !st.drag) {
+    // Pointer moves without a button (the plan asks for them): with Ctrl the target at a wall or the cross in an empty space
+    const ctrl = ev.ctrl && !ev.shift;
+    const aim = ctrl ? aimFor(p, base, selection(st, base, idAt(p, s.selected[LIST])), ev.x, ev.y) : null;
+    const free: [number, number] | null = ctrl && !aim && inside ? [Math.round(ev.x), Math.round(ev.y)] : null;
+    if (JSON.stringify([aim, free]) === JSON.stringify([st.aim ?? null, st.free ?? null])) return null;
+    const rest: State = { ...st };
+    delete rest.aim;
+    delete rest.free;
+    const next = { ...rest, ...(aim ? { aim } : {}), ...(free ? { free } : {}) };
+    return { state: Object.keys(next).length ? next : null };
   }
 
   if (ev.type === 'move') {
@@ -300,9 +506,9 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
       const dx = ev.x - g.x0,
         dy = ev.y - g.y0;
       if (Math.max(Math.abs(dx), Math.abs(dy)) < 1) return null;
-      const axis: Axis = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+      const axis: Axis = g.axis ?? (Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v');
       const [pos, a, b] = axis === 'h' ? [g.y0, g.x0, ev.x] : [g.x0, g.y0, ev.y];
-      r = addWall(L, p.w, p.d, p.lim, axis, Math.round(pos), Math.round(Math.min(a, b)), Math.round(Math.max(a, b)), snapOf(p));
+      r = addWall(L, p.w, p.d, p.lim, axis, g.axis ? pos : Math.round(pos), Math.round(Math.min(a, b)), Math.round(Math.max(a, b)), snapOf(p));
       if (!r.ok) {
         const draft: [number, number, number, number] = axis === 'h' ? [g.x0, g.y0, ev.x, g.y0] : [g.x0, g.y0, g.x0, ev.y];
         return { state: { drag: g, draft }, message: refusal(r) };
@@ -311,10 +517,19 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
     }
     const x = g.base.find((q) => q.id === g.id);
     if (!x) return null;
-    // The pointer on the wall: the space there is measured and centred on
-    const along = g.kind === 'move' ? Math.min(x.to, Math.max(x.from, x.axis === 'h' ? ev.x : ev.y)) : undefined;
-    if (g.kind === 'move') r = moveWallNear(L, p.w, p.d, p.lim, g.id, x.pos + (x.axis === 'h' ? ev.y - g.y0 : ev.x - g.x0), snapOf(p), along, p.sides);
-    else r = stretchEndNear(L, p.w, p.d, p.lim, g.id, g.which!, Math.round(x.axis === 'h' ? ev.x : ev.y), snapOf(p));
+    if (g.kind === 'move' && g.sel) {
+      // The pointer on the wall: the space there is measured and centred on
+      const along = Math.min(x.to, Math.max(x.from, x.axis === 'h' ? ev.x : ev.y));
+      const to = g.sel.pos + (x.axis === 'h' ? ev.y - g.y0 : ev.x - g.x0);
+      const m = moveRunsNear(L, p.w, p.d, p.lim, g.sel.axis, g.sel.pos, g.sel.runs, to, snapOf(p), along, p.sides);
+      if (!m.ok) return { state: st, message: refusal(m) };
+      const sel = { ...g.sel, pos: m.pos ?? to };
+      const id = wallAt(m.layout.walls, sel, along)?.id;
+      const at = id !== undefined ? { at: { id, along } } : {};
+      return { state: { drag: g, walls: m.layout.walls, sel, ...at }, message: measures(p, m.layout.walls, id, along) };
+    }
+    const along: number | undefined = undefined;
+    r = stretchEndNear(L, p.w, p.d, p.lim, g.id, g.which!, Math.round(x.axis === 'h' ? ev.x : ev.y), snapOf(p));
     // Nowhere to go: the last accepted walls stay, the message says why
     if (!r.ok) return { state: st, message: refusal(r) };
     const id = dragged(r.layout.walls, g);
@@ -325,30 +540,47 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
   if (ev.type === 'up') {
     const g = st.drag;
     if (!g) return null;
-    if (!st.walls || JSON.stringify(st.walls) === JSON.stringify(g.base)) return { state: st.at ? { at: st.at } : null };
+    // A click on the target: the new wall across the compartment
+    if (g.kind === 'draw' && g.sel && g.aim && !st.walls && !st.draft) {
+      const n = newAcross(p, g.base, g.sel, g.aim);
+      const r = addWall(layout(g.base), p.w, p.d, p.lim, n.axis, n.pos, n.from, n.to, snapOf(p));
+      return finish(p, r, g.base.reduce((k, q) => Math.max(k, q.id), 0) + 1);
+    }
+    const keep = { ...(st.at ? { at: st.at } : {}), ...(st.sel ? { sel: st.sel } : {}) };
+    if (!st.walls || JSON.stringify(st.walls) === JSON.stringify(g.base)) return { state: Object.keys(keep).length ? keep : null };
+    if (g.kind === 'move' && st.at) return commit(p, st.walls, st.at.id, st.at.along, st.sel);
     const added = g.kind === 'draw' ? st.walls.find((q) => !g.base.some((b) => b.id === q.id))?.id : dragged(st.walls, g);
     return commit(p, st.walls, added, st.at && st.at.id === added ? st.at.along : undefined);
   }
 
   if (ev.type === 'dblclick') {
+    // On a wall: the whole wall
+    const hit = /^w(\d+)$/.exec(ev.hit ?? '');
+    const x = hit && base.find((q) => q.id === Number(hit[1]));
+    if (x) return { state: { sel: whole(x) }, select: { [LIST]: p.layout.walls.findIndex((q) => q.id === x.id) }, message: measures(p, base, x.id) };
     if (ev.hit || !inside) return null;
-    const axis: Axis = ev.shift ? 'v' : 'h';
-    const a = acrossAt(p, base, axis, ev.x, ev.y);
-    const r = addWall(layout(base), p.w, p.d, p.lim, axis, a.pos, a.from, a.to, snapOf(p));
-    const id = base.reduce((n, q) => Math.max(n, q.id), 0) + 1;
-    return finish(p, r, id);
+    // In a compartment: a wall across it, in its middle when the pointer is near it
+    const r = splitAt(p, base, ev.shift ? 'v' : 'h', ev.x, ev.y);
+    return finish(p, r, base.reduce((n, q) => Math.max(n, q.id), 0) + 1);
   }
 
   if (ev.type === 'context') {
-    const hit = /^[we](\d+)/.exec(ev.hit ?? '');
+    // On a wall: the stretch under the pointer; on an end point: the whole wall
+    const hit = /^([we])(\d+)/.exec(ev.hit ?? '');
     if (!hit) return null;
-    return finish(p, deleteWall(p.layout, p.w, p.d, Number(hit[1])), undefined);
+    const x = base.find((q) => q.id === Number(hit[2]));
+    if (hit[1] === 'e' || !x) return finish(p, deleteWall(p.layout, p.w, p.d, Number(hit[2])), undefined);
+    const run = stretchOf(buildModel({ ref: [p.w, p.d], walls: base }, p.w, p.d, p.lim), x, x.axis === 'h' ? ev.x : ev.y);
+    return finish(p, deleteRuns(p.layout, p.w, p.d, x.axis, x.pos, [run]), undefined);
   }
 
+  // Escape: the target and the selection go (the plan asks for pointer moves, so the app sends it the key)
+  if (ev.type === 'key' && ev.key === 'Escape') return { state: null, select: { [LIST]: -1 }, message: '' };
+
   if (ev.type === 'key' && (ev.key === 'Delete' || ev.key === 'Backspace')) {
-    const id = idAt(p, s.selected[LIST]);
-    if (id === undefined) return null;
-    return finish(p, deleteWall(p.layout, p.w, p.d, id), undefined);
+    const sel = selection(st, base, idAt(p, s.selected[LIST]));
+    if (!sel) return null;
+    return finish(p, deleteRuns(p.layout, p.w, p.d, sel.axis, sel.pos, sel.runs), undefined);
   }
   return null;
 }

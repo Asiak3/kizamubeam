@@ -89,6 +89,76 @@ test('move near: the nearest place where the wall may stand; lined up with a wal
   const open = { x0: false, x1: true, y0: true, y1: true };
   assert.deepEqual(E.neighbours(SK.walls, SK.walls[3], W, D, T, undefined, open), { lo: -4.5, hi: 47 });
   assert.equal(wallOf(E.moveWallNear(SK, W, D, LIM, 4, 20, 6, undefined, open), 4)!.pos, 21.25, 'open side: the middle up to the edge of the floor');
+  // Mitte der ganzen Kiste (47), auch wenn das Fach eine andere Mitte hat (zwischen Wand 3 und rechts: 57.75)
+  const B = { ref: [W, D] as [number, number], walls: [{ id: 1, axis: 'h' as const, pos: 97, from: 0, to: W }, { id: 2, axis: 'v' as const, pos: 70, from: 97, to: D }, { id: 3, axis: 'v' as const, pos: 20, from: 97, to: D }] };
+  assert.equal(wallOf(E.moveWallNear(B, W, D, LIM, 2, 50, 6), 2)!.pos, 47, 'snapped to the middle of the box');
+  assert.equal(wallOf(E.moveWallNear(B, W, D, LIM, 2, 50, 6, undefined, open), 2)!.pos, 47, 'the same with an open side');
+  assert.equal(wallOf(E.moveWallNear(B, W, D, LIM, 2, 60, 6), 2)!.pos, 57.75, 'nearer the middle of the space: that one');
+});
+
+test('stretches: the pieces of a wall between its ends, T joints and crossings', () => {
+  const m = model(SK.walls);
+  // Wand 1 (y = 97): Wand 4 endet bei 19.74 auf ihr, Wand 2 kreuzt bei 47
+  assert.deepEqual(E.stretchOf(m, SK.walls[0], 30), [19.74, 47]);
+  assert.deepEqual(E.stretchOf(m, SK.walls[0], 5), [0, 19.74]);
+  assert.deepEqual(E.stretchOf(m, SK.walls[0], 60), [47, 94]);
+  assert.deepEqual(E.joinRuns([[47, 94], [19.74, 47], [0, 5]]), [[0, 5], [19.74, 94]]);
+  assert.equal(E.wholeWall(SK.walls, 'h', 97, [[0, 19.74], [19.74, 47], [47, 94]]), 1);
+  assert.equal(E.wholeWall(SK.walls, 'h', 97, [[19.74, 47]]), null);
+});
+
+/** The walls of a result without ids, sorted: [axis, pos, from, to] */
+const shape = (r: ReturnType<typeof E.moveWall>) =>
+  r.ok ? r.layout.walls.map((x) => [x.axis, +x.pos.toFixed(2), +x.from.toFixed(2), +x.to.toFixed(2)].join(' ')).sort() : r;
+
+test('moving a stretch: its wall is cut, a wall from behind gets longer (a U), one from the front is crossed', () => {
+  // Wand 1, Stück 19.74 … 47, nach hinten (y 85): Wand 4 kommt von vorne (von hinter dem Stück) und wird länger
+  const up = E.moveRuns(SK, W, D, LIM, 'h', 97, [[19.74, 47]], 85);
+  assert.ok(up.ok);
+  assert.deepEqual(shape(up), ['h 150.35 47 94', 'h 85 19.74 47', 'h 97 0 19.74', 'h 97 47 94', 'v 19.74 85 169.75', 'v 47 0 150.35']);
+  assert.deepEqual(model((up as { layout: { walls: Wall[] } }).layout.walls).issues.filter((i) => i.level === 'error'), []);
+  // Nach vorne (y 110): Wand 4 kommt von dort, bleibt und wird gekreuzt
+  const down = E.moveRuns(SK, W, D, LIM, 'h', 97, [[19.74, 47]], 110);
+  assert.ok(down.ok);
+  assert.deepEqual(shape(down), ['h 110 19.74 47', 'h 150.35 47 94', 'h 97 0 19.74', 'h 97 47 94', 'v 19.74 97 169.75', 'v 47 0 150.35']);
+  // Zurück auf die Linie: wieder eine Wand, Wand 4 wie vorher
+  const back = E.moveRuns((up as { layout: Parameters<typeof E.moveRuns>[0] }).layout, W, D, LIM, 'h', 85, [[19.74, 47]], 97);
+  assert.deepEqual(shape(back), shape({ ok: true, layout: SK }));
+  // Alle Stücke = die ganze Wand: wie moveWall
+  assert.deepEqual(E.moveRunsNear(SK, W, D, LIM, 'h', 97, [[0, 19.74], [19.74, 94]], 80).ok && shape(E.moveRunsNear(SK, W, D, LIM, 'h', 97, [[0, 94]], 80)), shape(E.moveWall(SK, W, D, LIM, 1, 80)));
+  // Ziehen: nächste ganze Zahl, die Lage der Stücke kommt mit
+  const near = E.moveRunsNear(SK, W, D, LIM, 'h', 97, [[19.74, 47]], 85.3, 6, 30);
+  assert.ok(near.ok);
+  assert.equal(near.pos, 85);
+});
+
+test('moving past the end of a wall: that wall gets longer; a follower gets shorter only up to its next joint', () => {
+  // Wie im Plan des Nutzers: 2 und 3 von hinten bis 100, 4 dazwischen bei 60, 1 und 5 enden bei 100 an 2 und 3 (Ecken)
+  const L = {
+    ref: [W, D] as [number, number],
+    walls: [
+      { id: 1, axis: 'h' as const, pos: 100, from: 0, to: 30 },
+      { id: 2, axis: 'v' as const, pos: 30, from: 0, to: 100 },
+      { id: 3, axis: 'v' as const, pos: 60, from: 0, to: 100 },
+      { id: 4, axis: 'h' as const, pos: 60, from: 30, to: 60 },
+      { id: 5, axis: 'h' as const, pos: 100, from: 60, to: W },
+    ],
+  };
+  const down = E.moveWall(L, W, D, LIM, 4, 130);
+  assert.deepEqual(shape(down), ['h 100 0 30', 'h 100 60 94', 'h 130 30 60', 'v 30 0 130', 'v 60 0 130'], '2 and 3 reach wall 4');
+  assert.deepEqual(model((down as { layout: { walls: Wall[] } }).layout.walls).issues.filter((i) => i.level === 'error'), []);
+  // Zurück nach oben: 2 und 3 folgen nur bis zu den Wänden 1 und 5 (bei 100), Wand 4 endet dann wieder an ihnen
+  const up = E.moveWall((down as { layout: Parameters<typeof E.moveWall>[0] }).layout, W, D, LIM, 4, 60);
+  assert.deepEqual(shape(up), shape({ ok: true, layout: L }));
+  // Ein Stück, das über das Ende einer Wand hinaus geht, die es kreuzt: die Wand wird länger (Wand 4 der Skizze bis 175)
+  const past = E.moveRuns(SK, W, D, LIM, 'h', 97, [[19.74, 47]], 175);
+  assert.ok(past.ok);
+  assert.ok(shape(past).includes('v 19.74 97 175'), 'wall 4 reaches the stretch');
+});
+
+test('deleting a stretch: the rest of the wall stays', () => {
+  const r = E.deleteRuns(SK, W, D, 'h', 97, [[19.74, 47]]);
+  assert.deepEqual(shape(r), ['h 150.35 47 94', 'h 97 0 19.74', 'h 97 47 94', 'v 19.74 97 169.75', 'v 47 0 150.35']);
 });
 
 test('stretch: snaps to outer walls and walls, joints may appear or go', () => {

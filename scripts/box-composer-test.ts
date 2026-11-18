@@ -436,17 +436,19 @@ const drag = (hit: string | undefined, x0: number, y0: number, x1: number, y1: n
   { type: 'move', x: x1, y: y1, drag: true, from: { x: x0, y: y0 }, ...extra },
   { type: 'up', x: x1, y: y1, from: { x: x0, y: y0 }, ...extra },
 ];
+/** A double click on the wall first (the whole wall), then the drag */
+const dragWhole = (hit: string, x0: number, y0: number, x1: number, y1: number) => [{ type: 'dblclick', x: x0, y: y0, hit }, ...drag(hit, x0, y0, x1, y1)];
 
 await atest('plan: dragging a wall moves it, walls ending on it follow; one parameter change on release', async () => {
   const { runDialog } = await import('../src/plugins/headless');
-  const [start, moved] = await runDialog(manifest, [{ $surface: drag('w1', 20, 97, 20, 107.4) }]);
+  const [start, moved] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 107.4) }]);
   assert.ok(start.surface!.items > 10 && start.surface!.layers === 1, 'walls, ends and the outer box are drawn');
   assert.deepEqual(byId(moved, 1), { id: 1, axis: 'h', pos: 107, from: 0, to: 94 }, 'moved, rounded to whole mm');
   assert.equal(byId(moved, 4)!.from, 107, 'the T on it follows');
   assert.deepEqual(byId(moved, 2), byId(start, 2), 'the crossing wall stays');
   assert.equal(moved.params.wallsRef, '[94,194]');
   assert.equal(moved.surface!.selected.walls, 0, 'the moved wall is selected');
-  assert.deepEqual(moved.surface!.state, { at: { id: 1, along: 20 } }, 'after the release only where its measures are taken');
+  assert.deepEqual(moved.surface!.state, { at: { id: 1, along: 20 }, sel: { axis: 'h', pos: 107, runs: [[0, 94]] } }, 'after the release where its measures are taken and the selection');
   // Measured where the pointer held it (x = 20): from the inside of the back wall 107 − 1.5, to the front wall
   // 195.5 − 107 − 3 (wall 3 is not there; numbers in the system's format)
   assert.match(moved.message ?? '', /^Wall 1 · clear behind 105[.,]5 mm, in front 85[.,]5 mm · length 94 mm$/, 'the measures under the plan');
@@ -455,9 +457,9 @@ await atest('plan: dragging a wall moves it, walls ending on it follow; one para
 
 await atest('plan: a dragged wall goes to the nearest place where it may stand; a wall that cannot be added is refused', async () => {
   const { runDialog } = await import('../src/plugins/headless');
-  const [start, held] = await runDialog(manifest, [{ $surface: drag('w1', 20, 97, 20, 150) }]);
+  const [start, held] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 150) }]);
   assert.equal(byId(held, 1)!.pos, 144, 'not onto wall 3');
-  const [, past] = await runDialog(manifest, [{ $surface: drag('w1', 20, 97, 20, 156) }]);
+  const [, past] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 156) }]);
   assert.equal(byId(past, 1)!.pos, 157, 'over wall 3 to below it');
   assert.deepEqual(past.issues, []);
   const [, short] = await runDialog(manifest, [{ $surface: drag('e4.to', 19.74, 169.75, 19.74, 99) }]);
@@ -467,17 +469,68 @@ await atest('plan: a dragged wall goes to the nearest place where it may stand; 
   assert.match(close.message ?? '', /closer than 3 mm/);
 });
 
-await atest('plan: double click adds a wall across the compartment (Shift: the other way), Shift-drag draws one', async () => {
+await atest('plan: a click takes the stretch under the pointer; dragged, it leaves its wall (a U); Shift adds stretches', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const shape = (st: { params: Record<string, unknown> }) => wallsOf(st).map((w) => [w.axis, w.pos, w.from, w.to].join(' ')).sort();
+  // Wand 1 zwischen Wand 4 (19.74) und Wand 2 (47) nach hinten: Wand 4 kommt von vorne und wird länger, der Rest bleibt
+  const [, u] = await runDialog(manifest, [{ $surface: drag('w1', 30, 97, 30, 85.2) }]);
+  assert.deepEqual(shape(u), ['h 150.35 47 94', 'h 85 19.74 47', 'h 97 0 19.74', 'h 97 47 94', 'v 19.74 85 169.75', 'v 47 0 150.35']);
+  assert.deepEqual(u.issues, []);
+  assert.deepEqual((u.surface!.state as { sel?: unknown }).sel, { axis: 'h', pos: 85, runs: [[19.74, 47]] }, 'the stretch stays selected where it is now');
+  // Mit Umschalt das Stück rechts dazu (bis zur rechten Außenwand), beide zusammen nach hinten
+  const click = (x: number, y: number, hit: string) => [{ type: 'down', x, y, hit }, { type: 'up', x, y, from: { x, y } }];
+  const [, two] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), ...drag('w1', 60, 97, 60, 85.2, { shift: true })] }]);
+  assert.deepEqual(shape(two), ['h 150.35 47 94', 'h 85 19.74 94', 'h 97 0 19.74', 'v 19.74 85 169.75', 'v 47 0 150.35']);
+  assert.deepEqual(two.issues, []);
+  // Rechtsklick löscht nur das Stück unter dem Zeiger
+  const [, cut] = await runDialog(manifest, [{ $surface: [{ type: 'context', x: 30, y: 97, hit: 'w1' }] }]);
+  assert.deepEqual(shape(cut), ['h 150.35 47 94', 'h 97 0 19.74', 'h 97 47 94', 'v 19.74 97 169.75', 'v 47 0 150.35']);
+});
+
+await atest('plan: Ctrl shows a target on the selection; a click adds a wall from there across the compartment, a drag draws it', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const click = (x: number, y: number, hit: string) => [{ type: 'down', x, y, hit }, { type: 'up', x, y, from: { x, y } }];
+  // Stück 19.74 … 47 von Wand 1 gewählt, Strg vor der Wand: Ziel in seiner Mitte (33.37), Seite vorne
+  const [, aimed] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), { type: 'move', x: 32, y: 103, ctrl: true }] }]);
+  const aim = (aimed.surface!.state as { aim?: { along: number; side: number; sel: unknown } }).aim!;
+  assert.deepEqual([aim.along, aim.side, aim.sel], [33.37, 1, { axis: 'h', pos: 97, runs: [[19.74, 47]] }]);
+  const [, added] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), ...click(32, 103, 'w1').map((e) => ({ ...e, ctrl: true }))] }]);
+  assert.deepEqual(byId(added, 5), { id: 5, axis: 'v', pos: 33.37, from: 97, to: 194 }, 'from wall 1 to the front wall');
+  assert.deepEqual(added.issues, []);
+  const [, drawn] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), ...drag(undefined, 32, 103, 32, 150, { ctrl: true })] }]);
+  assert.deepEqual(byId(drawn, 5), { id: 5, axis: 'v', pos: 33.37, from: 97, to: 150 }, 'drawn from the target to the pointer');
+  // Ohne Auswahl, nahe an Wand 4 (x 19.74): das Ziel auf ihr, in der Mitte ihres Stücks; der Klick setzt eine Wand nach rechts bis Wand 2
+  const [, near] = await runDialog(manifest, [{ $surface: [{ type: 'move', x: 23, y: 130, ctrl: true }] }]);
+  const a4 = (near.surface!.state as { aim?: { along: number; side: number; sel: unknown } }).aim!;
+  assert.deepEqual([a4.along, a4.side, a4.sel], [133.38, 1, { axis: 'v', pos: 19.74, runs: [[97, 169.75]] }], 'wall 4 preselected');
+  const [, fromFour] = await runDialog(manifest, [{ $surface: [{ type: 'down', x: 23, y: 130, ctrl: true }, { type: 'up', x: 23, y: 130, from: { x: 23, y: 130 }, ctrl: true }] }]);
+  assert.deepEqual(byId(fromFour, 5), { id: 5, axis: 'h', pos: 133.38, from: 19.74, to: 47 });
+  assert.deepEqual(fromFour.issues, []);
+  // Ohne Strg verschwindet das Ziel
+  const [, gone] = await runDialog(manifest, [{ $surface: [...click(30, 97, 'w1'), { type: 'move', x: 32, y: 103, ctrl: true }, { type: 'move', x: 32, y: 104 }] }]);
+  assert.equal((gone.surface!.state as { aim?: unknown }).aim, undefined);
+  // Strg im leeren Raum: ein Kreuz, Ziehen zeichnet eine freie Wand (das Ende rastet an der rechten Außenwand ein)
+  const [, cross] = await runDialog(manifest, [{ $surface: [{ type: 'move', x: 60.3, y: 120, ctrl: true }] }]);
+  assert.deepEqual((cross.surface!.state as { free?: unknown }).free, [60, 120]);
+  const [, free] = await runDialog(manifest, [{ $surface: drag(undefined, 60, 120, 92, 121, { ctrl: true }) }]);
+  assert.deepEqual(byId(free, 5), { id: 5, axis: 'h', pos: 120, from: 60, to: 94 }, 'drawn left to right, the end snapped to the right wall');
+  assert.deepEqual(free.issues, []);
+});
+
+await atest('plan: double click adds a wall across the compartment (Shift: the other way); Ctrl+Shift+click takes the whole wall', async () => {
   const { runDialog } = await import('../src/plugins/headless');
   const [, across] = await runDialog(manifest, [{ $surface: [{ type: 'dblclick', x: 70, y: 40.3 }] }]);
   assert.deepEqual(byId(across, 5), { id: 5, axis: 'h', pos: 40, from: 47, to: 94 }, 'from wall 2 to the right wall');
   assert.equal(across.surface!.selected.walls, 4, 'the new wall is selected');
   assert.deepEqual(across.issues, []);
   const [, deep] = await runDialog(manifest, [{ $surface: [{ type: 'dblclick', x: 70, y: 40, shift: true }] }]);
-  assert.deepEqual(byId(deep, 5), { id: 5, axis: 'v', pos: 70, from: 0, to: 97 }, 'from the back wall to wall 1');
-  const [, drawn] = await runDialog(manifest, [{ $surface: drag(undefined, 60, 120, 92, 121, { shift: true }) }]);
-  assert.deepEqual(byId(drawn, 5), { id: 5, axis: 'h', pos: 120, from: 60, to: 94 }, 'drawn left to right, the end snapped to the right wall');
-  assert.deepEqual(drawn.issues, []);
+  assert.deepEqual(byId(deep, 5), { id: 5, axis: 'v', pos: 71.25, from: 0, to: 97 }, 'from the back wall to wall 1, near the middle: in the middle');
+  const [, mid] = await runDialog(manifest, [{ $surface: [{ type: 'dblclick', x: 70, y: 45 }] }]);
+  assert.deepEqual(byId(mid, 5), { id: 5, axis: 'h', pos: 47.75, from: 47, to: 94 }, 'near the middle: in the middle');
+  const [, all] = await runDialog(manifest, [{ $surface: drag('w1', 20, 97, 20, 107.4, { ctrl: true, shift: true }) }]);
+  assert.deepEqual(byId(all, 1), { id: 1, axis: 'h', pos: 107, from: 0, to: 94 }, 'the whole wall moved');
+  assert.equal(byId(all, 4)!.from, 107, 'the T on it follows');
+  assert.deepEqual(all.issues, []);
 });
 
 await atest('plan: Delete removes the selected wall, a right click the one under the pointer; ends snap when stretched', async () => {
@@ -507,12 +560,12 @@ await atest('plan: a wall dragged near the middle between its neighbours snaps t
 await atest('plan: measured and centred where the pointer holds the wall; the middle of a wall it crosses', async () => {
   const { runDialog } = await import('../src/plugins/headless');
   // Wand 1 (quer bei 97) kreuzt Wand 2 (0–150.35): deren Mitte 75.175; der Zeiger bei x = 20
-  const [, onWall] = await runDialog(manifest, [{ $surface: drag('w1', 20, 97, 20, 78) }]);
+  const [, onWall] = await runDialog(manifest, [{ $surface: dragWhole('w1', 20, 97, 20, 78) }]);
   assert.equal(byId(onWall, 1)!.pos, 75.175);
   assert.match(onWall.message ?? '', /^Wall 1 · in the middle of wall 2 · /);
   // Wand 2 (längs bei 47) zwischen linker Außenwand und Wand 4 nur unten (97–169.75): oben gefasst ist die Mitte die
   // ganze Breite, unten zwischen Wand 4 und der rechten Außenwand
-  const [, low] = await runDialog(manifest, [{ $surface: drag('w2', 47, 120, 55, 120) }]);
+  const [, low] = await runDialog(manifest, [{ $surface: dragWhole('w2', 47, 120, 55, 120) }]);
   assert.equal(byId(low, 2)!.pos, 57.62, 'pointer at y = 120: the middle between wall 4 (19.74) and the right wall');
   assert.match(low.message ?? '', /^Wall 2 · centred · /);
 });
@@ -523,6 +576,14 @@ await atest('plan: with the side open, the middle and the measures go to the edg
   const [, open] = await runDialog(manifest, [{ wallLeft: false, $surface: drag('w4', 19.74, 130, 21, 130) }]);
   assert.equal(byId(open, 4)!.pos, 21.25);
   assert.match(open.message ?? '', /^Wall 4 · centred · clear on the left 22[.,]75 mm, on the right 22[.,]75 mm/);
+});
+
+await atest('plan: a wall dragged near the middle of the box snaps there, with a guide and the measures', async () => {
+  const { runDialog } = await import('../src/plugins/headless');
+  const walls = JSON.stringify([{ id: 1, axis: 'h', pos: 97, from: 0, to: 94 }, { id: 2, axis: 'v', pos: 70, from: 97, to: 194 }, { id: 3, axis: 'v', pos: 20, from: 97, to: 194 }]);
+  const [, s] = await runDialog(manifest, [{ walls, $surface: drag('w2', 70, 150, 50, 150) }]);
+  assert.equal(byId(s, 2)!.pos, 47);
+  assert.match(s.message ?? '', /^Wall 2 · in the middle of the box · clear on the left 24 mm, on the right 45[.,]5 mm/);
 });
 
 await atest('plan: a new width asks whether the walls scale with the box or keep their mm', async () => {
