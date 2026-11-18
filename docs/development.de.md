@@ -2,6 +2,8 @@
 
 [English](development.md) · Deutsch · [Zurück zum README](../README.de.md)
 
+Schriftgrößengruppen, CSS-/Canvas-Anbindung und Einstellungsvorschau: [UI typography (Englisch)](ui-typography.md).
+
 ## Bauen
 
 Voraussetzungen: Node.js 20+, Rust (stable), unter Linux zusätzlich `libwebkit2gtk-4.1-dev`, `librsvg2-dev`, `build-essential`, `libssl-dev`

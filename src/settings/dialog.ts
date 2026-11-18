@@ -23,6 +23,7 @@ export async function openSettings(sectionId?: string, fieldId?: string) {
   if (!list.length) return;
   const before = await loadValues(list);
   const draft = new Map(before);
+  const refreshers = new Set<() => void>();
   let current = list.find((s) => s.id === (sectionId || lastSection)) ?? list[0];
 
   const search = h('input', { type: 'search', class: 'settings-search', placeholder: t('Einstellungen durchsuchen …'), spellcheck: false }) as HTMLInputElement;
@@ -34,7 +35,10 @@ export async function openSettings(sectionId?: string, fieldId?: string) {
   const control = (f: ValueField): HTMLElement => {
     const has = draft.has(f.id);
     const val = draft.get(f.id);
-    const set = (v: Value) => draft.set(f.id, v);
+    const set = (v: Value) => {
+      draft.set(f.id, v);
+      refreshers.forEach((refresh) => refresh());
+    };
     switch (f.kind) {
       case 'toggle': {
         const el = h('input', { type: 'checkbox', id: `set-${f.id}`, checked: !!val, disabled: !has }) as HTMLInputElement;
@@ -46,6 +50,28 @@ export async function openSettings(sectionId?: string, fieldId?: string) {
         el.value = String(val ?? '');
         el.onchange = () => set(el.value);
         return el;
+      }
+      case 'slider': {
+        const options = f.options();
+        const el = h('input', {
+          type: 'range', id: `set-${f.id}`, min: '0', max: String(Math.max(0, options.length - 1)),
+          step: '1', disabled: !has || !options.length,
+        }) as HTMLInputElement;
+        const value = h('span', { class: 'settings-slider-value' });
+        const show = (index: number) => {
+          el.value = String(index);
+          const label = options[index]?.[1] ?? '';
+          value.textContent = label;
+          el.setAttribute('aria-valuetext', label);
+        };
+        show(Math.max(0, options.findIndex(([v]) => v === val)));
+        el.oninput = () => {
+          const index = Math.max(0, Math.min(options.length - 1, Math.round(Number(el.value))));
+          if (!options[index]) return;
+          show(index);
+          set(options[index][0]);
+        };
+        return h('span', { class: 'settings-slider' }, el, value);
       }
       case 'number': {
         const el = h('input', { type: 'text', id: `set-${f.id}`, inputmode: 'decimal', disabled: !has, class: 'settings-num' }) as HTMLInputElement;
@@ -96,7 +122,14 @@ export async function openSettings(sectionId?: string, fieldId?: string) {
         h('div', { class: 'settings-ctl' }, h('button', { class: 'btn', type: 'button', onclick: () => f.run() }, f.button)));
     }
     if (f.kind === 'custom') {
-      return h('div', { class: 'settings-row settings-custom', 'data-field': f.id }, h('div', { class: 'settings-label' }, h('span', {}, f.label), hint), f.render());
+      return h('div', { class: 'settings-row settings-custom', 'data-field': f.id }, h('div', { class: 'settings-label' }, h('span', {}, f.label), hint), f.render({
+        read: (id) => draft.get(id),
+        update: (values) => {
+          values.forEach((value, id) => before.has(id) && draft.set(id, value));
+          render();
+        },
+        onChange: (refresh) => { refreshers.add(refresh); },
+      }));
     }
     if (f.kind === 'toggle') {
       return h('div', { class: 'settings-row settings-toggle', 'data-field': f.id },
@@ -123,6 +156,7 @@ export async function openSettings(sectionId?: string, fieldId?: string) {
   };
 
   const render = () => {
+    refreshers.clear();
     const q = search.value.trim();
     nav.querySelectorAll('button').forEach((b) => {
       const on = !q && b.dataset.section === current.id;

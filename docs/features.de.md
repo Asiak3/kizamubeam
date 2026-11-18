@@ -31,6 +31,8 @@ Offline-Regressionen: `npm run test:camera`. Tests öffnen keine Hardware.
 
 ## Oberfläche und Arbeitsfläche
 
+- **Schriftgrößen der Oberfläche** (Bearbeiten → Einstellungen → Darstellung): Bedienelemente und Menüs, Hinweise und Zusatztexte, technische Werte und Ausgaben sowie Beschriftungen im Arbeitsbereich unabhängig auf 80 %, 100 %, 125 % oder 150 % stellen. Eine lokale Vorschau zeigt die Auswahl; OK übernimmt sie, Abbrechen verwirft sie. 100 % stellt die ursprünglichen Größen einer Gruppe wieder her; Dokumente und Exporte bleiben unverändert.
+
 ### Erweiterte Vektorbearbeitung
 
 - **Werkzeuge → Pfade vereinfachen / glätten…** passt ganze ausgewählte

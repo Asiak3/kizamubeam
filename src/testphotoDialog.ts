@@ -11,6 +11,7 @@ import {
 } from './materialtest';
 import { cellAt, cellQuad, Corners, cornersFromView, gridToImage, measureCells, Measurement, suggestCell } from './testphoto';
 import { dec, t } from './i18n';
+import { getTypography, groupFactor, onTypographyChange, resolveTypography } from './uiTypography';
 
 /** Längere Seite des Arbeitsbilds in Pixeln; größere Fotos werden verkleinert */
 const MAX_PX = 2400;
@@ -165,7 +166,8 @@ export function openTestPhotoDialog(ed: Editor, opts?: TestOptions) {
           if (showValues && meas && cellPx >= 18) {
             const m = meas.cells[r * L.cols + c];
             const ctr = toScreen({ x: (q[0].x + q[2].x) / 2, y: (q[0].y + q[2].y) / 2 });
-            const fs = Math.max(8, Math.min(13, cellPx / 3.2));
+            // Unterstützend: Zellmesswert, an Zellgröße gekoppelt (Baseline: 8–13)
+            const fs = Math.max(8, Math.min(13, cellPx / 3.2)) * groupFactor(resolveTypography(getTypography()), 'supporting');
             ctx.font = `600 ${fs}px system-ui, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -188,7 +190,8 @@ export function openTestPhotoDialog(ed: Editor, opts?: TestOptions) {
       ctx.lineWidth = 2;
       ctx.strokeStyle = accent;
       ctx.stroke();
-      ctx.font = '600 11px system-ui, sans-serif';
+      // Unterstützend: Eckennummern (Baseline: 11)
+      ctx.font = `600 ${11 * groupFactor(resolveTypography(getTypography()), 'supporting')}px system-ui, sans-serif`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
       ctx.lineWidth = 3;
@@ -387,7 +390,9 @@ export function openTestPhotoDialog(ed: Editor, opts?: TestOptions) {
   );
   const ro = new ResizeObserver(() => layout());
   ro.observe(wrap);
-  dlg.addEventListener('close', () => (ro.disconnect(), dlg.remove()));
+  // Typografie live nachführen, beim Schließen abmelden
+  const offTypo = onTypographyChange(() => draw());
+  dlg.addEventListener('close', () => (ro.disconnect(), offTypo(), dlg.remove()));
   dlg.addEventListener('keydown', (e) => e.stopPropagation());
   document.body.append(dlg);
   dlg.showModal();

@@ -21,6 +21,7 @@ import { openCheck } from './checkPanel';
 import { presetList } from './packs';
 import { laserTypeLabel, presetPicker } from './packsDialog';
 import { dec, locale, t, tBackend, tn } from './i18n';
+import { getTypography, groupFactor, onTypographyChange, resolveTypography } from './uiTypography';
 import { isNightly } from './updates';
 import { version as APP_VERSION } from '../package.json';
 
@@ -1207,18 +1208,20 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   const updatePointer = () => {
     const o = d.pointerOffset;
     const s = 4, cx = 110, cy = 60; // px pro mm; Zeigerpunkt in der Mitte
+    // Technisch: Diagrammtexte im Geräteeinstellungs-Dialog (Baseline: 9/10/10)
+    const fTe = groupFactor(resolveTypography(getTypography()), 'technical');
     const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
     const bx = clamp(cx + o.x * s, 14, 206), by = clamp(cy - o.y * s, 14, 106); // +Y = hinten/oben
     setTrustedSvg(
       poDiagram,
       `<svg viewBox="0 0 220 120" width="220" height="120" role="img">` +
       `<rect x="4" y="4" width="212" height="112" fill="none" stroke="currentColor" stroke-opacity="0.3" rx="4"/>` +
-      `<text x="10" y="18" font-size="9" fill="currentColor" fill-opacity="0.6">+Y ↑ · +X →</text>` +
+      `<text x="10" y="18" font-size="${9 * fTe}" fill="currentColor" fill-opacity="0.6">+Y ↑ · +X →</text>` +
       `<line x1="${cx}" y1="${cy}" x2="${bx}" y2="${by}" stroke="currentColor" stroke-dasharray="4 3"/>` +
       `<circle cx="${cx}" cy="${cy}" r="5" fill="#4da3ff"/>` +
-      `<text x="${cx + 9}" y="${cy + 4}" font-size="10" fill="#4da3ff">${escapeXml(t('Zeiger'))}</text>` +
+      `<text x="${cx + 9}" y="${cy + 4}" font-size="${10 * fTe}" fill="#4da3ff">${escapeXml(t('Zeiger'))}</text>` +
       `<g stroke="#ff5252" stroke-width="2"><line x1="${bx - 6}" y1="${by}" x2="${bx + 6}" y2="${by}"/><line x1="${bx}" y1="${by - 6}" x2="${bx}" y2="${by + 6}"/></g>` +
-      `<text x="${bx + 9}" y="${by + 4}" font-size="10" fill="#ff5252">${escapeXml(t('Strahl'))}</text></svg>`,
+      `<text x="${bx + 9}" y="${by + 4}" font-size="${10 * fTe}" fill="#ff5252">${escapeXml(t('Strahl'))}</text></svg>`,
     );
     poSentence.textContent =
       (o.enabled ? '' : t('Derzeit ausgeschaltet. ')) +
@@ -1247,6 +1250,8 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   rows.push(poDiagram, poSentence, poRotNote);
   rows.push(h('div', { class: 'note wide' }, t('Nur für Positionieren, Startreferenz (Aktuelle Position/Benutzer-Ursprung) und Rotpunkt-Framing. Geometrie, Schnitt und G-Code-Export bleiben Werkzeuglaser.')));
   updatePointer();
+  // Typografie live nachführen, beim Schließen abmelden
+  const offTypo = onTypographyChange(() => updatePointer());
   newTab(t('G-Code'));
   {
     const fncHead = head('FluidNC');
@@ -1391,7 +1396,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
       }, t('Übernehmen')),
     ),
   );
-  dlg.addEventListener('close', () => dlg.remove());
+  dlg.addEventListener('close', () => (offTypo(), dlg.remove()));
   dlg.addEventListener('keydown', (e) => e.stopPropagation());
   document.body.append(dlg);
   dlg.showModal();

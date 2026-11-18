@@ -1,4 +1,12 @@
 {
+  "Bedienelemente und Menüs": "Controles e menus",
+  "Hinweise und Zusatztexte": "Dicas e textos complementares",
+  "Technische Werte und Ausgaben": "Valores técnicos e saída",
+  "Beschriftungen im Arbeitsbereich": "Rótulos da área de trabalho",
+  "Schriftgrößen": "Tamanhos de texto",
+  "Schriftvorschau": "Prévia do texto",
+  "Nur diese Vorschau ändert sich sofort. 100 % setzt eine Schriftgruppe zurück. Mit OK werden die Schriftgrößen übernommen; Dokumente und Exporte bleiben unverändert.": "Somente esta prévia muda imediatamente. Selecione 100 % para restaurar um grupo de texto. OK aplica os tamanhos de texto; documentos e exportações permanecem inalterados.",
+  "Alle Schriftgruppen zurücksetzen": "Restaurar todos os grupos de texto",
   "{n} Konturen über Objekt {id}: Layer {layer}, Modus {mode}, Kerf {kerf} mm, Geschwindigkeit {speed}, Leistung {power} %.": "{n} contornos via objeto {id}: layer {layer}, modo {mode}, kerf {kerf} mm, velocidade {speed}, potência {power}%.",
   "Verbleibende offene Quellreste und ihre geänderte Kerf-Wirkung müssen ausdrücklich bestätigt werden.": "Os fragmentos restantes da fonte abertos e o comportamento alterado do kerf precisam ser confirmados explicitamente.",
   "Achtung: Verbleibende Quellreste werden offene Linien. Darauf wirkt kein Layer-Kerf; die gemeinsame Ergebniskontur bleibt geschlossen. Diese Änderung muss bestätigt werden.": "Atenção: os fragmentos restantes da fonte viram linhas abertas. O kerf do Layer não se aplica a elas; o contorno comum resultante permanece fechado. Essa alteração precisa ser confirmada.",

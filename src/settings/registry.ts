@@ -35,6 +35,11 @@ export interface SelectField extends FieldBase<string> {
   kind: 'select';
   options: () => [value: string, label: string][];
 }
+/** Discrete choices in slider order; stored values remain independent of their indices. */
+export interface SliderField extends FieldBase<string> {
+  kind: 'slider';
+  options: () => [value: string, label: string][];
+}
 export interface NumberField extends FieldBase<number> {
   kind: 'number';
   min?: number;
@@ -68,6 +73,15 @@ export interface ActionField {
   button: string;
   run(): void;
 }
+/** Dialog-local access for custom content; never writes through feature setters. */
+export interface SettingsDraftContext {
+  read(id: string): Value | undefined;
+  /** Update draft values and redraw the section, without applying settings. */
+  update(values: ReadonlyMap<string, Value>): void;
+  /** Called on control changes; subscriptions last until the next section render. */
+  onChange(refresh: () => void): void;
+}
+
 /** Free content such as a read-only table; render() is called each time the section is shown */
 export interface CustomField {
   kind: 'custom';
@@ -77,10 +91,10 @@ export interface CustomField {
   keywords?: string;
   group?: string;
   when?: () => boolean;
-  render(): HTMLElement;
+  render(context: SettingsDraftContext): HTMLElement;
 }
 
-export type ValueField = ToggleField | SelectField | NumberField | TextField | ColorField;
+export type ValueField = ToggleField | SelectField | SliderField | NumberField | TextField | ColorField;
 export type SettingsField = ValueField | ActionField | CustomField;
 
 export interface SettingsSection {

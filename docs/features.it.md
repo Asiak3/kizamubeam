@@ -31,6 +31,8 @@ Test offline: `npm run test:camera`. I test non usano alcun hardware.
 
 ## Interfaccia e area di lavoro
 
+- **Dimensioni del testo dell’interfaccia** (Modifica → Impostazioni → Aspetto): imposta separatamente controlli e menu, testi di supporto, valori e output tecnici ed etichette dell’area di lavoro su 80%, 100%, 125% o 150%. Un campione locale mostra l’anteprima; OK applica le modifiche, Annulla le scarta. Il 100% ripristina le dimensioni originali di un gruppo; documenti ed esportazioni restano invariati.
+
 ### Modifica vettoriale avanzata
 
 - **Strumenti → Semplifica / smussa percorsi…** riadatta interi percorsi o forme

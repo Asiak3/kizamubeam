@@ -1,4 +1,12 @@
 {
+  "Bedienelemente und Menüs": "Controles y menús",
+  "Hinweise und Zusatztexte": "Indicaciones y texto complementario",
+  "Technische Werte und Ausgaben": "Valores técnicos y salida",
+  "Beschriftungen im Arbeitsbereich": "Etiquetas del área de trabajo",
+  "Schriftgrößen": "Tamaños de texto",
+  "Schriftvorschau": "Vista previa del texto",
+  "Nur diese Vorschau ändert sich sofort. 100 % setzt eine Schriftgruppe zurück. Mit OK werden die Schriftgrößen übernommen; Dokumente und Exporte bleiben unverändert.": "Solo esta vista previa cambia de inmediato. Seleccione 100 % para restablecer un grupo de texto. OK aplica los tamaños de texto; los documentos y las exportaciones no cambian.",
+  "Alle Schriftgruppen zurücksetzen": "Restablecer todos los grupos de texto",
   "Erhaltene Originale können doppelt geschnitten werden.": "Los originales conservados pueden cortarse dos veces.",
   "Verbindet nahe Enden. Eine Änderung setzt die Inselauswahl zurück.": "Conecta extremos cercanos. Cambiar esto restablece la selección de islas.",
   "Nur Außenkontur": "Solo contorno exterior",
