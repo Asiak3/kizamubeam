@@ -1,0 +1,484 @@
+{
+ "format": "kizamubeam-pack",
+ "formatVersion": 2,
+ "id": "org.kizamubeam.box-composer",
+ "version": "0.1.0",
+ "minApp": "2.9.0-rc.3",
+ "name": {
+  "en": "Box composer",
+  "de": "Box-Composer",
+  "es": "Compositor de cajas",
+  "it": "Compositore di scatole",
+  "pt-BR": "Compositor de caixas"
+ },
+ "description": {
+  "en": "Box with freely placed inner walls (experimental).",
+  "de": "Kasten mit frei gesetzten Innenwänden (experimentell).",
+  "es": "Caja con paredes interiores colocadas libremente (experimental).",
+  "it": "Scatola con pareti interne posizionate liberamente (sperimentale).",
+  "pt-BR": "Caixa com paredes internas posicionadas livremente (experimental)."
+ },
+ "author": "Asiak3",
+ "plugins": [
+  {
+   "id": "org.kizamubeam.box-composer",
+   "type": "generator",
+   "api": 1,
+   "version": 1,
+   "kind": "assembly",
+   "runtime": "js",
+   "code": "\"use strict\";(()=>{var R=globalThis.host;function H(e){globalThis.plugin=e}var N=e=>String(Math.round(e*1e3)/1e3);var W=class extends Error{constructor(n,r){super(n);this.code=n;this.values=r}},O=1e-6,D=(e,t)=>Math.abs(e.x-t.x)<O&&Math.abs(e.y-t.y)<O;function G(e,t,n={}){let r=l=>[...new Set((l??[]).filter(c=>c>O&&c<e-O))].sort((c,d)=>c-d),s=r(n.top),o=r(n.bottom).reverse();return{closed:!0,nodes:[{x:0,y:0},...s.map(l=>({x:l,y:0})),{x:e,y:0},{x:e,y:t},...o.map(l=>({x:l,y:t})),{x:0,y:t}]}}function ie(e,t,n,r=0){let s=e[r]?.nodes??[];for(let o=0;o<s.length;o++){let l=s[o],c=s[(o+1)%s.length];if(D(l,t)&&D(c,n)||D(l,n)&&D(c,t))return o}return-1}function C(e,t,n){let r={},s=n.map(l=>{r[l.part]=e[l.part];let c=ie(e[l.part],l.a,l.b);if(c<0)throw new W(\"composer-edge-lost\");return{part:l.part,seg:c}}),o=R.joints({op:\"edge\",options:{...t,kerf:0},parts:r,edges:s});if(o.error)throw new W(o.error.code,o.error.values);return{parts:{...e,...o.parts},info:o.info}}function V(e,t,n,r,s,o){let l=\"_guide\",d={...C({...e,[l]:[{closed:!1,nodes:[s,o]}]},{...t,kind:\"tenon\"},[n,{part:l,a:s,b:o}]).parts};return d[r]=[...e[r],...d[l]??[]],delete d[l],d}function X(e,t){return t>0?R.offset({subs:e,delta:t/2,join:\"miter\"}):e}var q=e=>{if(typeof e!=\"string\"||e.length>1e5)return null;try{return{v:e?JSON.parse(e):void 0}}catch{return null}};function _(e,t=\"\"){let n=q(e),r=q(t);if(!n||!r)return null;let s=n.v??[],o=r.v,l=a=>typeof a==\"number\"&&Number.isFinite(a);if(o!==void 0&&!(Array.isArray(o)&&o.length===2&&o.every(a=>l(a)&&a>0))||!Array.isArray(s)||s.length>100)return null;let c=[],d=new Set;for(let a of s){if(!a||typeof a!=\"object\")return null;let m=a;if(!l(m.id)||!Number.isInteger(m.id)||m.id<1||d.has(m.id)||m.axis!==\"h\"&&m.axis!==\"v\"||!l(m.pos)||!l(m.from)||!l(m.to))return null;d.add(m.id),c.push({id:m.id,axis:m.axis,pos:m.pos,from:Math.min(m.from,m.to),to:Math.max(m.from,m.to)})}return{ref:o??[0,0],walls:c}}function le(e,t,n){let[r,s]=e.ref;if(!(r>0&&s>0)||Math.abs(r-t)<1e-9&&Math.abs(s-n)<1e-9)return e.walls.map(c=>({...c}));let o=t/r,l=n/s;return e.walls.map(c=>c.axis===\"h\"?{...c,pos:c.pos*l,from:c.from*o,to:c.to*o}:{...c,pos:c.pos*o,from:c.from*l,to:c.to*l})}function ue(e){let t=[...e].sort((r,s)=>r.id-s.id),n=!0;for(;n;){n=!1;for(let r=0;r<t.length&&!n;r++)for(let s=r+1;s<t.length&&!n;s++){let o=t[r],l=t[s];o.axis===l.axis&&Math.abs(o.pos-l.pos)<.01&&o.from<=l.to+.01&&l.from<=o.to+.01&&(t[r]={...o,from:Math.min(o.from,l.from),to:Math.max(o.to,l.to)},t.splice(s,1),n=!0)}}return t}var K=(e,t,n)=>e===\"h\"?t:n,me=(e,t,n)=>e===\"h\"?n:t;function z(e,t,n,r){let{t:s,gap:o,minLen:l,freeLen:c}=r,d=[],a=(i,b)=>d.push({level:\"error\",code:i,...b?{values:b}:{}}),m=ue(le(e,t,n)),f=[];for(let i of m){let b=K(i.axis,t,n),g=me(i.axis,t,n);i.pos<-.01||i.pos>g+.01||i.from<-.01||i.to>b+.01?a(\"wall-outside\",{id:i.id}):i.pos<.01||i.pos>g-.01?a(\"wall-on-outer\",{id:i.id}):i.to-i.from<l?a(\"wall-short\",{id:i.id,min:l}):((i.pos-s/2<o-.01||g-i.pos-s/2<o-.01)&&a(\"wall-near-outer\",{id:i.id,min:o}),f.push({...i,from:Math.max(0,i.from),to:Math.min(b,i.to)}))}let P=new Map(f.map(i=>[i.id,{wall:i,start:{kind:\"free\"},end:{kind:\"free\"},tees:[],crosses:[]}])),M=i=>f.filter(b=>b.axis!==i.axis);for(let i of f){let b=P.get(i.id);for(let g of[\"start\",\"end\"]){let p=g===\"start\"?i.from:i.to,S=K(i.axis,t,n),v={kind:\"free\"};if(p<.01)v={kind:\"outer\",side:i.axis===\"h\"?\"x0\":\"y0\"};else if(p>S-.01)v={kind:\"outer\",side:i.axis===\"h\"?\"x1\":\"y1\"};else{let I=M(i).find(u=>Math.abs(u.pos-p)<.01&&u.from-.01<=i.pos&&i.pos<=u.to+.01);I?i.pos>I.from+.01&&i.pos<I.to-.01?(v={kind:\"tee\",host:I.id},P.get(I.id).tees.push({at:i.pos,wall:i.id,side:g===\"start\"?1:-1})):v={kind:\"corner\",other:I.id}:p<o-.01||S-p<o-.01?a(\"wall-gap\",{id:i.id,min:o}):M(i).some(u=>Math.abs(u.pos-p)-s/2<o-.01&&u.from-o-s/2<i.pos&&i.pos<u.to+o+s/2)&&a(\"wall-gap\",{id:i.id,min:o})}b[g]=v}}for(let i of f)for(let b of f)i.axis===\"v\"&&b.axis===\"h\"&&i.pos>b.from+.01&&i.pos<b.to-.01&&b.pos>i.from+.01&&b.pos<i.to-.01&&(P.get(i.id).crosses.push({at:b.pos,wall:b.id}),P.get(b.id).crosses.push({at:i.pos,wall:i.id}));for(let i=0;i<f.length;i++)for(let b=i+1;b<f.length;b++){let g=f[i],p=f[b];g.axis===p.axis&&Math.abs(g.pos-p.pos)-s<o-.01&&Math.min(g.to,p.to)-Math.max(g.from,p.from)>-o&&a(\"walls-close\",{id:g.id,id2:p.id,min:o})}for(let i of P.values()){let b=i.wall;for(let p of i.tees)for(let S of i.tees)p.wall<S.wall&&p.side!==S.side&&Math.abs(p.at-S.at)-s<o-.01&&a(\"tees-misaligned\",{id:p.wall,id2:S.wall,min:o});let g=[...i.tees.map(p=>p.at),...i.crosses.map(p=>p.at)];for(let[p,S]of[[\"start\",b.from],[\"end\",b.to]]){if(i[p].kind!==\"free\")continue;let v=p===\"start\"?i.end:i.start,I=p===\"start\"?b.to:b.from,u=[...g.map(w=>Math.abs(w-S)-s/2),Math.abs(I-S)-(v.kind===\"free\"?0:s/2)];Math.min(...u)<c-.01&&a(\"free-end-short\",{id:b.id,min:c})}}return{w:t,d:n,walls:[...P.values()],issues:ce(d)}}function ce(e){let t=new Set;return e.filter(n=>{let r=n.code+JSON.stringify(n.values??{});return t.has(r)?!1:(t.add(r),!0)})}var $={x0:\"left\",x1:\"right\",y0:\"back\",y1:\"front\"},fe=e=>`wall-${e}`,ee=e=>e.sides.x0||e.sides.x1||e.sides.y0||e.sides.y1,j=e=>ee(e)?e.H-e.t-(e.lid?e.t:0)-e.drop:e.H-e.t,te=e=>Math.max(1.5*e.t,e.t+Math.max(0,e.clearance)+.5);function Y(e,t,n,r){return e.kind===\"outer\"?r.sides[e.side]?t:t+n*r.t:e.kind===\"free\"?t:t-n*r.t/2}function be(e,t){let n=j(t);return e.walls.map(r=>({key:fe(r.wall.id),it:r,s:Y(r.start,r.wall.from,-1,t),e:Y(r.end,r.wall.to,1,t),h:n,fromTop:r.wall.axis===\"h\"}))}function Z(e,t){let{t:n,finger:r}=t,s=e.fromTop?[]:e.it.crosses.map(f=>f.at).sort((f,P)=>f-P),o=te(t),l=[],c=e.s;for(let f of s)l.push({a:c,b:f-o}),c=f+o;l.push({a:c,b:e.e});let d=(f,P)=>{let M=P-f,i=Math.max(1,Math.round(M/(3*r)));return{a:f,b:P,n:i,width:Math.min(r,M/(2*i))}},a=[],m=r+n;return l.forEach((f,P)=>{let M=P===0&&e.it.start.kind===\"free\",i=P===l.length-1&&e.it.end.kind===\"free\",b=f.b-f.a,g=(M?1:0)+(i?1:0);if(!g)return a.push(d(f.a,f.b));if(b<g*m+r)return a.push({a:f.a,b:f.b,n:1,width:Math.min(r,b-n)});let p=f.a,S=f.b;M&&(a.push({a:p,b:p+m,n:1,width:r}),p+=m);let v=i?{a:S-m,b:S,n:1,width:r}:null;i&&(S-=m),a.push(d(p,S)),v&&a.push(v)}),a.filter(f=>f.b-f.a>1e-6)}function Q(e,t){let n=Math.max(1,Math.round(e/(3*t)));return{tenonCount:n,tenonWidth:Math.min(t,e/(2*n))}}function ne(e,t){let{W:n,D:r,H:s,t:o,finger:l}=t,c=t.clearance/2,d=[],a={},m=t.sides,f=ee(t),P=(u,w,h,y)=>[R.joints({op:\"panel\",width:u,height:w,thickness:o,finger:l,clearance:c,kerf:0,edges:h,corners:y}).outline],M=(u,w)=>u?w:\"flat\",i=t.lid?\"B\":\"flat\",b=()=>P(n,r,[M(m.y0,\"A\"),M(m.x1,\"A\"),M(m.y1,\"A\"),M(m.x0,\"A\")],!1);if(a.floor=b(),t.lid&&(a.lid=b()),m.y1&&(a.front=P(n,s,[i,M(m.x1,\"A\"),\"B\",M(m.x0,\"A\")],!0)),m.y0&&(a.back=P(n,s,[i,M(m.x1,\"A\"),\"B\",M(m.x0,\"A\")],!0)),m.x0&&(a.left=P(r,s,[i,M(m.y1,\"B\"),\"B\",M(m.y0,\"B\")],!1)),m.x1&&(a.right=P(r,s,[i,M(m.y1,\"B\"),\"B\",M(m.y0,\"B\")],!1)),f)for(let u of[\"y0\",\"y1\"])for(let w of[\"x0\",\"x1\"]){if(m[u])continue;let h=(y,x)=>{let k=y<0?y:y-o,A=x<0?x:x-o;return{closed:!0,nodes:[{x:k,y:A},{x:k+o,y:A},{x:k+o,y:A+o},{x:k,y:A+o}]}};if(m[w]){let y=$[w],x=u===\"y1\"?r/2:-r/2;a[y]=R.boolean({op:\"union\",a:a[y],b:[h(x,-s/2),h(x,s/2)]})}else{let y=h(w===\"x1\"?n/2:-n/2,u===\"y1\"?r/2:-r/2);a.floor=R.boolean({op:\"union\",a:a.floor,b:[y]}),a.lid&&(a.lid=R.boolean({op:\"union\",a:a.lid,b:[y]}))}}f||(a.floor=[{closed:!0,nodes:[{x:-n/2,y:-r/2},{x:n/2,y:-r/2},{x:n/2,y:r/2},{x:-n/2,y:r/2}]}]);let g=be(e,t),p=new Map(g.map(u=>[u.it.wall.id,u])),S=te(t);for(let u of g){let w=u.e-u.s,h=u.fromTop?u.it.crosses.flatMap(x=>[x.at-S-u.s,x.at+S-u.s]):[],y=Z(u,t).flatMap(x=>[x.a-u.s,x.b-u.s]);a[u.key]=[G(w,u.h,{top:h,bottom:y})]}let v=u=>({thickness:o,clearance:c,...u}),I=u=>{a=u.parts,d.push(...u.info)};for(let u of g)if(u.fromTop)for(let w of u.it.crosses){let h=p.get(w.wall),y=h.it.crosses.find(A=>A.wall===u.it.wall.id).at,x=w.at-u.s,k=y-h.s;I(C(a,{kind:\"lap\",thickness:o,clearance:t.clearance,lapCount:1,lapDepth:50},[{part:u.key,a:{x:x-S,y:0},b:{x:x+S,y:0}},{part:h.key,a:{x:k+S,y:h.h},b:{x:k-S,y:h.h}}]))}for(let u of g)for(let w of[\"start\",\"end\"]){let h=u.it[w],y=w===\"start\"?0:u.e-u.s,x={part:u.key,a:{x:y,y:0},b:{x:y,y:u.h}};if(h.kind===\"corner\"){let k=p.get(h.other);if(k.it.wall.id<u.it.wall.id)continue;let L=(k.it.start.kind===\"corner\"&&k.it.start.other===u.it.wall.id?\"start\":\"end\")===\"start\"?0:k.e-k.s;I(C(a,v({kind:\"finger\",fingerWidth:l,direction:\"out\"}),[x,{part:k.key,a:{x:L,y:0},b:{x:L,y:k.h}}]))}else if(h.kind===\"tee\"){let k=p.get(h.host),A=k.it.tees.find(L=>L.wall===u.it.wall.id).at-k.s;a=V(a,v({kind:\"tenon\",slotClearance:t.clearance,...Q(u.h,l)}),x,k.key,{x:A,y:0},{x:A,y:u.h})}else if(h.kind===\"outer\"&&t.sides[h.side]){let k=h.side,A=$[k],L=k===\"x0\"||k===\"x1\"?r:n,B=u.it.wall.pos+o-L/2,U=s/2-o;a=V(a,v({kind:\"tenon\",slotClearance:t.clearance,...Q(u.h,l)}),x,A,{x:B,y:U-u.h},{x:B,y:U})}}for(let u of g){let w=u.it.wall;for(let h of Z(u,t)){let y=x=>w.axis===\"h\"?{x:x+o-n/2,y:w.pos+o-r/2}:{x:w.pos+o-n/2,y:x+o-r/2};a=V(a,v({kind:\"tenon\",slotClearance:t.clearance,tenonCount:h.n,tenonWidth:h.width}),{part:u.key,a:{x:h.b-u.s,y:u.h},b:{x:h.a-u.s,y:u.h}},\"floor\",y(h.a),y(h.b))}}for(let u of g){let w=(u.e-u.s)/2,h=u.h/2;a[u.key]=a[u.key].map(y=>({closed:y.closed,nodes:y.nodes.map(x=>({x:x.x-w,y:x.y-h}))}))}return{parts:a,info:pe(d),walls:g}}var E=[1,0,0],T=[0,1,0],F=[0,0,1],J=e=>[-e[0],-e[1],-e[2]];function re(e,t,n){let{W:r,D:s,H:o,t:l}=t,c=J(F),d={floor:{o:[r/2,s/2,0],u:E,v:J(T),n:F},lid:{o:[r/2,s/2,o-l],u:E,v:J(T),n:F},front:{o:[r/2,0,o/2],u:E,v:c,n:T},back:{o:[r/2,s-l,o/2],u:E,v:c,n:T},left:{o:[0,s/2,o/2],u:J(T),v:c,n:E},right:{o:[r-l,s/2,o/2],u:J(T),v:c,n:E}};for(let a of e){let m=a.it.wall,f=a.s+(a.e-a.s)/2,P=l+a.h/2;d[a.key]=m.axis===\"h\"?{o:[l+f,s-l-m.pos-l/2,P],u:E,v:c,n:T}:{o:[l+m.pos-l/2,s-l-f,P],u:J(T),v:c,n:E}}return Object.fromEntries(n.filter(a=>d[a]).map(a=>[a,d[a]]))}function oe(e,t){let n={};for(let[r,s]of Object.entries(e))n[r]=X(s,t);return n}function pe(e){let t=new Set;return e.filter(n=>{let r=n.code+JSON.stringify(n.values??{});return t.has(r)?!1:(t.add(r),!0)})}function ae(){let e=R.context(\"material\");return!e||e.thickness==null?null:{thickness:e.thickness,kerf:e.kerf,clearance:e.slotPlay,name:e.name}}function de(e){let t=[],n=null;if(e.fromMaterial){let l=ae();if(!l)return{d:null,issues:[{key:\"fromMaterial\",level:\"error\",code:\"material-none\"}],material:null};n=l.name;let c=(d,a)=>d!=null&&Math.abs(d-a)>1e-6;(c(l.thickness,e.thickness)||c(l.kerf,e.kerf)||c(l.clearance,e.clearance))&&t.push({key:\"fromMaterial\",level:\"warn\",code:\"material-changed\",values:{thickness:l.thickness}}),l.kerf==null&&t.push({key:\"fromMaterial\",level:\"warn\",code:\"material-no-kerf\",values:{kerf:e.kerf}}),l.clearance==null&&t.push({key:\"fromMaterial\",level:\"warn\",code:\"material-no-play\",values:{play:e.clearance}})}let r={x0:e.wallLeft,x1:e.wallRight,y0:e.wallBack,y1:e.wallFront},s=r.x0||r.x1||r.y0||r.y1;return{d:{W:e.width,D:e.depth,H:e.height,t:e.thickness,finger:e.finger,clearance:e.clearance,kerf:e.kerf,sides:r,lid:s&&e.lid,drop:s?e.dividerDrop:0},issues:t,material:n}}function he(e,t){let n=t.t,r=t.W-2*n,s=t.D-2*n;if(!(r>2*n&&s>2*n))return{level:\"error\",code:\"box-small\"};if(j(t)<2*n)return{key:\"height\",level:\"error\",code:\"walls-low\",values:{min:2*n}};let o=_(e.walls,e.wallsRef);return o?z(o,r,s,{t:n,gap:n,minLen:2*n,freeLen:2*n}):{key:\"walls\",level:\"error\",code:\"walls-bad\"}}var ge=e=>\"code\"in e;function se(e){let{d:t,issues:n,material:r}=de(e);if(!t)return{issues:n,d:t,material:r,built:null};let s=he(e,t);if(ge(s))return{issues:[...n,s],d:t,material:r,built:null};if(n.push(...s.issues.map(o=>({key:\"walls\",...o}))),n.some(o=>o.level===\"error\"))return{issues:n,d:t,material:r,built:null};try{return{issues:n,d:t,material:r,built:ne(s,t),m:s}}catch(o){if(o instanceof W)return{issues:[...n,{level:\"error\",code:o.code,...o.values?{values:o.values}:{}}],d:t,material:r,built:null};throw o}}function xe(e,t){let n=R.context(\"workArea\");return R.check({parts:Object.entries(e).map(([s,o])=>({key:s,subs:o})),kerf:t,...n?{workArea:n}:{}}).filter(s=>s.level!==\"info\").map(s=>({level:s.level,code:s.code,...s.values?{values:s.values}:{}}))}function ye(e){let t=R.context(\"workArea\");if(!t)return!0;let n=1/0,r=1/0,s=-1/0,o=-1/0;for(let d of e)for(let a of d.subs)for(let m of a.nodes)n=Math.min(n,m.x+d.at.x),s=Math.max(s,m.x+d.at.x),r=Math.min(r,m.y+d.at.y),o=Math.max(o,m.y+d.at.y);let l=s-n,c=o-r;return l<=t.width&&c<=t.height||c<=t.width&&l<=t.height}H({onChange({key:e,params:t}){if(e!==\"fromMaterial\"||!t.fromMaterial)return null;let n=ae();return n?{patch:{thickness:n.thickness,...n.kerf!=null?{kerf:n.kerf}:{},...n.clearance!=null?{clearance:n.clearance}:{}}}:null},validate(e){let t=se(e);return!t.built||!t.d?t.issues:[...t.issues,...xe(t.built.parts,t.d.kerf)]},generate(e){let t=se(e);if(!t.built||!t.d)throw new Error(t.issues.find(a=>a.level===\"error\")?.code??\"walls-bad\");let n=oe(t.built.parts,t.d.kerf),r=Object.keys(n),s=R.nest({parts:r.map(a=>({key:a,subs:n[a]})),gap:Math.max(3,2*t.d.kerf+2)}),o=r.map((a,m)=>({key:a,subs:n[a],at:{x:s[m][0],y:s[m][1]}})),l={};for(let a of t.built.walls)l[a.key]={code:\"part.wall\",values:{id:a.it.wall.id}};let c=[[\"info.walls\",String(t.built.walls.length)],[\"info.height\",`${N(j(t.d))} mm`]];t.material&&c.push([\"info.material\",`${t.material} \\xB7 ${N(t.d.t)} mm`]);let d=ye(o)?{}:{distribute:{rotate:!1}};return{parts:o,info:c,labels:l,poses:{poses:re(t.built.walls,t.d,r)},...d}}});})();\n",
+   "dialog": {
+    "version": 1
+   },
+   "icon": "box",
+   "params": [
+    {
+     "key": "width",
+     "type": "length",
+     "min": 20,
+     "max": 2000,
+     "def": 100
+    },
+    {
+     "key": "depth",
+     "type": "length",
+     "min": 20,
+     "max": 2000,
+     "def": 200
+    },
+    {
+     "key": "height",
+     "type": "length",
+     "min": 10,
+     "max": 1000,
+     "def": 50
+    },
+    {
+     "key": "wallFront",
+     "type": "bool",
+     "def": true
+    },
+    {
+     "key": "wallBack",
+     "type": "bool",
+     "def": true
+    },
+    {
+     "key": "wallLeft",
+     "type": "bool",
+     "def": true
+    },
+    {
+     "key": "wallRight",
+     "type": "bool",
+     "def": true
+    },
+    {
+     "key": "lid",
+     "type": "bool",
+     "def": false,
+     "showIf": {
+      "or": [
+       {
+        "eq": [
+         "wallFront",
+         true
+        ]
+       },
+       {
+        "eq": [
+         "wallBack",
+         true
+        ]
+       },
+       {
+        "eq": [
+         "wallLeft",
+         true
+        ]
+       },
+       {
+        "eq": [
+         "wallRight",
+         true
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": "dividerDrop",
+     "type": "length",
+     "min": 0,
+     "max": 500,
+     "def": 0,
+     "showIf": {
+      "or": [
+       {
+        "eq": [
+         "wallFront",
+         true
+        ]
+       },
+       {
+        "eq": [
+         "wallBack",
+         true
+        ]
+       },
+       {
+        "eq": [
+         "wallLeft",
+         true
+        ]
+       },
+       {
+        "eq": [
+         "wallRight",
+         true
+        ]
+       }
+      ]
+     }
+    },
+    {
+     "key": "fromMaterial",
+     "type": "bool",
+     "def": false
+    },
+    {
+     "key": "thickness",
+     "type": "length",
+     "min": 1,
+     "max": 20,
+     "def": 3,
+     "showIf": {
+      "eq": [
+       "fromMaterial",
+       false
+      ]
+     }
+    },
+    {
+     "key": "clearance",
+     "type": "length",
+     "min": -1,
+     "max": 2,
+     "def": 0.1,
+     "showIf": {
+      "eq": [
+       "fromMaterial",
+       false
+      ]
+     }
+    },
+    {
+     "key": "kerf",
+     "type": "length",
+     "min": 0,
+     "max": 1,
+     "def": 0,
+     "showIf": {
+      "eq": [
+       "fromMaterial",
+       false
+      ]
+     }
+    },
+    {
+     "key": "finger",
+     "type": "length",
+     "min": 2,
+     "max": 100,
+     "def": 10,
+     "advanced": true
+    },
+    {
+     "key": "walls",
+     "type": "data",
+     "def": "[{\"id\":1,\"axis\":\"h\",\"pos\":97,\"from\":0,\"to\":94},{\"id\":2,\"axis\":\"v\",\"pos\":47,\"from\":0,\"to\":150.35},{\"id\":3,\"axis\":\"h\",\"pos\":150.35,\"from\":47,\"to\":94},{\"id\":4,\"axis\":\"v\",\"pos\":19.74,\"from\":97,\"to\":169.75}]"
+    },
+    {
+     "key": "wallsRef",
+     "type": "data",
+     "def": "[94,194]"
+    }
+   ],
+   "texts": {
+    "en": {
+     "name": "Box composer",
+     "desc": "Box with freely placed inner walls: T joints, corners, free ends and crossings. Experimental: please test-cut the joints before a large job.",
+     "keys": "box divider compartment organizer insert",
+     "label": "Box composer {width} × {depth} × {height}",
+     "width": "Width",
+     "depth": "Depth",
+     "height": "Height",
+     "thickness": "Material thickness",
+     "walls": "Inner walls",
+     "wallsRef": "Size the inner walls were placed in",
+     "part.floor": "Floor",
+     "walls-bad": "The wall list cannot be read.",
+     "box-small": "The box is too small for the material thickness.",
+     "wall-outside": "Wall {id} lies outside the box.",
+     "wall-on-outer": "Wall {id} lies on an outer wall.",
+     "wall-near-outer": "Wall {id} is closer than {min} mm to an outer wall.",
+     "wall-short": "Wall {id} is shorter than {min} mm.",
+     "walls-close": "Walls {id} and {id2} are closer than {min} mm to each other.",
+     "wall-gap": "Wall {id} ends less than {min} mm from a wall without touching it.",
+     "tees-misaligned": "Walls {id} and {id2} meet the same wall from both sides less than {min} mm apart: line them up or move them further apart.",
+     "free-end-short": "The free end of wall {id} is shorter than {min} mm.",
+     "info.walls": "Inner walls",
+     "wallFront": "Front wall",
+     "wallBack": "Back wall",
+     "wallLeft": "Left wall",
+     "wallRight": "Right wall",
+     "lid": "Lid",
+     "dividerDrop": "Inner walls lower by",
+     "dividerDrop.title": "How much lower the inner walls are than the outer walls",
+     "fromMaterial": "From material",
+     "fromMaterial.title": "Takes thickness, kerf and play from the material of the layer when switched on",
+     "clearance": "Play",
+     "clearance.title": "Total play of a joint: the slot is this much wider than the board (negative = press fit)",
+     "kerf": "Kerf",
+     "finger": "Finger width",
+     "part.lid": "Lid",
+     "part.front": "Front",
+     "part.back": "Back",
+     "part.left": "Left side",
+     "part.right": "Right side",
+     "part.wall": "Wall {id}",
+     "material-none": "The layer has no material with a thickness: pick a layer with a material or switch off \"From material\".",
+     "material-changed": "The material of the layer ({thickness} mm) no longer matches the box: switch \"From material\" off and on again to take it over.",
+     "material-no-kerf": "The material has no calibrated kerf: {kerf} mm is used.",
+     "material-no-play": "The material has no calibrated slot play: {play} mm is used.",
+     "walls-low": "The inner walls are lower than {min} mm.",
+     "info.height": "Height of the inner walls",
+     "info.material": "Material",
+     "composer-edge-lost": "Internal error: an edge for a joint was not found."
+    },
+    "de": {
+     "name": "Box-Composer",
+     "desc": "Kasten mit frei gesetzten Innenwänden: T-Stöße, Ecken, freie Enden und Kreuzungen. Experimentell: bitte die Verbindungen vor einem großen Auftrag zur Probe schneiden.",
+     "keys": "Kasten Box Fächer Einsatz Trennwand Sortierkasten",
+     "label": "Box-Composer {width} × {depth} × {height}",
+     "width": "Breite",
+     "depth": "Tiefe",
+     "height": "Höhe",
+     "thickness": "Materialstärke",
+     "walls": "Innenwände",
+     "wallsRef": "Innenmaß, in dem die Wände gesetzt wurden",
+     "part.floor": "Boden",
+     "walls-bad": "Die Wandliste kann nicht gelesen werden.",
+     "box-small": "Der Kasten ist zu klein für die Materialstärke.",
+     "wall-outside": "Wand {id} liegt außerhalb des Kastens.",
+     "wall-on-outer": "Wand {id} liegt auf einer Außenwand.",
+     "wall-near-outer": "Wand {id} ist näher als {min} mm an einer Außenwand.",
+     "wall-short": "Wand {id} ist kürzer als {min} mm.",
+     "walls-close": "Die Wände {id} und {id2} sind näher als {min} mm beieinander.",
+     "wall-gap": "Wand {id} endet weniger als {min} mm vor einer Wand, ohne sie zu berühren.",
+     "tees-misaligned": "Die Wände {id} und {id2} stoßen von beiden Seiten weniger als {min} mm versetzt an dieselbe Wand: in eine Linie bringen oder weiter auseinander setzen.",
+     "free-end-short": "Das freie Ende von Wand {id} ist kürzer als {min} mm.",
+     "info.walls": "Innenwände",
+     "wallFront": "Vorderwand",
+     "wallBack": "Rückwand",
+     "wallLeft": "Seitenwand links",
+     "wallRight": "Seitenwand rechts",
+     "lid": "Deckel",
+     "dividerDrop": "Innenwände niedriger um",
+     "dividerDrop.title": "Um wie viel die Innenwände niedriger sind als die Außenwände",
+     "fromMaterial": "Aus dem Material",
+     "fromMaterial.title": "Übernimmt beim Einschalten Stärke, Schnittfuge und Spiel aus dem Material der Ebene",
+     "clearance": "Spiel",
+     "clearance.title": "Gesamtspiel einer Verbindung: der Schlitz ist um so viel breiter als die Platte (negativ = Pressung)",
+     "kerf": "Schnittfuge",
+     "finger": "Zinkenbreite",
+     "part.lid": "Deckel",
+     "part.front": "Vorderwand",
+     "part.back": "Rückwand",
+     "part.left": "Seitenwand links",
+     "part.right": "Seitenwand rechts",
+     "part.wall": "Wand {id}",
+     "material-none": "Die Ebene hat kein Material mit Stärke: eine Ebene mit Material wählen oder „Aus dem Material“ ausschalten.",
+     "material-changed": "Das Material der Ebene ({thickness} mm) passt nicht mehr zum Kasten: „Aus dem Material“ aus- und wieder einschalten, um es zu übernehmen.",
+     "material-no-kerf": "Das Material hat keine kalibrierte Schnittfuge: es werden {kerf} mm verwendet.",
+     "material-no-play": "Das Material hat kein kalibriertes Schlitzspiel: es werden {play} mm verwendet.",
+     "walls-low": "Die Innenwände sind niedriger als {min} mm.",
+     "info.height": "Höhe der Innenwände",
+     "info.material": "Material",
+     "composer-edge-lost": "Interner Fehler: eine Kante für eine Verbindung wurde nicht gefunden."
+    },
+    "es": {
+     "name": "Compositor de cajas",
+     "desc": "Caja con paredes interiores colocadas libremente: uniones en T, esquinas, extremos libres y cruces. Experimental: corta una prueba de las uniones antes de un trabajo grande.",
+     "keys": "caja divisor compartimentos organizador inserto",
+     "label": "Compositor de cajas {width} × {depth} × {height}",
+     "width": "Ancho",
+     "depth": "Fondo",
+     "height": "Alto",
+     "thickness": "Grosor del material",
+     "walls": "Paredes interiores",
+     "wallsRef": "Medida interior en la que se colocaron las paredes",
+     "part.floor": "Suelo",
+     "walls-bad": "No se puede leer la lista de paredes.",
+     "box-small": "La caja es demasiado pequeña para el grosor del material.",
+     "wall-outside": "La pared {id} está fuera de la caja.",
+     "wall-on-outer": "La pared {id} está sobre una pared exterior.",
+     "wall-near-outer": "La pared {id} está a menos de {min} mm de una pared exterior.",
+     "wall-short": "La pared {id} mide menos de {min} mm.",
+     "walls-close": "Las paredes {id} y {id2} están a menos de {min} mm una de otra.",
+     "wall-gap": "La pared {id} termina a menos de {min} mm de otra pared sin tocarla.",
+     "tees-misaligned": "Las paredes {id} y {id2} llegan a la misma pared desde los dos lados con menos de {min} mm de desfase: alinéalas o sepáralas más.",
+     "free-end-short": "El extremo libre de la pared {id} mide menos de {min} mm.",
+     "info.walls": "Paredes interiores",
+     "wallFront": "Pared frontal",
+     "wallBack": "Pared trasera",
+     "wallLeft": "Pared izquierda",
+     "wallRight": "Pared derecha",
+     "lid": "Tapa",
+     "dividerDrop": "Paredes interiores más bajas",
+     "dividerDrop.title": "Cuánto más bajas son las paredes interiores que las exteriores",
+     "fromMaterial": "Del material",
+     "fromMaterial.title": "Al activarla toma el grosor, el kerf y la holgura del material de la capa",
+     "clearance": "Holgura",
+     "clearance.title": "Holgura total de una unión: la ranura es esto más ancha que el tablero (negativo = a presión)",
+     "kerf": "Kerf",
+     "finger": "Ancho de diente",
+     "part.lid": "Tapa",
+     "part.front": "Frente",
+     "part.back": "Fondo",
+     "part.left": "Lateral izquierdo",
+     "part.right": "Lateral derecho",
+     "part.wall": "Pared {id}",
+     "material-none": "La capa no tiene un material con grosor: elige una capa con material o desactiva «Del material».",
+     "material-changed": "El material de la capa ({thickness} mm) ya no coincide con la caja: desactiva y vuelve a activar «Del material» para tomarlo.",
+     "material-no-kerf": "El material no tiene kerf calibrado: se usan {kerf} mm.",
+     "material-no-play": "El material no tiene holgura de ranura calibrada: se usan {play} mm.",
+     "walls-low": "Las paredes interiores miden menos de {min} mm de alto.",
+     "info.height": "Alto de las paredes interiores",
+     "info.material": "Material",
+     "composer-edge-lost": "Error interno: no se encontró una arista para una unión."
+    },
+    "it": {
+     "name": "Compositore di scatole",
+     "desc": "Scatola con pareti interne posizionate liberamente: giunti a T, angoli, estremità libere e incroci. Sperimentale: taglia una prova dei giunti prima di un lavoro grande.",
+     "keys": "scatola divisorio scomparti organizer inserto",
+     "label": "Compositore di scatole {width} × {depth} × {height}",
+     "width": "Larghezza",
+     "depth": "Profondità",
+     "height": "Altezza",
+     "thickness": "Spessore del materiale",
+     "walls": "Pareti interne",
+     "wallsRef": "Misura interna in cui sono state posizionate le pareti",
+     "part.floor": "Fondo",
+     "walls-bad": "Impossibile leggere l'elenco delle pareti.",
+     "box-small": "La scatola è troppo piccola per lo spessore del materiale.",
+     "wall-outside": "La parete {id} è fuori dalla scatola.",
+     "wall-on-outer": "La parete {id} è sopra una parete esterna.",
+     "wall-near-outer": "La parete {id} è a meno di {min} mm da una parete esterna.",
+     "wall-short": "La parete {id} è più corta di {min} mm.",
+     "walls-close": "Le pareti {id} e {id2} sono a meno di {min} mm l’una dall’altra.",
+     "wall-gap": "La parete {id} finisce a meno di {min} mm da una parete senza toccarla.",
+     "tees-misaligned": "Le pareti {id} e {id2} arrivano alla stessa parete dai due lati sfalsate di meno di {min} mm: allineale o allontanale di più.",
+     "free-end-short": "L’estremità libera della parete {id} è più corta di {min} mm.",
+     "info.walls": "Pareti interne",
+     "wallFront": "Parete frontale",
+     "wallBack": "Parete posteriore",
+     "wallLeft": "Parete sinistra",
+     "wallRight": "Parete destra",
+     "lid": "Coperchio",
+     "dividerDrop": "Pareti interne più basse di",
+     "dividerDrop.title": "Di quanto le pareti interne sono più basse di quelle esterne",
+     "fromMaterial": "Dal materiale",
+     "fromMaterial.title": "Quando è attivo prende spessore, kerf e gioco dal materiale del livello",
+     "clearance": "Gioco",
+     "clearance.title": "Gioco totale di un giunto: la fessura è più larga del pannello di questo valore (negativo = a pressione)",
+     "kerf": "Kerf",
+     "finger": "Larghezza dei denti",
+     "part.lid": "Coperchio",
+     "part.front": "Frontale",
+     "part.back": "Retro",
+     "part.left": "Fianco sinistro",
+     "part.right": "Fianco destro",
+     "part.wall": "Parete {id}",
+     "material-none": "Il livello non ha un materiale con spessore: scegli un livello con materiale o disattiva «Dal materiale».",
+     "material-changed": "Il materiale del livello ({thickness} mm) non corrisponde più alla scatola: disattiva e riattiva «Dal materiale» per riprenderlo.",
+     "material-no-kerf": "Il materiale non ha un kerf calibrato: si usano {kerf} mm.",
+     "material-no-play": "Il materiale non ha un gioco calibrato per le fessure: si usano {play} mm.",
+     "walls-low": "Le pareti interne sono più basse di {min} mm.",
+     "info.height": "Altezza delle pareti interne",
+     "info.material": "Materiale",
+     "composer-edge-lost": "Errore interno: non è stato trovato uno spigolo per un giunto."
+    },
+    "pt-BR": {
+     "name": "Compositor de caixas",
+     "desc": "Caixa com paredes internas posicionadas livremente: juntas em T, cantos, extremidades livres e cruzamentos. Experimental: corte um teste das juntas antes de um trabalho grande.",
+     "keys": "caixa divisória compartimentos organizador inserto",
+     "label": "Compositor de caixas {width} × {depth} × {height}",
+     "width": "Largura",
+     "depth": "Profundidade",
+     "height": "Altura",
+     "thickness": "Espessura do material",
+     "walls": "Paredes internas",
+     "wallsRef": "Medida interna em que as paredes foram posicionadas",
+     "part.floor": "Fundo",
+     "walls-bad": "Não é possível ler a lista de paredes.",
+     "box-small": "A caixa é pequena demais para a espessura do material.",
+     "wall-outside": "A parede {id} está fora da caixa.",
+     "wall-on-outer": "A parede {id} está sobre uma parede externa.",
+     "wall-near-outer": "A parede {id} está a menos de {min} mm de uma parede externa.",
+     "wall-short": "A parede {id} tem menos de {min} mm.",
+     "walls-close": "As paredes {id} e {id2} estão a menos de {min} mm uma da outra.",
+     "wall-gap": "A parede {id} termina a menos de {min} mm de uma parede sem tocá-la.",
+     "tees-misaligned": "As paredes {id} e {id2} chegam à mesma parede pelos dois lados com menos de {min} mm de desalinhamento: alinhe-as ou afaste-as mais.",
+     "free-end-short": "A extremidade livre da parede {id} tem menos de {min} mm.",
+     "info.walls": "Paredes internas",
+     "wallFront": "Parede frontal",
+     "wallBack": "Parede traseira",
+     "wallLeft": "Parede lateral esquerda",
+     "wallRight": "Parede lateral direita",
+     "lid": "Tampa",
+     "dividerDrop": "Paredes internas mais baixas em",
+     "dividerDrop.title": "Quanto as paredes internas são mais baixas que as externas",
+     "fromMaterial": "Do material",
+     "fromMaterial.title": "Ao ativar, usa espessura, kerf e folga do material do layer",
+     "clearance": "Folga",
+     "clearance.title": "Folga total de uma junta: o slot é isto mais largo que a chapa (negativo = encaixe sob pressão)",
+     "kerf": "Kerf",
+     "finger": "Largura dos dedos",
+     "part.lid": "Tampa",
+     "part.front": "Parede frontal",
+     "part.back": "Parede traseira",
+     "part.left": "Parede lateral esquerda",
+     "part.right": "Parede lateral direita",
+     "part.wall": "Parede {id}",
+     "material-none": "O layer não tem um material com espessura: escolha um layer com material ou desative “Do material”.",
+     "material-changed": "O material do layer ({thickness} mm) não corresponde mais à caixa: desative e ative de novo “Do material” para usá-lo.",
+     "material-no-kerf": "O material não tem kerf calibrado: são usados {kerf} mm.",
+     "material-no-play": "O material não tem folga de slot calibrada: são usados {play} mm.",
+     "walls-low": "As paredes internas têm menos de {min} mm de altura.",
+     "info.height": "Altura das paredes internas",
+     "info.material": "Material",
+     "composer-edge-lost": "Erro interno: não foi encontrada uma aresta para uma junta."
+    }
+   },
+   "fit": {
+    "kind": "slot",
+    "play": "clearance"
+   },
+   "assemblyCheck": true,
+   "host": [
+    "joints",
+    "offset",
+    "boolean",
+    "nest",
+    "check"
+   ],
+   "context": [
+    "material",
+    "workArea"
+   ],
+   "sha256": "282208c54294f29576133d15d5dacd9784c2830de37a4602e7103c53b75fecd4"
+  }
+ ]
+}
