@@ -24,6 +24,9 @@ import { dec, locale, t, tBackend, tn } from './i18n';
 import { getTypography, groupFactor, onTypographyChange, resolveTypography } from './uiTypography';
 import { isNightly } from './updates';
 import { version as APP_VERSION } from '../package.json';
+import { electricityTariffText, energyDraft, estimateEnergy, parseEnergyNumber } from './energy';
+import { energyPreview, energySettingsRows, saveEnergySettings } from './energyUi';
+import { previewSplitter } from './previewLayout';
 
 const store = loadDevices();
 /** Das gewählte Gerät (live gebunden: wechselt mit der Auswahl) */
@@ -934,7 +937,7 @@ let lastDeviceTab = 0;
 
 /** Einstellungen eines Geräts bearbeiten (ohne Angabe: das gewählte) */
 export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: () => void) {
-  const d = { ...target };
+  const d = { ...target, energy: energyDraft(target.energy) };
   const bed = { w: d.bedW, h: d.bedH };
   const isCurrent = target === device;
   // FR #235: Tabs statt Scroll-Liste — gleiche Felder, gleiche Speicherung, nur sortiert.
@@ -1252,6 +1255,10 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   updatePointer();
   // Typografie live nachführen, beim Schließen abmelden
   const offTypo = onTypographyChange(() => updatePointer());
+  newTab(t('Energie'));
+  const energyTabIndex = tabs.length - 1;
+  const energyRows = energySettingsRows(d.energy);
+  rows.push(...energyRows);
   newTab(t('G-Code'));
   {
     const fncHead = head('FluidNC');
@@ -1387,11 +1394,13 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
         onclick: () => {
           // Felder, die noch den Fokus haben, zuerst übernehmen
           (document.activeElement as HTMLElement | null)?.blur();
-          Object.assign(target, d, { bedW: bed.w, bedH: bed.h });
-          if (isCurrent) applyBed(ed);
-          deviceChanged();
-          dlg.close();
-          onDone?.();
+          saveEnergySettings(energyRows, () => selectTab(energyTabIndex), () => {
+            Object.assign(target, d, { bedW: bed.w, bedH: bed.h });
+            if (isCurrent) applyBed(ed);
+            deviceChanged();
+            dlg.close();
+            onDone?.();
+          });
         },
       }, t('Übernehmen')),
     ),
@@ -1633,12 +1642,13 @@ export async function openPreview(ed: Editor, src?: JobSource) {
       : [])),
   );
   const warn = h('div', { class: 'note' }, ...job.warnings.map((w) => h('div', {}, w)));
-  const dlg = h('dialog', { class: 'preview-dialog' },
+  const dlg = h('dialog', { class: 'preview-dialog', 'data-dialog-resize': 'true', 'data-dialog-min-width': '480', 'data-dialog-min-height': '360' },
     h('h3', {}, t('Vorschau')),
     h('div', { class: 'preview-main' },
       cv,
       h('div', { class: 'preview-side' },
         info,
+        energyPreview(estimateEnergy(mv, est, job.air, energyDraft(device.energy)), parseEnergyNumber(electricityTariffText())),
         h('label', { class: 'check' }, rapidChk, t('Leerwege zeigen')),
         h('label', { class: 'check' }, shadeChk, t('Nach Leistung schattieren')),
         warn,
@@ -1651,6 +1661,9 @@ export async function openPreview(ed: Editor, src?: JobSource) {
     ),
     h('div', { class: 'preview-bar' }, playBtn, slider, timeTxt, speedSel, hereBtn),
   );
+  const main = dlg.querySelector<HTMLElement>('.preview-main')!;
+  const side = dlg.querySelector<HTMLElement>('.preview-side')!;
+  main.insertBefore(previewSplitter(main, side, t('Breite der Vorschauinformationen')), side);
   document.body.append(dlg);
   dlg.addEventListener('keydown', (e) => e.stopPropagation());
   dlg.showModal();

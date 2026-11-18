@@ -240,6 +240,7 @@ await test('Jeder Speicher-Schlüssel im Code ist einem Bereich zugeordnet', () 
   walk('src');
   assert.deepEqual(missing, [], 'Neue Schlüssel in syncData.ts einer Liste zuordnen');
   assert.equal(data.classifyKey('kizamubeam.autosave'), 'local');
+  assert.equal(data.classifyKey('kizamubeam.previewSidebarWidth'), 'local');
   assert.equal(data.classifyKey('kizamubeam.camera'), 'camera');
 });
 

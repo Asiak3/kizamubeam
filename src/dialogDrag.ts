@@ -296,7 +296,29 @@ function addGrip(dlg: HTMLDialogElement, st: SizeState) {
   st.watch?.disconnect();
   st.watch = null;
   const g = Object.assign(document.createElement('div'), { className: 'dlg-grip', title: gripLabel() });
-  g.setAttribute('aria-hidden', 'true');
+  if (dlg.dataset.dialogResize === 'true') {
+    g.tabIndex = 0;
+    g.setAttribute('role', 'button');
+    g.setAttribute('aria-label', gripLabel());
+    g.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        g.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+        return;
+      }
+      const dx = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      const dy = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (!dx && !dy) return;
+      e.preventDefault();
+      const r = dlg.getBoundingClientRect();
+      const step = e.shiftKey ? 50 : 10;
+      st.want = { w: r.width + dx * step, h: r.height + dy * step };
+      st.max = null;
+      applySize(dlg, st);
+      const now = dlg.getBoundingClientRect();
+      saveSize(storage(), st.key, { w: now.width, h: now.height });
+    });
+  } else g.setAttribute('aria-hidden', 'true');
   dlg.append(g);
   st.grip = g;
   st.follow = new ResizeObserver(() => placeGrip(dlg, st));
@@ -329,8 +351,11 @@ function initSize(dlg: HTMLDialogElement, key: string) {
   clearSize(dlg);
   const r = dlg.getBoundingClientRect();
   const st: SizeState = { key, min: { w: r.width, h: r.height }, want: loadSizes(storage())[key] ?? null, grip: null, watch: null, follow: null, max: null };
+  if (dlg.dataset.dialogResize === 'true') {
+    st.min = { w: Number(dlg.dataset.dialogMinWidth) || r.width, h: Number(dlg.dataset.dialogMinHeight) || r.height };
+  }
   sizing.set(dlg, st);
-  if (st.want) {
+  if (st.want || dlg.dataset.dialogResize === 'true') {
     addGrip(dlg, st);
     applySize(dlg, st);
   } else if (dlg.classList.contains('dlg-resizable')) addGrip(dlg, st);
@@ -346,6 +371,7 @@ function startResize(e: PointerEvent, dlg: HTMLDialogElement, grip: HTMLElement)
   // Die linke obere Ecke bleibt beim Ziehen stehen
   place(dlg, { x: r.left, y: r.top });
   const sx = e.clientX, sy = e.clientY;
+  const before = st.want;
   grip.setPointerCapture(e.pointerId);
   const move = (ev: PointerEvent) => {
     // Nur bis zum Fensterrand, damit der Dialog dabei nicht nach links oder oben rückt
@@ -355,10 +381,17 @@ function startResize(e: PointerEvent, dlg: HTMLDialogElement, grip: HTMLElement)
     };
     applySize(dlg, st);
   };
-  const end = () => {
+  const end = (ev: PointerEvent) => {
     grip.removeEventListener('pointermove', move);
     grip.removeEventListener('pointerup', end);
     grip.removeEventListener('pointercancel', end);
+    if (ev.type === 'pointercancel' && dlg.dataset.dialogResize === 'true') {
+      st.want = before;
+      if (before) applySize(dlg, st);
+      else clearSize(dlg);
+      placeGrip(dlg, st);
+      return;
+    }
     if (st.want) {
       st.max = null; // von Hand gezogen: das ist jetzt die normale Größe
       const now = dlg.getBoundingClientRect();
