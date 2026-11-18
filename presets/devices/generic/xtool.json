@@ -1,0 +1,14 @@
+{
+  "id": "generic.xtool",
+  "name": {
+    "de": "xTool-Laser über USB (allgemein)",
+    "en": "xTool laser over USB (generic)",
+    "it": "Laser xTool via USB (generico)",
+    "es": "Láser xTool por USB (genérico)",
+    "pt-BR": "Laser xTool via USB (genérico)"
+  },
+  "fw": "xtool",
+  "bedW": 430,
+  "bedH": 400,
+  "baud": 230400
+}

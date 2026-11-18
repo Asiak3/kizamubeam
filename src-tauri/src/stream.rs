@@ -28,13 +28,20 @@ pub struct Protocol {
     pub sync: bool,
     /// Echtzeitbefehle ? ! ~ 0x18 (GRBL-Familie, Smoothieware)
     pub realtime: bool,
-    /// Ohne Echtzeitstatus: Befehlszeile zur Positionsabfrage im Leerlauf (Marlin: M114)
+    /// Ohne Echtzeitstatus: Befehlszeile zur Positionsabfrage im Leerlauf (Marlin: M114, xTool: ?).
+    /// Set means no real-time status report even when `realtime` is true (xTool: `!`/`~`/0x18 work,
+    /// but the `?` byte corrupts the next line and the reply lacks a state word).
     pub poll: Option<String>,
     /// Empfangspuffer der Steuerung in Bytes für die Zeichenzählung
     pub rx_buffer: usize,
 }
 
 impl Protocol {
+    /// Controller answers the `?` real-time byte with a status report that names its state (Idle, Run …)
+    fn live_status(&self) -> bool {
+        self.realtime && self.poll.is_none()
+    }
+
     #[cfg(test)]
     pub fn grbl(telnet: bool) -> Self {
         Protocol { telnet, sync: false, realtime: true, poll: None, rx_buffer: RX_BUFFER }
@@ -164,7 +171,7 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
 
     /// Steuerungen ohne Statusbericht: Zustand selbst melden, im Format eines GRBL-Statusberichts
     fn synthetic(&self, state: &str) {
-        if !self.proto.realtime {
+        if !self.proto.live_status() {
             self.events.line(&format!("<{state}>"));
         }
     }
@@ -190,6 +197,8 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             Cmd::Pause => {
                 if self.proto.realtime {
                     self.write(b"!")?;
+                    // No-op where the controller reports its own state
+                    self.synthetic("Hold");
                 } else if self.job.is_some() {
                     // Keine weiteren Zeilen senden; die Steuerung arbeitet nur ihren Puffer ab
                     self.paused = true;
@@ -199,6 +208,7 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             Cmd::Resume => {
                 if self.proto.realtime {
                     self.write(b"~")?;
+                    self.synthetic(if self.job.is_some() { "Run" } else { "Idle" });
                 } else if self.paused {
                     self.paused = false;
                     self.synthetic(if self.job.is_some() { "Run" } else { "Idle" });
@@ -275,7 +285,7 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             Err(e) => return Err(format!("Lesen fehlgeschlagen: {e}")),
         }
         self.fill()?;
-        if self.proto.realtime {
+        if self.proto.live_status() {
             if self.last_poll.elapsed() >= POLL {
                 self.last_poll = Instant::now();
                 self.write(b"?")?;
@@ -425,7 +435,7 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             return Ok(());
         }
         while !self.paused {
-            let realtime = self.proto.realtime;
+            let live_status = self.proto.live_status();
             let job_inflight = self.inflight.iter().any(|x| x.1 == Kind::Job);
             let Some(j) = &mut self.job else { break };
             if j.next >= j.lines.len() {
@@ -433,7 +443,7 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
                     j.finishing = true;
                     self.progress_dirty = true;
                     // Ohne Statusbericht gilt der Job mit dem letzten „ok“ als fertig (Marlin: M400 am Ende wartet auf Stillstand)
-                    if !realtime {
+                    if !live_status {
                         self.finish_job();
                     }
                 }
@@ -708,6 +718,39 @@ mod tests {
         assert!(l.iter().any(|x| x.starts_with("done true")), "{l:?}");
         assert!(l.iter().any(|x| x.starts_with("line X:10.00")));
         assert!(!l.iter().any(|x| x.starts_with("line ok")), "{l:?}");
+    }
+
+    #[test]
+    fn xtool_polls_as_line_when_idle_and_ends_job_on_last_ok() {
+        let fake = Fake::default();
+        let log = Log::default();
+        let proto = Protocol { telnet: false, sync: false, realtime: true, poll: Some("?".into()), rx_buffer: RX_BUFFER };
+        let mut s = Streamer::new(fake.clone(), log.clone(), Arc::new(AtomicBool::new(false)), proto);
+        // Idle: `?` goes out as a whole line, never as the bare real-time byte; its ok is not reported
+        s.pump().unwrap();
+        assert_eq!(fake.written.lock().unwrap().as_slice(), b"?\n");
+        fake.reply.lock().unwrap().extend(b"<MPos:1.000,2.000,0.000,0.000>\nok\nok:IDLE\n");
+        s.pump().unwrap();
+        fake.written.lock().unwrap().clear();
+        s.handle(Cmd::Job(vec!["G1 X1 S100".into(), "M5".into(), "M2".into()])).unwrap();
+        s.pump().unwrap();
+        assert_eq!(fake.written.lock().unwrap().as_slice(), b"G1 X1 S100\nM5\nM2\n", "character counting, no poll during the job");
+        s.handle(Cmd::Pause).unwrap();
+        s.handle(Cmd::Resume).unwrap();
+        fake.reply.lock().unwrap().extend(b"ok\nok\nok\n");
+        s.pump().unwrap();
+        // No state word from the controller: the last ok ends the job
+        assert!(s.job.is_none());
+        let w = fake.written.lock().unwrap().clone();
+        assert!(w.starts_with(b"G1 X1 S100\nM5\nM2\n!~"), "{:?}", String::from_utf8_lossy(&w));
+        assert!(!w.windows(2).any(|p| p[0] != b'\n' && p[1] == b'?'), "no bare ? byte");
+        let l = log.0.lock().unwrap();
+        assert!(l.iter().any(|x| x == "line <Idle>"), "{l:?}");
+        assert!(l.iter().any(|x| x == "line <Run>"));
+        assert!(l.iter().any(|x| x == "line <Hold>"));
+        assert!(l.iter().any(|x| x.starts_with("line <MPos:1.000")));
+        assert!(l.iter().any(|x| x.starts_with("done true")), "{l:?}");
+        assert!(!l.iter().any(|x| x == "line ok"), "{l:?}");
     }
 
     #[test]

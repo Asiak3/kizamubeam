@@ -5,7 +5,7 @@ import { escapeXml, h, numInput, setIcon, setTrustedSvg } from './dom';
 import { saveText } from './files';
 import { native } from './native';
 import {
-  anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, formatDuration, frameGCode, Job, jogLines, jogToLines, LASER_TYPES, LaserModule, LaserType, loadDevices, Moves, newDevice,
+  anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_ROTARY, Device, estimate, Firmware, FIRMWARES, liveStatus, formatDuration, frameGCode, Job, jogLines, jogToLines, LASER_TYPES, moveLines, LaserModule, LaserType, loadDevices, Moves, newDevice,
   posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, sameMoves, saveDevices, StartFrom, startHere, zJogLines,
 } from './gcode';
 import { isTauri, machine, PortInfo } from './machine';
@@ -35,6 +35,9 @@ function deviceChanged() {
 /** Wird bei jedem Geräte- oder Einstellungswechsel aufgerufen; liefert eine Abmeldefunktion */
 export const onDeviceChange = (f: () => void) => (deviceListeners.add(f), () => deviceListeners.delete(f));
 const fw = () => FIRMWARES[device.fw];
+const sendAll = (lines: string[]) => {
+  for (const l of lines) machine.send(l);
+};
 
 // Die Klickfahrt teilen sich das Verschieben-Tab und der Toolbar-Knopf (linke Leiste,
 // LightBurn-Vorbild): ein Zustand je Editor, die Geschwindigkeit liefert das Verschieben-Tab.
@@ -194,7 +197,7 @@ function boundsOk(ed: Editor, job: Job): boolean {
   const hint =
     c.kind === 'unknown'
       ? t('Prüfe vor dem Start, dass vom Ursprung aus genug Platz ist, zum Beispiel mit dem Rahmen.') +
-        (fw().realtime ? ' ' + t('Den Ursprung meldet die Steuerung meist nach wenigen Sekunden, dann prüft KizamuBeam selbst.') : '')
+        (liveStatus(fw()) ? ' ' + t('Den Ursprung meldet die Steuerung meist nach wenigen Sekunden, dann prüft KizamuBeam selbst.') : '')
       : device.startFrom === 'user'
         ? t('Wahrscheinlich ist der Ursprung falsch gesetzt oder der Job-Ursprung passt nicht dazu.')
         : '';
@@ -481,7 +484,7 @@ function laserTab(ed: Editor): HTMLElement {
     if (rotaryOn(device) && device.rotary.axis === 'Y' && !confirm(t('Die Drehachse steckt am Y-Anschluss. Eine Referenzfahrt kann sie endlos drehen lassen, weil es dort keinen Endschalter gibt.\n\nTrotzdem referenzieren?'))) return;
     machine.send((machine.remote ? machine.fw : fw()).home);
   });
-  const originB = big('origin', t('Ursprung'), t('Zum Nullpunkt fahren'), () => machine.send('G0 X0 Y0'));
+  const originB = big('origin', t('Ursprung'), t('Zum Nullpunkt fahren'), () => sendAll(moveLines(device, 'X0 Y0')));
   const previewB = big('preview', t('Vorschau'), t('Vorschau mit Zeitschätzung (Alt+P)'), () => openPreview(ed));
   const saveB = big('gcode', 'G-Code', t('G-Code speichern'), () => saveGCode(ed));
   const bar = h('div', { class: 'progress' }, h('div', { class: 'fill' }));
@@ -717,7 +720,7 @@ function moveTab(ed: Editor): HTMLElement {
       h('button', {
         class: 'btn',
         title: dx || dy ? t('{step} mm verfahren', { step: st.step }) : t('Zum Nullpunkt fahren'),
-        onclick: () => (dx || dy ? jog(dx, dy) : machine.send('G0 X0 Y0')),
+        onclick: () => (dx || dy ? jog(dx, dy) : sendAll(moveLines(device, 'X0 Y0'))),
       }, label),
     );
   const stepSel = h('select', { onchange: (e: Event) => (st.step = Number((e.target as HTMLSelectElement).value)) },
@@ -733,7 +736,7 @@ function moveTab(ed: Editor): HTMLElement {
     const a = anchorOf(box, device.jobOrigin);
     // Zeiger-Modus (#213): Je nach Stellung landet Rotpunkt oder Werkzeug auf der Auswahl.
     const po = posShift(device);
-    machine.send(`G0 X${(a.x - po.x).toFixed(3)} Y${(a.y - po.y).toFixed(3)}`);
+    sendAll(moveLines(device, `X${(a.x - po.x).toFixed(3)} Y${(a.y - po.y).toFixed(3)}`));
   };
   // Laser zur Klickposition: teilt sich den Zustand mit dem Toolbar-Knopf (linke Leiste).
   posPickSpeed.set(ed, () => st.speed);
@@ -839,7 +842,7 @@ function consoleTab(): HTMLElement {
       history.push(v);
       hi = history.length;
       input.value = '';
-      if (v === '?' && fw().realtime) machine.realtime(0x3f);
+      if (v === '?' && liveStatus(fw())) machine.realtime(0x3f);
       else machine.send(v);
     } else if (e.key === 'ArrowUp' && hi > 0) {
       e.preventDefault();

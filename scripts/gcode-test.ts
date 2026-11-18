@@ -1,7 +1,7 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode, zJogLines } from '../src/gcode';
+import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, Moves, moveLines as rapidTo, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode, zJogLines } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
 import { dedupPolys } from '../src/dedup';
@@ -282,6 +282,8 @@ await test('Rahmen mit Drehachse fährt zum Start zurück', () => {
   // Ohne Drehachse wie bisher
   const g0 = frameGCode(job, newDevice({ fw: 'fluidnc' }), false)!;
   assert.deepEqual(g0, ['G21', 'G90', 'G0 X10 Y0', 'G1 X20 Y0 S0 F3000', 'G1 X20 Y5', 'G1 X10 Y5', 'G1 X10 Y0', 'M5']);
+  // xTool only moves after a program end, so the frame keeps M2
+  assert.deepEqual(frameGCode(job, newDevice({ fw: 'xtool' }), false)!.slice(-2), ['M5', 'M2']);
 });
 
 await test('Verfahren und Testdrehung auf der Drehachse', () => {
@@ -604,6 +606,12 @@ await test('Durchgänge laufen pro Bearbeitung: erst Sub1 fertig, dann Sub2 (#21
 
 await test('Laser zur Klickposition: absolutes Verfahren je Firmware', () => {
   assert.deepEqual(jogToLines(newDevice({ fw: 'fluidnc' }), 12.5, 30, 3000), ['$J=G90 G21 X12.5 Y30 F3000']);
+  // xTool ignores $J and runs queued motion only after M2
+  assert.deepEqual(jogToLines(newDevice({ fw: 'xtool' }), 12.5, 30, 3000), ['G90', 'G1 X12.5 Y30 F3000 S0', 'M2']);
+  assert.deepEqual(jogLines(newDevice({ fw: 'xtool' }), -5, 0, 1000), ['G91', 'G1 X-5 F1000 S0', 'G90', 'M2']);
+  assert.deepEqual(zJogLines(newDevice({ fw: 'xtool' }), 1, 300), ['G91', 'G1 Z1 F300 S0', 'G90', 'M2']);
+  assert.deepEqual(rapidTo(newDevice({ fw: 'xtool' }), 'X0 Y0'), ['G0 X0 Y0', 'M2']);
+  assert.deepEqual(rapidTo(newDevice({ fw: 'grbl' }), 'X0 Y0'), ['G0 X0 Y0']);
   assert.deepEqual(jogToLines(newDevice({ fw: 'grbl' }), 1, null, 1500), ['$J=G90 G21 X1 F1500']);
   assert.deepEqual(jogToLines(newDevice({ fw: 'marlin' }), 5, 6, 3000), ['G90', 'G0 X5 Y6 F3000']);
 });
@@ -1007,6 +1015,15 @@ await test('Manuell: gesetzter Startpunkt gilt auch ohne Optimierung', async () 
   const job = await cutJob(objs, {}, { optInnerFirst: false, optTravel: false, optGroup: false });
   // gesetzter Knoten nodes[0]=(100,300) → Maschine (100,100); ohne fixed wäre es der nächste Knoten
   assert.deepEqual(firstRapid(job.moves), [100, 100]);
+});
+
+await test('xTool status report without a state word', () => {
+  const wco: WorkOffset = { v: [0, 0, 0], known: false };
+  const run = { ...emptyStatus(), state: 'Run' };
+  const st = parseStatus('<MPos:12.500,7.000,0.000,0.000>', run, wco);
+  assert.equal(st.state, 'Run');
+  assert.deepEqual(st.mpos, [12.5, 7, 0]);
+  assert.equal(parseStatus('<Hold:0|MPos:1,2,0>', run, wco).state, 'Hold');
 });
 
 if (failed) {

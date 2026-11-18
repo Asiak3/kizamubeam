@@ -12,7 +12,7 @@ import { cameraImageControls } from './cameraImageControls';
 import { cameraOverlaysVisible, onCameraOverlayVisibilityChange, toggleCameraOverlays } from './cameraOverlayVisibility';
 import { cameraImageIsIdentity, drawCameraPreview } from './cameraDisplay';
 import { defaultLayer, loadDoc, Obj, Pt, translate } from './model';
-import { buildJob, estimate, writeGCode } from './gcode';
+import { buildJob, estimate, moveLines, writeGCode } from './gcode';
 import { calibrationMachineControls } from './calibrationMachineControls';
 import { machine } from './machine';
 import { device, onDeviceChange } from './laser';
@@ -337,7 +337,7 @@ class CamUnit {
         if (scan.stop) return t('Abgebrochen.');
         progress(i, pts.length);
         const p = pts[i];
-        await machine.send(`G0 X${p.x.toFixed(2)} Y${p.y.toFixed(2)}`);
+        for (const l of moveLines(device, `X${p.x.toFixed(2)} Y${p.y.toFixed(2)}`)) await machine.send(l);
         // Warten, bis der Kopf angekommen ist und ruhig steht
         const t0 = performance.now();
         for (;;) {

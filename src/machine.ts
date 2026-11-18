@@ -108,14 +108,16 @@ export interface WorkOffset {
 export function parseStatus(line: string, prev: MachineStatus, wco: WorkOffset): MachineStatus {
   const body = line.replace(/^<|>$/g, '').split('|');
   // Pn, A und SD fehlen, wenn nichts aktiv ist; Ov und Bf bleiben bis zur nächsten Meldung
-  const st: MachineStatus = { ...prev, state: body[0].split(':')[0], pins: '', acc: '', sd: null };
+  // xTool reports `<MPos:x,y,z,a>` without a state word: keep the previous state and read every field
+  const stateless = /^[MW]Pos:/.test(body[0]);
+  const st: MachineStatus = { ...prev, state: stateless ? prev.state : body[0].split(':')[0], pins: '', acc: '', sd: null };
   const vec = (s: string) => {
     const v = s.split(',').map(Number);
     return [v[0] || 0, v[1] || 0, v[2] || 0] as [number, number, number];
   };
   let mpos: [number, number, number] | null = null,
     wpos: [number, number, number] | null = null;
-  for (const f of body.slice(1)) {
+  for (const f of stateless ? body : body.slice(1)) {
     const [k, v] = f.split(':');
     if (k === 'MPos') mpos = vec(v);
     else if (k === 'WPos') wpos = vec(v);

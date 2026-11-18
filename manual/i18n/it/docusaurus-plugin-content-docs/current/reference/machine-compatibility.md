@@ -15,6 +15,7 @@ KizamuBeam comunica direttamente con il controller del tuo laser e invia G-code.
 | **grblHAL** | USB, rete | Come GRBL |
 | **Marlin** | USB | Invio riga per riga; posizione tramite M114 |
 | **Smoothieware** | USB | Invio riga per riga; potenza da 0 a 1 |
+| **xTool (USB)** | USB | Famiglia xTool D1; riconosciuto dalla procedura guidata. Lo stato viene letto solo a riposo, quindi il lavoro risulta finito quando l'ultima riga è stata accettata. Non ancora provato su hardware |
 
 Sono supportati assi rotanti (a rulli o a mandrino, sulla porta Y o come asse separato), asse Z motorizzato e assistenza aria.
 

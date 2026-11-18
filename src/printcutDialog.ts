@@ -5,7 +5,7 @@ import { check } from './arrayDialogs';
 import { cameraViews } from './cameraui';
 import { h } from './dom';
 import { boundsOf } from './geom';
-import { jogLines, pointerGCode, rotaryOn } from './gcode';
+import { jogLines, moveLines, pointerGCode, rotaryOn } from './gcode';
 import { dec, t, tn } from './i18n';
 import { device, setStartFrom } from './laser';
 import { machine } from './machine';
@@ -152,7 +152,7 @@ export function openPrintCutDialog(ed: Editor) {
   const goTo = (p: Pt) => {
     if (!canMove()) return say(t('Nicht verbunden.'), true);
     const m = designToMachine(p, bed.h);
-    machine.send(`G0 X${m.x.toFixed(3)} Y${m.y.toFixed(3)}`);
+    moveLines(device, `X${m.x.toFixed(3)} Y${m.y.toFixed(3)}`).forEach((l) => machine.send(l));
     dotOn();
   };
   const here = (): Pt | null => {

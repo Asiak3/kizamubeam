@@ -36,6 +36,9 @@ export function detectFirmware(lines: string[]): { fw: Firmware; version: string
   if (m) return { fw: 'marlin', version: `Marlin ${m[1]}`.trim() };
   m = /Smoothie\w*.*?(?:version|Build version)[:\s]*([\w.\-]+)?/i.exec(all) ?? /Build version:\s*([\w.\-]+)/i.exec(all);
   if (m) return { fw: 'smoothie', version: `Smoothieware ${m[1] ?? ''}`.trim() };
+  // xTool D1 family answers $I with "[XTool …]" (seen by OpenBurn); it may also send a GRBL greeting
+  m = /\[XTool\b\s*([^\]]*)\]/i.exec(all);
+  if (m) return { fw: 'xtool', version: `xTool ${m[1]}`.trim() };
   m = /\[VER:([^:\]]+)/.exec(all) ?? /^Grbl\s+([\w.]+)/im.exec(all);
   if (m) return { fw: 'grbl', version: `GRBL ${m[1]}` };
   return null;

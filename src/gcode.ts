@@ -17,7 +17,7 @@ import { addPt, boxesOf, buildContainment, containsStrict, emptyBox } from './po
 
 export type StartFrom = 'absolute' | 'user' | 'current';
 
-export type Firmware = 'fluidnc' | 'grbl' | 'grblhal' | 'marlin' | 'smoothie';
+export type Firmware = 'fluidnc' | 'grbl' | 'grblhal' | 'marlin' | 'smoothie' | 'xtool';
 
 /** Was je Steuerung anders ist: Übertragung, Laserbefehle, Maschinenbefehle */
 export interface FirmwareInfo {
@@ -28,7 +28,10 @@ export interface FirmwareInfo {
   sync: boolean;
   /** Echtzeitbefehle ? ! ~ 0x18 */
   realtime: boolean;
-  /** Positionsabfrage per Befehl, wenn es keinen Echtzeitstatus gibt */
+  /**
+   * Positionsabfrage per Befehlszeile, nur im Leerlauf (Marlin: M114, xTool: ?). Set means the controller has no
+   * real-time status report: the job ends with its last `ok` and KizamuBeam reports Idle/Run itself.
+   */
   poll: string | null;
   /** Laser vorbereiten (vor der ersten Bewegung) */
   laserOn: string[];
@@ -46,10 +49,17 @@ export interface FirmwareInfo {
   read: 'fluidnc' | 'grbl' | null;
   /** Echtzeit-Overrides für Vorschub, Eilgang und Leistung (0x90 …), Kühlmittel umschalten (0xA0/0xA1) */
   overrides: boolean;
+  /** Queued motion only runs after a program end (M2), so every motion sequence must end with it (xTool) */
+  runsOnM2?: boolean;
 }
 
 const grblJog = (x: number, y: number, f: number, axis = 'Y') => [`$J=G91 G21${x ? ` X${num(x)}` : ''}${y ? ` ${axis}${num(y)}` : ''} F${Math.round(f)}`];
 const relJog = (x: number, y: number, f: number, axis = 'Y') => ['G91', `G0${x ? ` X${num(x)}` : ''}${y ? ` ${axis}${num(y)}` : ''} F${Math.round(f)}`, 'G90'];
+/**
+ * xTool firmware (D1 family over USB): ignores `$J=` and only runs queued motion after a program end (M2).
+ * Sequence documented by OpenBurn (github.com/SJLS27/openburn, MIT), the same one LightBurn uses for jogging.
+ */
+const xtoolJog = (x: number, y: number, f: number, axis = 'Y') => ['G91', `G1${x ? ` X${num(x)}` : ''}${y ? ` ${axis}${num(y)}` : ''} F${Math.round(f)} S0`, 'G90', 'M2'];
 const GRBL_BASE = {
   sync: false, realtime: true, poll: null, laserOn: ['M4 S0'], frameOn: ['M3 S0'], footer: ['M5', 'M2'],
   home: '$H', unlock: '$X', jog: grblJog, setOrigin: 'G10 L20 P1 X0 Y0', clearOrigin: 'G10 L2 P1 X0 Y0', overrides: true,
@@ -71,7 +81,14 @@ export const FIRMWARES: Record<Firmware, FirmwareInfo> = {
     laserOn: [], frameOn: [], footer: [],
     home: '$H', unlock: '$X', jog: relJog, setOrigin: 'G10 L20 P1 X0 Y0', clearOrigin: 'G10 L2 P1 X0 Y0', read: null, overrides: false,
   },
+  // xTool D1 family over USB: GRBL dialect, but the real-time `?` corrupts the next line and its status reply
+  // `<MPos:…>` has no state word and an extra `ok`, so the status is polled as a line while idle only.
+  // Pause/stop keep the GRBL real-time bytes (! ~ 0x18); overrides and $$ are not known to work.
+  xtool: { ...GRBL_BASE, label: 'xTool (USB)', sMax: 1000, poll: '?', jog: xtoolJog, read: null, overrides: false, runsOnM2: true },
 };
+
+/** Controller sends real-time status reports on `?` (GRBL family, Smoothieware); otherwise it is polled as a line */
+export const liveStatus = (fw: FirmwareInfo): boolean => fw.realtime && !fw.poll;
 
 /** Achse, auf der die Drehung ausgegeben wird: Y = Rotary steckt am Y-Anschluss, sonst eine eigene Achse */
 export type RotaryAxis = 'Y' | 'Z' | 'A' | 'B' | 'C';
@@ -466,11 +483,18 @@ export function zJogLines(d: Device, dz: number, f: number): string[] {
 }
 
 /** Absolut an eine Werkstückposition fahren (Laser zur Klickposition). y = null lässt Y stehen (z. B. mit Drehachse).
- *  GRBL-Familie über $J (Soft-Limits, Abbruch mit Jog-Cancel), sonst G0 in G90. */
+ *  GRBL-Familie über $J (Soft-Limits, Abbruch mit Jog-Cancel), xTool über G1 S0 mit M2 (führt Bewegungen erst nach dem Programmende aus), sonst G0 in G90. */
 export function jogToLines(d: Device, x: number, y: number | null, f: number): string[] {
   const fw = FIRMWARES[d.fw];
   const axes = `X${num(x)}${y === null ? '' : ` Y${num(y)}`}`;
-  return fw.jog === grblJog ? [`$J=G90 G21 ${axes} F${Math.round(f)}`] : ['G90', `G0 ${axes} F${Math.round(f)}`];
+  if (fw.jog === grblJog) return [`$J=G90 G21 ${axes} F${Math.round(f)}`];
+  if (fw.runsOnM2) return ['G90', `G1 ${axes} F${Math.round(f)} S0`, 'M2'];
+  return ['G90', `G0 ${axes} F${Math.round(f)}`];
+}
+
+/** Rapid move to absolute coordinates (e.g. `X0 Y0`); xTool also needs M2 before it moves */
+export function moveLines(d: Device, axes: string): string[] {
+  return FIRMWARES[d.fw].runsOnM2 ? [`G0 ${axes}`, 'M2'] : [`G0 ${axes}`];
 }
 
 /** Testdrehung: das Objekt einmal ganz herumdrehen (bei Walzen hängt das vom Objektdurchmesser ab) */
@@ -2311,7 +2335,7 @@ export function frameGCode(job: Job, d: Device, contour: boolean): string[] | nu
     first = false;
     cf = mv.f[i];
   }
-  out.push(...fw.footer.filter((l) => l !== 'M2'));
+  out.push(...fw.footer.filter((l) => l !== 'M2' || fw.runsOnM2));
   return out;
 }
 

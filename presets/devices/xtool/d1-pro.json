@@ -2,13 +2,13 @@
   "id": "xtool.d1-pro",
   "vendor": "xTool",
   "name": "xTool D1 Pro",
-  "fw": "grbl",
+  "fw": "xtool",
   "bedW": 430,
   "bedH": 400,
   "laser": {
     "type": "diode"
   },
   "baud": 230400,
-  "source": "atomm.com (approx.); 230400 baud per LightBurn forum",
-  "checked": "2026-10-19"
+  "source": "atomm.com (approx.); 230400 baud per LightBurn forum; xTool firmware over USB per OpenBurn (github.com/SJLS27/openburn, tested on D1 fw 40.30.002.01) (same controller family as the D1, assumed)",
+  "checked": "2026-11-18"
 }

@@ -4,7 +4,7 @@
 // keine Referenzfahrt ohne Endschalter; der Testauftrag startet nur nach ausdrücklicher Freigabe.
 import type { Editor } from './editor';
 import { h, numInput } from './dom';
-import { Device, FIRMWARES, newDevice, rotaryOn, StartFrom } from './gcode';
+import { Device, FIRMWARES, liveStatus, newDevice, rotaryOn, StartFrom } from './gcode';
 import { presetList } from './packs';
 import { presetPicker } from './packsDialog';
 import { isTauri, machine, PortInfo } from './machine';
@@ -74,7 +74,7 @@ export function openSetupWizard(ed: Editor) {
     if (e.key !== 'Enter' || !cmdIn.value.trim()) return;
     const v = cmdIn.value.trim();
     cmdIn.value = '';
-    if (v === '?' && fw().realtime) machine.realtime(0x3f);
+    if (v === '?' && liveStatus(fw())) machine.realtime(0x3f);
     else machine.send(v);
   });
   const consoleBox = h('details', { class: 'setup-console' }, h('summary', {}, t('Konsole')), log, h('div', { class: 'console-input' }, cmdIn));

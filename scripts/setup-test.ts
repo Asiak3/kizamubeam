@@ -76,6 +76,8 @@ test('Firmware an $I, M115 und version erkennen', () => {
   assert.equal(detectFirmware(['FIRMWARE_NAME:Marlin 2.1.2 (Sep  1 2023) SOURCE_CODE_URL:github.com/MarlinFirmware/Marlin', 'ok'])?.version, 'Marlin 2.1.2');
   assert.equal(detectFirmware(['Build version: edge-3332442, Build date: Jun 1 2020, MCU: LPC1769', 'ok'])?.fw, 'smoothie');
   assert.equal(detectFirmware(["Grbl 1.1f ['$' for help]"])?.fw, 'grbl');
+  assert.deepEqual(detectFirmware(['[XTool D1 V40.30.002.01]', 'ok']), { fw: 'xtool', version: 'xTool D1 V40.30.002.01' });
+  assert.equal(detectFirmware(["Grbl 1.1f ['$' for help]", '[XTool]', 'ok'])?.fw, 'xtool');
   assert.equal(detectFirmware(['error:20', 'ok']), null);
 });
 

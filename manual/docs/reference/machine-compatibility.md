@@ -15,6 +15,7 @@ KizamuBeam talks directly to the controller of your laser and sends G-code. It w
 | **grblHAL** | USB, network | Like GRBL |
 | **Marlin** | USB | Sent line by line; position via M114 |
 | **Smoothieware** | USB | Sent line by line; power from 0 to 1 |
+| **xTool (USB)** | USB | xTool D1 family; detected by the setup wizard. Status is read only while idle, so the job counts as finished when the last line is accepted. Not yet tested on hardware |
 
 Rotary attachments (roller or chuck, on the Y port or as a separate axis), a motorized Z axis and air assist are supported.
 
