@@ -3,8 +3,9 @@
 // text from files, plugins, catalogs or the network is always inserted as text.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const ALLOW = new Set(['src/dom.ts']);
 const RULES = [
   [/\.(innerHTML|outerHTML)\s*[+]?=/, 'innerHTML/outerHTML assignment'],

@@ -3,6 +3,7 @@
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 const { createEngine, unwrap, EngineError, setQuickJSWasm } = await import('../src/plugins/engine');
 const qjs = readFileSync(new URL('../node_modules/@jitl/quickjs-wasmfile-release-sync/dist/emscripten-module.wasm', import.meta.url));
 setQuickJSWasm(qjs.buffer.slice(qjs.byteOffset, qjs.byteOffset + qjs.byteLength));
@@ -246,7 +247,7 @@ await test('the plugin Worker starts without the DOM (no document, no localStora
   const { createRequire } = await import('node:module');
   const name = 'esbuild';
   const { build } = createRequire(import.meta.url)(name) as typeof import('esbuild');
-  const r = await build({ entryPoints: [new URL('../src/plugins/worker.ts', import.meta.url).pathname], bundle: true, format: 'iife', write: false, metafile: true, logLevel: 'silent' });
+  const r = await build({ entryPoints: [fileURLToPath(new URL('../src/plugins/worker.ts', import.meta.url))], bundle: true, format: 'iife', write: false, metafile: true, logLevel: 'silent' });
   const inputs = Object.keys(r.metafile!.inputs).filter((k) => k.startsWith('src/'));
   for (const bad of ['src/i18n.ts', 'src/model.ts', 'src/dom.ts']) assert.ok(!inputs.includes(bad), `${bad} is in the Worker`);
   const { runInNewContext } = await import('node:vm');
