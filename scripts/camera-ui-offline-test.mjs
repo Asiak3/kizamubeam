@@ -167,7 +167,7 @@ const mocks = {
   './calibrationMachineControls': ['calibrationMachineControls'],
   './laser': ['device', 'onDeviceChange'], './machine': ['machine'],
   './files': ['openText', 'saveText'], './model': ['defaultLayer', 'loadDoc', 'translate'],
-  './gcode': ['buildJob', 'estimate', 'writeGCode', 'FIRMWARES'],
+  './gcode': ['buildJob', 'estimate', 'writeGCode', 'FIRMWARES', 'moveLines'],
   './i18n': ['dec', 't', 'tn'], './workpieceDialog': ['openWorkpieceDialog'],
 };
 // Synthetic connection data only; no URL is ever opened by this test.
