@@ -212,7 +212,7 @@ function onCentre(m: Model, x: Wall, along: number): { id: number; at: number } 
   return c && Math.abs(c.at - x.pos) < 0.005 ? c : null;
 }
 
-export function planDraw(p: Plan, s: Surface & { have: string[] }): Drawing {
+export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width: number; height: number } }): Drawing {
   const { w, d, t } = p;
   const st = stateOf(s.state);
   const walls = st.walls ?? current(p.layout, w, d);
@@ -237,9 +237,11 @@ export function planDraw(p: Plan, s: Surface & { have: string[] }): Drawing {
 
   const items: Item[] = [];
   const info = new Map(m.walls.map((it) => [it.wall.id, it]));
-  // The app fits the frame into the surface (about 560 × 480 px, see dialogSurface.ts) and writes a text 6 px right of
-  // and 6 px above its point; with the scale estimated, a text can be centred on a point
-  const k = Math.min((0.92 * 560) / (frame.x1 - frame.x0), (0.9 * 480) / (frame.y1 - frame.y0));
+  // The app fits the frame into the surface (its size in px from newer apps, otherwise about 560 × 480, see
+  // dialogSurface.ts) and writes a text 6 px right of and 6 px above its point; with the scale, a text can be centred
+  const sw = s.size?.width || 560,
+    sh = s.size?.height || 480;
+  const k = Math.min((0.92 * sw) / (frame.x1 - frame.x0), (0.9 * sh) / (frame.y1 - frame.y0));
   const px = (n: number) => n / k;
   const label = (cx: number, cy: number, text: string, style: 'accent' | 'muted') =>
     items.push({ type: 'text', x: r1(cx - px(text.length * 3.1 + 6)), y: r1(cy + px(10)), text, style });
@@ -366,8 +368,10 @@ export function planDraw(p: Plan, s: Surface & { have: string[] }): Drawing {
     const [x0, y0, x1, y1] = st.draft;
     items.push({ type: 'line', pts: [[r1(x0), r1(y0)], [r1(x1), r1(y1)]], style: 'warn', dash: true, width: 1.5 });
   }
-  // The plan wants pointer moves without a button, for the target (Ctrl)
-  return { frame, layers, items, track: true };
+  // The plan wants pointer moves without a button, for the target (Ctrl); Escape clears what is selected or shown and
+  // otherwise closes the dialog (newer apps)
+  // While Ctrl shows the target or the cross, the normal cursor everywhere (not the move cursor over walls)
+  return { frame, layers, items, track: true, escape: !!(pick || st.aim || st.free || st.drag), ...(st.aim || st.free ? { cursor: 'default' as const } : {}) };
 }
 
 // ---- Pointer and keys ----
