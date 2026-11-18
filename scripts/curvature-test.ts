@@ -6,6 +6,7 @@ import { defaultLayer, newDoc, Node, Obj, Pt } from '../src/model';
 import { curvaturePreview, smoothAnchors } from '../src/editor/vector';
 import { draftHandleMarks } from '../src/editor/render';
 import { DEFAULT_GRID } from '../src/grid';
+import { baselineTypography } from '../src/uiTypography';
 
 type Mat6 = [number, number, number, number, number, number];
 class MockPath2D {
@@ -33,7 +34,8 @@ function editor(){
     cursor:{x:0,y:0},snapHit:null,alignGuides:[],nodeEditObj:null,nodeHover:null,segHover:null,jointPicks:[],jointHover:null,jointHingeMode:false,
     trimHover:null,startHover:null,relPicks:[],relHover:null,measure:null,measureCircle:null,sketchEdit:null,builderSession:null,
     isolation:null,vectorPreview:null,hingePreview:null,patternPreview:null,outlinePreview:null,offsetPreview:null,arrayPreview:null,
-    arrayCenter:null,laserPos:null,checkMarks:false,checkIssues:[],checkActive:null,overlapHover:null,pivot:null,rotateMode:false});
+    arrayCenter:null,laserPos:null,checkMarks:false,checkIssues:[],checkActive:null,overlapHover:null,pivot:null,rotateMode:false,
+    typo:baselineTypography()});
   ed.doc.layers[0]=defaultLayer(0);ed.emit=()=>{};ed.redraw=()=>{};return ed;
 }
 function mockCtx(){

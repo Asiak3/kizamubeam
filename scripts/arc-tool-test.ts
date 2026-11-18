@@ -6,6 +6,7 @@ import { History } from '../src/history';
 import { defaultLayer, newDoc, Node, Pt } from '../src/model';
 import { ARC_SNAP, arcFrom3Points, arcNodes, arcSubPath, newArcDraft, snapAngle } from '../src/editor/arc';
 import { DEFAULT_GRID } from '../src/grid';
+import { baselineTypography } from '../src/uiTypography';
 
 class MockPath2D {
   ops: { op: string; args: number[] }[] = [];
@@ -46,6 +47,7 @@ function editor() {
     patternPreview: null, outlinePreview: null, offsetPreview: null, arrayPreview: null, arrayCenter: null,
     laserPos: null, checkMarks: false, checkIssues: [], checkActive: null, overlapHover: null, pivot: null,
     rotateMode: false, space: false, pickHandler: null, pickEnd: null,
+    typo: baselineTypography(),
   });
   ed.doc.layers[0] = defaultLayer(0);
   ed.emit = () => {};

@@ -92,6 +92,7 @@ import { Editor } from '../src/editor';
 import { History } from '../src/history';
 import { apply, defaultLayer, newDoc, type Obj } from '../src/model';
 import { DEFAULT_GRID } from '../src/grid';
+import { baselineTypography } from '../src/uiTypography';
 import { installCanvasGlobals, recordingCtx } from './render-mock';
 installCanvasGlobals();
 
@@ -118,6 +119,7 @@ function sEditor() {
     builderSession: null, sketchEdit: null, measure: null, measureCircle: null, trimHover: null,
     startHover: null, relPicks: [], relHover: null, jointPicks: [], jointHover: null, jointHingeMode: false,
     nodeEditObj: null, nodeHover: null, segHover: null, draft: null, continuedFrom: null,
+    typo: baselineTypography(),
   });
   ed.doc.layers[0] = defaultLayer(0);
   ed.emit = () => {};
