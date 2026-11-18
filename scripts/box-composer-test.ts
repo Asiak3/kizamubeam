@@ -375,7 +375,10 @@ const { assemblyReport } = await import('../src/asmcheck');
 const { asmSolids, findOverlaps } = await import('../src/view3d/solids');
 
 execFileSync('node', ['scripts/plugin-pack.mjs', '--build', 'plugins/box-composer'], { stdio: 'ignore' });
-const manifest = parsePack(buildPluginPack('plugins/box-composer')).plugins[0];
+const pack = parsePack(buildPluginPack('plugins/box-composer')).plugins[0];
+// A new box starts without inner walls; the tests work on the sketch from #327 in the inner rectangle 94 × 194
+const SKETCH = '[{"id":1,"axis":"h","pos":97,"from":0,"to":94},{"id":2,"axis":"v","pos":47,"from":0,"to":150.35},{"id":3,"axis":"h","pos":150.35,"from":47,"to":94},{"id":4,"axis":"v","pos":19.74,"from":97,"to":169.75}]';
+const manifest = { ...pack, schema: pack.schema.map((q) => (q.key === 'walls' ? { ...q, def: SKETCH } : q.key === 'wallsRef' ? { ...q, def: '[94,194]' } : q)) };
 const ctx: Record<string, unknown> = {};
 const gen = pluginGenerator(manifest, { id: 'box-composer', name: 'Box composer' }, { context: (w: string) => (ctx[w] ?? null) as never });
 G.register(gen);
@@ -387,6 +390,17 @@ await atest('pack: catalogue check without errors or warnings', async () => {
   assert.deepEqual(r.errors, []);
   assert.deepEqual(r.warnings, []);
   assert.equal(manifest.fit?.kind, 'slot', 'clearance is the total play, like the slot play of a material (#402)');
+});
+
+await atest('pack: a new box starts with the outer walls only', async () => {
+  const w = pack.schema.find((q) => q.key === 'walls')!,
+    r = pack.schema.find((q) => q.key === 'wallsRef')!;
+  assert.deepEqual([w.def, w.resetOnNew, r.def, r.resetOnNew], ['[]', true, '', true]);
+  const empty = pluginGenerator(pack, { id: 'box-composer-new', name: 'Box composer' }, { context: (k: string) => (ctx[k] ?? null) as never });
+  Object.assign(ctx, { material: PLY, workArea: { width: 400, height: 300 } });
+  const out = await G.buildGenAsync(empty, G.normalizeParams(empty, G.defaultParams(empty)));
+  assert.deepEqual(out.issues, []);
+  assert.deepEqual(out.parts.map((x) => x.shape.part).sort(), ['back', 'floor', 'front', 'left', 'right']);
 });
 
 await atest('pack: the sketch from the material, parts named, one assembly that fits together without overlaps', async () => {

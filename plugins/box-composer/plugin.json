@@ -69,8 +69,8 @@
         { "key": "clearance", "type": "length", "min": -1, "max": 2, "def": 0.1, "showIf": { "eq": ["fromMaterial", false] } },
         { "key": "kerf", "type": "length", "min": 0, "max": 1, "def": 0, "showIf": { "eq": ["fromMaterial", false] } },
         { "key": "finger", "type": "length", "min": 2, "max": 100, "def": 10, "advanced": true },
-        { "key": "walls", "type": "data", "def": "[{\"id\":1,\"axis\":\"h\",\"pos\":97,\"from\":0,\"to\":94},{\"id\":2,\"axis\":\"v\",\"pos\":47,\"from\":0,\"to\":150.35},{\"id\":3,\"axis\":\"h\",\"pos\":150.35,\"from\":47,\"to\":94},{\"id\":4,\"axis\":\"v\",\"pos\":19.74,\"from\":97,\"to\":169.75}]" },
-        { "key": "wallsRef", "type": "data", "def": "[94,194]" }
+        { "key": "walls", "type": "data", "def": "[]", "resetOnNew": true },
+        { "key": "wallsRef", "type": "data", "def": "", "resetOnNew": true }
       ],
       "texts": {
         "en": {
