@@ -57,7 +57,8 @@ export function panelPolys(p: BoxParams): { key: string; a: number; b: number; p
     key: panel.key,
     a: panel.a,
     b: panel.b,
-    pts: panelCut(panel, p.thickness, p.finger, p.clearance, p.kerf),
+    // The box's clearance is still per side: total play twice that (#402)
+    pts: panelCut(panel, p.thickness, p.finger, 2 * p.clearance, p.kerf),
   }));
 }
 
@@ -145,7 +146,7 @@ export const BOX: Generator = {
       let x = -rowW[ri] / 2;
       const y0 = -totalH / 2 + (ri ? rowH[0] + gap : 0);
       for (const panel of r) {
-        const sub: SubPath = { closed: true, nodes: panelCut(panel, th, p.finger, p.clearance, p.kerf) };
+        const sub: SubPath = { closed: true, nodes: panelCut(panel, th, p.finger, 2 * p.clearance, p.kerf) };
         parts.push({ key: panel.key, subs: [sub], at: { x: x + panel.a / 2, y: y0 + panel.b / 2 } });
         x += panel.a + gap;
       }

@@ -6,8 +6,9 @@ import type { PanelSpec } from '../../src/generators/panelJoints.ts';
 
 export * from '../../src/generators/panelJoints.ts';
 
-export function panelCut(P: PanelSpec, th: number, finger: number, clearance: number, kerf: number): Pt[] {
+export function panelCut(P: PanelSpec, th: number, finger: number, play: number, kerf: number): Pt[] {
+  // play is the total play of the joints, as in version 2 (#402)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const r = (globalThis as any).host.joints({ op: 'panel', v: 1, width: P.a, height: P.b, thickness: th, finger, clearance, kerf, edges: P.edges.map((e) => e.pattern), corners: P.corners });
+  const r = (globalThis as any).host.joints({ op: 'panel', v: 2, width: P.a, height: P.b, thickness: th, finger, clearance: play, kerf, edges: P.edges.map((e) => e.pattern), corners: P.corners });
   return r.outline.nodes;
 }

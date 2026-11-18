@@ -63,7 +63,7 @@ test('Schlitze in Rückwand und Deckel, Knöchel als neue Teile', () => {
   assert.equal(r.changes.get(lid)!.subs.length, 1 + 2);
   // je Knöchel Umriss + Stiftloch
   assert.equal(r.added.length, 5 * 2);
-  const d = lidHingeDims(opts());
+  const d = lidHingeDims(opts(), 1);
   // Schlitz: Materialdicke breit, Zapfenlänge tief, mit Abstand zur Kante; erster mittig bei 10 mm
   const slot = r.changes.get(wall)!.subs[1].nodes;
   const xs = slot.map((p) => p.x), ys = slot.map((p) => p.y);
@@ -87,8 +87,8 @@ test('Gerade Knöchelzahl wird ungerade, eine Kante allein geht nicht', () => {
 
 test('Stiftloch mittig im Auge, mit Spiel', () => {
   const o = opts({ pinDia: 3, pinPlay: 0.2 });
-  const d = lidHingeDims(o);
-  for (const part of Object.values(lidHingeProfiles(o))) {
+  const d = lidHingeDims(o, 1);
+  for (const part of Object.values(lidHingeProfiles(o, 1))) {
     const hole = flatten(part[1]);
     const cx = hole.reduce((s, p) => s + p.x, 0) / hole.length, cy = hole.reduce((s, p) => s + p.y, 0) / hole.length;
     near(cx, d.ax, 1e-3);
@@ -103,8 +103,8 @@ test('Stiftloch mittig im Auge, mit Spiel', () => {
 
 test('Deckel öffnet bis 100° ohne an Kasten-Knöcheln oder Rückwand anzustoßen', () => {
   for (const o of [opts(), opts({ thickness: 6, pinDia: 4, hingeWall: 3 }), opts({ thickness: 2, pinDia: 1.75, hingeWall: 1.5 })]) {
-    const d = lidHingeDims(o);
-    const prof = lidHingeProfiles(o);
+    const d = lidHingeDims(o, 1);
+    const prof = lidHingeProfiles(o, 1);
     const A = { x: d.ax, y: d.ay };
     const boxKnuckle = flatten(prof.box[0]);
     const lidKnuckle = flatten(prof.lid[0]);
