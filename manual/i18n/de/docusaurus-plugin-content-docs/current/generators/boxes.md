@@ -36,7 +36,7 @@ Die [Passungs-Kalibrierung](../features/materials-tests.md#calibrate-fit) findet
 
 ## Box mit Fingerzinken und Trennwänden
 
-Eine offene oder geschlossene Box mit sich kreuzenden Trennwänden. Dieser Generator ist **experimentell**: Prüfe die Teile in der 3D-Ansicht und an einem Reststück, bevor du das richtige Material schneidest.
+Eine offene oder geschlossene Box mit sich kreuzenden Trennwänden.
 
 | Feld | Bedeutung |
 |---|---|

@@ -36,7 +36,7 @@ The [fit calibration](../features/materials-tests.md#calibrate-fit) finds these 
 
 ## Finger Joint Box with Dividers
 
-An open or closed box with dividers that cross each other. This generator is **experimental**: check the parts in the 3D view and on an offcut before cutting the real material.
+An open or closed box with dividers that cross each other.
 
 | Field | Meaning |
 |---|---|
