@@ -52,6 +52,12 @@ export interface TextField extends FieldBase<string> {
   kind: 'text';
   placeholder?: () => string;
   maxLength?: number;
+  /** Quick suggestions rendered as a <datalist>; free entry stays allowed */
+  datalist?: () => string[];
+  /** Normalize live while typing (return value replaces the input); unset = as typed */
+  coerce?: (value: string) => string;
+  /** Select all text on focus, so typing replaces the value (discovery for datalist suggestions) */
+  selectOnFocus?: boolean;
 }
 /** Colour; '' stands for "follow the design" when auto is set */
 export interface ColorField extends FieldBase<string> {

@@ -28,28 +28,53 @@ export function energyDraft(value?: EnergySettings): EnergySettings {
 export function electricityTariffText(): string {
   try { return localStorage.getItem('kizamubeam.electricityTariff') ?? ''; } catch { return ''; }
 }
-/** ISO-4217-Auswahl für die Kostenanzeige; Default EUR, Fallback bei unbekanntem Wert. */
+/** Vorschläge für die frei eingebbare Währung der Kostenanzeige; Vorgabe EUR. */
 export const ELECTRICITY_CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'PLN', 'CZK', 'SEK', 'JPY'] as const;
-export type ElectricityCurrency = typeof ELECTRICITY_CURRENCIES[number];
+/** Jede eingebbare Währungsbezeichnung: ISO-Code oder eigene Kennzeichnung, höchstens 16 Zeichen. */
+export type ElectricityCurrency = string;
+export const ELECTRICITY_CURRENCY_MAX_LENGTH = 16;
+/** Leer → EUR; umgebende Leerzeichen weg; dreibuchstabige Codes groß (chf → CHF). */
+export function normalizeElectricityCurrency(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return 'EUR';
+  return /^[A-Za-z]{3}$/.test(trimmed) ? trimmed.toUpperCase() : trimmed;
+}
+/** Live-Variante für die Eingabe: erhält Leer, damit das Feld löschbar bleibt (Speichern mappt leer → EUR). */
+export function normalizeElectricityCurrencyInput(value: string): string {
+  return value.trim() ? normalizeElectricityCurrency(value) : value;
+}
+/** Zur Laufzeit bekannte ISO-4217-Codes; auf älteren Laufzeiten die acht Vorschläge. */
+function isoCurrencyCodes(): readonly string[] {
+  try {
+    const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => unknown }).supportedValuesOf?.('currency');
+    if (Array.isArray(supported) && supported.length > 0 && supported.every((code): code is string => typeof code === 'string')) return supported;
+  } catch { /* ältere Laufzeit ohne supportedValuesOf: Vorschläge unten */ }
+  return ELECTRICITY_CURRENCIES;
+}
 export function electricityCurrency(): ElectricityCurrency {
   try {
-    const v = localStorage.getItem('kizamubeam.electricityCurrency');
-    if ((ELECTRICITY_CURRENCIES as readonly string[]).includes(v ?? '')) return v as ElectricityCurrency;
+    const stored = localStorage.getItem('kizamubeam.electricityCurrency');
+    if (stored !== null && stored.trim() !== '') return normalizeElectricityCurrency(stored);
   } catch { /* storage unavailable */ }
   return 'EUR';
 }
 export function setElectricityCurrency(value: string): void {
-  if (!(ELECTRICITY_CURRENCIES as readonly string[]).includes(value)) {
-    throw new Error(t('Unbekannte Währung. Wählen Sie eine der angebotenen Währungen.'));
+  const normalized = normalizeElectricityCurrency(value);
+  if (normalized.length > ELECTRICITY_CURRENCY_MAX_LENGTH) {
+    throw new Error(t('Die Währungsangabe ist zu lang. Geben Sie höchstens 16 Zeichen ein.'));
   }
-  try { localStorage.setItem('kizamubeam.electricityCurrency', value); } catch { /* storage unavailable */ }
+  try { localStorage.setItem('kizamubeam.electricityCurrency', normalized); } catch { /* storage unavailable */ }
 }
-/** Kosten betragssprachig formatieren, mit Fallback ohne Intl. */
+/** Kosten betragssprachig formatieren: ISO-Codes mit Intl, eigene Kennzeichnungen als Klartext. */
 export function formatCost(value: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(document.documentElement.lang || undefined,
-      { style: 'currency', currency }).format(value);
-  } catch { return `${value.toFixed(2)} ${currency}`; }
+  const code = normalizeElectricityCurrency(currency);
+  if (isoCurrencyCodes().includes(code)) {
+    try {
+      return new Intl.NumberFormat(document.documentElement.lang || undefined,
+        { style: 'currency', currency: code }).format(value);
+    } catch { /* fällt unten auf Klartext zurück */ }
+  }
+  return `${value.toFixed(2)} ${code}`;
 }
 export function setElectricityTariffText(value: string): void {
   if (value.trim() && parseEnergyNumber(value) === null) {

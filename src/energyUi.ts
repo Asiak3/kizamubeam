@@ -1,16 +1,18 @@
 import { h } from './dom';
 import { t } from './i18n';
-import { ELECTRICITY_CURRENCIES, electricityCurrency, electricityTariffText, EnergySettings, estimateEnergy, formatCost, formatEnergyValue, parseEnergyNumber, setElectricityCurrency, setElectricityTariffText } from './energy';
-import type { SelectField, TextField } from './settings/registry';
+import { ELECTRICITY_CURRENCIES, ELECTRICITY_CURRENCY_MAX_LENGTH, electricityCurrency, electricityTariffText, EnergySettings, estimateEnergy, formatCost, formatEnergyValue, normalizeElectricityCurrencyInput, parseEnergyNumber, setElectricityCurrency, setElectricityTariffText } from './energy';
+import type { TextField } from './settings/registry';
 
 const numberHint = () => t('Geben Sie eine nicht negative elektrische Leistung in Watt ein. Lassen Sie unbekannte Werte leer; geben Sie 0 nur bei einem bekannten Nullwert ein.');
 let fieldId = 0;
 
-export function electricityCurrencyField(): SelectField {
+export function electricityCurrencyField(): TextField {
   return {
-    kind: 'select', id: 'general.electricityCurrency', label: t('Währung für Stromkosten'),
-    hint: t('Währung der Kostenanzeige in der Vorschau. Der Tarif selbst bleibt ein reiner Zahlenwert pro kWh.'),
-    options: () => ELECTRICITY_CURRENCIES.map((c) => [c, c] as [string, string]),
+    kind: 'text', id: 'general.electricityCurrency', label: t('Währung für Stromkosten'),
+    hint: t('Währung der Kostenanzeige in der Vorschau als freie Eingabe; die gängigsten Codes stehen als Vorschläge bereit. Der Tarif selbst bleibt ein reiner Zahlenwert pro kWh.'),
+    placeholder: () => 'EUR', maxLength: ELECTRICITY_CURRENCY_MAX_LENGTH,
+    datalist: () => [...ELECTRICITY_CURRENCIES],
+    coerce: normalizeElectricityCurrencyInput, selectOnFocus: true,
     get: electricityCurrency, set: setElectricityCurrency,
   };
 }
