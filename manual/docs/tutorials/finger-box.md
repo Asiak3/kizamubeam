@@ -57,8 +57,8 @@ Open **Window → 3D View**. The box is shown assembled, with the name on the li
 
 Push the panels together by hand: first the sides onto the base, then the lid. If the fit is too tight, tap the joints with a piece of wood instead of forcing them. For the next box:
 
-- **Too tight:** raise the fit clearance by 0.05 mm.
-- **Too loose:** lower it by 0.05 mm, or use a few drops of wood glue.
+- **Too tight:** raise the fit clearance by 0.1 mm.
+- **Too loose:** lower it by 0.1 mm, or use a few drops of wood glue.
 
 ## Going further
 

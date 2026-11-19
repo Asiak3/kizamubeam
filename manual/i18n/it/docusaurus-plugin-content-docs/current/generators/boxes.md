@@ -17,7 +17,7 @@ Entrambi i generatori di scatole si trovano in **Casella degli strumenti → Sca
 | **Spessore del materiale** | Spessore del pannello. Misuralo: i pannelli sono raramente spessi quanto dichiarato. |
 | **Su** | **Aperta** o **Chiusa (coperchio con dita)**. |
 | **Larghezza delle dita** | Larghezza minima delle dita. Ogni bordo riceve un numero dispari di dita della stessa larghezza. |
-| **Gioco di accoppiamento** | Ogni dito diventa più stretto di questo valore; negativo = accoppiamento a pressione. |
+| **Gioco di accoppiamento totale** | Gioco totale delle dita: ogni fessura è più larga del suo dito di questo valore, metà per lato; negativo = accoppiamento a pressione. |
 | **Kerf** | Larghezza del taglio laser; i contorni vengono spostati verso l’esterno della metà. |
 
 Le pareti anteriore e posteriore possiedono gli angoli. Le parti sono oggetti separati in una disposizione compatta: le parti uguali restano vicine. Un doppio clic su una parte qualsiasi modifica l’intera scatola, su tutti i lati. Le parti ancora nella disposizione generata si allontanano quando la scatola cresce; quelle che hai disposto tu restano dove sono.
@@ -30,7 +30,7 @@ Metti testo o immagini su una parete e raggruppali con essa, oppure appoggiali s
 
 1. Misura lo spessore del materiale con un calibro in più punti e inserisci la media.
 2. Parti con gioco 0 e il kerf del tuo laser (da 0,1 a 0,2 mm per un laser a diodo su compensato).
-3. Taglia la scatola. Se è troppo stretta, aumenta il gioco a passi di 0,05 mm; se è lenta, riducilo.
+3. Taglia la scatola. Se è troppo stretta, aumenta il gioco a passi di 0,1 mm; se è lenta, riducilo.
 
 La [calibrazione dell’accoppiamento](../features/materials-tests.md#calibrate-fit) trova questi valori per un materiale con un solo test, e le nuove scatole li adottano poi automaticamente.
 
@@ -46,4 +46,4 @@ Una scatola aperta o chiusa con divisori che si incrociano. Questo generatore è
 | **Divisori più bassi della scatola** | Di quanto i divisori sono più bassi delle pareti. |
 | **Kerf** | Larghezza del taglio laser. |
 
-**Larghezza delle dita** e **Gioco di accoppiamento** si trovano in **Avanzate**. Le parti e i loro fori stanno su un livello comune.
+**Larghezza delle dita** e **Gioco di accoppiamento totale** si trovano in **Avanzate**. Le parti e i loro fori stanno su un livello comune.

@@ -55,7 +55,7 @@ test('every generator tile shows up in the toolbox, in its group and order', () 
 });
 
 test('fit and assembly check come from the generator', () => {
-  assert.deepEqual(genFit('box'), { kind: 'pair', play: 'clearance' });
+  assert.deepEqual(genFit('box'), { kind: 'pair', play: 'clearance', total: true });
   assert.deepEqual(genFit('insert'), { kind: 'slot', play: 'play' });
   assert.equal(genFit('gear'), undefined);
   assert.equal(getGenerator('gearpair')?.assemblyCheck, undefined, 'gear pair: wheels sit on axles');

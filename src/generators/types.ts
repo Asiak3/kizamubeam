@@ -38,6 +38,11 @@ interface SpecBase {
   section?: string;
   /** New objects always start with def instead of the last-used value (layout choices of saved objects) */
   resetOnNew?: boolean;
+  /**
+   * The value is the total play of a joint, and was the play per side before #402: a last-used value remembered
+   * before that is doubled once (generators/dialog.ts)
+   */
+  playTotal?: boolean;
   /** Feld nur zeigen (und beachten), wenn diese Bedingung gilt */
   showIf?: Rule;
 }
@@ -461,7 +466,7 @@ export interface Generator {
   /** Texts for issue codes that generate() may throw (Error.message = code); buildGen translates them */
   texts?: Record<string, () => string>;
   /** Plug-in joints: kind of fit and the parameter that holds the play (design check, material calibration) */
-  fit?: { kind: 'pair' | 'slot'; play: string };
+  fit?: { kind: 'pair' | 'slot'; play: string; total?: boolean };
   /** Position of every part in space (3D view, assembly check); th = material thickness of the view as fallback */
   poses?(p: Params, th: number): AsmPoses | null;
   /** The parts form one connected assembly that the assembly check examines */

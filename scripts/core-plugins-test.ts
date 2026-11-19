@@ -371,6 +371,10 @@ await test('the app uses the core pack: tiles, fits, assembly check and migratio
     const { parsePlugin } = await import('../src/plugins/manifest');
     const raw = JSON.parse(text).plugins.find((x: { id: string }) => x.id === 'box');
     assert.throws(() => parsePlugin({ ...raw, fit: { kind: 'pair', play: 'nope' } }, 'box'), /fit/);
+    // The box's clearance is the total play (#402): the fit says so, and plug-in packs can say it too
+    assert.deepEqual(raw.fit, { kind: 'pair', play: 'clearance', total: true });
+    assert.deepEqual(parsePlugin({ ...raw, fit: { kind: 'pair', play: 'clearance' } }, 'box').fit, { kind: 'pair', play: 'clearance' });
+    assert.throws(() => parsePlugin({ ...raw, fit: { kind: 'pair', play: 'clearance', total: 'yes' } }, 'box'), /fit/);
     assert.throws(() => parsePlugin({ ...raw, tile: { group: '' } }, 'box'), /tile/);
     assert.throws(() => parsePlugin({ ...raw, assemblyCheck: 'yes' }, 'box'), /assemblyCheck/);
     // A pack that copies the core pack's id cannot take over its generators
@@ -382,7 +386,7 @@ await test('the app uses the core pack: tiles, fits, assembly check and migratio
     assert.equal(old.v, 1, 'version stays until the plugin answers');
     assert.ok(genUpgrading(old));
     await genReady(old);
-    assert.equal(old.v, 2);
+    assert.equal(old.v, 3);
     assert.deepEqual(old.params, want);
     // Up to date: nothing to wait for
     await genReady(old);

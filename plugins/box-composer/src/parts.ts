@@ -115,11 +115,10 @@ export function floorSpans(p: WallPanel, d: Dims): { a: number; b: number; width
  */
 export function buildParts(m: Model, d: Dims): { parts: Parts; info: JointMsg[]; walls: WallPanel[] } {
   const { W, D, H, t, finger } = d;
-  const half = d.clearance / 2;
   const info: JointMsg[] = [];
   let parts: Parts = {};
 
-  // Außenwände, Boden und Deckel: die Platten der Box (Spiel je Seite = halbes Gesamtspiel). Eine offene Seite hat
+  // Außenwände, Boden und Deckel: die Platten der Box (host.joints v: 2, Spiel = Gesamtspiel). Eine offene Seite hat
   // keine Wand; die Kanten der Nachbarplatten dort sind glatt.
   const S = d.sides;
   const any = anyOuter(d);
@@ -132,7 +131,7 @@ export function buildParts(m: Model, d: Dims): { parts: Parts; info: JointMsg[];
   const plate = (w: number, hh: number, edges: ('A' | 'B' | 'flat')[], corners: boolean, cut = 0): SubPath[] => {
     const b = hh + cut;
     const one = (e: ('A' | 'B' | 'flat')[], f: number) =>
-      host.joints({ op: 'panel', width: w, height: b, thickness: t, finger: f, clearance: half, kerf: 0, edges: e as ['A', 'A', 'A', 'A'], corners }).outline;
+      host.joints({ op: 'panel', v: 2, width: w, height: b, thickness: t, finger: f, clearance: d.clearance, kerf: 0, edges: e as ['A', 'A', 'A', 'A'], corners }).outline;
     const across = one([edges[0], 'flat', edges[2], 'flat'], fingerFor(w - 2 * t)),
       upDown = one(['flat', edges[1], 'flat', edges[3]], fingerFor(b - 2 * t));
     const out = host.boolean({ op: 'intersection', a: [across], b: [upDown] });
@@ -188,8 +187,8 @@ export function buildParts(m: Model, d: Dims): { parts: Parts; info: JointMsg[];
     const ends = tenonStretches(0, p.h, finger).flatMap((sp) => [sp.a, sp.b]);
     parts[p.key] = [panel(len, p.h, { top, bottom, left: tenoned(p.it.start) ? ends : [], right: tenoned(p.it.end) ? ends : [] })];
   }
-  // Spiel je Seite = halbes Gesamtspiel; quer über den Zapfenschlitz das ganze (slotClearance, #402/#403)
-  const opts = (o: JointOptions): JointOptions => ({ thickness: t, clearance: half, ...o });
+  // Gesamtspiel der Verbindung, entlang und quer zum Zapfenschlitz (host.joints v: 2, #402)
+  const opts = (o: JointOptions): JointOptions => ({ thickness: t, clearance: d.clearance, ...o });
   const keep = (r: { parts: Parts; info: JointMsg[] }) => {
     parts = r.parts;
     info.push(...r.info);
@@ -221,7 +220,7 @@ export function buildParts(m: Model, d: Dims): { parts: Parts; info: JointMsg[];
       /** One tenon per stretch, into the slot along the guide from `at(0)` to `at(p.h)` in part `into` */
       const tenons = (into: string, at: (y: number) => { x: number; y: number }) => {
         for (const sp of tenonStretches(0, p.h, finger))
-          parts = tenonsInto(parts, opts({ kind: 'tenon', slotClearance: d.clearance, tenonCount: 1, tenonWidth: sp.width }), { part: p.key, a: { x, y: sp.a }, b: { x, y: sp.b } }, into, at(sp.a), at(sp.b));
+          parts = tenonsInto(parts, opts({ kind: 'tenon', tenonCount: 1, tenonWidth: sp.width }), { part: p.key, a: { x, y: sp.a }, b: { x, y: sp.b } }, into, at(sp.a), at(sp.b));
       };
       if (end.kind === 'corner') {
         const q = byId.get(end.other)!;
@@ -252,7 +251,7 @@ export function buildParts(m: Model, d: Dims): { parts: Parts; info: JointMsg[];
         w.axis === 'h' ? { x: along + t - W / 2, y: w.pos + t - D / 2 } : { x: w.pos + t - W / 2, y: along + t - D / 2 };
       parts = tenonsInto(
         parts,
-        opts({ kind: 'tenon', slotClearance: d.clearance, tenonCount: 1, tenonWidth: sp.width }),
+        opts({ kind: 'tenon', tenonCount: 1, tenonWidth: sp.width }),
         { part: p.key, a: { x: sp.b - p.s, y: p.h }, b: { x: sp.a - p.s, y: p.h } },
         'floor',
         map(sp.a),

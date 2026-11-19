@@ -486,7 +486,9 @@ test('Box: Validierung', () => {
   const lvl = (o: Partial<BoxParams>, l: string) => BOX.validate(box(o) as never).filter((i) => i.level === l);
   assert.equal(lvl({}, 'error').length, 0);
   assert.ok(lvl({ height: 10, thickness: 3 }, 'error').length, 'zu dick nicht erkannt');
-  assert.ok(lvl({ clearance: 1, finger: 3 }, 'error').length, 'Spiel zu groß nicht erkannt');
+  // Total play (#402): a finger loses half of it, so at half the finger width nothing is left of a field between them
+  assert.ok(lvl({ clearance: 1.5, finger: 3 }, 'error').length, 'Spiel zu groß nicht erkannt');
+  assert.equal(lvl({ clearance: 1.4, finger: 3 }, 'error').length, 0, 'Spiel knapp unter der Grenze');
   assert.ok(lvl({ finger: 2 }, 'warn').length, 'schmale Zinken nicht gewarnt');
 });
 

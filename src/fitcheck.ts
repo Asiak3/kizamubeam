@@ -15,8 +15,14 @@ import { getGenerator } from './generators/index';
  */
 export type FitKind = 'pair' | 'slot';
 
-/** Plug-in joints of a generator (Generator.fit): kind of fit and the parameter that holds the play */
-export const genFit = (gen: string): { kind: FitKind; play: string } | undefined => getGenerator(gen)?.fit;
+/**
+ * Plug-in joints of a generator (Generator.fit): kind of fit and the parameter that holds the play. total: a pair fit
+ * whose parameter is the total play of the joint (#402), twice the play per side this file computes with.
+ */
+export const genFit = (gen: string): { kind: FitKind; play: string; total?: boolean } | undefined => getGenerator(gen)?.fit;
+
+/** How much the generator's play parameter is of the play per side: 2 for a total play, else 1 */
+const playScale = (spec: { kind: FitKind; total?: boolean }) => (spec.kind === 'pair' && spec.total ? 2 : 1);
 
 /** Verbindungsarten des Verbindungs-Werkzeugs: Zinken und Haken sind Teil-in-Teil, die übrigen stecken in Schlitzen */
 export const jointFitKind = (kind: string): FitKind => (kind === 'finger' || kind === 'snap' || kind === 'hook' ? 'pair' : 'slot');
@@ -70,7 +76,7 @@ export function genFitPatch(gen: string, e: MaterialEntry, p: Params, layerKerf:
   if (!spec) return null;
   const s = suggestFit(spec.kind, e, Number(p.kerf ?? 0), layerKerf);
   if (!s) return null;
-  return { thickness: s.th, kerf: s.kerf, [spec.play]: s.play };
+  return { thickness: s.th, kerf: s.kerf, [spec.play]: Math.round(s.play * playScale(spec) * 1000) / 1000 };
 }
 
 export interface FitFinding {
@@ -100,7 +106,10 @@ interface FitCase {
   name: string;
   kind: FitKind;
   th: number;
+  /** Play per side (pair) or over the thickness (slot) */
   play: number;
+  /** The generator's play parameter is this many times play (playScale) */
+  scale: number;
   kerf: number;
   layer: Layer;
   objs: Obj[];
@@ -136,7 +145,7 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
     const p = s.params as Params;
     const allTops = [...new Set(parts.map((x) => tops.get(x)!))];
     cases.push({
-      key: `gen:${k}`, name: genName(s.gen), kind: spec.kind, th: Number(p.thickness), play: Number(p[spec.play] ?? 0), kerf: Number(p.kerf ?? 0),
+      key: `gen:${k}`, name: genName(s.gen), kind: spec.kind, th: Number(p.thickness), play: Number(p[spec.play] ?? 0) / playScale(spec), scale: playScale(spec), kerf: Number(p.kerf ?? 0),
       layer: layerOf(o.layer), objs: allTops, lines: [boxLine(allTops)],
       gen: { obj: o, gen: s.gen, params: p, bound: new Set(Object.keys(s.bind ?? {})) },
     });
@@ -151,7 +160,7 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
       const objsOf = [tops.get(o)!, ...(other ? [tops.get(other[0])!] : [])];
       cases.push({
         key: `mate:${o.id}:${i}`, name: jointName(mt.kind), kind: jointFitKind(mt.kind), th: mt.th,
-        play: mt.fit?.c ?? NaN, kerf: mt.fit?.k ?? NaN, layer: layerOf(o.layer), objs: [...new Set(objsOf)], lines: ln,
+        play: mt.fit?.c ?? NaN, scale: 1, kerf: mt.fit?.k ?? NaN, layer: layerOf(o.layer), objs: [...new Set(objsOf)], lines: ln,
       });
     }
   }
@@ -176,7 +185,7 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
     }
     if (!isFinite(c.play) || !isFinite(c.kerf)) continue;
     const drawn = drawnFit(c.kind, c.play, c.kerf, kl);
-    const detail = t(' (Spiel {c}, Schnittfuge im Generator {k}, Kerf-Versatz am Layer {kl} mm)', { c: f2(c.play), k: f2(c.kerf), kl: f2(kl) });
+    const detail = t(' (Spiel {c}, Schnittfuge im Generator {k}, Kerf-Versatz am Layer {kl} mm)', { c: f2(c.play * c.scale), k: f2(c.kerf), kl: f2(kl) });
     const fix = () => {
       if (!c.gen || !entry?.fit) return undefined;
       const patch = genFitPatch(c.gen.gen, entry, c.gen.params, kl);
@@ -209,7 +218,7 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
     // Ohne Kalibrierung: Spiel so setzen, dass nach dem Lasern nichts übrig bleibt (satt)
     if (c.gen && !c.gen.bound.has(genFit(c.gen.gen)!.play)) {
       const target = c.kind === 'pair' ? c.kerf + 2 * kl - beam : c.kerf + 2 * kl - beam + (thMat ?? c.th) - c.th;
-      f.gen = { obj: c.gen.obj, patch: { [genFit(c.gen.gen)!.play]: Math.round(target * 100) / 100 } };
+      f.gen = { obj: c.gen.obj, patch: { [genFit(c.gen.gen)!.play]: Math.round(target * c.scale * 100) / 100 } };
     }
     out.push(f);
   }

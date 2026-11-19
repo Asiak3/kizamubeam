@@ -20,10 +20,28 @@ import { setContextLayer } from '../plugins/context';
 import { surfaceArea } from './dialogSurface';
 
 const LAST_KEY = (id: string) => `kizamubeam.gen.${id}`;
+/** Marks remembered values written with total play (#402); the values are synced, so the mark travels with them */
+const PLAY_TOTAL = '_playTotal';
+/** Parameters that are the total play of a joint and were the play per side before #402 (ParamSpec.playTotal) */
+const playKeys = (g: Pick<Generator, 'schema'>) => g.schema.filter((s) => s.playTotal).map((s) => s.key);
+
+/**
+ * Remembered values of a generator. Those written before #402 have the play per side: doubled once, so a new box gets
+ * the same joints as the last one.
+ */
+export function lastRaw(g: Pick<Generator, 'id' | 'schema'>): Record<string, unknown> {
+  const raw = JSON.parse(localStorage.getItem(LAST_KEY(g.id)) ?? '{}') as Record<string, unknown>;
+  const keys = playKeys(g).filter((k) => typeof raw[k] === 'number');
+  if (raw[PLAY_TOTAL] || !keys.length) return raw;
+  const out: Record<string, unknown> = { ...raw, [PLAY_TOTAL]: true };
+  for (const k of keys) out[k] = 2 * (raw[k] as number);
+  localStorage.setItem(LAST_KEY(g.id), JSON.stringify(out));
+  return out;
+}
 
 function lastParams(g: Generator): Params {
   try {
-    return normalizeParams(g, JSON.parse(localStorage.getItem(LAST_KEY(g.id)) ?? '{}'));
+    return normalizeParams(g, lastRaw(g));
   } catch {
     return defaultParams(g);
   }
@@ -541,7 +559,7 @@ export function openGenDialog(ed: Editor, genId: string, o?: Obj, init?: Params,
       if (answer === 'cancel') return dlg.close();
     }
     try {
-      localStorage.setItem(LAST_KEY(g.id), JSON.stringify(r.parts[0].shape.params));
+      localStorage.setItem(LAST_KEY(g.id), JSON.stringify({ ...r.parts[0].shape.params, ...(playKeys(g).length ? { [PLAY_TOTAL]: true } : {}) }));
     } catch {
       /* Speicher nicht verfügbar */
     }

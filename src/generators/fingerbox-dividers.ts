@@ -8,6 +8,11 @@ export interface DividerParams {
   width: number; depth: number; height: number; thickness: number; finger: number;
   compartmentsX: number; compartmentsY: number; ratiosX: string; ratiosY: string;
   dividerHeight: number; top?: 'open' | 'closed'; clearance?: number; slotClearance?: number;
+  /**
+   * Play of the dividers (teeth along, slots across) when it differs from clearance: boxes saved before #402 had the
+   * clearance per side at the corners but whole at the dividers; migrate keeps the old value here. Not set = clearance.
+   */
+  dividerClearance?: number;
 }
 export interface DividerResult {
   dividers: { key: string; outline: SubPath }[];
@@ -75,7 +80,8 @@ export function makeDividers(p: DividerParams): DividerResult {
   const {width:W,depth:D,height:H,thickness:t,finger,dividerHeight:hd} = p;
   if (![W,D,H,t,finger,hd].every((n)=>Number.isFinite(n) && n>0) || hd>H || hd<=2*t) throw new Error('divider-height-invalid');
   if (p.top === 'closed' && hd > H-t+1e-9) throw new Error('divider-into-lid');
-  const clearance = p.clearance ?? 0, slotClearance = p.slotClearance ?? clearance, slotWidth = t + slotClearance;
+  // clearance: total play of the dividers' teeth (along) and slots (across); slotClearance only across
+  const clearance = p.dividerClearance ?? p.clearance ?? 0, slotClearance = p.slotClearance ?? clearance, slotWidth = t + slotClearance;
   if (!Number.isFinite(clearance) || !Number.isFinite(slotClearance) || slotWidth <= 0) throw new Error('clearance-invalid');
   const x = distributeGaps(W,t,p.compartmentsX,p.ratiosX), y = distributeGaps(D,t,p.compartmentsY,p.ratiosY);
   const nx=x.centres, ny=y.centres;

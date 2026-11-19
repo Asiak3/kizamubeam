@@ -23,7 +23,7 @@ Eine Schublade mit vorn offenem Korpus, passendem Schubkasten und Blende. Ohne K
 | **Fuge um die Blende** | Die Blende wird an jeder Seite um so viel kleiner. |
 | **Schnittfuge (Kerf)** | Breite des Laserschnitts. |
 
-**Zinkenbreite** und **Steckspiel** stehen unter **Erweitert**.
+**Zinkenbreite** und **Steckspiel gesamt** (Gesamtspiel der Zinken, wie bei der [Box](boxes.md)) stehen unter **Erweitert**.
 
 ## Einsatz mit Fächern
 
