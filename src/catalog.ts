@@ -22,6 +22,12 @@ export const CATALOG_URLS = [
   'https://negurvulkan.github.io/kizamubeam/catalog/catalog.json',
 ];
 export const CATALOG_URL = CATALOG_URLS[0];
+/** Separate signed catalogues hosted by the three content repositories */
+export const CATALOG_SOURCES: string[][] = [
+  ['https://kizamubeam.github.io/kizamubeam-packs/catalog.json'],
+  ['https://kizamubeam.github.io/kizamubeam-plugins/catalog.json'],
+  ['https://kizamubeam.github.io/kizamubeam-devices/catalog.json'],
+];
 /** Address the last catalogue was loaded from; package files are resolved relative to it */
 let catalogSource = CATALOG_URL;
 export const CATALOG_FORMAT = 'kizamubeam-catalog';
@@ -61,6 +67,8 @@ export interface CatalogEntry {
   file: string;
   sha256: string;
   size: number;
+  /** Runtime-only: URL des Katalogs, aus dem dieser Eintrag stammt */
+  catalogUrl?: string;
 }
 
 export interface Catalog {
@@ -138,11 +146,7 @@ export function catalogState(e: CatalogEntry, installed: Pack | undefined, appVe
   return c > 0 ? 'update' : c === 0 ? 'installed' : 'newer-installed';
 }
 
-/**
- * Load the catalogue and check its signature. With several addresses, they are tried in order until one delivers
- * a correctly signed catalogue; if none does, a signature error wins over "not reachable".
- */
-export async function fetchCatalog(url: string | string[] = CATALOG_URLS, pubHex = CATALOG_PUBKEY): Promise<Catalog> {
+async function fetchSingleCatalog(url: string | string[], pubHex: string): Promise<Catalog> {
   if (!HEX64.test(pubHex)) throw new CatalogError(t('Diese Version kennt noch keinen Schlüssel für den Katalog.'));
   const get = async (u: string) => {
     const r = await fetch(u, { cache: 'no-cache' });
@@ -160,6 +164,7 @@ export async function fetchCatalog(url: string | string[] = CATALOG_URLS, pubHex
       }
       const catalog = parseCatalog(text);
       catalogSource = u;
+      for (const p of catalog.packs) p.catalogUrl = u;
       return catalog;
     } catch (e) {
       error = e;
@@ -168,8 +173,50 @@ export async function fetchCatalog(url: string | string[] = CATALOG_URLS, pubHex
   throw badSignature ?? error;
 }
 
+/**
+ * Load one catalogue (string | string[] mirrors) or merge multiple independent catalogues (string[][]).
+ * Signature errors always win over reachability errors; if at least one source in a multi-source list
+ * succeeds without signature errors, its packs are returned.
+ */
+export async function fetchCatalog(
+  url: string | string[] | string[][] = CATALOG_SOURCES,
+  pubHex = CATALOG_PUBKEY,
+): Promise<Catalog> {
+  if (!Array.isArray(url) || url.length === 0 || typeof url[0] === 'string') {
+    return fetchSingleCatalog(url as string | string[], pubHex);
+  }
+  const results = await Promise.allSettled((url as string[][]).map((mirrors) => fetchSingleCatalog(mirrors, pubHex)));
+  const merged: CatalogEntry[] = [];
+  const seen = new Set<string>();
+  let generated = '';
+  let lastError: unknown;
+  let badSignature: CatalogError | undefined;
+  let okCount = 0;
+
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      okCount++;
+      if (r.value.generated > generated) generated = r.value.generated;
+      for (const p of r.value.packs) {
+        if (seen.has(p.id)) continue;
+        seen.add(p.id);
+        merged.push(p);
+      }
+    } else {
+      const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      if (/Signatur/i.test(msg) || /Schlüssel/i.test(msg)) badSignature = r.reason as CatalogError;
+      lastError = r.reason;
+    }
+  }
+
+  if (badSignature) throw badSignature;
+  if (okCount === 0) throw lastError ?? new CatalogError(t('Katalog nicht erreichbar ({status})', { status: 0 }));
+  merged.sort((a, b) => a.id.localeCompare(b.id));
+  return { generated, packs: merged };
+}
+
 /** Paketdatei eines Eintrags laden und gegen Prüfsumme und Kennung prüfen; liefert den Text zum Installieren */
-export async function fetchCatalogPack(e: CatalogEntry, url = catalogSource): Promise<string> {
+export async function fetchCatalogPack(e: CatalogEntry, url = e.catalogUrl ?? catalogSource): Promise<string> {
   const r = await fetch(new URL(e.file, url).href, { cache: 'no-cache' });
   if (!r.ok) throw new CatalogError(t('Paket nicht erreichbar ({status})', { status: r.status }));
   const text = await r.text();

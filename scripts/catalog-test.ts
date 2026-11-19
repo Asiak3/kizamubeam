@@ -143,6 +143,34 @@ await test('fetchCatalog: falls back to the next mirror, packages come from the 
   await assert.rejects(() => C.fetchCatalog(['https://gone.test/catalog.json'], pub), /nicht erreichbar/);
 });
 
+await test('fetchCatalog: merges multiple independent catalog sources and resolves each pack from its source', async () => {
+  const p1 = pack('1.0.0').replace('"de.test.katalog"', '"de.test.packs"');
+  const p2 = pack('2.0.0').replace('"de.test.katalog"', '"de.test.plugins"');
+  const c1 = await C.buildCatalog([['de.test.packs.kzp', p1]], '2026-01-01T00:00:00Z');
+  const c2 = await C.buildCatalog([['de.test.plugins.kzp', p2]], '2026-02-01T00:00:00Z');
+  const files = new Map<string, string>([
+    ['https://packs.test/catalog.json', c1],
+    ['https://packs.test/catalog.json.sig', await sign(c1)],
+    ['https://packs.test/de.test.packs.kzp', p1],
+    ['https://plugins.test/catalog.json', c2],
+    ['https://plugins.test/catalog.json.sig', await sign(c2)],
+    ['https://plugins.test/de.test.plugins.kzp', p2],
+  ]);
+  g.fetch = async (u: string) => ({ ok: files.has(u), status: files.has(u) ? 200 : 404, text: async () => files.get(u) ?? '' });
+  const cat = await C.fetchCatalog(
+    [
+      ['https://packs.test/catalog.json'],
+      ['https://plugins.test/catalog.json'],
+      ['https://missing-devices.test/catalog.json'],
+    ],
+    pub,
+  );
+  assert.equal(cat.generated, '2026-02-01T00:00:00Z');
+  assert.deepEqual(cat.packs.map((x) => x.id), ['de.test.packs', 'de.test.plugins']);
+  assert.equal(await C.fetchCatalogPack(cat.packs[0]), p1);
+  assert.equal(await C.fetchCatalogPack(cat.packs[1]), p2);
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
