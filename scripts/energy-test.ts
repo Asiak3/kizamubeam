@@ -1,6 +1,6 @@
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { ELECTRICITY_CURRENCIES, electricityCurrency, electricityTariffText, emptyEnergySettings, energyDraft, estimateEnergy, formatCost, formatEnergyValue, laserElectricalWatts, parseEnergyNumber, setElectricityCurrency, setElectricityTariffText } from '../src/energy';
+import { ELECTRICITY_CURRENCIES, electricityCurrency, electricityTariffText, emptyEnergySettings, energyDraft, estimateEnergy, formatCost, formatEnergyValue, laserElectricalWatts, normalizeElectricityCurrencyInput, parseEnergyNumber, setElectricityCurrency, setElectricityTariffText } from '../src/energy';
 import { estimate, loadDevices, Moves, newDevice, saveDevices, writeGCode } from '../src/gcode';
 import { applyChanges, loadValues, SettingsSection } from '../src/settings/registry';
 
@@ -63,14 +63,38 @@ await test('unknown, invalid, empty and valid zero stay distinct; no incomplete 
   draft.laserWatts = [0, 0, 0]; draft.baseWatts = 0; draft.consumers = [];
   assert.equal(estimateEnergy(moves, timing, [], draft).total, 0);
 });
-await test('currency default, allowlist rejection and cost formatting fallback', () => {
+await test('currency default, free ISO and custom labels, over-long rejection and cost formatting fallback', () => {
+  const data = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => data.set(key, value) } });
   assert.deepEqual([...ELECTRICITY_CURRENCIES].slice(0, 3), ['EUR', 'USD', 'GBP']);
   assert.equal(electricityCurrency(), 'EUR');
-  assert.throws(() => setElectricityCurrency('XXX'));
-  setElectricityCurrency('USD');
+  setElectricityCurrency('');
   assert.equal(electricityCurrency(), 'EUR');
+  setElectricityCurrency('chf');
+  assert.equal(electricityCurrency(), 'CHF');
+  setElectricityCurrency('  usd  ');
+  assert.equal(electricityCurrency(), 'USD');
+  setElectricityCurrency('JPY');
+  assert.equal(electricityCurrency(), 'JPY');
+  setElectricityCurrency('kr');
+  assert.equal(electricityCurrency(), 'kr');
+  setElectricityCurrency('credits');
+  assert.equal(electricityCurrency(), 'credits');
+  setElectricityCurrency('1234567890123456');
+  assert.equal(electricityCurrency(), '1234567890123456');
+  assert.throws(() => setElectricityCurrency('12345678901234567'));
+  assert.equal(electricityCurrency(), '1234567890123456');
+  data.delete('kizamubeam.electricityCurrency');
   assert.equal(formatCost(10, 'USD').replace(/[\s ]/g, ''), '10,00$');
   assert.equal(formatCost(10, 'EUR').replace(/[\s ]/g, ''), '10,00€');
+  assert.equal(formatCost(10, 'chf').replace(/[\s ]/g, ''), '10,00CHF');
+  assert.equal(formatCost(10, 'credits'), '10.00 credits');
+  // Live-Normalisierung im Eingabefeld: 3-Buchstaben-Codes groß, sonst unverändert, Leer bleibt löschbar
+  assert.equal(normalizeElectricityCurrencyInput('aud'), 'AUD');
+  assert.equal(normalizeElectricityCurrencyInput('kr'), 'kr');
+  assert.equal(normalizeElectricityCurrencyInput('credits'), 'credits');
+  assert.equal(normalizeElectricityCurrencyInput(''), '');
+  assert.equal(normalizeElectricityCurrencyInput('   '), '   ');
 });
 await test('included incomplete accessory blocks total; excluded data persists without blocking', () => {
   const draft = energyDraft(settings);

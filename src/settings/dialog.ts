@@ -91,11 +91,18 @@ export async function openSettings(sectionId?: string, fieldId?: string) {
         return f.unit ? h('span', { class: 'settings-unit' }, el, ' ', f.unit) : el;
       }
       case 'text': {
-        const el = h('input', { type: 'text', id: `set-${f.id}`, disabled: !has, maxlength: f.maxLength ? String(f.maxLength) : undefined }) as HTMLInputElement;
+        const el = h('input', { type: 'text', id: `set-${f.id}`, disabled: !has, maxlength: f.maxLength ? String(f.maxLength) : undefined, list: f.datalist ? `set-${f.id}-list` : undefined }) as HTMLInputElement;
         el.value = String(val ?? '');
         if (f.placeholder) el.placeholder = f.placeholder();
-        el.oninput = () => set(el.value);
-        return el;
+        if (f.selectOnFocus) el.addEventListener('focus', () => el.select());
+        el.oninput = () => {
+          const coerced = f.coerce ? f.coerce(el.value) : el.value;
+          if (coerced !== el.value) el.value = coerced;
+          set(coerced);
+        };
+        if (!f.datalist) return el;
+        return h('span', { class: 'settings-suggest' },
+          el, h('datalist', { id: `set-${f.id}-list` }, ...f.datalist().map((v) => h('option', { value: v }))));
       }
       case 'color': {
         const color = h('input', { type: 'color', id: `set-${f.id}`, disabled: !has }) as HTMLInputElement;
