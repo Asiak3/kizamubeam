@@ -23,7 +23,7 @@ A drawer with a carcass open at the front, a matching drawer box and a front pan
 | **Gap around the front panel** | The front panel is made this much smaller on every side. |
 | **Kerf** | Width of the laser cut. |
 
-**Finger width** and **Fit clearance** are under **Advanced**.
+**Finger width** and **Total fit clearance** (total play of the finger joints, as in the [box](boxes.md)) are under **Advanced**.
 
 ## Divider insert
 

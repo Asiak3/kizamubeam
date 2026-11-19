@@ -17,7 +17,7 @@ Find both box generators in **Toolbox → Boxes and Furniture**. For a lid that 
 | **Material thickness** | Thickness of the board. Measure it; boards are rarely exactly as thick as sold. |
 | **Up** | **Open**, or **Closed (lid with fingers)**. |
 | **Finger width** | Minimum finger width. Every edge gets an odd number of equally wide fingers. |
-| **Fit clearance** | Every finger gets this much narrower; negative = press fit. |
+| **Total fit clearance** | Total play of the finger joints: each gap is this much wider than its finger, half on each side; negative = press fit. |
 | **Kerf** | Width of the laser cut; outlines are offset outward by half of it. |
 
 The front and back walls own the corners. The parts are separate objects in a compact arrangement: identical parts stay together. A double-click on any part edits the whole box, on every page. Parts still in their generated layout move apart when they grow; parts you arranged yourself stay where they are.
@@ -30,7 +30,7 @@ Put text or images on a panel and group them with it, or simply place them on to
 
 1. Measure the material thickness with a caliper at several spots and enter the average.
 2. Start with a fit clearance of 0 and the kerf of your laser (0.1 to 0.2 mm for a diode laser on plywood).
-3. Cut the box. If it is too tight, increase the clearance in steps of 0.05 mm; if it is loose, decrease it.
+3. Cut the box. If it is too tight, increase the clearance in steps of 0.1 mm; if it is loose, decrease it.
 
 The [fit calibration](../features/materials-tests.md#calibrate-fit) finds these values for a material in one test, and new boxes then take them automatically.
 
@@ -46,4 +46,4 @@ An open or closed box with dividers that cross each other. This generator is **e
 | **Divider drop below box top** | How much lower the dividers are than the walls. |
 | **Kerf** | Width of the laser cut. |
 
-**Finger width** and **Fit clearance** are under **Advanced**. Pieces and their holes share one layer.
+**Finger width** and **Total fit clearance** are under **Advanced**. Pieces and their holes share one layer.

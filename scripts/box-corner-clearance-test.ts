@@ -11,7 +11,8 @@ type P = { x: number; y: number };
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 const canon = (pts: P[]) => JSON.stringify(pts.map((q) => q.x.toFixed(4) + ',' + q.y.toFixed(4)).sort());
 const polys = (c: number, top: 'open' | 'closed', w = 120, d = 100, h = 60, th = 3.6, finger = 10) =>
-  panelPolys({ sizeMode: 'outer', width: w, depth: d, height: h, thickness: th, finger, top, clearance: c, kerf: 0 });
+  // c is the old clearance per side; the box takes the total play since #402
+  panelPolys({ sizeMode: 'outer', width: w, depth: d, height: h, thickness: th, finger, top, clearance: 2 * c, kerf: 0 });
 
 // Wall panels frozen from the outlines produced before the corner fix (120 x 100 x 60, th 3.6, finger 10).
 const WALLS: Record<string, string> = {"-1|open":"4c7f135dd04bc50e","-1|closed":"71d36d9f03069968","-0.5|open":"4ff8319f0f084f90","-0.5|closed":"ba9fce60eadad9f0","0|open":"c8f434758f0fb2d4","0|closed":"39c812bfc02e4d57","0.2|open":"257d1d271b70313b","0.2|closed":"461b686e652c89ff","0.5|open":"b71f9586e5052001","0.5|closed":"87c92ea6e43386e4","1|open":"0ebd51b5d1b41e33","1|closed":"40f2506fd4316122"};

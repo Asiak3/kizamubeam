@@ -285,14 +285,23 @@ const fitOnly = (xs: CheckIssue[]) => xs.filter((x) => x.kind === 'fit' || x.kin
 
 test('Box: Standard passt, Presspassung zu eng, großes Spiel zu locker', () => {
   assert.deepEqual(fitOnly(run(genObjs('box', {}))), []);
-  const tight = fitOnly(run(genObjs('box', { clearance: -0.3 })));
+  // Das Steckspiel der Box ist das Gesamtspiel (#402): −0,6 = 0,3 Pressung je Seite, 0,4 = 0,2 Luft je Seite
+  const tight = fitOnly(run(genObjs('box', { clearance: -0.6 })));
   assert.equal(tight.length, 1);
   assert.equal(tight[0].level, 'error');
+  assert.match(tight[0].msg, /0[.,]30 mm/, 'Pressung je Seite: die Hälfte des Gesamtspiels');
   assert.ok(tight[0].objs.length >= 4, 'alle Teile der Baugruppe');
   assert.ok(tight[0].fix?.kind === 'gen' && tight[0].fix.patch.clearance === 0);
+  assert.deepEqual(fitOnly(run(genObjs('box', { clearance: 0.2 }))), [], '0,1 je Seite passt');
   const loose = fitOnly(run(genObjs('box', { clearance: 0.4 })));
   assert.equal(loose.length, 1);
   assert.match(loose[0].msg, /locker|loose/);
+  // Ohne Kalibrierung, mit Kerf-Versatz am Layer: die Korrektur ist ein Gesamtspiel, danach kein Befund mehr
+  layers[5] = { ...defaultLayer(5), kerf: 0.08 };
+  const kl = fitOnly(run(genObjs('box', { clearance: -0.6 }, 5)))[0];
+  assert.ok(kl.fix?.kind === 'gen');
+  assert.ok(Number(kl.fix.patch.clearance) > 0.2, `${kl.fix.patch.clearance}`);
+  assert.deepEqual(fitOnly(run(genObjs('box', kl.fix.patch as Record<string, number>, 5))), []);
 });
 
 test('Kerf doppelt (Generator und Layer) wird als zu eng erkannt', () => {
@@ -324,8 +333,9 @@ test('Mit Kalibrierung: Abweichung gemeldet, Korrektur übernimmt die kalibriert
   const f = xs[0].fix;
   assert.ok(f && f.kind === 'gen' && f.calibrated);
   assert.equal(f.patch.kerf, 0.2);
-  // gezeichnetes Spiel = 0,15 − 0,2 = −0,05 wie kalibriert
-  assert.ok(Math.abs(drawnFit('pair', Number(f.patch.clearance), 0.2, 0) - -0.05) < 1e-9);
+  // gezeichnetes Spiel je Seite = 0,15 − 0,2 = −0,05 wie kalibriert; das Steckspiel der Box ist das Gesamtspiel (#402)
+  assert.equal(f.patch.clearance, 0.3);
+  assert.ok(Math.abs(drawnFit('pair', Number(f.patch.clearance) / 2, 0.2, 0) - -0.05) < 1e-9);
   // nach dem Übernehmen kein Befund mehr
   assert.deepEqual(fitOnly(run(genObjs('box', f.patch as Record<string, number>, 7))), []);
   // Einsatz: Schlitz = Dicke + 0,1 gezeichnet

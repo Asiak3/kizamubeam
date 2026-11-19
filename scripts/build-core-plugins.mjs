@@ -175,7 +175,7 @@ export async function corePlugin(id) {
         put(`${s.key}.${v}`, label);
         return v;
       });
-    for (const k of ['advanced', 'resetOnNew', 'showIf', 'resource']) if (s[k] !== undefined) p[k] = s[k];
+    for (const k of ['advanced', 'resetOnNew', 'playTotal', 'showIf', 'resource']) if (s[k] !== undefined) p[k] = s[k];
     return p;
   });
   for (const de of sourceTexts(node.files)) put(codeOf(de), de);

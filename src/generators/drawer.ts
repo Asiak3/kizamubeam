@@ -109,12 +109,12 @@ function drawerPoses(p: DrawerParams): AsmPoses {
 
 export const DRAWER: Generator = {
   id: 'drawer',
-  version: 2,
+  version: 3,
   kind: 'assembly',
   name: t('Schublade'),
   icon: 'drawer',
   poses: (p) => drawerPoses(p as unknown as DrawerParams),
-  fit: { kind: 'pair', play: 'clearance' },
+  fit: { kind: 'pair', play: 'clearance', total: true },
   assemblyCheck: true,
   tile: {
     group: 'box',
@@ -142,11 +142,12 @@ export const DRAWER: Generator = {
     { key: 'backPlay', type: 'length', label: t('Luft hinten'), min: 0, max: 100, def: 2 },
     { key: 'frontGap', type: 'length', label: t('Fuge um die Blende'), min: 0, max: 20, def: 1, showIf: { ne: ['front', 'none'] }, title: t('Die Blende wird ringsum um so viel kleiner') },
     { key: 'finger', type: 'length', label: t('Zinkenbreite'), min: 0.5, max: 500, def: 10, advanced: true },
-    { key: 'clearance', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0, advanced: true, title: t('Jede Zinke wird um so viel schmaler; negativ = Presspassung') },
+    { key: 'clearance', type: 'length', label: t('Steckspiel gesamt'), min: -2, max: 4, def: 0, playTotal: true, advanced: true, title: t('Gesamtspiel der Zinken: Lücke minus Zinke, auf beide Seiten verteilt; negativ = Presspassung') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Löcher werden kleiner. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],
   // Saved objects keep their packParts layout; new ones are nested compactly.
-  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'packed' } : p; },
+  // 2: saved drawers keep their packed layout; 3 (#402): the clearance was per side, now it is the total play
+  migrate(p, from) { return { ...p, ...(from < 2 ? { partLayout: 'packed' } : {}), ...(from < 3 ? { clearance: 2 * Number(p.clearance ?? 0) } : {}) }; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -155,7 +156,7 @@ export const DRAWER: Generator = {
     if (Math.min(box.W, box.H, box.D) <= 4 * th)
       out.push({ key: 'thickness', level: 'error', msg: t('Der Schubkasten wird zu klein für diese Materialdicke (jede Seite braucht mehr als die vierfache Materialdicke).') });
     if (p.carcass && Math.min(p.width, p.height, p.depth) <= 4 * th) out.push({ key: 'thickness', level: 'error', msg: t('Die Platten sind zu dick für diese Maße (jede Seite braucht mehr als die vierfache Materialdicke).') });
-    if (Math.abs(p.clearance) >= p.finger / 4) out.push({ key: 'clearance', level: 'error', msg: t('Das Steckspiel ist zu groß für diese Zinkenbreite.') });
+    if (Math.abs(p.clearance) >= p.finger / 2) out.push({ key: 'clearance', level: 'error', msg: t('Das Steckspiel ist zu groß für diese Zinkenbreite.') });
     if (p.finger < th) out.push({ key: 'finger', level: 'warn', msg: t('Zinken schmaler als die Materialdicke brechen leicht.') });
     if (front && p.handle !== 'none') {
       const hw = p.handleWidth,

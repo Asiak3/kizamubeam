@@ -44,10 +44,11 @@ function verticalRuns(height: number, finger: number, thickness: number, closed:
     offset: (i % 2 === 0) === firstActive ? thickness : 0,
   }));
 }
-function edge(target: Point[], rs: Run[], map: (s: number, offset: number) => Point, reverse = false, clearance = 0, fullOffset = 0) {
+/** play: total play of the joint (#402): each boundary moves play/4, so a finger gets play/2 narrower and a gap play/2 wider */
+function edge(target: Point[], rs: Run[], map: (s: number, offset: number) => Point, reverse = false, play = 0, fullOffset = 0) {
   const adjusted = rs.map((r) => ({ ...r }));
   for (let i = 0; i + 1 < adjusted.length; i++) {
-    const shift = adjusted[i].offset === fullOffset ? -clearance / 2 : clearance / 2;
+    const shift = adjusted[i].offset === fullOffset ? -play / 4 : play / 4;
     adjusted[i].to += shift;
     adjusted[i + 1].from += shift;
   }

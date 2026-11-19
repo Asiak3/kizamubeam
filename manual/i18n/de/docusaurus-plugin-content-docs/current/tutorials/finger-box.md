@@ -57,8 +57,8 @@ Die sechs Wände erscheinen kompakt angeordnet auf der Seite. Sie sind ein param
 
 Steck die Wände von Hand zusammen: erst die Seiten auf den Boden, dann den Deckel. Ist es zu stramm, klopfe die Verbindungen mit einem Holzstück fest, statt sie zu erzwingen. Für die nächste Box:
 
-- **Zu stramm:** Steckspiel um 0,05 mm erhöhen.
-- **Zu locker:** Steckspiel um 0,05 mm verringern, oder ein paar Tropfen Holzleim nehmen.
+- **Zu stramm:** Steckspiel um 0,1 mm erhöhen.
+- **Zu locker:** Steckspiel um 0,1 mm verringern, oder ein paar Tropfen Holzleim nehmen.
 
 ## Weiter geht’s
 

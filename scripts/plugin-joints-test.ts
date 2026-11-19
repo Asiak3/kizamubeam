@@ -39,12 +39,13 @@ await test('panel: the same outline as the box generator', () => {
   const box = { sizeMode: 'outer' as const, width: 120, depth: 80, height: 60, thickness: 3, top: 'closed' as const, finger: 10, clearance: 0.1, kerf: 0.15 };
   const polys = panelPolys(box);
   // front: width × height, top B (closed lid), sides A, bottom B, with corners; bottom/top plates: all A, no corners
-  const front = call({ op: 'panel', width: 120, height: 60, thickness: 3, finger: 10, clearance: 0.1, kerf: 0.15, edges: ['B', 'A', 'B', 'A'], corners: true });
-  assert.equal(front.ok!.v, 1);
+  // The box's clearance is the total play (#402): v: 2, or v: 1 with half of it
+  const front = call({ op: 'panel', v: 2, width: 120, height: 60, thickness: 3, finger: 10, clearance: 0.1, kerf: 0.15, edges: ['B', 'A', 'B', 'A'], corners: true });
+  assert.equal(front.ok!.v, 2);
   assert.deepEqual(round((front.ok!.outline as SubPath).nodes), round(polys.find((p) => p.key === 'front')!.pts));
-  const bottom = call({ op: 'panel', width: 120, height: 80, thickness: 3, finger: 10, clearance: 0.1, kerf: 0.15, edges: ['A', 'A', 'A', 'A'] });
+  const bottom = call({ op: 'panel', v: 2, width: 120, height: 80, thickness: 3, finger: 10, clearance: 0.1, kerf: 0.15, edges: ['A', 'A', 'A', 'A'] });
   assert.deepEqual(round((bottom.ok!.outline as SubPath).nodes), round(polys.find((p) => p.key === 'bottom')!.pts));
-  const left = call({ op: 'panel', v: 1, width: 80, height: 60, thickness: 3, finger: 10, clearance: 0.1, kerf: 0.15, edges: ['B', 'B', 'B', 'B'] });
+  const left = call({ op: 'panel', v: 1, width: 80, height: 60, thickness: 3, finger: 10, clearance: 0.05, kerf: 0.15, edges: ['B', 'B', 'B', 'B'] });
   assert.deepEqual(round((left.ok!.outline as SubPath).nodes), round(polys.find((p) => p.key === 'left')!.pts));
 });
 

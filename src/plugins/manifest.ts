@@ -55,7 +55,7 @@ export interface PluginManifest {
   /** Servers the app may fetch data from for the plugin (#280); needs the host function fetch */
   network?: PluginNetHost[];
   /** Plug-in joints (generators): kind of fit and the number parameter that holds the play (design check) */
-  fit?: { kind: 'pair' | 'slot'; play: string };
+  fit?: { kind: 'pair' | 'slot'; play: string; total?: boolean };
   /** The parts form one connected assembly that the assembly check examines */
   assemblyCheck?: boolean;
   /**
@@ -218,6 +218,7 @@ function param(v: unknown, i: number): ParamSpec {
     key, label: key,
     ...(v.advanced === true ? { advanced: true } : {}),
     ...(v.resetOnNew === true ? { resetOnNew: true } : {}),
+    ...(v.playTotal === true ? { playTotal: true } : {}),
     // Text key of the section heading; the generator replaces it with the text
     ...(typeof v.section === 'string' ? { section: v.section } : {}),
   };
@@ -500,8 +501,9 @@ export function parsePlugin(raw: unknown, where: string): PluginManifest {
     if (raw.fit !== undefined) {
       const f = raw.fit;
       const play = isObj(f) ? schema.find((s) => s.key === f.play) : undefined;
-      if (!isObj(f) || (f.kind !== 'pair' && f.kind !== 'slot') || !play || !(NUMERIC as readonly string[]).includes(play.type)) fail(t('ungültige Angabe „{key}“', { key: 'fit' }));
-      m.fit = { kind: (f as { kind: 'pair' | 'slot' }).kind, play: play!.key };
+      if (!isObj(f) || (f.kind !== 'pair' && f.kind !== 'slot') || !play || !(NUMERIC as readonly string[]).includes(play.type) || (f.total !== undefined && typeof f.total !== 'boolean'))
+        fail(t('ungültige Angabe „{key}“', { key: 'fit' }));
+      m.fit = { kind: (f as { kind: 'pair' | 'slot' }).kind, play: play!.key, ...((f as { total?: boolean }).total ? { total: true } : {}) };
     }
     if (raw.assemblyCheck !== undefined) {
       if (typeof raw.assemblyCheck !== 'boolean') fail(t('ungültige Angabe „{key}“', { key: 'assemblyCheck' }));

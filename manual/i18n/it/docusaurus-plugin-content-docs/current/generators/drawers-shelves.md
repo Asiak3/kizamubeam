@@ -23,7 +23,7 @@ Un cassetto con un mobile aperto sul davanti, un cassetto abbinato e un pannello
 | **Spazio attorno al pannello frontale** | Il frontale diventa più piccolo di questo valore su ogni lato. |
 | **Kerf** | Larghezza del taglio laser. |
 
-**Larghezza delle dita** e **Gioco di accoppiamento** si trovano in **Avanzate**.
+**Larghezza delle dita** e **Gioco di accoppiamento totale** (gioco totale delle dita, come nella [scatola](boxes.md)) si trovano in **Avanzate**.
 
 ## Inserto divisorio
 

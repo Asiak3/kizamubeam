@@ -17,7 +17,7 @@ Beide Box-Generatoren stehen unter **Werkzeugkasten → Boxen und Möbel**. Für
 | **Materialdicke** | Dicke der Platte. Miss nach; Platten sind selten genau so dick wie verkauft. |
 | **Oben** | **Offen** oder **Geschlossen (Deckel mit Zinken)**. |
 | **Zinkenbreite** | Mindestbreite der Zinken. Jede Kante bekommt eine ungerade Zahl gleich breiter Zinken. |
-| **Steckspiel** | Jede Zinke wird um so viel schmaler; negativ = Presspassung. |
+| **Steckspiel gesamt** | Gesamtspiel der Zinken: Jede Lücke wird um so viel breiter als ihre Zinke, je Seite die Hälfte; negativ = Presspassung. |
 | **Schnittfuge (Kerf)** | Breite des Laserschnitts; Konturen werden um die Hälfte nach außen versetzt. |
 
 Vorder- und Rückwand besitzen die Ecken. Die Teile sind eigene Objekte in einer kompakten Anordnung: Gleiche Teile bleiben beieinander. Ein Doppelklick auf irgendein Teil bearbeitet die ganze Box, auf allen Seiten. Teile, die noch in ihrer erzeugten Anordnung liegen, rücken beim Wachsen auseinander; Teile, die du selbst angeordnet hast, bleiben, wo sie sind.
@@ -30,7 +30,7 @@ Lege Text oder Bilder auf eine Wand und gruppiere sie damit, oder lege sie einfa
 
 1. Miss die Materialdicke mit einem Messschieber an mehreren Stellen und gib den Mittelwert ein.
 2. Beginne mit Steckspiel 0 und der Schnittfuge deines Lasers (0,1 bis 0,2 mm bei einem Diodenlaser auf Sperrholz).
-3. Schneide die Box. Ist sie zu stramm, erhöhe das Spiel in Schritten von 0,05 mm; ist sie locker, verringere es.
+3. Schneide die Box. Ist sie zu stramm, erhöhe das Spiel in Schritten von 0,1 mm; ist sie locker, verringere es.
 
 Die [Passungs-Kalibrierung](../features/materials-tests.md#calibrate-fit) findet diese Werte für ein Material in einem Test, und neue Boxen übernehmen sie dann automatisch.
 
@@ -46,4 +46,4 @@ Eine offene oder geschlossene Box mit sich kreuzenden Trennwänden. Dieser Gener
 | **Trennwände niedriger als Box** | Um wie viel die Trennwände niedriger als die Wände sind. |
 | **Schnittfuge (Kerf)** | Breite des Laserschnitts. |
 
-**Zinkenbreite** und **Steckspiel** stehen unter **Erweitert**. Teile und ihre Löcher liegen auf einem gemeinsamen Layer.
+**Zinkenbreite** und **Steckspiel gesamt** stehen unter **Erweitert**. Teile und ihre Löcher liegen auf einem gemeinsamen Layer.

@@ -57,8 +57,8 @@ Apri **Finestra → Vista 3D**. La scatola appare montata, con il nome sul coper
 
 Unisci le pareti a mano: prima i fianchi sul fondo, poi il coperchio. Se l’accoppiamento è troppo stretto, batti le giunzioni con un pezzo di legno invece di forzarle. Per la prossima scatola:
 
-- **Troppo stretta:** aumenta il gioco di accoppiamento di 0,05 mm.
-- **Troppo lenta:** riducilo di 0,05 mm, oppure usa qualche goccia di colla vinilica.
+- **Troppo stretta:** aumenta il gioco di accoppiamento di 0,1 mm.
+- **Troppo lenta:** riducilo di 0,1 mm, oppure usa qualche goccia di colla vinilica.
 
 ## Per andare oltre
 

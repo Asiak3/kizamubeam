@@ -93,7 +93,8 @@ export function joint(parts: Parts, options: JointOptions, picks: Pick[]): { par
     if (seg < 0) throw new JointError('composer-edge-lost');
     return { part: p.part, seg };
   });
-  const r = host.joints({ op: 'edge', options: { ...options, kerf: 0 }, parts: own, edges });
+  // v: 2: the clearance is the total play of the joint (#402)
+  const r = host.joints({ op: 'edge', v: 2, options: { ...options, kerf: 0 }, parts: own, edges });
   if (r.error) throw new JointError(r.error.code, r.error.values);
   return { parts: { ...parts, ...r.parts }, info: r.info };
 }
