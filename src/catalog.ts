@@ -29,7 +29,7 @@ export const CATALOG_FORMAT = 'kizamubeam-catalog';
  * Öffentlicher Schlüssel (Ed25519, hex) zum Prüfen von catalog.json.sig; erzeugen mit scripts/catalog-keygen.mjs.
  * Leer = Katalog nicht eingerichtet; das Fenster Erweiterungen meldet das statt einer Liste.
  */
-export const CATALOG_PUBKEY = '97302ac6a427ea28ce54058421152cbe1992f6985e09c6210d6efa47672b11f6';
+export const CATALOG_PUBKEY = 'add263ac33d1cfeb3e28265b3a2db89155641ff578664e4031cc016f8ee31359';
 
 export interface CatalogEntry {
   id: string;
