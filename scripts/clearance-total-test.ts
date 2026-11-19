@@ -119,6 +119,131 @@ test('remembered dialog values from before #402 are doubled once, also when they
   assert.deepEqual(lastRaw(INSERT), { play: 0.1 });
 });
 
+// ---------- PR 3: material library, calibration, Joint tool, plugin context ----------
+
+const { library, parseLibrary, pairSide } = await import('../src/materials');
+const { genFitPatch } = await import('../src/fitcheck');
+await import('./builtin-generators');
+const { editorContext } = await import('../src/plugins/context');
+const calib = await import('../src/calibrate');
+const { loadCalibTest, saveCalibTest, calibResult, defaultSteps, stepValues } = calib;
+const { loadJointState, saveJointState, JOINT_STATE_KEY } = await import('../src/jointState');
+const { defaultLayer } = await import('../src/model');
+
+const entryJson = (fit: Record<string, unknown>, title = 'Schneiden') => ({ material: 'Birke', thickness: 3, title, desc: '', settings: { ...defaultLayer(1) }, fit });
+const V1_FIT = { kerf: 0.15, pair: 0.075, slot: 0.1, th: 3, date: '2026-10-01' };
+
+test('material library: a fit without the mark has the play per side and is doubled once; with the mark it is left alone', () => {
+  const [old] = parseLibrary(JSON.stringify({ format: 'kizamubeam-materials', version: 1, entries: [{ ...entryJson(V1_FIT), id: 'a' }] }));
+  assert.deepEqual(old.fit, { ...V1_FIT, pair: 0.15, v: 2 });
+  const [cur] = parseLibrary(JSON.stringify({ format: 'kizamubeam-materials', version: 2, entries: [{ ...entryJson({ ...V1_FIT, pair: 0.15, v: 2 }), id: 'a' }] }));
+  assert.deepEqual(cur.fit, old.fit);
+  // Converted entries do not change again when they are read again (save, load, save, load)
+  const again = parseLibrary(JSON.stringify([old]))[0];
+  assert.deepEqual(again.fit, old.fit);
+  // Only pair changes: kerf, slot and thickness stay
+  assert.equal(old.fit!.slot, 0.1);
+  assert.equal(old.fit!.kerf, 0.15);
+  assert.equal(pairSide(old.fit!), 0.075);
+  // Negative values (press fit) and no fit at all
+  assert.equal(parseLibrary(JSON.stringify([entryJson({ ...V1_FIT, pair: -0.05 })]))[0].fit!.pair, -0.1);
+  assert.equal(parseLibrary(JSON.stringify([{ ...entryJson({}), fit: undefined }]))[0].fit, undefined);
+});
+
+test('material library: export is version 2, import of a version 1 file and a pack applied twice give the same values', () => {
+  const [old] = parseLibrary(JSON.stringify({ version: 1, entries: [{ ...entryJson(V1_FIT), id: 'a' }] }));
+  library.merge([old]);
+  const out = JSON.parse(library.serialize());
+  assert.equal(out.version, 2);
+  assert.equal(out.entries.find((e: { id: string }) => e.id === 'a').fit.pair, 0.15);
+  // Round trip: a file exported now reads back with the same values
+  const [back] = parseLibrary(library.serialize());
+  assert.deepEqual(back.fit, old.fit);
+  // A pack with the play per side (no mark) is converted every time it is read, the stored entry is not doubled again
+  const fromPack = () => parseLibrary(JSON.stringify([{ ...entryJson(V1_FIT), id: 'pk:x:1' }]))[0];
+  library.syncPack('x', [fromPack()]);
+  library.syncPack('x', [fromPack()]);
+  assert.equal(library.get('pk:x:1')!.fit!.pair, 0.15);
+  library.syncPack('x', [library.get('pk:x:1')!]);
+  assert.equal(library.get('pk:x:1')!.fit!.pair, 0.15, 'a stored entry synced back is not doubled');
+  // What the library stores in localStorage reads back unchanged
+  const stored = JSON.parse(mem.get('kizamubeam.materials')!);
+  assert.equal(stored.version, 2);
+  assert.ok(stored.entries.every((e: { fit: { v: number } }) => e.fit.v === 2));
+});
+
+test('a calibration suggests the same values for a generator as before (library doubled, suggestion per side)', () => {
+  const [e] = parseLibrary(JSON.stringify([{ ...entryJson(V1_FIT), id: 'b' }]));
+  // Before: clearance = 2 · (pair + kerf) with pair per side = 0.075 and kerf 0.15 → 0.45
+  const patch = genFitPatch('box', e, { kerf: 0 } as never, 0)!;
+  assert.equal(patch.clearance, 0.45);
+  assert.equal(patch.kerf, 0.15);
+  // With a layer kerf offset of 0.08 the generator gets no kerf of its own: 2 · (0.075 + 2 · 0.08) = 0.47
+  assert.equal(genFitPatch('box', e, { kerf: 0 } as never, 0.08)!.clearance, 0.47);
+});
+
+test('host.context("material"): pairPlay keeps the play per side, pairPlayTotal is new', () => {
+  const [e] = parseLibrary(JSON.stringify([{ ...entryJson(V1_FIT, 'Kontext'), id: 'c' }]));
+  library.merge([e]);
+  const ed = { doc: { bed: { w: 400, h: 300 } }, currentLayer: 0, layer: () => ({ material: 'c' }) };
+  const ctx = editorContext(ed as never, 'material') as Record<string, unknown>;
+  assert.equal(ctx.pairPlay, 0.075);
+  assert.equal(ctx.pairPlayTotal, 0.15);
+  assert.equal(ctx.slotPlay, 0.1);
+  assert.equal(ctx.kerf, 0.15);
+});
+
+test('calibration: a half-finished test from before is converted once; the default comb is the same as before', () => {
+  mem.set('kizamubeam.calib', JSON.stringify({ th: 3, kl: 0.05, layer: 1, pair: [-0.2, -0.15, -0.1], slot: [-0.1, 0, 0.1], date: '2026-10-18' }));
+  const t1 = loadCalibTest()!;
+  assert.deepEqual(t1.pair, [-0.4, -0.3, -0.2]);
+  assert.equal(t1.v, 2);
+  assert.deepEqual(loadCalibTest()!.pair, [-0.4, -0.3, -0.2], 'only once');
+  assert.deepEqual(JSON.parse(mem.get('kizamubeam.calib')!).pair, [-0.4, -0.3, -0.2], 'stored with the mark');
+  // The old result of the best tab (−0.15 per side, layer kerf 0.05) is the new one with twice the value
+  const r = calibResult(t1, null, 2, 1);
+  assert.ok('fit' in r);
+  assert.equal(r.fit.pair, -0.5, '−0.3 − 4 · 0.05 = 2 · (−0.15 − 2 · 0.05)');
+  assert.equal(r.fit.v, 2);
+  // Old default steps: from r(2kl − beam − 0.05) step 0.05; now twice that
+  for (const [beam, kl] of [[0.15, 0], [0.2, 0.05], [0.1, -0.05]] as const) {
+    const old = { from: Math.round((2 * kl - beam - 0.05) / 0.05) * 0.05, step: 0.05 };
+    assert.deepEqual(stepValues(defaultSteps(beam, kl).pair), stepValues({ ...old, count: 6 }).map((c) => Math.round(2 * c * 1000) / 1000), `${beam} ${kl}`);
+  }
+  saveCalibTest(null);
+});
+
+test('calibration test parts are the same as before #402 (hashes taken with the old code; steps are now the total play)', () => {
+  const { buildCalibParts } = calib;
+  const strip = (o: { objs: { id: number }[] }) => o.objs.map((x) => ({ ...x, id: 0 }));
+  const got: Record<string, string> = {};
+  for (const [beam, kl, th] of [[0.15, 0, 3], [0.2, 0.05, 4], [0.1, -0.05, 6], [0.3, 0, 3]] as const) {
+    got[`def ${beam} ${kl} ${th}`] = hash(strip(buildCalibParts({ th, ...defaultSteps(beam, kl) }, 1, 2, 'Arial')));
+  }
+  // Steps as they were per side: from, step, count; now twice the from and step
+  for (const [from, step, count] of [[-0.2, 0.05, 6], [0, 0.1, 5], [-0.1, 0.025, 12], [0.05, 0.05, 1]] as const) {
+    got[`cust ${from} ${step} ${count}`] = hash(strip(buildCalibParts({ th: 3, pair: { from: 2 * from, step: 2 * step, count }, slot: { from: 0, step: 0.05, count: 4 } }, 1, 2, 'Arial')));
+  }
+  assert.deepEqual(got, {
+    'def 0.15 0 3': '789af0afa269feda', 'def 0.2 0.05 4': '313a37511312c0dd', 'def 0.1 -0.05 6': '43582b7b9b50bc45', 'def 0.3 0 3': 'f09d427f0f1da91d',
+    'cust -0.2 0.05 6': 'c3c38f44ec76689f', 'cust 0 0.1 5': '3cad1ba616e73e98', 'cust -0.1 0.025 12': 'c6877cede35f911b', 'cust 0.05 0.05 1': '2ccdd0b8bf444b2a',
+  });
+});
+
+test('Joint tool: the remembered play is doubled once', () => {
+  mem.set(JOINT_STATE_KEY, JSON.stringify({ kind: 'finger', thickness: 4, clearance: 0.05, kerf: 0.1 }));
+  const st = loadJointState();
+  assert.equal(st.clearance, 0.1);
+  assert.equal(st.thickness, 4);
+  assert.equal((st as unknown as Record<string, unknown>)._playTotal, undefined, 'the mark stays out of the options');
+  assert.equal(loadJointState().clearance, 0.1, 'only once');
+  assert.equal(JSON.parse(mem.get(JOINT_STATE_KEY)!)._playTotal, true);
+  saveJointState({ ...st, clearance: -0.05 });
+  assert.equal(loadJointState().clearance, -0.05, 'a value saved by the new dialog is kept');
+  mem.delete(JOINT_STATE_KEY);
+  assert.equal(loadJointState().clearance, 0);
+});
+
 if (failed) {
   console.log(`\n${failed} test(s) failed`);
   process.exit(1);

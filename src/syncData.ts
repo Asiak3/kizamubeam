@@ -151,7 +151,7 @@ const materialsAdapter: Adapter = {
         else list.push(e);
       }
     }
-    setItem(MATERIALS_KEY, JSON.stringify({ format: 'kizamubeam-materials', version: 1, entries: list }));
+    setItem(MATERIALS_KEY, JSON.stringify({ format: 'kizamubeam-materials', version: 2, entries: list }));
   },
 };
 

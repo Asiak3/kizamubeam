@@ -387,9 +387,13 @@ export type JointAnswer =
 export interface MaterialContext {
   name: string | null;
   thickness: number | null;
-  /** Calibrated kerf width, play per side for two parts fitted together, slot width over the thickness */
+  /** Calibrated kerf width */
   kerf: number | null;
+  /** Calibrated play per side for two parts fitted together. Deprecated: use pairPlayTotal (the play is the total play of the joint since #402) */
   pairPlay: number | null;
+  /** Calibrated total play (both sides together) for two parts fitted together, the meaning of `clearance` in `host.joints` with `"v": 2` */
+  pairPlayTotal: number | null;
+  /** Calibrated slot width over the thickness */
   slotPlay: number | null;
 }
 /** host.context("workArea"): the machine's work area in mm */

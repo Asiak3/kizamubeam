@@ -30,7 +30,7 @@ Il risultato resta un percorso normale e modificabile. La giunzione ricorda lo s
 | **Asola a T** | Un’asola per vite con finestra per il dado tra ogni coppia di tenoni e un foro per la vite corrispondente nell’altro pannello. |
 | **Cerniera del coperchio (con perno)** | Vedi [Cerniera del coperchio](#lid-hinge) sotto. |
 
-Le impostazioni comuni sono lo spessore del materiale, il **kerf** (dita e tenoni vengono disegnati più larghi, spazi e asole più stretti, così i pezzi hanno la misura nominale dopo il taglio) e il **gioco** per lato (valori negativi danno un accoppiamento forzato). Quando il materiale è [calibrato](materials-tests.md#calibrate-fit), lo strumento propone kerf e gioco per il tipo scelto.
+Le impostazioni comuni sono lo spessore del materiale, il **kerf** (dita e tenoni vengono disegnati più larghi, spazi e asole più stretti, così i pezzi hanno la misura nominale dopo il taglio) e il **gioco totale**, il gioco della giunzione su entrambi i lati insieme (valori negativi danno un accoppiamento forzato). Quando il materiale è [calibrato](materials-tests.md#calibrate-fit), lo strumento propone kerf e gioco per il tipo scelto.
 
 ## Cerniera del coperchio {#lid-hinge}
 

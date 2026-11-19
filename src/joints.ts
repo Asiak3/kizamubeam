@@ -65,7 +65,7 @@ export function jointMate(picks: EdgePick[], o: JointOptions): MateWorld | null 
 /**
  * Verbindung berechnen. Fingerzinken: eine oder zwei Kanten (die zweite bekommt das Gegenstück).
  * Schlitz und Zapfen: erste Kante bekommt die Zapfen, die zweite Linie (Kante oder einzelne Hilfslinie) die Schlitze.
- * v: version of the joint geometry; the Joint tool still uses 1 (clearance per side along fingers and tenons, #402).
+ * v: version of the joint geometry (jointsGeom.ts); the Joint tool passes the newest one (clearance is the total play, #402).
  */
 export function computeJoint(picks: EdgePick[], o: JointOptions, v: JointGeometryVersion = 1): JointResult {
   const r = computeJointGeom(edges(picks), o, v);

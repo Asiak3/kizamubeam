@@ -382,8 +382,11 @@ export interface Mate {
   out?: boolean;
   /** Überblattung: Kreuzungspunkt auf beiden Kanten (Anteil vom Anfang) und Schlitztiefen */
   lap?: { ua: number; ub: number; da: number; db: number };
-  /** Kerf und Spiel, mit denen die Verbindung gezeichnet wurde (für „Konstruktion prüfen“; fehlt bei älteren) */
-  fit?: { k: number; c: number };
+  /**
+   * Kerf und Spiel, mit denen die Verbindung gezeichnet wurde (für „Konstruktion prüfen“; fehlt bei älteren). v: Version
+   * der Verbindungsgeometrie (jointsGeom.ts); ab 2 ist c das Gesamtspiel, ohne v das Spiel je Seite bei Zinken (#402).
+   */
+  fit?: { k: number; c: number; v?: number };
 }
 
 export type LayerMode = 'line' | 'fill';

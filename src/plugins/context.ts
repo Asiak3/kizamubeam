@@ -1,7 +1,7 @@
 // Context a generator plugin may declare (#386): the material of the layer its part goes on and the work area of
 // the machine. Only these values leave the app, as plain numbers and a name; no editor, document or machine state.
 import type { Editor } from '../editor';
-import { library } from '../materials';
+import { library, pairSide } from '../materials';
 import type { PluginContext } from './manifest';
 
 /** What host.context("material") answers; every value null when the app does not know it */
@@ -12,8 +12,11 @@ export interface MaterialContext {
   thickness: number | null;
   /** Calibrated kerf width in mm (material test) */
   kerf: number | null;
-  /** Calibrated play per side for two parts fitted into each other, and the slot width over the thickness, in mm */
+  /** Calibrated play per side for two parts fitted into each other (deprecated: use pairPlayTotal), in mm */
   pairPlay: number | null;
+  /** Calibrated total play of two parts fitted into each other (both sides together), in mm */
+  pairPlayTotal: number | null;
+  /** Calibrated slot width over the thickness, in mm */
   slotPlay: number | null;
 }
 
@@ -38,7 +41,9 @@ export function editorContext(ed: Editor, what: PluginContext): MaterialContext 
     name: [e.material, e.title].filter(Boolean).join(' ').slice(0, 200) || null,
     thickness: num(e.thickness),
     kerf: num(e.fit?.kerf),
-    pairPlay: num(e.fit?.pair),
+    // The library holds the total play (#402); pairPlay stays what it always was, the play per side
+    pairPlay: num(e.fit && pairSide(e.fit)),
+    pairPlayTotal: num(e.fit?.pair),
     slotPlay: num(e.fit?.slot),
   };
 }

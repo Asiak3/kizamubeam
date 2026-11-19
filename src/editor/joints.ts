@@ -2,6 +2,7 @@
 import { apply, IDENT, inv, leaves, Mat, newId, Obj, Pt, SubPath, visibleLeaves } from '../model';
 import { transformSubs } from '../importers';
 import { computeJoint, EdgePick, isStraight, jointMate, JointOptions } from '../joints';
+import { JOINT_GEOMETRY_VERSION } from '../jointsGeom';
 import { region } from '../ops';
 import { SCALE } from '../clip';
 import ClipperLib from 'clipper-lib';
@@ -77,7 +78,7 @@ export class EditorJoints {
     // Lage der Verbindung vor dem Ändern der Konturen bestimmen (für die 3D-Ansicht)
     const mate = jointMate(picks, opt);
     const guide = !!mate && isGuide(picks[1].obj, opt);
-    const r = computeJoint(picks, opt);
+    const r = computeJoint(picks, opt, JOINT_GEOMETRY_VERSION);
     if (r.error) {
       this.hint = t('Verbindung: {error}', { error: r.error });
       this.emit('tool');
@@ -134,7 +135,7 @@ export class EditorJoints {
     const obj = A.obj;
     obj.mates = [
       ...(obj.mates ?? []),
-      { to: B.obj.id, kind: opt.kind, th: opt.thickness, a: local(A.m, mate.a), b: local(B.m, mate.b), ...(mate.out ? { out: true } : {}), ...(mate.lap ? { lap: mate.lap } : {}), fit: { k: opt.kerf, c: opt.clearance } },
+      { to: B.obj.id, kind: opt.kind, th: opt.thickness, a: local(A.m, mate.a), b: local(B.m, mate.b), ...(mate.out ? { out: true } : {}), ...(mate.lap ? { lap: mate.lap } : {}), fit: { k: opt.kerf, c: opt.clearance, v: JOINT_GEOMETRY_VERSION } },
     ];
   }
 }

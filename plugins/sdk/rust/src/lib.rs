@@ -250,7 +250,7 @@ pub fn mesh(data: &str) -> Option<(Vec<f32>, Vec<u32>)> {
 /// compact arrangement) or `"fetch"` (`{ "host", "path", "query"?, "method"?, "body"? }`: data from a server the
 /// manifest declares; `Err("net-pending")` the first time, which the plugin returns so the app fetches the data and
 /// calls again), `"context"` (`"material"` or `"workArea"`: what the manifest declares under `"context"`, #386;
-/// `{ "name", "thickness", "kerf", "pairPlay", "slotPlay" }` or `{ "width", "height" }` in mm, `null` when the app
+/// `{ "name", "thickness", "kerf", "pairPlay" (per side, deprecated), "pairPlayTotal", "slotPlay" }` or `{ "width", "height" }` in mm, `null` when the app
 /// does not know it) or `"check"` (`{ "parts": [{ "key", "subs", "at"? }], "placed"?, "minWeb"?, "kerf"?,
 /// "workArea"? }`: findings of the design check as `check-*` codes with values, to pass on as issues) or `"joints"` (`{ "op":
 /// "panel" | "edge", "v"?, … }`: the app's wood joints, #398; `"v": 2` = clearance is the total play, #402). See docs/plugins.md

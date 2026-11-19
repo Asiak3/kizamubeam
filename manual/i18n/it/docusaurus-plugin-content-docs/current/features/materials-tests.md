@@ -55,9 +55,9 @@ I pezzi a incastro si accoppiano solo se kerf e gioco sono giusti. **Laser → T
 
 - un quadrato di 20 × 20 mm per misurare il kerf,
 - un pettine di asole con larghezze a gradini,
-- una piastra con fori e un pettine di linguette con gioco a gradini.
+- una piastra con fori e un pettine di linguette con gioco totale a gradini.
 
-I numeri vengono incisi su un livello separato. Dopo la lavorazione, misura il quadrato e inserisci la misura, insieme al numero della linguetta e dell’asola che si accoppiano meglio. KizamuBeam calcola kerf, gioco per lato e maggiorazione delle asole e li salva con il materiale nella libreria. Un offset kerf del livello viene considerato.
+I numeri vengono incisi su un livello separato. Dopo la lavorazione, misura il quadrato e inserisci la misura, insieme al numero della linguetta e dell’asola che si accoppiano meglio. KizamuBeam calcola kerf, gioco totale (entrambi i lati insieme) e maggiorazione delle asole e li salva con il materiale nella libreria. Un offset kerf del livello viene considerato.
 
 Da quel momento nuove scatole, cassetti, inserti e scaffali prendono spessore, kerf e gioco dalla calibrazione del materiale del livello, e lo strumento Giunzione propone valori adatti. I pezzi esistenti ricevono un pulsante per applicare i valori calibrati, e il [controllo del progetto](construction-3d.md#check-the-design-before-cutting) confronta le giunzioni con la calibrazione.
 

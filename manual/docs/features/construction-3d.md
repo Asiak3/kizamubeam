@@ -30,7 +30,7 @@ The result stays an ordinary, editable path. The joint remembers the material th
 | **T-slot** | A screw slot with a nut window between every two tenons, and a matching screw hole in the other panel. |
 | **Lid hinge (with pin)** | See [Lid hinge](#lid-hinge) below. |
 
-Common settings are the material thickness, the **kerf** (fingers and tenons are drawn wider, gaps and slots narrower, so the parts have their nominal size after cutting) and the **clearance** per side (negative values give a press fit). Once the material is [calibrated](materials-tests.md#calibrate-fit), the tool proposes kerf and clearance for the chosen type.
+Common settings are the material thickness, the **kerf** (fingers and tenons are drawn wider, gaps and slots narrower, so the parts have their nominal size after cutting) and the **clearance**, the total play of the joint with both sides together (negative values give a press fit). Once the material is [calibrated](materials-tests.md#calibrate-fit), the tool proposes kerf and clearance for the chosen type.
 
 ## Lid hinge
 
