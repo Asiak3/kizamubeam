@@ -49,7 +49,7 @@ export function openCalibrateDialog(ed: Editor) {
     thField,
     h('label', { for: 'cal-layer' }, t('Schnitt-Layer')),
     select('cal-layer', String(cut), Array.from({ length: 30 }, (_, i) => [String(i), name(i)] as [string, string]), (v) => (cut = Number(v))),
-    ...stepsRow('cal-pair', t('Spiel Zapfen (mm)'), t('Spiel je Seite zwischen Zapfen und Loch; negativ = Pressung'), opt.pair),
+    ...stepsRow('cal-pair', t('Spiel Zapfen gesamt (mm)'), t('Gesamtspiel zwischen Zapfen und Loch, beide Seiten zusammen; negativ = Pressung'), opt.pair),
     ...stepsRow('cal-slot', t('Schlitz-Zugabe (mm)'), t('Um so viel ist ein Schlitz breiter als die Materialdicke gezeichnet'), opt.slot),
   );
 
@@ -77,7 +77,7 @@ export function openCalibrateDialog(ed: Editor) {
     ed.doc.page = at;
     saveCalibTest({
       th: opt.th, kl, layer: cut, entry: entryId || undefined,
-      pair: stepValues(opt.pair), slot: stepValues(opt.slot), date: new Date().toISOString().slice(0, 10),
+      pair: stepValues(opt.pair), slot: stepValues(opt.slot), date: new Date().toISOString().slice(0, 10), v: 2,
     });
     ed.hint = t('Testteile auf der Seite „Passungstest“. Lasern, dann Laser → Passung kalibrieren … erneut öffnen und das Ergebnis eintragen.');
     ed.emit('doc');
@@ -109,7 +109,7 @@ export function openCalibrateDialog(ed: Editor) {
       const f = r.fit;
       out.textContent = [
         f.kerf !== null ? t('Schnittfuge {k} mm.', { k: f2(f.kerf) }) : t('Schnittfuge nicht gemessen.'),
-        t('Zapfen in Loch: {c} mm je Seite gezeichnet.', { c: signed(f.pair) }),
+        t('Zapfen in Loch: {c} mm gesamt gezeichnet.', { c: signed(f.pair) }),
         t('Schlitz für {th} mm: {d} mm über der Dicke gezeichnet.', { th: f2(f.th), d: signed(f.slot) }),
         library.get(saveId) ? '' : t('Zum Speichern einen Eintrag der Material-Bibliothek wählen.'),
       ].filter(Boolean).join(' ');

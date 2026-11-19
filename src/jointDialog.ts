@@ -2,27 +2,13 @@
 import { Editor } from './editor';
 import { check, numField, select } from './arrayDialogs';
 import { h } from './dom';
-import { computeJoint, DEFAULT_JOINT, JointKind, JointOptions } from './joints';
+import { computeJoint, JointKind } from './joints';
+import { loadJointState as loadState, saveJointState as saveState } from './jointState';
+import { JOINT_GEOMETRY_VERSION } from './jointsGeom';
 import { entryLabel, library } from './materials';
-import { jointFitKind, suggestFit } from './fitcheck';
+import { jointFitKind, jointPlayField, suggestFit } from './fitcheck';
 import { dec, t } from './i18n';
 
-const STATE_KEY = 'kizamubeam.joints';
-
-function loadState(): JointOptions {
-  try {
-    return { ...DEFAULT_JOINT, ...JSON.parse(localStorage.getItem(STATE_KEY) ?? '{}') };
-  } catch {
-    return { ...DEFAULT_JOINT };
-  }
-}
-function saveState(st: JointOptions) {
-  try {
-    localStorage.setItem(STATE_KEY, JSON.stringify(st));
-  } catch {
-    /* Speicher nicht verfügbar */
-  }
-}
 
 export function openJointDialog(ed: Editor) {
   const picks = ed.validJointPicks();
@@ -49,8 +35,10 @@ export function openJointDialog(ed: Editor) {
     const s = suggestFit(jointFitKind(st.kind), { ...entry, thickness: st.thickness }, st.kerf, L.kerf);
     if (!s) return false;
     st.kerf = s.kerf;
-    st.clearance = s.play;
-    calibrated = { kerf: s.kerf, clearance: s.play };
+    // Fingers, snaps and hooks: the calibration is a total play and suggestFit gives the play per side
+    const play = jointPlayField(jointFitKind(st.kind), s.play);
+    st.clearance = play;
+    calibrated = { kerf: s.kerf, clearance: play };
     return true;
   };
   if (applyCalib()) notes.push(t('Kerf und Spiel aus der Kalibrierung für „{entry}“.', { entry: entryLabel(entry!) }));
@@ -71,7 +59,7 @@ export function openJointDialog(ed: Editor) {
     }
     for (const k of ['finger', 'tenon', 'lap', 'snap', 'hook', 'wedge', 'tslot', 'lidhinge'] as JointKind[]) rows[k].forEach((el) => (el.hidden = st.kind !== k));
     rows.tenons.forEach((el) => (el.hidden = !tenonKinds.includes(st.kind)));
-    const r = computeJoint(picks, st);
+    const r = computeJoint(picks, st, JOINT_GEOMETRY_VERSION);
     howtoNote.textContent = [st.kind === 'lidhinge' ? hingeHowto : howto, ...notes].join(' ');
     info.textContent = r.error ?? t('{info}. Orange gestrichelt: Vorschau.', { info: r.info });
     info.classList.toggle('error', !!r.error);
@@ -144,8 +132,8 @@ export function openJointDialog(ed: Editor) {
     ),
     h('label', { for: 'joint-kerf' }, t('Kerf (mm)')),
     numField('joint-kerf', st.kerf, (v) => (st.kerf = Math.max(0, v)), t('Schnittbreite des Lasers: Zinken/Zapfen werden breiter, Lücken/Schlitze schmaler gezeichnet')),
-    h('label', { for: 'joint-clear' }, t('Spiel (mm)')),
-    numField('joint-clear', st.clearance, (v) => (st.clearance = v), t('Positiv = lockerer, negativ = strammer (Press-Fit)')),
+    h('label', { for: 'joint-clear' }, t('Spiel gesamt (mm)')),
+    numField('joint-clear', st.clearance, (v) => (st.clearance = v), t('Gesamtspiel der Verbindung: positiv = lockerer, negativ = strammer (Press-Fit)')),
     ...row('finger', h('span', { class: 'checks' }, check(st.swap, (v) => (st.swap = v), t('Zinken und Lücken tauschen')))),
     ...row('hook', h('span', { class: 'checks' }, check(st.hookFlip, (v) => (st.hookFlip = v), t('Haken in die andere Richtung')))),
   ];

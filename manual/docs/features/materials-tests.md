@@ -55,9 +55,9 @@ Slot-together parts only fit when kerf and clearance are right. **Laser → Test
 
 - a 20 × 20 mm square to measure the kerf,
 - a slot comb with stepped slot widths,
-- a hole plate with a tab comb with stepped clearance.
+- a hole plate with a tab comb with stepped total clearance.
 
-The numbers are engraved on a separate layer. After lasering, measure the square and enter it, together with the number of the best-fitting tab and slot. KizamuBeam computes the kerf, the clearance per side and the slot allowance and stores them with the material in the library. A kerf offset on the layer is taken into account.
+The numbers are engraved on a separate layer. After lasering, measure the square and enter it, together with the number of the best-fitting tab and slot. KizamuBeam computes the kerf, the total clearance (both sides together) and the slot allowance and stores them with the material in the library. A kerf offset on the layer is taken into account.
 
 From then on, new boxes, drawers, inserts and shelves take thickness, kerf and clearance from the calibration of the layer's material, and the Joint tool proposes matching values. Existing parts get a button to apply the calibrated values, and the [design check](construction-3d.md#check-the-design-before-cutting) compares joints against the calibration.
 

@@ -1,8 +1,8 @@
 // Kalibrierassistent für Schnittfuge und Steckspiel (DOM-frei): Testteile erzeugen und aus dem, was der Nutzer
 // misst bzw. als beste Passung auswählt, die Kalibrierung eines Materials berechnen (MaterialFit).
 // Testteile: ein Quadrat 20 × 20 mm zum Messen der Schnittfuge, ein Schlitzkamm mit gestuften Schlitzbreiten
-// (für eine Platte in voller Materialdicke) sowie eine Lochplatte und ein Zapfenkamm mit gestuftem Spiel je Seite
-// (Teil in Teil, wie Fingerzinken). Die Stufen sind Zugaben zur gezeichneten Geometrie; der Kerf-Versatz des
+// (für eine Platte in voller Materialdicke) sowie eine Lochplatte und ein Zapfenkamm mit gestuftem Gesamtspiel
+// (Teil in Teil, wie Fingerzinken; seit #402 das Spiel beider Seiten zusammen). Die Stufen sind Zugaben zur gezeichneten Geometrie; der Kerf-Versatz des
 // Layers wird beim Auswerten abgezogen, damit die Werte zu fitcheck.ts passen.
 import type { Obj, SubPath, TextShape } from './model';
 import { newId, translate } from './model';
@@ -19,7 +19,7 @@ export interface CalibSteps {
 export interface CalibOptions {
   /** Nenndicke des Materials (mm) */
   th: number;
-  /** Spiel je Seite für Zapfen in Loch (mm, negativ = Pressung) */
+  /** Gesamtspiel (beide Seiten zusammen) für Zapfen in Loch (mm, negativ = Pressung) */
   pair: CalibSteps;
   /** Schlitzbreite über der Nenndicke (mm) */
   slot: CalibSteps;
@@ -33,9 +33,12 @@ export interface CalibTest {
   layer: number;
   /** Material-Eintrag, für den kalibriert wird */
   entry?: string;
+  /** Gesamtspiel je Stufe (bei v < 2, vor #402, je Seite; loadCalibTest rechnet das einmal um) */
   pair: number[];
   slot: number[];
   date: string;
+  /** 2: pair ist das Gesamtspiel */
+  v?: 2;
 }
 
 /** Seitenlänge des Quadrats zum Messen der Schnittfuge */
@@ -57,7 +60,8 @@ export function stepValues(s: CalibSteps): number[] {
 export function defaultSteps(beam: number, kl: number): { pair: CalibSteps; slot: CalibSteps } {
   const r = (v: number) => Math.round(v / 0.05) * 0.05;
   return {
-    pair: { from: r(2 * kl - beam - 0.05), step: 0.05, count: 6 },
+    // Gesamtspiel: doppelt so groß wie je Seite, damit derselbe Kamm entsteht wie vor #402
+    pair: { from: 2 * r(2 * kl - beam - 0.05), step: 0.1, count: 6 },
     slot: { from: r(2 * kl - beam - 0.1), step: 0.05, count: 8 },
   };
 }
@@ -111,11 +115,11 @@ export function buildCalibParts(o: CalibOptions, cut: number, label: number, fon
   });
   objs.push({ ...path(plate, t('Lochplatte')), m: translate(0, y1) });
 
-  // Zapfenkamm: Zapfen TAB − 2·Spiel breit, Dicke + 2 lang, auf einer 12 mm hohen Leiste
+  // Zapfenkamm: Zapfen TAB − Gesamtspiel breit, Dicke + 2 lang, auf einer 12 mm hohen Leiste
   const y2 = y1 + plateH + gap, tabL = th + 2, baseH = 12;
   const tn: { x: number; y: number }[] = [{ x: 0, y: tabL }];
   pairs.forEach((c, i) => {
-    const w = TAB - 2 * c, l = i * CELL + (CELL - w) / 2;
+    const w = TAB - c, l = i * CELL + (CELL - w) / 2;
     tn.push({ x: l, y: tabL }, { x: l, y: 0 }, { x: l + w, y: 0 }, { x: l + w, y: tabL });
     objs.push(text(String(i + 1), i * CELL + CELL / 2, y2 + tabL + baseH / 2 + ls * 0.36));
   });
@@ -142,15 +146,21 @@ export function calibResult(test: CalibTest, square: number | null, bestPair: nu
   if (c === undefined) return { error: 'pair' };
   if (d === undefined) return { error: 'slot' };
   const r = (v: number) => Math.round(v * 1000) / 1000;
-  return { fit: { kerf, pair: r(c - 2 * test.kl), slot: r(d - 2 * test.kl), th: test.th, date: test.date } };
+  // Gesamtspiel: der Kerf-Versatz wirkt an Zapfen und Loch auf beiden Seiten, zusammen 4·kl
+  return { fit: { kerf, pair: r(c - 4 * test.kl), slot: r(d - 2 * test.kl), th: test.th, date: test.date, v: 2 } };
 }
 
 const STORE_KEY = 'kizamubeam.calib';
 
+/** Test aus der Zeit vor #402 (Spiel je Seite): einmal auf das Gesamtspiel umrechnen und so wieder ablegen */
 export function loadCalibTest(): CalibTest | null {
   try {
     const v = JSON.parse(localStorage.getItem(STORE_KEY) ?? 'null') as CalibTest | null;
-    return v && Array.isArray(v.pair) && Array.isArray(v.slot) && v.th > 0 ? v : null;
+    if (!v || !Array.isArray(v.pair) || !Array.isArray(v.slot) || !(v.th > 0)) return null;
+    if (v.v === 2) return v;
+    const test: CalibTest = { ...v, pair: v.pair.map((c) => Math.round(2 * c * 1000) / 1000), v: 2 };
+    saveCalibTest(test);
+    return test;
   } catch {
     return null;
   }

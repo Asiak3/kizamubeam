@@ -4,13 +4,14 @@
 // Genutzt von „Konstruktion prüfen“ (check.ts), den Generator- und Verbindungsdialogen (Vorschläge) und dem Assistenten.
 import { apply, isOff, Layer, Mat, mul, IDENT, Obj, Pt } from './model';
 import { boundsOf } from './geom';
-import { library, MaterialEntry, MaterialFit } from './materials';
+import { library, MaterialEntry, MaterialFit, pairSide } from './materials';
 import { dec, t } from './i18n';
 import type { Params } from './generators/types';
 import { getGenerator } from './generators/index';
 
 /**
- * Art der Passung. pair: zwei gelaserte Teile ineinander (Fingerzinken: Zinke in Lücke), Spiel je Seite.
+ * Art der Passung. pair: zwei gelaserte Teile ineinander (Fingerzinken: Zinke in Lücke); hier wird je Seite gerechnet
+ * (die Felder und die Kalibrierung sind das Gesamtspiel, #402; Umrechnung mit playScale und pairSide).
  * slot: ein Schlitz nimmt eine Platte in voller Materialdicke auf; extra = wie viel breiter als die Dicke gezeichnet.
  */
 export type FitKind = 'pair' | 'slot';
@@ -23,6 +24,15 @@ export const genFit = (gen: string): { kind: FitKind; play: string; total?: bool
 
 /** How much the generator's play parameter is of the play per side: 2 for a total play, else 1 */
 const playScale = (spec: { kind: FitKind; total?: boolean }) => (spec.kind === 'pair' && spec.total ? 2 : 1);
+
+/**
+ * Play field of the Joint tool (total play since Joint geometry version 2) for a play per side as computed here:
+ * fingers, snaps and hooks are pair fits; the other kinds measure the play across the slot, which is the total already.
+ */
+export const jointPlayField = (kind: FitKind, play: number) => (kind === 'pair' ? 2 * play : play);
+
+/** Joints of the Joint tool store `fit.v` (2: the play is the total play); older ones have the play per side along fingers */
+export const mateScale = (kind: FitKind, v: number | undefined) => (kind === 'pair' && v === 2 ? 2 : 1);
 
 /** Verbindungsarten des Verbindungs-Werkzeugs: Zinken und Haken sind Teil-in-Teil, die übrigen stecken in Schlitzen */
 export const jointFitKind = (kind: string): FitKind => (kind === 'finger' || kind === 'snap' || kind === 'hook' ? 'pair' : 'slot');
@@ -52,7 +62,7 @@ export function fitLimits(th: number) {
 
 /** Abweichung von der Kalibrierung je Seite (negativ = enger als kalibriert) */
 export function calibratedDev(kind: FitKind, drawn: number, th: number, fit: MaterialFit): number {
-  return kind === 'pair' ? drawn - fit.pair : (th + drawn - (fit.th + fit.slot)) / 2;
+  return kind === 'pair' ? drawn - pairSide(fit) : (th + drawn - (fit.th + fit.slot)) / 2;
 }
 
 /**
@@ -65,8 +75,8 @@ export function suggestFit(kind: FitKind, e: MaterialEntry, kerfNow: number, lay
   const th = e.thickness ?? f.th;
   // Hat der Layer einen Kerf-Versatz, gleicht der schon die Fuge aus: im Bauteil dann keine zweite Fuge
   const kerf = layerKerf ? 0 : (f.kerf ?? kerfNow);
-  // pair: play − kerf − 2·kl = f.pair; slot: th + play − kerf − 2·kl = f.th + f.slot
-  const play = kind === 'pair' ? f.pair + kerf + 2 * layerKerf : f.slot + f.th - th + kerf + 2 * layerKerf;
+  // pair: play − kerf − 2·kl = f.pair / 2 (je Seite); slot: th + play − kerf − 2·kl = f.th + f.slot
+  const play = kind === 'pair' ? pairSide(f) + kerf + 2 * layerKerf : f.slot + f.th - th + kerf + 2 * layerKerf;
   return { th, kerf, play: Math.round(play * 1000) / 1000 };
 }
 
@@ -110,6 +120,8 @@ interface FitCase {
   play: number;
   /** The generator's play parameter is this many times play (playScale) */
   scale: number;
+  /** The play as the dialog field shows it (total play for a pair fit), for the message; default play · scale */
+  shown?: number;
   kerf: number;
   layer: Layer;
   objs: Obj[];
@@ -158,9 +170,12 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
       const ln: Pt[][] = [[apply(m, mt.a[0].x, mt.a[0].y), apply(m, mt.a[1].x, mt.a[1].y)]];
       if (other) ln.push([apply(other[1], mt.b[0].x, mt.b[0].y), apply(other[1], mt.b[1].x, mt.b[1].y)]);
       const objsOf = [tops.get(o)!, ...(other ? [tops.get(other[0])!] : [])];
+      const kind = jointFitKind(mt.kind);
+      const side = (mt.fit?.c ?? NaN) / mateScale(kind, mt.fit?.v);
       cases.push({
-        key: `mate:${o.id}:${i}`, name: jointName(mt.kind), kind: jointFitKind(mt.kind), th: mt.th,
-        play: mt.fit?.c ?? NaN, scale: 1, kerf: mt.fit?.k ?? NaN, layer: layerOf(o.layer), objs: [...new Set(objsOf)], lines: ln,
+        key: `mate:${o.id}:${i}`, name: jointName(mt.kind), kind, th: mt.th,
+        // Joints from before #402 hold the play per side along fingers; the message shows the total play like the Joint tool does now
+        play: side, scale: mateScale(kind, mt.fit?.v), shown: kind === 'pair' ? 2 * side : side, kerf: mt.fit?.k ?? NaN, layer: layerOf(o.layer), objs: [...new Set(objsOf)], lines: ln,
       });
     }
   }
@@ -185,7 +200,7 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
     }
     if (!isFinite(c.play) || !isFinite(c.kerf)) continue;
     const drawn = drawnFit(c.kind, c.play, c.kerf, kl);
-    const detail = t(' (Spiel {c}, Schnittfuge im Generator {k}, Kerf-Versatz am Layer {kl} mm)', { c: f2(c.play * c.scale), k: f2(c.kerf), kl: f2(kl) });
+    const detail = t(' (Spiel {c}, Schnittfuge im Generator {k}, Kerf-Versatz am Layer {kl} mm)', { c: f2(c.shown ?? c.play * c.scale), k: f2(c.kerf), kl: f2(kl) });
     const fix = () => {
       if (!c.gen || !entry?.fit) return undefined;
       const patch = genFitPatch(c.gen.gen, entry, c.gen.params, kl);
@@ -197,8 +212,8 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
       out.push({
         key: `${c.key}:fit`, kind: 'fit', level: 'warn',
         msg: (d < 0
-          ? t('{name}: {d} mm je Seite enger als die Kalibrierung für {material}.', { name: c.name, d: f2(-d), material: entry.material })
-          : t('{name}: {d} mm je Seite lockerer als die Kalibrierung für {material}.', { name: c.name, d: f2(d), material: entry.material })) + detail,
+          ? t('{name}: {d} mm gesamt enger als die Kalibrierung für {material}.', { name: c.name, d: f2(-2 * d), material: entry.material })
+          : t('{name}: {d} mm gesamt lockerer als die Kalibrierung für {material}.', { name: c.name, d: f2(2 * d), material: entry.material })) + detail,
         objs: c.objs, lines: c.lines, gen: fix(), calibrated: true,
       });
       continue;
@@ -209,10 +224,10 @@ export function checkFits(objs: Obj[], layerOf: (i: number) => Layer, beam: numb
     let level: FitFinding['level'] = 'warn';
     if (g < -lim.veryTight) {
       level = 'error';
-      msg = t('{name}: Die Passung ist für {th} mm Material zu eng ({g} mm Pressung je Seite). Die Teile passen kaum zusammen oder das Material reißt.', { name: c.name, th: f2(c.th), g: f2(-g) });
+      msg = t('{name}: Die Passung ist für {th} mm Material zu eng ({g} mm Pressung gesamt). Die Teile passen kaum zusammen oder das Material reißt.', { name: c.name, th: f2(c.th), g: f2(-2 * g) });
     } else if (g < -lim.tight)
-      msg = t('{name}: Die Passung ist für {th} mm Material sehr eng ({g} mm Pressung je Seite).', { name: c.name, th: f2(c.th), g: f2(-g) });
-    else if (g > lim.loose) msg = t('{name}: Die Passung ist sehr locker ({g} mm Luft je Seite), die Verbindung wackelt.', { name: c.name, g: f2(g) });
+      msg = t('{name}: Die Passung ist für {th} mm Material sehr eng ({g} mm Pressung gesamt).', { name: c.name, th: f2(c.th), g: f2(-2 * g) });
+    else if (g > lim.loose) msg = t('{name}: Die Passung ist sehr locker ({g} mm Luft gesamt), die Verbindung wackelt.', { name: c.name, g: f2(2 * g) });
     if (!msg) continue;
     const f: FitFinding = { key: `${c.key}:fit`, kind: 'fit', level, msg: msg + detail, objs: c.objs, lines: c.lines, calibrated: false };
     // Ohne Kalibrierung: Spiel so setzen, dass nach dem Lasern nichts übrig bleibt (satt)

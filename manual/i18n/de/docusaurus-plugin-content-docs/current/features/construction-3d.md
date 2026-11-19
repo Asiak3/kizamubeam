@@ -30,7 +30,7 @@ Das Ergebnis bleibt ein gewöhnlicher, bearbeitbarer Pfad. Die Verbindung merkt 
 | **T-Slot** | Ein Schraubenschlitz mit Mutternfenster zwischen je zwei Zapfen und ein passendes Schraubenloch in der anderen Platte. |
 | **Scharnier für Deckel (mit Stift)** | Siehe [Deckelscharnier](#lid-hinge) unten. |
 
-Gemeinsame Einstellungen sind die Materialdicke, die **Schnittfuge (Kerf)** (Zinken und Zapfen werden breiter, Lücken und Schlitze schmaler gezeichnet, damit die Teile nach dem Schneiden ihr Nennmaß haben) und das **Spiel** je Seite (negative Werte ergeben eine Presspassung). Ist das Material [kalibriert](materials-tests.md#calibrate-fit), schlägt das Werkzeug Kerf und Spiel für die gewählte Art vor.
+Gemeinsame Einstellungen sind die Materialdicke, die **Schnittfuge (Kerf)** (Zinken und Zapfen werden breiter, Lücken und Schlitze schmaler gezeichnet, damit die Teile nach dem Schneiden ihr Nennmaß haben) und das **Spiel gesamt**, das Gesamtspiel der Verbindung auf beiden Seiten zusammen (negative Werte ergeben eine Presspassung). Ist das Material [kalibriert](materials-tests.md#calibrate-fit), schlägt das Werkzeug Kerf und Spiel für die gewählte Art vor.
 
 ## Deckelscharnier {#lid-hinge}
 

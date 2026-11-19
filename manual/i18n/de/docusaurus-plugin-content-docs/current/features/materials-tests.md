@@ -57,7 +57,7 @@ Steckteile passen nur, wenn Kerf und Spiel stimmen. **Laser → Test und Kalibri
 - einen Schlitzkamm mit abgestuften Schlitzbreiten,
 - eine Lochplatte mit Zapfenkamm mit abgestuftem Spiel.
 
-Die Nummern werden auf einem eigenen Layer graviert. Miss nach dem Lasern das Quadrat und gib es ein, zusammen mit der Nummer des am besten passenden Zapfens und Schlitzes. KizamuBeam berechnet Schnittbreite, Spiel je Seite und Schlitzzugabe und speichert sie beim Material in der Bibliothek. Ein Kerf-Versatz des Layers wird berücksichtigt.
+Die Nummern werden auf einem eigenen Layer graviert. Miss nach dem Lasern das Quadrat und gib es ein, zusammen mit der Nummer des am besten passenden Zapfens und Schlitzes. KizamuBeam berechnet Schnittbreite, Gesamtspiel (beide Seiten zusammen) und Schlitzzugabe und speichert sie beim Material in der Bibliothek. Ein Kerf-Versatz des Layers wird berücksichtigt.
 
 Ab dann übernehmen neue Boxen, Schubladen, Einsätze und Regale Dicke, Kerf und Spiel aus der Kalibrierung des Layer-Materials, und das Werkzeug Verbindung schlägt passende Werte vor. Vorhandene Teile bekommen eine Schaltfläche, um die kalibrierten Werte zu übernehmen, und die [Konstruktionsprüfung](construction-3d.md#check-the-design-before-cutting) vergleicht Verbindungen mit der Kalibrierung.
 
