@@ -4068,7 +4068,7 @@ input.bound {
 
 /* Erweiterungen */
 .packs-dialog {
-  width: min(560px, 96vw);
+  width: min(760px, 96vw);
 }
 .packs-dialog .error {
   color: var(--danger, #c0392b);
@@ -4080,7 +4080,7 @@ input.bound {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 50vh;
+  max-height: 46vh;
   overflow: auto;
 }
 .pack-card {
@@ -4102,11 +4102,46 @@ input.bound {
 .pack-filter {
   display: flex;
   gap: 6px;
-  margin-bottom: 4px;
+  margin-bottom: 10px;
 }
 .pack-filter .pack-search {
   flex: 1;
   min-width: 0;
+}
+.pack-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.pack-tab {
+  appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.pack-tab:hover {
+  color: var(--text);
+}
+.pack-tab.active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+.pack-panel > h4,
+.pack-section-heading h4 {
+  margin: 0;
+}
+.pack-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 .pack-card.disabled .pack-text {
   opacity: 0.6;

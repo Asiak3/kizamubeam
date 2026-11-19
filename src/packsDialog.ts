@@ -199,6 +199,8 @@ const hasContent = (devices: number, templates: number, materials: number, asset
 export async function openPacksDialog(doc?: Doc) {
   await ensurePacks();
   const list = h('div', { class: 'pack-list' });
+  const catalogPanel = h('div', { class: 'pack-panel' });
+  const installedPanel = h('div', { class: 'pack-panel' });
   const err = h('p', { class: 'error' });
   const search = h('input', { type: 'search', placeholder: t('Suchen …'), class: 'pack-search' }) as HTMLInputElement;
   const filter = h('select', {},
@@ -313,8 +315,41 @@ export async function openPacksDialog(doc?: Doc) {
   const catStatus = h('p', { class: 'note' });
   const updateAll = h('button', { class: 'btn small primary', hidden: true }) as HTMLButtonElement;
   let catalog: Catalog | null = null;
+  let view: 'catalog' | 'installed' | 'updates' = 'catalog';
   const stateOf = (e: CatalogEntry) => catalogState(e, allPacks().find((x) => x.pack.id === e.id)?.pack, APP_VERSION);
   const updates = () => (catalog?.packs ?? []).filter((e) => stateOf(e) === 'update');
+  const catalogTab = h('button', { class: 'pack-tab', type: 'button' }, t('Katalog')) as HTMLButtonElement;
+  const installedTab = h('button', { class: 'pack-tab', type: 'button' }) as HTMLButtonElement;
+  const updatesTab = h('button', { class: 'pack-tab', type: 'button' }) as HTMLButtonElement;
+  const catalogHeading = h('h4', {}, t('Katalog'));
+  const tabs = h('div', { class: 'pack-tabs', role: 'tablist' }, catalogTab, installedTab, updatesTab);
+  const syncView = () => {
+    const installed = allPacks().length;
+    const updateCount = updates().length;
+    installedTab.textContent = `${t('Installiert')} (${installed})`;
+    updatesTab.textContent = `${t('Updates')} (${updateCount})`;
+    catalogHeading.textContent = view === 'updates' ? t('Updates') : t('Katalog');
+    catalogPanel.hidden = view === 'installed';
+    installedPanel.hidden = view !== 'installed';
+    catalogTab.classList.toggle('active', view === 'catalog');
+    installedTab.classList.toggle('active', view === 'installed');
+    updatesTab.classList.toggle('active', view === 'updates');
+    catalogTab.setAttribute('aria-selected', String(view === 'catalog'));
+    installedTab.setAttribute('aria-selected', String(view === 'installed'));
+    updatesTab.setAttribute('aria-selected', String(view === 'updates'));
+  };
+  catalogTab.onclick = () => {
+    view = 'catalog';
+    fillCatalog();
+  };
+  installedTab.onclick = () => {
+    view = 'installed';
+    syncView();
+  };
+  updatesTab.onclick = () => {
+    view = 'updates';
+    fillCatalog();
+  };
   const fromCatalog = async (e: CatalogEntry, btn: HTMLButtonElement) => {
     btn.disabled = true;
     try {
@@ -354,8 +389,12 @@ export async function openPacksDialog(doc?: Doc) {
     const n = updates().length;
     updateAll.hidden = n < 2;
     updateAll.textContent = t('Alle aktualisieren ({n})', { n });
-    if (!catalog) return;
+    if (!catalog) {
+      syncView();
+      return;
+    }
     for (const e of catalog.packs) {
+      if (view === 'updates' && stateOf(e) !== 'update') continue;
       const name = localText(e.name);
       const desc = localText(e.description);
       if (!shown([name, e.id, e.author, desc], e.plugins, hasContent(e.devices, e.templates, e.materials, e.assets))) continue;
@@ -382,7 +421,10 @@ export async function openPacksDialog(doc?: Doc) {
       ));
     }
     if (!catalog.packs.length) catList.append(h('p', { class: 'note' }, t('Der Katalog enthält noch keine Pakete.')));
-    else if (!catList.children.length) catList.append(h('p', { class: 'note' }, t('Keine Treffer.')));
+    else if (!catList.children.length) catList.append(h('p', { class: 'note' }, view === 'updates' && !search.value.trim()
+      ? t('{n} Aktualisierungen verfügbar.', { n: 0 })
+      : t('Keine Treffer.')));
+    syncView();
   };
   const loadCatalog = async () => {
     catStatus.textContent = t('Katalog wird geladen …');
@@ -408,12 +450,9 @@ export async function openPacksDialog(doc?: Doc) {
   const dlg = h('dialog', { class: 'packs-dialog' },
     h('h3', {}, t('Erweiterungen')),
     h('div', { class: 'pack-filter' }, search, filter),
-    h('h4', {}, t('Installiert')),
-    list,
-    netSwitch(),
-    h('h4', {}, t('Katalog'), ' ', h('button', { class: 'btn small', onclick: loadCatalog }, t('Neu laden')), ' ', updateAll),
-    catStatus,
-    catList,
+    tabs,
+    installedPanel,
+    catalogPanel,
     err,
     h('div', { class: 'dialog-buttons' },
       hasPackFolder() ? h('button', { class: 'btn', onclick: () => openPackFolder().catch((e) => (err.textContent = errText(e))) }, t('Ordner zeigen')) : null,
@@ -422,7 +461,14 @@ export async function openPacksDialog(doc?: Doc) {
       h('button', { class: 'btn', onclick: () => dlg.close() }, t('Schließen')),
     ),
   ) as HTMLDialogElement;
+  installedPanel.append(h('h4', {}, t('Installiert')), list, netSwitch());
+  catalogPanel.append(
+    h('div', { class: 'pack-section-heading' }, catalogHeading, h('div', {}, h('button', { class: 'btn small', onclick: loadCatalog }, t('Neu laden')), ' ', updateAll)),
+    catStatus,
+    catList,
+  );
   fill();
+  syncView();
   showDialog(dlg);
   void loadCatalog();
 }
