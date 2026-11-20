@@ -36,7 +36,7 @@ La [calibrazione dell’accoppiamento](../features/materials-tests.md#calibrate-
 
 ## Scatola con giunti a pettine e divisori
 
-Una scatola aperta o chiusa con divisori che si incrociano. Questo generatore è **sperimentale**: controlla le parti nella vista 3D e su un ritaglio prima di tagliare il materiale buono.
+Una scatola aperta o chiusa con divisori che si incrociano.
 
 | Campo | Significato |
 |---|---|

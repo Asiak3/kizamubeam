@@ -1,5 +1,5 @@
 // Box composer (#327): a box with freely placed inner walls (T joints, corners, free ends, crossings).
-// Experimental (pack version 0.x). All wood joints come from the app through host.joints.
+// All wood joints come from the app through host.joints.
 // Build: node scripts/plugin-pack.mjs --build plugins/box-composer
 // Check: npm run plugin:check plugins/box-composer
 import { definePlugin, host, mm, type Drawing, type Issue, type Part, type SubPath, type Text } from '../../sdk/ts';
