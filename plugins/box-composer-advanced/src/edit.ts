@@ -119,6 +119,15 @@ function reach(h: Wall, to: number): Wall {
  * end to end on the same line is joined with it (one wall, e.g. crossing the wall both ended on).
  */
 export function moveWall(l: Layout, w: number, d: number, lim: Limits, id: number, pos: number): EditResult {
+  const r = moveWallPlain(l, w, d, lim, id, pos);
+  if (r.ok) return r;
+  // An open wall that is refused moves like a closed one (#451)
+  const x = current(l, w, d).find((q) => q.id === id);
+  if (!x?.open) return r;
+  const o = moveOpen(l, w, d, lim, x.axis, x.pos, [[x.from, x.to]], pos);
+  return o.ok ? o : r;
+}
+function moveWallPlain(l: Layout, w: number, d: number, lim: Limits, id: number, pos: number): EditResult {
   const walls = current(l, w, d);
   const x = walls.find((q) => q.id === id);
   if (!x) return refuse('edit-no-wall', { id });
@@ -366,6 +375,93 @@ export function wholeWall(walls: Wall[], axis: Axis, pos: number, runs: Run[]): 
  * is joined with the rest again.
  */
 export function moveRuns(l: Layout, w: number, d: number, lim: Limits, axis: Axis, pos: number, runs: Run[], to: number): EditResult {
+  const r = moveRunsPlain(l, w, d, lim, axis, pos, runs, to);
+  if (r.ok) return r;
+  // Stretches that are open and refused move like closed ones (#451)
+  if (!current(l, w, d).some((q) => q.open && onLine(q, axis, pos) && runsOn(q, runs).length)) return r;
+  const o = moveOpen(l, w, d, lim, axis, pos, runs, to);
+  return o.ok ? o : r;
+}
+
+/**
+ * An open stretch moved like a closed one (#451): the box is seen with every wall built, the stretches move as in
+ * moveRuns (the walls ending on them follow, the box changes shape), and the open stretches are open again where they
+ * are now. (At an open stretch the model joins the walls ending on it to the wall next to it in the line, so they would not
+ * follow it.) Checked against the real walls, with the open ones, as any edit.
+ */
+function moveOpen(l: Layout, w: number, d: number, lim: Limits, axis: Axis, pos: number, runs: Run[], to: number): EditResult {
+  const walls = current(l, w, d);
+  const real = modelFor(withWalls(l, w, d, walls), w, d, lim);
+  const spans = walls.filter((q) => q.open);
+  const built = withWalls(l, w, d, walls.map(({ open, ...q }) => q));
+  const r = moveRunsPlain(l.sides ? { ...built, sides: { x0: true, x1: true, y0: true, y1: true } } : built, w, d, lim, axis, pos, runs, to);
+  if (!r.ok) return moveOpenAlone(l, w, d, lim, axis, pos, runs, to, walls, real) ?? r;
+  let out = r.layout.walls;
+  let next = out.reduce((n, q) => Math.max(n, q.id), 0) + 1;
+  for (const sp of spans) {
+    // Where the stretch is now: on the new line when it was one of the moved ones
+    const line = onLine(sp, axis, pos) && runsOn(sp, runs).length ? to : sp.pos;
+    const pieces: Wall[] = [];
+    for (const q of out) {
+      const a = Math.max(q.from, sp.from),
+        b = Math.min(q.to, sp.to);
+      if (!onLine(q, sp.axis, line) || b - a < EPS) {
+        pieces.push(q);
+        continue;
+      }
+      let first = true;
+      const piece = (from: number, upto: number, open: boolean) => {
+        pieces.push({ ...q, id: first ? q.id : next++, from, to: upto, ...(open ? { open: true } : {}) });
+        first = false;
+      };
+      if (a - q.from > EPS) piece(q.from, a, false);
+      piece(a, b, true);
+      if (q.to - b > EPS) piece(b, q.to, false);
+    }
+    out = pieces;
+  }
+  return accept(real, l, out, w, d, lim);
+}
+
+/**
+ * An open stretch with no wall across it at its ends (a gap in the middle of an outer wall) moved alone (#451): it moves
+ * and gets an open side at each end, from the old line to the new one (no wall there, the floor follows the new shape).
+ * null when it is not that case (a wall ends on it, or the runs are not open stretches).
+ */
+function moveOpenAlone(l: Layout, w: number, d: number, lim: Limits, axis: Axis, pos: number, runs: Run[], to: number, walls: Wall[], real: Model): EditResult | null {
+  const R = joinRuns(runs);
+  if (!R.length || Math.abs(to - pos) < EPS) return null;
+  const line = walls.filter((q) => onLine(q, axis, pos));
+  if (!R.every(([a, b]) => line.some((q) => q.open && q.from <= a + EPS && q.to >= b - EPS))) return null;
+  // Walls across it, at an end or anywhere along it: those the move would have to take along
+  if (walls.some((q) => q.axis !== axis && q.from - EPS <= pos && q.to + EPS >= pos && R.some(([a, b]) => q.pos >= a - EPS && q.pos <= b + EPS))) return null;
+  let next = walls.reduce((n, q) => Math.max(n, q.id), 0) + 1;
+  const out: Wall[] = [];
+  for (const q of walls) {
+    const mine = onLine(q, axis, pos) ? runsOn(q, R) : [];
+    if (!mine.length) {
+      out.push(q);
+      continue;
+    }
+    let first = true;
+    const piece = (from: number, upto: number, p: number) => {
+      out.push({ ...q, id: first ? q.id : next++, pos: p, from, to: upto });
+      first = false;
+    };
+    let cur = q.from;
+    for (const [a, b] of mine) {
+      if (a - cur > EPS) piece(cur, a, pos);
+      piece(a, b, to);
+      cur = b;
+    }
+    if (q.to - cur > EPS) piece(cur, q.to, pos);
+  }
+  const across: Axis = axis === 'h' ? 'v' : 'h';
+  for (const [a, b] of R) for (const at of [a, b]) out.push({ id: next++, axis: across, pos: at, from: Math.min(pos, to), to: Math.max(pos, to), open: true });
+  return accept(real, l, out, w, d, lim);
+}
+
+function moveRunsPlain(l: Layout, w: number, d: number, lim: Limits, axis: Axis, pos: number, runs: Run[], to: number): EditResult {
   const walls = current(l, w, d);
   const before = modelFor(withWalls(l, w, d, walls), w, d, lim);
   const s = shiftRuns(walls, before, axis, pos, runs, to);

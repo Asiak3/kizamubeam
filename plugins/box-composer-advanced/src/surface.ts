@@ -61,6 +61,8 @@ interface Drag {
   base: Wall[];
   x0: number;
   y0: number;
+  /** The frame of the plan as it has grown during this drag (x0, y0, x1, y1): it only grows, a little with each move (#451) */
+  reach?: [number, number, number, number];
 }
 interface State {
   /** The walls as they are while dragging (the last accepted edit) */
@@ -257,6 +259,46 @@ function onCentre(m: Model, x: Wall, along: number): { id: number; at: number } 
   return c && Math.abs(c.at - x.pos) < 0.005 ? c : null;
 }
 
+const FRAME_MARGIN = 4;
+/** The frame of a set of walls: the stored box (outer faces) and every wall, with a margin */
+function frameOf(p: Plan, walls: Wall[]): { x0: number; y0: number; x1: number; y1: number } {
+  const { w, d, t } = p;
+  const frame = { x0: -t - FRAME_MARGIN, y0: -t - FRAME_MARGIN, x1: w + t + FRAME_MARGIN, y1: d + t + FRAME_MARGIN };
+  for (const q of walls) {
+    const [x0, y0, x1, y1] = q.axis === 'h' ? [q.from, q.pos, q.to, q.pos] : [q.pos, q.from, q.pos, q.to];
+    frame.x0 = Math.min(frame.x0, x0 - t / 2 - FRAME_MARGIN);
+    frame.y0 = Math.min(frame.y0, y0 - t / 2 - FRAME_MARGIN);
+    frame.x1 = Math.max(frame.x1, x1 + t / 2 + FRAME_MARGIN);
+    frame.y1 = Math.max(frame.y1, y1 + t / 2 + FRAME_MARGIN);
+  }
+  return frame;
+}
+/** The frame keeps this part of the plan's size free beyond a wall that is pulled out (#451) */
+const GROW_ZONE = 0.04;
+/** The frame grows by at most this part of the plan's size with each move: slowly, so it does not run away */
+const GROW_STEP = 0.011;
+/**
+ * The drag has pulled walls towards the edge of the plan: its frame grows (never shrinks while dragging), by a small step
+ * with each move, so the plan changes smoothly and keeps room for the wall. The step is a part of the size the plan
+ * had when the drag started, so the growth is steady (not faster the bigger the plan gets).
+ */
+function grow(p: Plan, g: Drag, walls: Wall[]): void {
+  const start = frameOf(p, g.base);
+  const unit = Math.max(start.x1 - start.x0, start.y1 - start.y0);
+  const zone = Math.max(GROW_ZONE * unit, 2 * p.t),
+    step = Math.max(GROW_STEP * unit, p.t / 2);
+  const need = frameOf(p, walls);
+  const have = g.reach ?? [start.x0, start.y0, start.x1, start.y1];
+  const next: [number, number, number, number] = [have[0], have[1], have[2], have[3]];
+  // A wall pulled out beyond the edge the plan had when the drag started: the edge moves out ahead of it so that the zone
+  // is free (by a step at most). Walls inside the plan leave the frame alone.
+  if (need.x0 < start.x0) next[0] = Math.min(have[0], Math.max(need.x0 - zone, have[0] - step));
+  if (need.y0 < start.y0) next[1] = Math.min(have[1], Math.max(need.y0 - zone, have[1] - step));
+  if (need.x1 > start.x1) next[2] = Math.max(have[2], Math.min(need.x1 + zone, have[2] + step));
+  if (need.y1 > start.y1) next[3] = Math.max(have[3], Math.min(need.y1 + zone, have[3] + step));
+  g.reach = next;
+}
+
 export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width: number; height: number } }): Drawing {
   const { w, d, t } = p;
   const st = stateOf(s.state);
@@ -275,15 +317,15 @@ export function planDraw(p: Plan, s: Surface & { have: string[]; size?: { width:
       : idAt(p, s.selected[LIST]);
   const pick = selection(st, walls, sel);
   const picked = (x: Wall) => (pick ? touches(x, pick) : x.id === sel);
-  // The frame: the box as stored (outer faces) with a margin; not while dragging, so the plan does not jump
-  const margin = 4;
-  const frame = { x0: -t - margin, y0: -t - margin, x1: w + t + margin, y1: d + t + margin };
-  for (const q of base) {
-    const [x0, y0, x1, y1] = q.axis === 'h' ? [q.from, q.pos, q.to, q.pos] : [q.pos, q.from, q.pos, q.to];
-    frame.x0 = Math.min(frame.x0, x0 - t / 2 - margin);
-    frame.y0 = Math.min(frame.y0, y0 - t / 2 - margin);
-    frame.x1 = Math.max(frame.x1, x1 + t / 2 + margin);
-    frame.y1 = Math.max(frame.y1, y1 + t / 2 + margin);
+  // The frame: the box as stored (outer faces) with a margin. While dragging it keeps what it has grown to (reachOf), so
+  // the plan does not jump and a wall pulled outwards stays in view
+  const frame = frameOf(p, base);
+  const reach = st.drag?.reach;
+  if (reach) {
+    frame.x0 = Math.min(frame.x0, reach[0]);
+    frame.y0 = Math.min(frame.y0, reach[1]);
+    frame.x1 = Math.max(frame.x1, reach[2]);
+    frame.y1 = Math.max(frame.y1, reach[3]);
   }
 
   const items: Item[] = openItems(p, walls);
@@ -545,9 +587,31 @@ function dragged(walls: Wall[], g: Drag): number | undefined {
   return walls.find((q) => q.axis === x.axis && q.from <= x.from + 1e-6 && q.to >= x.to - 1e-6 && !same(q))?.id;
 }
 
+/** The walls (and box) a size was last made to fit: a patch the dialog does not take is not tried again */
+let reconciled = '';
+/**
+ * A number typed in the list (the position or the ends of an outer wall) does not reach the plugin when it is typed, so
+ * the box keeps its old width and depth. The next move of the pointer over the plan sees it: the box takes the size the
+ * walls enclose (the same as after an edit in the plan, see commit) and the walls go back to the corner (#451).
+ */
+function reconcile(p: Plan, base: Wall[]): EventResult | null {
+  const key = JSON.stringify([p.w, p.d, p.t, p.sides, p.layout.ref, base]);
+  if (key === reconciled) return null;
+  reconciled = key;
+  const set = settle(layoutWith(p, base), p.w, p.d, p.lim);
+  if (!set) return null;
+  const sizes = Math.abs(set.size[0] - p.w) > 1e-6 || Math.abs(set.size[1] - p.d) > 1e-6;
+  if (!sizes && !set.shift[0] && !set.shift[1]) return null;
+  return { patch: commit(p, layoutWith(p, base), undefined).patch };
+}
+
 export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | null {
   const st = stateOf(s.state);
   const base = current(p.layout, p.w, p.d);
+  if (ev.type === 'move' && !st.drag) {
+    const r = reconcile(p, base);
+    if (r) return r;
+  }
   const layout = (walls: Wall[]): Layout => layoutWith(p, walls);
   // Is the pointer inside the box (what the walls enclose)?
   const inside = () => {
@@ -628,6 +692,8 @@ export function planPointer(p: Plan, ev: Pointer, s: Surface): EventResult | nul
   if (ev.type === 'move') {
     const g = st.drag;
     if (!g) return null;
+    // The walls as the last move left them decide whether the plan grows (a move behind is not noticed)
+    grow(p, g, st.walls ?? g.base);
     const L = layout(g.base);
     let r: EditResult;
     if (g.kind === 'draw') {

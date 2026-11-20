@@ -292,9 +292,14 @@ const { planDraw, planPointer } = await import('../plugins/box-composer-advanced
     assert.ok(part.ok);
     assert.deepEqual(part.layout.walls.filter((q) => q.axis === 'v' && q.pos === 195.5).map((q) => [q.from, q.to, !!q.open]), [[-1.5, 60, false], [60, 130, true], [130, 195.5, false]]);
     assert.deepEqual(buildModel(part.layout, B, B, LIM).issues, []);
-    // The open wall is a wall of its own now: moved alone, walls 1 and 2 (its corners) follow and the right wall falls
-    // apart: refused
-    assert.equal(E.moveRuns(part.layout, B, B, LIM, 'v', 195.5, [[60, 130]], 150).ok, false);
+    // The open wall is a wall of its own now: moved alone (#451) it moves like a closed stretch (a notch in the outline,
+    // walls 1 and 2 stay joined to the right wall) and stays open
+    {
+      const moved = E.moveRuns(part.layout, B, B, LIM, 'v', 195.5, [[60, 130]], 150);
+      assert.ok(moved.ok, JSON.stringify(moved));
+      assert.deepEqual(moved.layout.walls.filter((q) => q.open).map((q) => [q.axis, q.pos, q.from, q.to]), [['v', 150, 60, 130]]);
+      assert.deepEqual(buildModel(moved.layout, B, B, LIM).issues, []);
+    }
     // The whole front wall: left open, the front of the rectangle is open; deleted again, it is closed
     const id = idOn(l, 'h', 195.5, 50);
     const front = E.deleteWall(l, B, B, LIM, id);
@@ -305,6 +310,55 @@ const { planDraw, planPointer } = await import('../plugins/box-composer-advanced
     const closed = E.deleteWall(front.layout, B, B, LIM, id);
     assert.ok(closed.ok);
     assert.deepEqual(closed.layout.walls, l.walls);
+  });
+
+  test('open stretch (#451): moved alone it moves like a closed one, in and out, and stays open', () => {
+    const closed = box([h(1, 60, 0, B), h(2, 140, 0, B)]);
+    const opened = E.deleteRuns(closed, B, B, LIM, 'v', 195.5, [[60, 140]]);
+    assert.ok(opened.ok);
+    const line = (x: Layout) => x.walls.filter((q) => q.axis === 'v' && q.open).map((q) => [q.pos, q.from, q.to]);
+    for (const to of [175.5, 135.5, 100, 215.5, 255.5]) {
+      const a = E.moveRunsNear(opened.layout, B, B, LIM, 'v', 195.5, [[60, 140]], to, 0, 100, opened.layout.sides);
+      const c = E.moveRunsNear(closed, B, B, LIM, 'v', 195.5, [[60, 140]], to, 0, 100, ALL);
+      assert.ok(a.ok && c.ok, `to ${to}: ${JSON.stringify(a.ok ? c : a)}`);
+      const [ma, mc] = [buildModel(a.layout, B, B, LIM), buildModel(c.layout, B, B, LIM)];
+      assert.deepEqual(ma.box?.pts, mc.box?.pts, `to ${to}: the same outline as the closed stretch`);
+      assert.deepEqual(ma.issues, [], `to ${to}`);
+      assert.deepEqual(line(a.layout), [[to, 60, 140]], `to ${to}: the stretch is open where it is now`);
+      // The walls 1 and 2 stay as the closed stretch has them
+      assert.deepEqual(a.layout.walls.filter((q) => q.id === 1 || q.id === 2).map((q) => [q.id, q.from, q.to]), c.layout.walls.filter((q) => q.id === 1 || q.id === 2).map((q) => [q.id, q.from, q.to]), `to ${to}`);
+    }
+    // Moved back to its line: joined with the open rest of the line, the box is as it was
+    const out = E.moveRunsNear(opened.layout, B, B, LIM, 'v', 195.5, [[60, 140]], 235.5, 0, 100, opened.layout.sides);
+    assert.ok(out.ok);
+    const back = E.moveRunsNear(out.layout, B, B, LIM, 'v', 235.5, [[60, 140]], 195.5, 0, 100, out.layout.sides);
+    assert.ok(back.ok, JSON.stringify(back));
+    assert.deepEqual(buildModel(back.layout, B, B, LIM).box?.pts, buildModel(opened.layout, B, B, LIM).box?.pts);
+    assert.deepEqual(line(back.layout), [[195.5, 60, 140]]);
+    // A gap with no wall across it at its ends: it moves alone, in or out, and its two sides are open (no wall)
+    const bare = E.deleteRuns(box([]), B, B, LIM, 'v', 195.5, [[60, 140]]);
+    assert.ok(bare.ok);
+    for (const to of [150.5, 235.5]) {
+      const g = E.moveRunsNear(bare.layout, B, B, LIM, 'v', 195.5, [[60, 140]], to, 0, 100, bare.layout.sides);
+      assert.ok(g.ok, `gap to ${to}: ${JSON.stringify(g)}`);
+      const m = buildModel(g.layout, B, B, LIM);
+      assert.deepEqual(m.issues, []);
+      assert.equal(m.box?.open.filter(Boolean).length, 3, 'the gap and its two sides are open');
+      // (the sides run from the old line to the new one, at the ends of the gap)
+      const [lo, hi] = [Math.min(195.5, to), Math.max(195.5, to)];
+      const key = (x: (string | number)[]) => JSON.stringify(x);
+      assert.deepEqual(g.layout.walls.filter((q) => q.open).map((q) => key([q.axis, q.pos, q.from, q.to])).sort(), [key(['h', 60, lo, hi]), key(['h', 140, lo, hi]), key(['v', to, 60, 140])].sort());
+    }
+    // With a wall ending on it (one leg), the closed way stays (no side is made up)
+    const oneLeg = E.deleteRuns(box([h(1, 60, 0, B)]), B, B, LIM, 'v', 195.5, [[60, 140]]);
+    assert.ok(oneLeg.ok);
+    // A whole open side with walls across it: the same as one that is closed
+    const side = E.deleteWall(box([h(1, 60, 0, B), h(2, 140, 0, B)]), B, B, LIM, idOn(box([h(1, 60, 0, B), h(2, 140, 0, B)]), 'v', 195.5, 100));
+    assert.ok(side.ok);
+    const sOpen = E.moveWallNear(side.layout, B, B, LIM, idOn(side.layout, 'v', 195.5, 100), 150, 0, 100, side.layout.sides);
+    const sClosed = E.moveWallNear(box([h(1, 60, 0, B), h(2, 140, 0, B)]), B, B, LIM, idOn(box([h(1, 60, 0, B), h(2, 140, 0, B)]), 'v', 195.5, 100), 150, 0, 100, ALL);
+    assert.ok(sOpen.ok && sClosed.ok);
+    assert.equal(buildModel(sOpen.layout, B, B, LIM).box?.size.join('x'), buildModel(sClosed.layout, B, B, LIM).box?.size.join('x'));
   });
 
   test('outer walls: dragged towards a wall in their line they join it (one board), as walls do (screenshot Nodos)', () => {
@@ -424,6 +478,145 @@ const { planDraw, planPointer } = await import('../plugins/box-composer-advanced
     const next = { ...plan, layout: { ...layout, ref: [B, B + 10] as [number, number], walls: JSON.parse(String(up.patch.walls)) as Wall[] }, d: B + 10 };
     const del = planPointer(next, { type: 'key', key: 'Delete' } as never, { view: 'plan', state, selected: { walls: row }, have: [] } as never) as { patch: Record<string, string> };
     assert.equal((JSON.parse(del.patch.walls) as Wall[]).filter((q) => q.open).length, 2);
+  });
+}
+
+// --- Außenwand in der Liste geändert (#451): die Kiste nimmt die Maße der Wände an ------------------------------------
+{
+  const edit = (walls: Wall[], f: (q: Wall) => Wall) => walls.map(f);
+  const lay = (): Layout => ({ ref: [194, 194], walls: unify([], 194, 194, T, ALL), sides: ALL });
+  const run = (l: Layout, w = 194, d = 194) => {
+    const plan = { w, d, t: T, lim: LIM, layout: l, sides: ALL };
+    return planPointer(plan, { type: 'move', x: 50, y: 50 } as never, { view: 'plan', state: null, selected: { walls: -1 }, have: [] } as never) as { patch?: Record<string, string | number> } | null;
+  };
+
+  test('list (#451): typing the position and ends of an outer wall (the box is still the old size) sets width and depth on the next move', () => {
+    const l = lay();
+    const [back, right, front] = [l.walls[0], l.walls[1], l.walls[2]];
+    // The right wall in at 150, the ends of the back and front wall with it (three entries in the list)
+    const moved: Layout = { ...l, walls: edit(l.walls, (q) => (q.id === right.id ? { ...q, pos: 150 } : q.id === back.id || q.id === front.id ? { ...q, to: 150 } : q)) };
+    const r = run(moved);
+    assert.ok(r?.patch, 'the plan answers with a patch');
+    assert.equal(r!.patch!.width, 194 + 2 * T - 45.5, 'the width follows the right wall');
+    assert.equal(r!.patch!.depth, 194 + 2 * T, 'the depth stays');
+    // With the patch taken the walls are the size of the box: nothing more to do
+    const w = JSON.parse(String(r!.patch!.walls)) as Wall[];
+    const ref = JSON.parse(String(r!.patch!.wallsRef)) as [number, number];
+    assert.equal(run({ ref, walls: w, sides: ALL }, 194 - 45.5, 194), null);
+  });
+
+  test('list (#451): the left wall typed in: the walls are put back to the corner and the width follows', () => {
+    const l = lay();
+    const left = l.walls[3];
+    const moved: Layout = { ...l, walls: edit(l.walls, (q) => (q.id === left.id ? { ...q, pos: 20 } : q.axis === 'h' ? { ...q, from: 20 } : q)) };
+    const r = run(moved);
+    assert.ok(r?.patch);
+    assert.equal(r!.patch!.width, 194 + 2 * T - 21.5);
+    const w = JSON.parse(String(r!.patch!.walls)) as Wall[];
+    assert.equal(Math.min(...w.map((q) => (q.axis === 'v' ? q.pos : q.from))), -1.5, 'the box starts at the corner again');
+  });
+
+  test('list (#451): a box that is as big as its walls, and walls that enclose no box, change nothing', () => {
+    assert.equal(run(lay()), null);
+    const l = lay();
+    // The right wall removed from the list: no box
+    assert.equal(run({ ...l, walls: l.walls.filter((q) => q.id !== l.walls[1].id) }), null);
+  });
+}
+
+// --- Der Plan wächst beim Herausziehen (#451, Punkt 4) ---------------------------------------------------------------
+{
+  const { viewFit } = await import('../src/generators/surfaceView');
+  const SW = 560, SH = 480;
+  const sizeOf = { width: SW, height: SH };
+  /** A plan on its drawing surface: the pointer is given in pixels, as in the app (the frame decides what they mean) */
+  const session = (B: number) => {
+    const layout: Layout = { ref: [B, B], walls: unify([], B, B, T, ALL), sides: ALL };
+    const plan = { w: B, d: B, t: T, lim: LIM, layout, sides: ALL };
+    let state: unknown = null;
+    let row = -1;
+    const surf = () => ({ view: 'plan', state, selected: { walls: row }, have: [], size: sizeOf }) as never;
+    const ev = (e: Record<string, unknown>) => {
+      const r = planPointer(plan, { shift: false, ctrl: false, ...e } as never, { view: 'plan', state, selected: { walls: row }, have: [] } as never) as { state?: unknown; select?: Record<string, number>; patch?: Record<string, string | number> } | null;
+      if (r && 'state' in r) state = r.state;
+      if (r?.select) row = r.select.walls;
+      return r;
+    };
+    const frame = () => planDraw(plan, surf()).frame;
+    const fit = () => viewFit(null, frame(), SW, SH);
+    const right = layout.walls.find((q) => q.axis === 'v' && q.pos > B / 2)!;
+    /** Press on the right outer wall; then moves to a pixel column (the middle row) */
+    const press = () => ev({ type: 'down', hit: `w${right.id}`, x: Math.round(right.pos), y: Math.round(B / 2) });
+    const moveToPx = (px: number) => {
+      const q = fit();
+      ev({ type: 'move', x: Math.round((px - q.ox) / q.k), y: Math.round((SH / 2 - q.oy) / q.k) });
+    };
+    const wallPx = () => {
+      const x = (state as { walls?: Wall[] } | null)?.walls?.find((q) => q.id === right.id)?.pos;
+      const q = fit();
+      return x === undefined ? NaN : q.ox + x * q.k;
+    };
+    return { plan, ev, frame, fit, press, moveToPx, wallPx, right, startPx: () => fit().ox + right.pos * fit().k, getState: () => state };
+  };
+  const width = (f: { x0: number; x1: number }) => f.x1 - f.x0;
+
+  test('plan grows (#451): the wall pulled to the edge of the plan, the frame grows a step with each move and the wall stays in view', () => {
+    const S = session(194);
+    const w0 = width(S.frame());
+    S.press();
+    // Inside the plan: the frame stays as it is
+    S.moveToPx(S.startPx() - 40);
+    assert.equal(width(S.frame()), w0, 'no growth while the wall is inside');
+    // Pushed out past the edge, the pointer at the edge of the surface, many moves
+    let last = width(S.frame());
+    const steps: number[] = [];
+    const px0 = S.startPx();
+    for (let i = 1; i <= 120; i++) {
+      S.moveToPx(i <= 20 ? px0 + ((SW - 4 - px0) * i) / 20 : SW - 4);
+      const w = width(S.frame());
+      steps.push(w - last);
+      last = w;
+      assert.ok(S.wallPx() <= SW, `move ${i}: the wall stays on the surface (${S.wallPx().toFixed(0)} px)`);
+    }
+    assert.ok(steps.every((d) => d >= -1e-9), 'the frame never shrinks while dragging out');
+    assert.ok(Math.max(...steps) <= 0.012 * w0 + 1e-6, `a step is small (${Math.max(...steps).toFixed(2)} mm of ${w0})`);
+    assert.ok(last > 2 * w0, 'the plan can be pulled to more than twice its size');
+    // Steady, not faster and faster: the last steps are as big as the middle ones
+    assert.ok(Math.abs(steps[119] - steps[60]) < 0.5, 'the growth is linear');
+  });
+
+  test('plan grows (#451): a wall pulled back does not shrink the frame; released, the plan hardly jumps', () => {
+    const S = session(194);
+    S.press();
+    const px0 = S.startPx();
+    for (let i = 1; i <= 60; i++) S.moveToPx(i <= 20 ? px0 + ((SW - 4 - px0) * i) / 20 : SW - 4);
+    const grown = width(S.frame());
+    // (it may still catch up with the room it keeps free beyond the wall, a step or two)
+    for (let i = 1; i <= 10; i++) {
+      S.moveToPx(SW - 4 - i * 20);
+      assert.ok(width(S.frame()) >= grown - 1e-9, 'pulled back: the frame does not shrink');
+    }
+    const settled = width(S.frame());
+    S.moveToPx(SW - 4 - 220);
+    assert.equal(width(S.frame()), settled, 'pulled back: the frame stays');
+    // Out again to the edge, then released there
+    for (let i = 0; i < 10; i++) S.moveToPx(SW - 4);
+    const before = width(S.frame());
+    const up = S.ev({ type: 'up', x: 0, y: 0 });
+    const w2 = Number(up!.patch!.width) - 2 * T;
+    const L2: Layout = { ref: [w2, 194], walls: JSON.parse(String(up!.patch!.walls)) as Wall[], sides: ALL };
+    const after = width(planDraw({ ...S.plan, layout: L2, w: w2 }, { view: 'plan', state: null, selected: { walls: -1 }, have: [], size: sizeOf } as never).frame);
+    assert.ok(after / before > 0.9 && after / before < 1.15, `the frame after release is about the one before (${(after / before).toFixed(2)})`);
+  });
+
+  test('plan grows (#451): a small box can be pulled out to more than twice its size', () => {
+    const S = session(30);
+    const w0 = width(S.frame());
+    S.press();
+    const px0 = S.startPx();
+    for (let i = 1; i <= 90; i++) S.moveToPx(i <= 20 ? px0 + ((SW - 4 - px0) * i) / 20 : SW - 4);
+    assert.ok(width(S.frame()) > 2 * w0, `${width(S.frame()).toFixed(0)} mm from ${w0}`);
+    assert.ok(S.wallPx() <= SW);
   });
 }
 

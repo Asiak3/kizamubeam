@@ -2,7 +2,7 @@
   "format": "kizamubeam-pack",
   "formatVersion": 2,
   "id": "org.kizamubeam.box-composer-advanced",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "minApp": "2.9.0-rc.3",
   "name": {
     "en": "Box composer (advanced)",

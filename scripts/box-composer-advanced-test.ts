@@ -932,6 +932,32 @@ await atest('plan: a new width asks whether the walls scale with the box or keep
   assert.equal(cancel.params.width, 100, 'cancelled: the width goes back');
 });
 
+// --- Offene Lücke in einer Außenwand, allein verschoben (#451): offene Seiten, Teile mit Spiel plus und minus -------------
+{
+  const E = await import('../plugins/box-composer-advanced/src/edit');
+  const IN = 194;
+  const ALL = { x0: true, x1: true, y0: true, y1: true };
+  const base: Layout = { ref: [IN, IN], walls: unify([], IN, IN, T, ALL), sides: ALL };
+  const gap = E.deleteRuns(base, IN, IN, LIM, 'h', 195.5, [[40, 76]]);
+  test('open gap moved alone (#451): parts come out for it, in and out, with positive and negative clearance', () => {
+    assert.ok(gap.ok);
+    for (const to of [160, 215.5]) {
+      const r = E.moveRunsNear(gap.layout, IN, IN, LIM, 'h', 195.5, [[40, 76]], to, 0, 58, gap.layout.sides);
+      assert.ok(r.ok, JSON.stringify(r));
+      const m = buildModel(r.layout, IN, IN, LIM);
+      assert.deepEqual(m.issues, []);
+      assert.ok(m.box);
+      assert.deepEqual(m.box.open.filter(Boolean).length, 3, 'the gap and its two sides are open');
+      for (const clearance of [0.1, -0.1]) {
+        const dims: Dims = { ...DIMS, W: m.box.size[0] + 2 * T, D: m.box.size[1] + 2 * T, sides: m.box.sides, clearance };
+        const built = buildParts(m.box.model, dims);
+        const all = Object.values(built.parts).flat();
+        assert.ok(all.length > 0 && all.every((sub) => sub.nodes.every((n) => Number.isFinite(n.x) && Number.isFinite(n.y))), `to ${to}, clearance ${clearance}`);
+      }
+    }
+  });
+}
+
 if (failed) {
   console.log(`\n${failed} failed`);
   process.exit(1);
