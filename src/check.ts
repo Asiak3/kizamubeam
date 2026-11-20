@@ -5,6 +5,9 @@
 import { IDENT, inv, isCutLayer, Layer, leaves, Mat, mul, Obj, outputLeaves, Pt, selfOutputOff, SubPath } from './model';
 import { conditionHolds } from './params';
 import { boundsOf, shapeSubs, textOutline } from './geom';
+import { resolveImageEdits } from './imageEdits';
+import { imageCutSettings, objectsById, resolveImageCutPath } from './imageCut';
+import { imageCutIssueText } from './gcode';
 import { parkedObjs } from './parking';
 import { segments } from './curves';
 import { copySub, extract } from './pathtools';
@@ -111,6 +114,9 @@ const withText = (out: CheckIssue[]) => (f: GeomIssue) => {
 function checkBed(inp: CheckInput, cs: Contour[], out: CheckIssue[]) {
   const { w, h } = inp.bed;
   const tops = new Set(cs.map((c) => c.top));
+  for (const top of inp.objs) {
+    if ([...outputLeaves([top])].some(([o]) => o.shape.kind === 'image' && inp.layer(o.layer).output)) tops.add(top);
+  }
   const eps = 1e-3;
   // Parts parked completely outside the work area are fine: they are not lasered
   const parked = parkedObjs(inp.objs, inp.bed, inp.layer);
@@ -205,12 +211,36 @@ function checkLooseEngravings(inp: CheckInput, out: CheckIssue[]) {
   }
 }
 
+/** Gescheiterte Bildschnitt-Konturen sind ein harter Befund: der Job würde sonst keine Kontur haben. */
+function checkImageCuts(inp: CheckInput, out: CheckIssue[]) {
+  const byId = objectsById(inp.objs);
+  for (const [o, world] of outputLeaves(inp.objs)) {
+    const s = o.shape;
+    if (s.kind !== 'image' || !imageCutSettings(inp.layer(o.layer).img).output) continue;
+    const path = resolveImageCutPath(o, world, (id) => byId.get(id));
+    if (path.ok) continue;
+    out.push({ key: `image-cut:${o.id}`, kind: 'image', level: 'error',
+      msg: imageCutIssueText(path.reason, s.name ?? t('Bild')), objs: [o], lines: [], pts: [] });
+  }
+}
+
 const ORDER: Record<CheckLevel, number> = { error: 0, warn: 1, info: 2 };
 
 /** Alle Prüfungen für die Objekte einer Seite; Ergebnis nach Schwere sortiert */
 export function checkDesign(inp: CheckInput): CheckIssue[] {
-  const cs = collect(inp);
   const out: CheckIssue[] = [];
+  for (const top of inp.objs) {
+    for (const [o] of leaves([top])) {
+      if (o.shape.kind !== 'image' || o.shape.edit === undefined || resolveImageEdits(o.shape).ok) continue;
+      out.push({ key: `image:${top.id}:${o.id}`, kind: 'image', level: 'error',
+        msg: t('Ungültiger Bildzuschnitt oder ungültige Perspektive. Zuschnitt und Perspektive zurücksetzen oder das Bild ersetzen.'),
+        objs: [top], lines: [], pts: [] });
+    }
+  }
+  checkImageCuts(inp, out);
+  // Invalid images must be reported before any bounds-dependent checks.
+  if (out.length) return out;
+  const cs = collect(inp);
   if (!inp.skipBed) checkBed(inp, cs, out);
   const geom: GeomIssue[] = [];
   checkDouble(cs, inp.settings, geom);

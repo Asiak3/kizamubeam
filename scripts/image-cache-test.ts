@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { ImageCache } from '../src/imageCache';
+const cache = new ImageCache<string, string>(10, 2);
+cache.set('a', 'A', 4); cache.set('b', 'B', 4);
+assert.equal(cache.get('a'), 'A');
+cache.set('c', 'C', 4);
+assert.equal(cache.get('b'), undefined); assert.equal(cache.get('a'), 'A');
+cache.set('d', 'D', 8);
+assert.equal(cache.get('a'), undefined); assert.equal(cache.get('c'), undefined);
+cache.set('d', 'replacement', 2); cache.set('e', 'E', 8);
+assert.equal(cache.get('d'), 'replacement'); assert.equal(cache.get('e'), 'E');
+cache.set('oversize', 'not retained', 11);
+assert.equal(cache.get('oversize'), undefined); assert.equal(cache.get('e'), 'E');
+for (const bytes of [-1, NaN, Infinity, .5]) cache.set('invalid', 'no', bytes);
+assert.equal(cache.get('invalid'), undefined);
+new ImageCache(0, 0).set('key', 'value', 0);
+console.log('Image cache: byte budget, entry budget, LRU, replacement, oversize and invalid sizes passed');

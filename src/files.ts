@@ -4,9 +4,10 @@ import { parseMeshFile } from './model3d/mesh';
 import { addMesh } from './model3d/store';
 import { askModelKind, openGenDialog } from './generators/dialog';
 import { getGenerator } from './generators/index';
-import { IDENT, Mat, mul, Obj, pageName, TextShape, visibleLeaves, PALETTE } from './model';
+import { IDENT, Mat, mul, Obj, pageName, TextShape, visibleLeaves, PALETTE, type ImageShape } from './model';
 import { boundsOf, subsToD, shapeSubs, textLayout, textOutline } from './geom';
-import { assetImage, assetUrl, flipImageV, hashId, processedPng, readDpi, registerAsset } from './images';
+import { assetImage, assetRgba, assetUrl, flipImageV, hashId, processedPng, readDpi, registerAsset } from './images';
+import { DEFAULT_IMAGE_MAX_PIXELS, rasterizeImage, resolveImageRasterGeometry } from './imageRaster';
 import { convertLbrn, finishLbrnTexts, isLbrn, LbrnResult, TextMeasure } from './lbrn';
 import { loadFont, textToSubs } from './fonts';
 import { importDxf, importSvg, ImportResult, PathBuilder, transformSubs } from './importers';
@@ -136,11 +137,110 @@ export async function openProject(ed: Editor) {
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// ---------- Nondestructive edits in visual exports (SVG, PDF, AI) ----------
+
+/** True only when a stored edit changes the visible pixels; no-op edits keep the legacy path. */
+export function imageEditAffectsAppearance(s: Readonly<ImageShape>): boolean {
+  const e = s.edit;
+  if (!e) return false;
+  if (e.cornerRadii?.some((r) => r > 0)) return true;
+  const c = e.crop;
+  if (c && (![c.left, c.top, c.right, c.bottom].every(Number.isFinite)
+    || Math.abs(c.left) > 1e-9 || Math.abs(c.top) > 1e-9
+    || Math.abs(c.right - 1) > 1e-9 || Math.abs(c.bottom - 1) > 1e-9)) return true;
+  const p = e.perspective;
+  if (!p) return false;
+  const original = [{ x: 0, y: 0 }, { x: s.w, y: 0 }, { x: s.w, y: s.h }, { x: 0, y: s.h }];
+  return p.length !== original.length || p.some((q, i) => !Number.isFinite(q.x) || !Number.isFinite(q.y)
+    || Math.abs(q.x - original[i].x) > 1e-9 || Math.abs(q.y - original[i].y) > 1e-9);
+}
+
+export interface ExportBakeSource {
+  readonly rgba: Uint8ClampedArray;
+  readonly width: number;
+  readonly height: number;
+}
+
+export interface BakedExportImage {
+  readonly rgba: Uint8ClampedArray;
+  readonly width: number;
+  readonly height: number;
+  readonly bounds: { x: number; y: number; width: number; height: number };
+  /** image pixel space -> world, so Obj.m still applies */
+  readonly im: Mat;
+  readonly capped: boolean;
+}
+
+/** Output grid at (roughly) source pixel density over the visible local-mm bounds. */
+export function exportBakeGrid(sw: number, sh: number, s: Readonly<ImageShape>,
+  bounds: { width: number; height: number }, maxPixels = DEFAULT_IMAGE_MAX_PIXELS) {
+  let width = Math.max(1, Math.round(sw * bounds.width / s.w));
+  let height = Math.max(1, Math.round(sh * bounds.height / s.h));
+  const capped = width * height > maxPixels;
+  if (capped) {
+    const f = Math.sqrt(maxPixels / (width * height));
+    width = Math.max(1, Math.floor(width * f));
+    height = Math.max(1, Math.floor(height * f));
+  }
+  return { width, height, capped };
+}
+
+/** Composite sampled pixels over white: polygon exterior becomes white, transparent interior too. */
+function composeExportWhite(rgba: Uint8ClampedArray, coverage: Uint8Array, width: number, height: number): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0, p = 0; i < width * height; i++, p += 4) {
+    if (!coverage[i]) {
+      out[p] = 255; out[p + 1] = 255; out[p + 2] = 255; out[p + 3] = 255;
+      continue;
+    }
+    const a = rgba[p + 3] / 255;
+    out[p] = rgba[p] * a + 255 * (1 - a);
+    out[p + 1] = rgba[p + 1] * a + 255 * (1 - a);
+    out[p + 2] = rgba[p + 2] * a + 255 * (1 - a);
+    out[p + 3] = 255;
+  }
+  return out;
+}
+
+/** Bake crop/perspective/rounding into an opaque local-mm raster; null when source or geometry is unavailable. */
+export function bakeEditedImage(source: ExportBakeSource, s: Readonly<ImageShape>, m: Mat,
+  maxPixels = DEFAULT_IMAGE_MAX_PIXELS): BakedExportImage | null {
+  if (!imageEditAffectsAppearance(s)) return null;
+  const geom = resolveImageRasterGeometry(s);
+  if (!geom.ok) return null;
+  const { width, height, capped } = exportBakeGrid(source.width, source.height, s, geom.bounds, maxPixels);
+  const sampled = rasterizeImage(source, s, { width, height, maxPixels, world: m });
+  if (!sampled.ok) return null;
+  const im: Mat = mul(m, [sampled.bounds.width / width, 0, 0, sampled.bounds.height / height, sampled.bounds.x, sampled.bounds.y]);
+  return {
+    rgba: composeExportWhite(sampled.rgba, sampled.coverage, width, height),
+    width, height, bounds: sampled.bounds, im, capped,
+  };
+}
+
+/** PNG data URL for an opaque baked raster; an affine <image> cannot express perspective or rounding. */
+function bakedPngUrl(baked: BakedExportImage): string | null {
+  const c = document.createElement('canvas');
+  c.width = baked.width;
+  c.height = baked.height;
+  const ctx = c.getContext('2d');
+  if (!ctx) return null;
+  const img = ctx.createImageData(baked.width, baked.height);
+  img.data.set(baked.rgba);
+  ctx.putImageData(img, 0, 0);
+  return c.toDataURL('image/png');
+}
+
+function addRasterNotes(notes: Set<string>, capped: boolean) {
+  if (capped) notes.add(t('Ein bearbeitetes Bild war für den Export zu groß und wurde mit reduzierter Auflösung gerastert.'));
+  notes.add(t('Bearbeitete Bilder werden für den Export gerastert und sind im Export nicht mehr bearbeitbar.'));
+}
+
 /**
  * SVG der aktuellen Seite. preview: kleine Vorschau (z. B. für Vorlagen) nur um die Objekte herum, Linien
  * unabhängig von der Größe sichtbar, große Bilder als graue Fläche.
  */
-export function buildSvg(ed: Editor, opts: { preview?: boolean } = {}): string {
+export function buildSvg(ed: Editor, opts: { preview?: boolean; notes?: Set<string> } = {}): string {
   const { w, h } = ed.doc.bed;
   const style = (i: number) => {
     const L = ed.layer(i);
@@ -150,7 +250,7 @@ export function buildSvg(ed: Editor, opts: { preview?: boolean } = {}): string {
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}mm" height="${h}mm" viewBox="0 0 ${w} ${h}">\n` +
-    objsSvgParts(ed.doc.objs, style, false).parts.join('\n') +
+    objsSvgParts(ed.doc.objs, style, false, {}, opts.notes).parts.join('\n') +
     `\n</svg>\n`
   );
 }
@@ -169,7 +269,7 @@ export function objsPreviewSvg(objs: Obj[], style: LayerStyle, thumbs: Record<st
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb.join(' ')}">${parts.join('')}</svg>`;
 }
 
-function objsSvgParts(objs: Obj[], style: LayerStyle, preview: boolean, thumbs: Record<string, string> = {}) {
+function objsSvgParts(objs: Obj[], style: LayerStyle, preview: boolean, thumbs: Record<string, string> = {}, notes?: Set<string>) {
   const parts: string[] = [];
   const box = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
   const sw = preview ? 'stroke-width="1" vector-effect="non-scaling-stroke"' : 'stroke-width="0.1"';
@@ -189,8 +289,22 @@ function objsSvgParts(objs: Obj[], style: LayerStyle, preview: boolean, thumbs: 
     const color = PALETTE[o.layer];
     const fill = L.fill ? color : 'none';
     if (o.shape.kind === 'image') {
-      const url = thumbs[o.shape.asset] ?? assetUrl(o.shape.asset);
-      const tf = `transform="matrix(${m.join(' ')})" width="${o.shape.w}" height="${o.shape.h}"`;
+      const s = o.shape;
+      if (!preview && imageEditAffectsAppearance(s)) {
+        const source = assetRgba(s.asset);
+        const baked = source ? bakeEditedImage(source, s, m) : null;
+        if (baked) {
+          const url = bakedPngUrl(baked);
+          if (url) {
+            if (notes) addRasterNotes(notes, baked.capped);
+            parts.push(`<image transform="matrix(${baked.im.join(' ')})" width="${baked.width}" height="${baked.height}" preserveAspectRatio="none" href="${url}"/>`);
+            continue;
+          }
+        }
+        if (notes) notes.add(t('Ein Bild ließ sich nicht einbetten.'));
+      }
+      const url = thumbs[s.asset] ?? assetUrl(s.asset);
+      const tf = `transform="matrix(${m.join(' ')})" width="${s.w}" height="${s.h}"`;
       if (url && preview && url.length > 150_000) parts.push(`<rect ${tf} fill="#bbb"/>`);
       else if (url) parts.push(`<image ${tf} preserveAspectRatio="none" href="${url}"/>`);
       continue;
@@ -221,7 +335,9 @@ function objsSvgParts(objs: Obj[], style: LayerStyle, preview: boolean, thumbs: 
 }
 
 export async function exportSvg(ed: Editor) {
-  await saveText('export.svg', 'SVG', 'svg', 'image/svg+xml', buildSvg(ed));
+  const notes = new Set<string>();
+  const svg = buildSvg(ed, { notes });
+  if (await saveText('export.svg', 'SVG', 'svg', 'image/svg+xml', svg) && notes.size) exportHint(ed, 'SVG', [...notes]);
 }
 
 // ---------- DXF, PDF, Illustrator ----------
@@ -261,6 +377,23 @@ async function exportItems(ed: Editor, objs: Obj[], withImages: boolean, notes: 
         continue;
       }
       const s = o.shape;
+      if (imageEditAffectsAppearance(s)) {
+        const source = assetRgba(s.asset);
+        const baked = source ? bakeEditedImage(source, s, m) : null;
+        if (!baked) {
+          notes.add(t('Ein Bild ließ sich nicht einbetten.'));
+          continue;
+        }
+        addRasterNotes(notes, baked.capped);
+        const rgb = new Uint8Array(baked.width * baked.height * 3);
+        for (let i = 0, j = 0; i < rgb.length / 3; i++, j += 4) {
+          rgb[i * 3] = baked.rgba[j];
+          rgb[i * 3 + 1] = baked.rgba[j + 1];
+          rgb[i * 3 + 2] = baked.rgba[j + 2];
+        }
+        items.push({ kind: 'image', m: baked.im, layer: o.layer, pxW: baked.width, pxH: baked.height, rgb });
+        continue;
+      }
       const img = assetImage(s.asset);
       const url = assetUrl(s.asset);
       if (!img || !url) {

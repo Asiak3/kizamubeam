@@ -28,6 +28,7 @@ import { isSlotGenerator } from './slotPlacement';
 import { isContourOffsetGenerator } from './contourOffset';
 import { openContourOffsetDialog } from './contourOffsetDialog';
 import { openWarpDialog } from './warpDialog';
+import { cropDraftEnabled, EDIT_TITLE, runImageEdit } from './imageCropUi';
 import { openVectorFitDialog } from './vectorDialog';
 import { installEditorContext } from './editorContext';
 import { commandKey, commandMatches } from './commandKeys';
@@ -340,6 +341,7 @@ function buildMenu(ed: Editor) {
         [t('Bild anpassen …'), '', () => openAdjustDialog(ed)],
         [t('Bild nachzeichnen …'), 'Alt+T', () => openTraceDialog(ed)],
         [t('Hintergrund entfernen …'), '', () => openBackgroundDialog(ed)],
+        [EDIT_TITLE(), '', () => runImageEdit(ed)],
         [t('Bild zuschneiden'), '', () => ed.cropImageSel(false)],
         [t('Maske auf Bild anwenden'), '', () => ed.cropImageSel(true)],
       ] },
@@ -739,6 +741,7 @@ function buildBars(ed: Editor) {
     { id: 'patternfill', cat: M, icon: 'pattern', label: t('Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen'), run: () => openPatternDialog(ed), enabled: sel1 },
     { id: 'adjust', cat: I, icon: 'adjust', label: t('Bild anpassen …'), run: () => openAdjustDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'trace', cat: I, icon: 'trace', label: t('Bild nachzeichnen (Alt+T)'), run: () => openTraceDialog(ed), enabled: () => ed.selImages().length > 0 },
+    { id: 'imageedit', cat: I, label: EDIT_TITLE(), run: () => runImageEdit(ed), enabled: () => cropDraftEnabled(ed) },
     { id: 'addpage', cat: S, short: t('+ Seite'), label: t('Neue Seite'), run: () => ed.addPage() },
     { id: 'prevpage', cat: S, icon: 'up', label: t('Vorherige Seite (Bild ↑)'), run: () => ed.setPage(ed.doc.page - 1), enabled: () => ed.doc.page > 0 },
     { id: 'nextpage', cat: S, icon: 'down', label: t('Nächste Seite (Bild ↓)'), run: () => ed.setPage(ed.doc.page + 1), enabled: () => ed.doc.page < ed.doc.pages.length - 1 },

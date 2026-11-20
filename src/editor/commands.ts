@@ -4,6 +4,7 @@ import type { Editor } from '../editor';
 import { t } from '../i18n';
 import { genLeaves } from './generators';
 import { copyMultiLayers, pruneMultiLayers } from '../multilayer';
+import { assignImageContour, expandImageCutSelection, unassignImageContour } from '../imageCut';
 
 export class EditorCommands {
   deleteSel(this: Editor) {
@@ -27,7 +28,8 @@ export class EditorCommands {
     this.setSel(this.doc.objs.filter((o) => this.selectable(o) && [...visibleLeaves([o])].some(([l]) => layers.has(l.layer))));
   }
   copy(this: Editor) {
-    this.clipboard = this.sel.map((o) => clone(o));
+    // Verknüpfte Schnittkonturen mitkopieren; cloneObjs vergibt danach frische Links.
+    this.clipboard = expandImageCutSelection(this.sel, this.doc.objs).map((o) => clone(o));
     // System-Zwischenablage überschreiben, damit danach nicht ein älteres Bild aus einem anderen Programm eingefügt wird
     navigator.clipboard?.writeText('').catch(() => undefined);
   }
@@ -49,7 +51,8 @@ export class EditorCommands {
   paste(this: Editor, offset = 5) {
     if (!this.clipboard.length) return;
     this.snapshot(t('Einfügen'));
-    const objs = cloneObjs(this.clipboard).map((c) => {
+    const copied = expandImageCutSelection(this.clipboard, this.clipboard);
+    const objs = cloneObjs(copied).map((c) => {
       c.m = mul(translate(offset, offset), c.m);
       return c;
     });
@@ -60,12 +63,48 @@ export class EditorCommands {
   }
   duplicate(this: Editor) {
     if (!this.sel.length) return;
+    // Die Auswahl schließt eine verknüpfte Schnittkontur ein, damit der Duplikat-Link erhalten bleibt.
+    const src = expandImageCutSelection(this.sel, this.doc.objs);
     this.snapshot(t('Duplizieren'));
-    const objs = cloneObjs(this.sel);
+    const objs = cloneObjs(src);
     this.doc.objs.push(...objs);
-    copyMultiLayers(this.doc, this.sel.map((o, i) => [o, objs[i]] as const));
+    copyMultiLayers(this.doc, src.map((o, i) => [o, objs[i]] as const));
     this.setSel(objs);
     this.emit('doc');
+  }
+  /** Assign one selected closed contour as the cut path of one selected image (one undo step). */
+  assignImageCutSel(this: Editor) {
+    const images = this.sel.filter((o) => o.shape.kind === 'image');
+    const paths = this.sel.filter((o) => o.shape.kind === 'path');
+    if (this.sel.length !== 2 || images.length !== 1 || paths.length !== 1)
+      throw new Error(t('Für den Bildschnitt genau ein Bild und eine geschlossene Kontur auswählen.'));
+    this.snapshot(t('Bildschnitt-Kontur zuweisen'));
+    if (!assignImageContour(images[0], paths[0], this.worldMatrix(images[0]))) {
+      this.dropSnapshot();
+      throw new Error(t('Die ausgewählte Schnittkontur ist ungültig. Kontur schließen, prüfen oder eine andere Kontur auswählen.'));
+    }
+    this.emit('doc');
+    this.emit('sel');
+  }
+  /** Release the assigned contour, restoring its original laser output (one undo step). */
+  unassignImageCutSel(this: Editor) {
+    const images = this.sel.filter((o) => o.shape.kind === 'image');
+    const image = images[0];
+    if (images.length !== 1 || !image || image.shape.kind !== 'image')
+      throw new Error(t('Für den Bildschnitt genau ein Bild und eine geschlossene Kontur auswählen.'));
+    const shape = image.shape;
+    if (shape.cut?.mode !== 'contour')
+      throw new Error(t('Für den Bildschnitt genau ein Bild und eine geschlossene Kontur auswählen.'));
+    const contour = this.doc.objs.find((o) => o.id === shape.cut!.contourId);
+    if (!contour || contour.shape.kind !== 'path' || !contour.cutLink || contour.cutLink.imageId !== image.id)
+      throw new Error(t('Zugewiesene Schnittkontur fehlt. Schnittkontur erneut zuweisen oder Bildschnitt deaktivieren.'));
+    this.snapshot(t('Bildschnitt-Kontur lösen'));
+    if (!unassignImageContour(image, contour, this.worldMatrix(image))) {
+      this.dropSnapshot();
+      throw new Error(t('Die ausgewählte Schnittkontur ist ungültig. Kontur schließen, prüfen oder eine andere Kontur auswählen.'));
+    }
+    this.emit('doc');
+    this.emit('sel');
   }
   /** Weltmatrix auf alle ausgewählten Objekte anwenden. */
   /** snap: Undo-Schritt anlegen (true oder dessen Name) */

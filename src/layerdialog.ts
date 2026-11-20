@@ -9,6 +9,7 @@ import { lookEditor } from './view3d/lookui';
 import { guessLook, lookName, resolveLook } from './view3d/looks';
 import { library } from './materials';
 import { imageLayerFields } from './imageLayerFields';
+import { imageCutSettings, type ImageCut } from './imageCut';
 
 /** Opens "Adjust Image" for a layer; set by the UI module (it lives there) */
 let openAdjust: ((ed: Editor, layer: number) => void) | null = null;
@@ -21,6 +22,8 @@ export function openLayerDialog(ed: Editor, i: number) {
   const parts = ed.layerParts(i);
   const vecs = parts.vec || !parts.img;
   const origImg = parts.img ? { ...ed.imgLayer(i) } : null;
+  // Separate working copy: the image cut is optional and committed as one undo step with the layer.
+  const imgCut: ImageCut | null = parts.img ? structuredClone(imageCutSettings(origImg ?? undefined)) : null;
   let name = L.name;
   let output = L.output;
   c.sub = c.sub?.map((s) => structuredClone(s)) ?? [];
@@ -117,10 +120,11 @@ export function openLayerDialog(ed: Editor, i: number) {
     modeBox.replaceChildren(...(vecs ? [e.mode === 'line' ? lineSection(e) : fillSection(e)] : []));
     lookSection.hidden = !!sub;
     imageSection.hidden = !!sub;
-    if (!sub) renderImage();
+    imageCutSection.hidden = !!sub;
+    if (!sub) { renderImage(); renderImageCut(); }
   };
 
-  const lineSection = (c: Entry) => {
+  const lineSection = (c: Entry, suffix = '') => {
     const T = c.tabs;
     const box = h('div', { class: 'form' });
     const fill = () => {
@@ -131,8 +135,8 @@ export function openLayerDialog(ed: Editor, i: number) {
               ...row(t('Steglänge (mm)'), num(() => T.size, (v) => (T.size = v), 0.05, 50)),
               h('label', {}, t('Verteilung')),
               h('span', { class: 'radios' },
-                h('label', {}, h('input', { type: 'radio', name: `tabs-${i}`, checked: T.useCount, onchange: () => ((T.useCount = true), fill()) }), t('Anzahl')),
-                h('label', {}, h('input', { type: 'radio', name: `tabs-${i}`, checked: !T.useCount, onchange: () => ((T.useCount = false), fill()) }), t('Abstand')),
+                h('label', {}, h('input', { type: 'radio', name: `tabs-${i}${suffix}`, checked: T.useCount, onchange: () => ((T.useCount = true), fill()) }), t('Anzahl')),
+                h('label', {}, h('input', { type: 'radio', name: `tabs-${i}${suffix}`, checked: !T.useCount, onchange: () => ((T.useCount = false), fill()) }), t('Abstand')),
               ),
               ...(T.useCount
                 ? row(t('Stege je Form'), num(() => T.count, (v) => (T.count = v), 1, 100, true))
@@ -143,7 +147,7 @@ export function openLayerDialog(ed: Editor, i: number) {
       );
     };
     fill();
-    return h('div', {}, h('div', { class: 'form-title' }, t('Linie')), box, dedupSection(c), perfSection(c), leadSection(c), rampSection(c));
+    return h('div', {}, h('div', { class: 'form-title' }, t('Linie')), box, dedupSection(c), perfSection(c), leadSection(c, suffix), rampSection(c));
   };
 
   const dedupSection = (c: Entry) =>
@@ -169,7 +173,7 @@ export function openLayerDialog(ed: Editor, i: number) {
     );
   };
 
-  const leadSection = (c: Entry) => {
+  const leadSection = (c: Entry, suffix = '') => {
     const Ld = c.lead;
     const box = h('div', { class: 'form' });
     const fill = () =>
@@ -181,8 +185,8 @@ export function openLayerDialog(ed: Editor, i: number) {
         ...row(t('Länge (mm)'), num(() => Ld.length, (v) => (Ld.length = v), 0, 100)),
         h('label', {}, t('Form')),
         h('span', { class: 'radios' },
-          h('label', {}, h('input', { type: 'radio', name: `lead-${i}`, checked: !Ld.arc, onchange: () => ((Ld.arc = false), fill()) }), t('Gerade')),
-          h('label', {}, h('input', { type: 'radio', name: `lead-${i}`, checked: Ld.arc, onchange: () => ((Ld.arc = true), fill()) }), t('Bogen')),
+          h('label', {}, h('input', { type: 'radio', name: `lead-${i}${suffix}`, checked: !Ld.arc, onchange: () => ((Ld.arc = false), fill()) }), t('Gerade')),
+          h('label', {}, h('input', { type: 'radio', name: `lead-${i}${suffix}`, checked: Ld.arc, onchange: () => ((Ld.arc = true), fill()) }), t('Bogen')),
         ),
         ...row(Ld.arc ? t('Bogenwinkel (°)') : t('Winkel zur Kontur (°)'), num(() => Ld.angle, (v) => (Ld.angle = v), Ld.arc ? 1 : 0, Ld.arc ? 180 : 90, false, Ld.arc ? t('Wie weit der Bogen um die Ecke führt') : t('90° = senkrecht zur Kontur, 0° = in Verlängerung'))),
         ...row(t('Überschnitt (mm)'), num(() => Ld.overcut, (v) => (Ld.overcut = v), 0, 100, false, t('Nach dem Schließen der Form so weit weiter schneiden, damit sich Anfang und Ende sicher treffen'))),
@@ -274,6 +278,36 @@ export function openLayerDialog(ed: Editor, i: number) {
     imageSection.replaceChildren(...kids.filter((k): k is HTMLElement => !!k));
   };
 
+  // Optionaler Bildschnitt: eigene Linienparameter, standardmäßig aus. Kein Eingriff in die Rastereinstellungen.
+  const imageCutBox = h('div', { class: 'form' });
+  const imageCutNote = h('div', { class: 'note' });
+  const imageCutSection = h('div', { class: 'image-cut-section' }, h('div', { class: 'form-title' }, t('Bildschnitt (optional)')), imageCutBox);
+  const renderImageCut = () => {
+    if (!imgCut) return;
+    const C = imgCut;
+    const cutImages = ed.doc.objs.filter((o) => o.layer === i && o.shape.kind === 'image' &&
+      (o.shape as { cut?: { mode?: string } }).cut?.mode === 'contour');
+    const dangling = cutImages.some((o) => !ed.doc.objs.some((c) =>
+      c.id === (o.shape as { cut?: { contourId?: number } }).cut?.contourId));
+    imageCutNote.hidden = !(dangling || !cutImages.length);
+    imageCutNote.textContent = dangling
+      ? t('Zugewiesene Schnittkontur fehlt. Schnittkontur erneut zuweisen oder Bildschnitt deaktivieren.')
+      : cutImages.length ? '' : t('Ohne zugewiesene Kontur folgt der Schnitt der Bildbegrenzung.');
+    imageCutBox.replaceChildren(
+      h('span', { class: 'checks' }, check(t('Bildschnitt ausgeben'), () => C.output, (v) => (C.output = v), t('Bildschnitt beim Lasern ausgeben (ein Undo-Schritt).'))),
+      ...row(t('Geschwindigkeit (mm/min)'), num(() => C.speed, (v) => (C.speed = v), 1, 100000)),
+      ...row(t('Max. Leistung (%)'), num(() => C.power, (v) => (C.power = v), 0, 100)),
+      ...row(t('Min. Leistung (%)'), num(() => C.minPower, (v) => (C.minPower = v), 0, 100)),
+      ...row(t('Durchgänge'), num(() => C.passes, (v) => (C.passes = v), 1, 100, true)),
+      ...row(t('Kerf-Versatz (mm)'), num(() => C.kerf, (v) => (C.kerf = v), -5, 5)),
+      ...row(t('Z-Versatz (mm)'), num(() => C.zOffset, (v) => (C.zOffset = v), -50, 50)),
+      ...row(t('Je Durchgang tiefer (mm)'), num(() => C.zStep, (v) => (C.zStep = v), -20, 20)),
+      h('span', { class: 'checks' }, check(t('Air Assist'), () => C.air, (v) => (C.air = v))),
+      lineSection(C as unknown as Entry, '-cut'),
+      imageCutNote,
+    );
+  };
+
   let applied = false;
   const dlg = h(
     'dialog',
@@ -283,6 +317,7 @@ export function openLayerDialog(ed: Editor, i: number) {
     general,
     modeBox,
     imageSection,
+    ...(parts.img ? [imageCutSection] : []),
     lookSection,
     h(
       'div',
@@ -314,6 +349,11 @@ export function openLayerDialog(ed: Editor, i: number) {
     const newImg = origImg ? { ...ed.imgLayer(i) } : null;
     if (origImg) L.img = { ...origImg };
     if (applied) {
+      if (imgCut && newImg) {
+        const untouched = JSON.stringify(imgCut) === JSON.stringify(imageCutSettings(undefined));
+        // Only add a cut field when the user enabled/changed it or the layer already had one.
+        if (imgCut.output || origImg?.cut || !untouched) newImg.cut = imgCut;
+      }
       const before = JSON.stringify({ ...cutSettings(L), name: L.name, output: L.output, img: origImg ?? undefined });
       const after = { ...c, sub: subs.length ? subs : undefined, name: name.trim() || L.name, output, img: newImg ?? undefined };
       if (JSON.stringify(after) !== before) ed.updateLayer(i, after);

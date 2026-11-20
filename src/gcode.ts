@@ -6,7 +6,9 @@ import type { EnergySettings } from './energy';
 import { apply, CutSettings, Doc, ImageLayer, ImageOutput, imageOutput, ImageShape, inv, isGrayMode, laserLeaves, Layer, LeadSettings, Mat, mul, normalizeLayer, Obj, outputLeaves, PerfSettings, Pt, RampSettings, SubLayer, SubPath, TabSettings } from './model';
 import { bezierPt, segments, shapeSubs } from './geom';
 import { loadFont, textToSubs } from './fonts';
-import { nativeScanLines, outputGrid, processImage } from './images';
+import { ImageProcessingError, imageRasterGeometry, nativeScanLines, outputGrid, processImage } from './images';
+import { resolveImageContour, type ImageContour } from './imageContour';
+import { imageCutSettings, objectsById, resolveImageCutPath } from './imageCut';
 import { hasNative, native } from './native';
 import { locale, t, tn } from './i18n';
 import { dedupPolys } from './dedup';
@@ -1217,8 +1219,18 @@ async function imageLines(shape: ImageShape, world: Mat, toOut: Mat, L: ImageOut
   const packed = await nativeScanLines(shape, L, cols, rows, M, IM);
   if (packed) return unpackLines(packed);
   // Browser (ohne Rust-Kern)
-  const v = processImage(shape, L, cols, rows);
-  return v && scanLines(v, shape.w, shape.h, L, cols, rows, M, IM);
+  const v = processImage(shape, L, cols, rows, M);
+  const edited = shape.edit !== undefined ? imageRasterGeometry(shape) : undefined;
+  const clipQuad = edited?.order === 'perspectiveFirst'
+    ? [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }].map(p => {
+      const q = edited.geometry.sourceToLocal(p);
+      if (!q) throw new ImageProcessingError('geometry', 'Invalid full perspective vertex');
+      return q;
+    }) : undefined;
+  const rounded = shape.edit?.cornerRadii?.some(r => r > 0) ? resolveImageContour(shape, M) : null;
+  if (rounded && !rounded.ok) throw new ImageProcessingError('geometry', 'Invalid rounded image contour');
+  return v && scanLines(v, shape.w, shape.h, L, cols, rows, M, IM,
+    edited && { ...edited, clipQuad, rounded: rounded?.ok ? rounded.contour : undefined });
 }
 
 /** Rasterzeilen aus dem Rust-Kern: je Zeile y, Anzahl der Läufe, dann x0, x1, s je Lauf */
@@ -1236,10 +1248,18 @@ function unpackLines(p: Float64Array): { y: number; runs: Run[] }[] {
 }
 
 /** Rasterzeilen aus dem verarbeiteten Bild v (cols × rows) der Größe w × h mm; M: lokal → Ausgabe, IM: Umkehrung */
-export function scanLines(v: Uint8Array | Uint8ClampedArray, w: number, h: number, L: ImageOutput, cols: number, rows: number, M: Mat, IM: Mat): { y: number; runs: Run[] }[] {
+export function scanLines(v: Uint8Array | Uint8ClampedArray, w: number, h: number, L: ImageOutput, cols: number, rows: number, M: Mat, IM: Mat,
+  edited?: Pick<ReturnType<typeof imageRasterGeometry>, 'bounds' | 'quad'> & {
+    clipQuad?: readonly Pt[]; rounded?: Pick<ImageContour, 'rowSpan'>;
+  }): { y: number; runs: Run[] }[] {
   const b = emptyBox();
-  for (const [x, y] of [[0, 0], [w, 0], [w, h], [0, h]]) {
-    const q = apply(M, x, y);
+  const quad = (edited?.quad ?? [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }])
+    .map(p => apply(M, p.x, p.y));
+  const clipQuad = edited?.clipQuad?.map(p => apply(M, p.x, p.y));
+  if (edited && [...quad, ...(clipQuad ?? [])].some(p => !Number.isFinite(p.x) || !Number.isFinite(p.y))) {
+    throw new ImageProcessingError('geometry', 'Invalid transformed image vertex');
+  }
+  for (const q of quad) {
     addPt(b, q.x, q.y);
   }
   // Achsparallel: genau ein Abtastpunkt pro Ausgabepunkt; gedreht: Raster im Zeilenabstand
@@ -1254,15 +1274,35 @@ export function scanLines(v: Uint8Array | Uint8ClampedArray, w: number, h: numbe
   const out: { y: number; runs: Run[] }[] = [];
   for (let j = 0; j < ny; j++) {
     const y = b.y0 + (j + 0.5) * stepY;
+    // Convex visible polygon: clip whole powered segments, not only their
+    // sample centers. Pixel filtering alone could burn past a slanted edge.
+    let span = edited ? imageRowSpan(quad, y) : null;
+    if (clipQuad && span) {
+      // Intersect row spans, not bounding boxes: the convex intersection can
+      // have up to eight vertices, while the raster grid/phase stays unchanged.
+      const clip = imageRowSpan(clipQuad, y);
+      span = clip ? [Math.max(span[0], clip[0]), Math.min(span[1], clip[1])] : null;
+      if (span && span[0] >= span[1]) span = null;
+    }
+    if (edited?.rounded && span) {
+      const round = edited.rounded.rowSpan(y);
+      span = round ? [Math.max(span[0], round[0]), Math.min(span[1], round[1])] : null;
+      if (span && span[0] >= span[1]) span = null;
+    }
     const runs: Run[] = [];
     let cur: Run | null = null;
-    for (let k = 0; k < nx; k++) {
+    // Retain the original grid phase and edge samples, but avoid transforming
+    // empty bounding-box columns (especially thin, rotated images).
+    const sampleSpan = edited ? span : imageRowSpan(quad, y);
+    const first = sampleSpan ? Math.max(0, Math.floor((sampleSpan[0] - b.x0) / stepX) - 1) : 0;
+    const end = sampleSpan ? Math.min(nx, Math.ceil((sampleSpan[1] - b.x0) / stepX) + 1) : edited ? 0 : nx;
+    for (let k = first; k < end; k++) {
       const x = b.x0 + (k + 0.5) * stepX;
       const q = apply(IM, x, y);
-      const c = Math.floor((q.x / w) * cols),
-        r = Math.floor((q.y / h) * rows);
+      const c = Math.floor(((q.x - (edited?.bounds.x ?? 0)) / (edited?.bounds.width ?? w)) * cols),
+        r = Math.floor(((q.y - (edited?.bounds.y ?? 0)) / (edited?.bounds.height ?? h)) * rows);
       let s = 0;
-      if (c >= 0 && c < cols && r >= 0 && r < rows) {
+      if (c >= 0 && c < cols && r >= 0 && r < rows && (!edited || (span && x >= span[0] && x <= span[1]))) {
         const val = v[r * cols + c];
         if (gray) s = val >= 255 ? 0 : Math.round((pmin + (pmax - pmin) * (1 - val / 255)) * 1000) / 1000;
         else s = val < 128 ? pmax : 0;
@@ -1276,9 +1316,24 @@ export function scanLines(v: Uint8Array | Uint8ClampedArray, w: number, h: numbe
       }
     }
     if (cur && cur[2] > 0) runs.push(cur);
-    out.push({ y, runs });
+    out.push({ y, runs: edited ? runs.flatMap(([a, z, s]): Run[] => {
+      if (!span) return [];
+      const x0 = Math.max(a, span[0]), x1 = Math.min(z, span[1]);
+      return x1 > x0 ? [[x0, x1, s]] : [];
+    }) : runs });
   }
   return out;
+}
+
+function imageRowSpan(quad: Pt[], y: number): [number, number] | null {
+  const xs: number[] = [];
+  for (let i = 0; i < quad.length; i++) {
+    const a = quad[i], b = quad[(i + 1) % quad.length];
+    if ((a.y <= y && y < b.y) || (b.y <= y && y < a.y)) {
+      xs.push(a.x + (b.x - a.x) * ((y - a.y) / (b.y - a.y)));
+    }
+  }
+  return xs.length >= 2 ? [Math.min(...xs), Math.max(...xs)] : null;
 }
 
 /** Formen um den Ursprung drehen (Winkel in rad) */
@@ -1670,6 +1725,26 @@ export function rampPath(path: CutPath, s: number, sMin: number, R: RampSettings
 }
 
 /** Aus dem Dokument einen Job berechnen. Texte werden mit ihren Schriftkonturen gelasert. */
+/** Validate edited images before parking can omit a whole group. Geometry is shared with the editor. */
+function jobParkedObjs(roots: Obj[], bed: { w: number; h: number }, layerOf: (i: number) => Layer): Set<Obj> {
+  for (const [o] of outputLeaves(roots)) {
+    const s = o.shape;
+    if (s.kind !== 'image' || s.edit === undefined || o.reg || !layerOf(o.layer).output) continue;
+    imageRasterGeometry(s);
+  }
+  return parkedObjs(roots, bed, layerOf);
+}
+
+/** Fehlermeldung für eine gescheiterte Bildschnitt-Kontur (Job und Konstruktionsprüfung teilen sie). */
+export function imageCutIssueText(reason: 'missing-contour' | 'invalid-contour' | 'invalid-geometry', name: string): string {
+  const detail = reason === 'missing-contour'
+    ? t('Die zugewiesene Vektorkontur fehlt.')
+    : reason === 'invalid-contour'
+      ? t('Die zugewiesene Vektorkontur ist ungültig (nicht geschlossen oder sich selbst schneidend).')
+      : t('Die Bildkontur konnte nicht berechnet werden.');
+  return t('Bild „{name}“: Schnitt nicht möglich — {detail}', { name, detail });
+}
+
 export async function buildJob(inp: JobInput): Promise<Job> {
   const { doc, device } = inp;
   const layerOf = (i: number) => normalizeLayer(inp.layer(i));
@@ -1677,12 +1752,16 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   let roots = inp.only ?? doc.objs;
   // Parts parked completely outside the work area are not lasered. Only with absolute coordinates: relative jobs
   // ignore the bed position, and with a rotary y is the circumference
-  const parked = device.startFrom !== 'absolute' || rotaryOn(device) ? new Set<Obj>() : parkedObjs(roots, doc.bed, layerOf);
+  const parked = device.startFrom !== 'absolute' || rotaryOn(device) ? new Set<Obj>() : jobParkedObjs(roots, doc.bed, layerOf);
   if (parked.size) {
     roots = roots.filter((o) => !parked.has(o));
     warnings.push(tn('{n} Objekt liegt ganz außerhalb des Arbeitsbereichs (geparkt) und wird nicht gelasert.', '{n} Objekte liegen ganz außerhalb des Arbeitsbereichs (geparkt) und werden nicht gelasert.', parked.size));
   }
   const toBed = FLIP(doc.bed.h);
+
+  // Objekte nach ID für zugewiesene Bildschnitt-Konturen: auch ausgeblendete/noLaser-Objekte
+  // müssen auffindbar bleiben, weil die Zuordnung sie gerade auf noLaser setzt.
+  const byId = objectsById(doc.objs);
 
   // Top-Level-ID je Blatt für „Gruppen zusammenhalten“ (Issue #222): Blätter desselben
   // obersten Objekts (inkl. Gruppenkinder) teilen sich die Gruppen-ID.
@@ -1704,12 +1783,14 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     objs: Poly[][];
     /** Konturen je Bearbeitung (Layer, dann Sub-Layer) nach Kerf */
     sets: Poly[][];
-    images: { shape: ImageShape; world: Mat }[];
+    images: { o: Obj; shape: ImageShape; world: Mat }[];
+    /** Schnittkonturen je Bild (Bettkoordinaten, vor dem „Starten ab“-Versatz) */
+    cuts: Poly[][];
   }
   const buckets = new Map<number, Bucket>();
   const bucket = (i: number) => {
     let b = buckets.get(i);
-    if (!b) buckets.set(i, (b = { objs: [], sets: [], images: [] }));
+    if (!b) buckets.set(i, (b = { objs: [], sets: [], images: [], cuts: [] }));
     return b;
   };
   const bounds = emptyBox();
@@ -1753,11 +1834,27 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     if (!L.output) continue;
     const s = o.shape;
     if (s.kind === 'image') {
-      bucket(o.layer).images.push({ shape: s, world });
+      const bk = bucket(o.layer);
+      bk.images.push({ o, shape: s, world });
       const M = mul(toBed, world);
-      for (const [x, y] of [[0, 0], [s.w, 0], [s.w, s.h], [0, s.h]]) {
-        const q = apply(M, x, y);
+      const quad = s.edit !== undefined ? imageRasterGeometry(s).quad
+        : [{ x: 0, y: 0 }, { x: s.w, y: 0 }, { x: s.w, y: s.h }, { x: 0, y: s.h }];
+      for (const p of quad) {
+        const q = apply(M, p.x, p.y);
         addPt(bounds, q.x, q.y);
+      }
+      // Optionaler Schnittschritt pro Bild-Layer: Kontur auflösen, keine Rechteck-Ersatzform.
+      const cut = imageCutSettings(inp.imgLayer(o.layer));
+      if (cut.output) {
+        const path = resolveImageCutPath(o, world, (id) => byId.get(id));
+        if (!path.ok) throw new Error(imageCutIssueText(path.reason, s.name ?? t('Bild')));
+        let polys: Poly[] = [{ pts: path.polygon.map((p) => apply(toBed, p.x, p.y)), closed: path.closed, grp: topOf.get(o) }];
+        if (cut.kerf) polys = kerfOffsetReport(polys, cut.kerf).polys;
+        if (cut.dedup) polys = dedupPolys(polys, cut.dedupTol, cut.kerf).polys;
+        if (polys.length) {
+          bk.cuts.push(polys);
+          for (const p of polys) for (const q of p.pts) addPt(bounds, q.x, q.y);
+        }
       }
       continue;
     }
@@ -1928,7 +2025,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     // Ohne Kerf teilen sich Layer und Sub-Layer dieselben Punkte: jeden nur einmal verschieben
     const moved = new Set<Pt>();
     for (const b of buckets.values())
-      for (const set of b.sets)
+      for (const set of [...b.sets, ...b.cuts])
         for (const p of set)
           for (const q of p.pts) {
             if (moved.has(q)) continue;
@@ -1967,6 +2064,18 @@ export async function buildJob(inp: JobInput): Promise<Job> {
           mv.zCur = useZ ? L.zOffset + p * L.zStep : 0;
           emitScanlines(mv, lines, { speed: IL.speed, bidirectional: IL.bidirectional, overscan: ov, layer: li }, flip);
         }
+        mv.zCur = 0;
+      }
+    }
+    // Nach allen Gravuren die Schnittkonturen der Bilder, noch vor den Vektor-Bearbeitungen.
+    if (bk.cuts.length) {
+      const cut = imageCutSettings(inp.imgLayer(li));
+      const entry = { ...cut, mode: 'line' as const } as CutEntry;
+      const pass = (p: number) => (mv.zCur = useZ ? cut.zOffset + p * cut.zStep : 0);
+      if (!useZ && (cut.zOffset || cut.zStep)) zSkipped = true;
+      const ord = { innerFirst: device.optInnerFirst, travel: device.optTravel, group: device.optGroup };
+      for (const polys of bk.cuts) {
+        emitEntry(mv, entry, polys, li, -2, flip, pass, ord);
         mv.zCur = 0;
       }
     }
@@ -2032,7 +2141,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
     px = mv.x[i];
     py = mv.y[i];
   }
-  const air = order.filter((li) => layerOf(li).air);
+  const air = order.filter((li) => layerOf(li).air || (!!buckets.get(li)?.cuts.length && imageCutSettings(inp.imgLayer(li)).air));
   const dedup = [...dedupInfo.entries()].map(([layer, d]) => ({ layer, len: d.len, lines: d.lines }));
   for (const d of dedup) {
     const L = layerOf(d.layer);

@@ -9,7 +9,7 @@ import { SCALE } from './clip';
 import { copySub, joinSubs } from './pathtools';
 import type { Params } from './generators/types';
 
-export type CheckKind = 'double' | 'open' | 'unjoined' | 'web' | 'hole' | 'bed' | 'import' | 'fit' | 'thickness' | 'loose' | 'insert' | 'engrave';
+export type CheckKind = 'double' | 'open' | 'unjoined' | 'web' | 'hole' | 'bed' | 'import' | 'fit' | 'thickness' | 'loose' | 'insert' | 'engrave' | 'image';
 export type CheckLevel = 'error' | 'warn' | 'info';
 
 /** Korrektur zu einem Befund; ausgeführt vom Editor (src/editor/check.ts) */

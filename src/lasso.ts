@@ -1,5 +1,6 @@
 import { apply, Obj, Pt } from './model';
-import { bezierPt, boundsOf, segments, shapeSubs } from './geom';
+import { bezierPt, boundsOf, imageContourHitsSegment, imageContourSegmentCuts, segments, shapeSubs } from './geom';
+import { resolveImageContour } from './imageContour';
 /** Boundary-inclusive even-odd hit, also valid for a self-crossing lasso. */
 export function insideLasso(point:Pt,polygon:Pt[]):boolean {
   if(polygon.length<3)return false;
@@ -40,6 +41,13 @@ export function touchHit(points:Pt[],o:Obj):boolean {
     if(p.x<x0)x0=p.x; if(p.y<y0)y0=p.y; if(p.x>x1)x1=p.x; if(p.y>y1)y1=p.y;
   }
   if(x1<b.x || x0>b.x+b.w || y1<b.y || y0>b.y+b.h)return false;
+  if(o.shape.kind==='image' && o.shape.edit!==undefined) {
+    const result=resolveImageContour(o.shape,o.m);
+    if(!result.ok)return false;
+    for(let i=0;i<points.length-1;i++)
+      if(imageContourHitsSegment(result.contour,points[i],points[i+1]))return true;
+    return points.length>=3 && imageContourHitsSegment(result.contour,points[points.length-1],points[0]);
+  }
   const subs=shapeSubs(o.shape);
   if(!subs.length)return false;
   const outline:[Pt,Pt][]=[];
@@ -64,6 +72,27 @@ export function touchHit(points:Pt[],o:Obj):boolean {
     for(const [c,d] of outline) if(segsCross(a,e,c,d))return true;
   }
   return false;
+}
+
+/** Enclose the visible image, allowing boundary contact but rejecting concave cuts through arcs. */
+export function imageEnclosedByLasso(points:Pt[],o:Obj):boolean {
+  if(points.length<3 || o.shape.kind!=='image')return false;
+  const result=resolveImageContour(o.shape,o.m);
+  if(!result.ok)return false;
+  const contour=result.contour;
+  if(!contour.corners.every(c=>insideLasso(c.start,points) && insideLasso(c.end,points)))return false;
+  for(let i=0;i<points.length;i++) {
+    const a=points[i],b=points[(i+1)%points.length];
+    const cuts=[0,...imageContourSegmentCuts(contour,a,b),1].sort((a,b)=>a-b);
+    // Exact intersections partition each lasso edge into wholly inside/outside intervals.
+    // An edge in the image interior excludes visible content; tangency/overlap does not.
+    for(let j=1;j<cuts.length;j++) {
+      if(cuts[j]===cuts[j-1])continue;
+      const u=(cuts[j]+cuts[j-1])/2,p={x:a.x+(b.x-a.x)*u,y:a.y+(b.y-a.y)*u};
+      if(contour.contains(p) && !imageContourHitsSegment(contour,p,p))return false;
+    }
+  }
+  return true;
 }
 
 /** Vorzeichenbehaftete Shoelace-Fläche des Lassos in Weltkoordinaten (y wächst nach

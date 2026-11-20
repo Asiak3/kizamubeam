@@ -1,8 +1,13 @@
 // Rasterbilder: Asset-Speicher (Bilddaten außerhalb von Undo und Dokument-JSON),
 // Bildverarbeitung (Helligkeit, Kontrast, Gamma, Schärfen, Negativ, Dithering) und Zwischenspeicher der Ergebnisse.
-import { DEFAULT_ADJUST, defaultImageLayer, DitherMode, ImageAdjust, ImageOutput, ImageShape, Mat } from './model';
+import { DEFAULT_ADJUST, defaultImageLayer, ImageEdit, ImageOutput, ImageShape, Mat } from './model';
 import { t } from './i18n';
 import { hasNative, native } from './native';
+import { DEFAULT_IMAGE_MAX_PIXELS, resolveImageRasterGeometry } from './imageRaster';
+import { ImageCache } from './imageCache';
+import { applyAdjust, resample, ditherOutput, editedGrayPixels, maskExterior, processEditedPixels, downsampleRgba, ImageProcessingError, type ImageProcessingErrorCode } from './imagePixels';
+export { applyAdjust, resample, dither, ImageProcessingError } from './imagePixels';
+export type { DitherOptions, ImageProcessingErrorCode } from './imagePixels';
 
 // ---------- Asset-Speicher ----------
 
@@ -18,6 +23,10 @@ interface Asset {
 }
 
 const assets = new Map<string, Asset>();
+// Disposable copies only: original assets remain available for save/output.
+// Sized for one 24 MP original (96 MB) plus working room; anything bigger
+// re-reads per use instead of pinning unbounded heap.
+const sourceRgba = new ImageCache<Asset, Uint8ClampedArray>(128 * 1024 * 1024, 4);
 const listeners = new Set<() => void>();
 
 /** Wird aufgerufen, sobald ein Bild dekodiert ist oder ein Ergebnis neu berechnet wurde. Liefert die Abmeldung. */
@@ -32,6 +41,28 @@ export function assetUrl(id: string): string | null {
 }
 export function assetImage(id: string): HTMLImageElement | null {
   return assets.get(id)?.img ?? null;
+}
+
+/** Dekodiertes Original-RGBA für Exporte, die Bildbearbeitungen einbacken; null, solange nicht dekodiert. */
+export function assetRgba(id: string): { rgba: Uint8ClampedArray; width: number; height: number } | null {
+  const a = assets.get(id);
+  if (!a?.img) return null;
+  let rgba = sourceRgba.get(a);
+  if (!rgba) {
+    try {
+      const c = document.createElement('canvas');
+      c.width = a.w;
+      c.height = a.h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return null;
+      ctx.drawImage(a.img, 0, 0);
+      rgba = ctx.getImageData(0, 0, a.w, a.h).data;
+      sourceRgba.set(a, rgba, rgba.byteLength);
+    } catch {
+      return null;
+    }
+  }
+  return { rgba, width: a.w, height: a.h };
 }
 
 /** Verkleinerte Fassung (PNG, längste Seite max Bildpunkte) für Vorschauen; null, solange das Bild nicht dekodiert ist */
@@ -198,248 +229,35 @@ function sourceGray(a: Asset): Float32Array | null {
   return g;
 }
 
-/** Graustufen auf cols × rows bringen (Flächenmittel beim Verkleinern, bilinear beim Vergrößern). */
-export function resample(src: Float32Array, sw: number, sh: number, cols: number, rows: number): Float32Array {
-  const out = new Float32Array(cols * rows);
-  const fx = sw / cols,
-    fy = sh / rows;
-  if (fx >= 1 && fy >= 1) {
-    // Flächenmittel: jede Zielzelle mittelt die überdeckten Quellpunkte (gewichtet an den Rändern)
-    for (let y = 0; y < rows; y++) {
-      const y0 = y * fy,
-        y1 = y0 + fy;
-      for (let x = 0; x < cols; x++) {
-        const x0 = x * fx,
-          x1 = x0 + fx;
-        let sum = 0,
-          wsum = 0;
-        for (let sy = Math.floor(y0); sy < Math.min(sh, Math.ceil(y1)); sy++) {
-          const wy = Math.min(y1, sy + 1) - Math.max(y0, sy);
-          const row = sy * sw;
-          for (let sx = Math.floor(x0); sx < Math.min(sw, Math.ceil(x1)); sx++) {
-            const w = wy * (Math.min(x1, sx + 1) - Math.max(x0, sx));
-            sum += src[row + sx] * w;
-            wsum += w;
-          }
-        }
-        out[y * cols + x] = wsum ? sum / wsum : 255;
-      }
-    }
-    return out;
-  }
-  for (let y = 0; y < rows; y++) {
-    const syf = Math.max(0, Math.min(sh - 1, (y + 0.5) * fy - 0.5));
-    const sy0 = Math.floor(syf),
-      sy1 = Math.min(sh - 1, sy0 + 1),
-      ty = syf - sy0;
-    for (let x = 0; x < cols; x++) {
-      const sxf = Math.max(0, Math.min(sw - 1, (x + 0.5) * fx - 0.5));
-      const sx0 = Math.floor(sxf),
-        sx1 = Math.min(sw - 1, sx0 + 1),
-        tx = sxf - sx0;
-      const a = src[sy0 * sw + sx0] * (1 - tx) + src[sy0 * sw + sx1] * tx;
-      const b = src[sy1 * sw + sx0] * (1 - tx) + src[sy1 * sw + sx1] * tx;
-      out[y * cols + x] = a * (1 - ty) + b * ty;
-    }
-  }
-  return out;
-}
-
-/** Kastenunschärfe (horizontal + vertikal), dreimal angewendet ≈ Gauß */
-function blur(v: Float32Array, w: number, h: number, r: number): Float32Array {
-  let a = v.slice();
-  let b = new Float32Array(v.length);
-  const pass = (src: Float32Array, dst: Float32Array, horiz: boolean) => {
-    const n = horiz ? w : h,
-      lines = horiz ? h : w;
-    for (let l = 0; l < lines; l++) {
-      const at = (i: number) => (horiz ? l * w + i : i * w + l);
-      let acc = 0;
-      for (let i = -r; i <= r; i++) acc += src[at(Math.max(0, Math.min(n - 1, i)))];
-      for (let i = 0; i < n; i++) {
-        dst[at(i)] = acc / (2 * r + 1);
-        acc += src[at(Math.min(n - 1, i + r + 1))] - src[at(Math.max(0, i - r))];
-      }
-    }
-  };
-  for (let k = 0; k < 3; k++) {
-    pass(a, b, true);
-    pass(b, a, false);
-  }
-  return a;
-}
-
-/** Helligkeit, Kontrast, Gamma, Schärfen und Negativ auf Graustufen (in place) anwenden. */
-export function applyAdjust(g: Float32Array, w: number, h: number, adj: ImageAdjust, negative: boolean) {
-  if (adj.sharpen > 0) {
-    const r = Math.max(1, Math.round(adj.sharpenRadius / 2));
-    const bl = blur(g, w, h, r);
-    const k = adj.sharpen / 100,
-      thr = adj.denoise;
-    for (let i = 0; i < g.length; i++) {
-      const d = g[i] - bl[i];
-      if (Math.abs(d) >= thr) g[i] += k * d;
-    }
-  }
-  const C = Math.max(-99, Math.min(99, adj.contrast)) * 2.55;
-  const cf = (259 * (C + 255)) / (255 * (259 - C));
-  const B = adj.brightness * 2.55;
-  const ig = 1 / Math.max(0.05, adj.gamma);
-  const lut = new Float32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let v = (i - 128) * cf + 128 + B;
-    v = Math.max(0, Math.min(255, v));
-    v = 255 * Math.pow(v / 255, ig);
-    lut[i] = negative ? 255 - v : v;
-  }
-  for (let i = 0; i < g.length; i++) {
-    const v = g[i];
-    const c = v <= 0 ? 0 : v >= 255 ? 255 : v;
-    const lo = Math.floor(c),
-      t = c - lo;
-    g[i] = lo >= 255 ? lut[255] : lut[lo] * (1 - t) + lut[lo + 1] * t;
-  }
-}
-
-const BAYER8 = (() => {
-  const m = [
-    [0, 32, 8, 40, 2, 34, 10, 42], [48, 16, 56, 24, 50, 18, 58, 26], [12, 44, 4, 36, 14, 46, 6, 38],
-    [60, 28, 52, 20, 62, 30, 54, 22], [3, 35, 11, 43, 1, 33, 9, 41], [51, 19, 59, 27, 49, 17, 57, 25],
-    [15, 47, 7, 39, 13, 45, 5, 37], [63, 31, 55, 23, 61, 29, 53, 21],
-  ];
-  return m.map((r) => r.map((v) => ((v + 0.5) / 64) * 255));
-})();
-
-// Fehlerverteilung: [dx, dy, Gewicht], Gewichte schon durch die Summe geteilt
-const KERNELS: Record<string, [number, number, number][]> = {
-  floyd: [[1, 0, 7], [-1, 1, 3], [0, 1, 5], [1, 1, 1]].map(([x, y, w]) => [x, y, w / 16]) as [number, number, number][],
-  atkinson: [[1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]].map(([x, y]) => [x, y, 1 / 8]) as [number, number, number][],
-  jarvis: [
-    [1, 0, 7], [2, 0, 5], [-2, 1, 3], [-1, 1, 5], [0, 1, 7], [1, 1, 5], [2, 1, 3], [-2, 2, 1], [-1, 2, 3], [0, 2, 5], [1, 2, 3], [2, 2, 1],
-  ].map(([x, y, w]) => [x, y, w / 48]) as [number, number, number][],
-  stucki: [
-    [1, 0, 8], [2, 0, 4], [-2, 1, 2], [-1, 1, 4], [0, 1, 8], [1, 1, 4], [2, 1, 2], [-2, 2, 1], [-1, 2, 2], [0, 2, 4], [1, 2, 2], [2, 2, 1],
-  ].map(([x, y, w]) => [x, y, w / 42]) as [number, number, number][],
-};
-
-/** Skizze: Kantenstärke unter dieser Schwelle bleibt weiß (Rauschen), darüber wird sie verstärkt */
-const SKETCH_FLOOR = 4,
-  SKETCH_GAIN = 2;
-
-export interface DitherOptions {
-  mode: DitherMode;
-  threshold: number;
-  /** Halbton und Zeitungsdruck: Zellengröße in Ausgabepunkten und Winkel in Grad */
-  cellPx: number;
-  angle: number;
-}
-
-/**
- * Graustufen in Ausgabewerte umsetzen: 0 = volle Leistung (schwarz), 255 = aus.
- * Bei allen Verfahren außer Graustufen und Skizze sind die Werte nur 0 oder 255.
- */
-export function dither(g: Float32Array, w: number, h: number, o: DitherOptions): Uint8ClampedArray {
-  const out = new Uint8ClampedArray(w * h);
-  switch (o.mode) {
-    case 'grayscale':
-      for (let i = 0; i < g.length; i++) out[i] = g[i];
-      return out;
-    case 'threshold':
-      for (let i = 0; i < g.length; i++) out[i] = g[i] < o.threshold ? 0 : 255;
-      return out;
-    case 'ordered':
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) out[y * w + x] = g[y * w + x] < BAYER8[y & 7][x & 7] ? 0 : 255;
-      return out;
-    case 'halftone': {
-      // Runde Punkte in einem gedrehten Zellraster (Spot-Funktion (cos u + cos v) / 2)
-      const a = (o.angle * Math.PI) / 180,
-        ca = Math.cos(a),
-        sa = Math.sin(a);
-      const f = (2 * Math.PI) / Math.max(2, o.cellPx);
-      for (let y = 0; y < h; y++)
-        for (let x = 0; x < w; x++) {
-          const u = (x * ca + y * sa) * f,
-            v = (-x * sa + y * ca) * f;
-          const spot = (Math.cos(u) + Math.cos(v)) * 0.25 + 0.5; // 0 … 1, Zellmitte = 1
-          // Dunkle Bildstellen ergeben große Punkte, die von der Zellmitte aus wachsen
-          out[y * w + x] = spot > g[y * w + x] / 255 ? 0 : 255;
-        }
-      return out;
-    }
-    case 'newsprint': {
-      // Zeitungsdruck: ein runder Punkt je Zelle eines gedrehten Rasters, seine Fläche entspricht der mittleren
-      // Dunkelheit der Zelle. Ab 50 % wachsen die Punkte zusammen und es bleiben helle Punkte in den Zellecken.
-      const cell = Math.max(2, o.cellPx);
-      const bl = blur(g, w, h, Math.max(1, Math.round(cell / 4)));
-      const a = (o.angle * Math.PI) / 180,
-        ca = Math.cos(a),
-        sa = Math.sin(a);
-      for (let y = 0; y < h; y++)
-        for (let x = 0; x < w; x++) {
-          const u = (x * ca + y * sa) / cell,
-            v = (-x * sa + y * ca) / cell;
-          const cu = Math.floor(u) + 0.5,
-            cv = Math.floor(v) + 0.5;
-          // Zellmitte zurück ins Bild, dort die (geglättete) Helligkeit lesen
-          const px = Math.min(w - 1, Math.max(0, Math.floor((cu * ca - cv * sa) * cell))),
-            py = Math.min(h - 1, Math.max(0, Math.floor((cu * sa + cv * ca) * cell)));
-          const dark = Math.min(1, Math.max(0, 1 - bl[py * w + px] / 255));
-          const du = u - cu,
-            dv = v - cv;
-          let black: boolean;
-          if (dark <= 0.5) black = du * du + dv * dv < dark / Math.PI;
-          else {
-            const eu = 0.5 - Math.abs(du),
-              ev = 0.5 - Math.abs(dv);
-            black = eu * eu + ev * ev >= (1 - dark) / Math.PI;
-          }
-          out[y * w + x] = black ? 0 : 255;
-        }
-      return out;
-    }
-    case 'sketch': {
-      // Skizze: Kanten (Sobel auf leicht geglättetem Bild) werden zu dunklen Strichen, gleichmäßige Flächen bleiben
-      // weiß. Die Werte sind Graustufen, gelasert wird mit veränderlicher Leistung.
-      const b = blur(g, w, h, 1);
-      const at = (x: number, y: number) => b[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
-      for (let y = 0; y < h; y++)
-        for (let x = 0; x < w; x++) {
-          const gx = at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1));
-          const gy = at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1));
-          const mag = Math.sqrt(gx * gx + gy * gy) / 4;
-          out[y * w + x] = 255 - Math.max(0, mag - SKETCH_FLOOR) * SKETCH_GAIN;
-        }
-      return out;
-    }
-    default: {
-      const k = KERNELS[o.mode] ?? KERNELS.floyd;
-      const e = g.slice();
-      // Schlangenlinie: jede zweite Zeile rückwärts, vermeidet Richtungsmuster
-      for (let y = 0; y < h; y++) {
-        const rev = y & 1;
-        for (let n = 0; n < w; n++) {
-          const x = rev ? w - 1 - n : n;
-          const i = y * w + x;
-          const old = e[i];
-          const nv = old < 128 ? 0 : 255;
-          out[i] = nv;
-          const err = old - nv;
-          if (!err) continue;
-          for (const [dx, dy, wt] of k) {
-            const xx = rev ? x - dx : x + dx,
-              yy = y + dy;
-            if (xx < 0 || xx >= w || yy >= h) continue;
-            e[yy * w + xx] += err * wt;
-          }
-        }
-      }
-      return out;
-    }
-  }
-}
-
 /** Ausgabepunkte eines Bildes für die gegebene Welt-Matrix und den Zeilenabstand. */
+/** Visible original-local polygon and sampling rectangle; world affine stays external. */
+export function imageRasterGeometry(s: ImageShape) {
+  const resolved = resolveImageRasterGeometry(s);
+  if (!resolved.ok) throw new ImageProcessingError('geometry', resolved.reason);
+  return resolved;
+}
+
+function validateEditedGrid(cols: number, rows: number) {
+  if (![cols, rows].every(n => Number.isSafeInteger(n) && n > 0)) {
+    throw new ImageProcessingError('invalid-grid', 'Output dimensions must be positive safe integers');
+  }
+  if (cols * rows > DEFAULT_IMAGE_MAX_PIXELS) {
+    throw new ImageProcessingError('output-too-large', `${cols} × ${rows} exceeds ${DEFAULT_IMAGE_MAX_PIXELS} pixels`);
+  }
+}
+
 export function outputGrid(s: ImageShape, m: Mat, interval: number): { cols: number; rows: number; capped: boolean } {
+  if (s.edit !== undefined) {
+    const { bounds } = imageRasterGeometry(s);
+    const det = m[0] * m[3] - m[1] * m[2];
+    if (!Number.isFinite(interval) || interval <= 0 || !m.every(Number.isFinite) || !Number.isFinite(det) || det === 0) {
+      throw new ImageProcessingError('invalid-grid', 'Invalid output interval or affine transform');
+    }
+    const cols = Math.max(1, Math.round(Math.hypot(m[0], m[1]) * bounds.width / interval)),
+      rows = Math.max(1, Math.round(Math.hypot(m[2], m[3]) * bounds.height / interval));
+    validateEditedGrid(cols, rows);
+    return { cols, rows, capped: false };
+  }
   const sx = Math.hypot(m[0], m[1]) * s.w,
     sy = Math.hypot(m[2], m[3]) * s.h;
   let cols = Math.max(1, Math.round(sx / interval)),
@@ -455,16 +273,43 @@ export function outputGrid(s: ImageShape, m: Mat, interval: number): { cols: num
   return { cols, rows, capped };
 }
 
+function editedGray(s: ImageShape, cols: number, rows: number, negative: boolean, world?: Mat) {
+  imageRasterGeometry(s);
+  validateEditedGrid(cols, rows);
+  const a = assets.get(s.asset);
+  if (!a?.img) throw new ImageProcessingError('asset-unavailable', 'Original image is not decoded');
+  let rgba = sourceRgba.get(a);
+  if (!rgba) {
+    try {
+      const c = document.createElement('canvas');
+      c.width = a.w; c.height = a.h;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      if (!ctx) throw new Error('Canvas context unavailable');
+      ctx.drawImage(a.img, 0, 0);
+      rgba = ctx.getImageData(0, 0, a.w, a.h).data;
+      sourceRgba.set(a, rgba, rgba.byteLength);
+    } catch {
+      throw new ImageProcessingError('source-read', 'Original RGBA could not be read');
+    }
+  }
+  return editedGrayPixels({ rgba, width: a.w, height: a.h }, s, cols, rows, negative, world);
+}
+
 /** Vollständige Verarbeitung: Ausgabewerte (0 = brennen … 255 = aus) im Raster cols × rows. */
-export function processImage(s: ImageShape, L: ImageOutput, cols: number, rows: number): Uint8ClampedArray | null {
+export function processImage(s: ImageShape, L: ImageOutput, cols: number, rows: number, world?: Mat): Uint8ClampedArray | null {
+  if (s.edit !== undefined) {
+    const { g, coverage } = editedGray(s, cols, rows, L.negative, world);
+    const values = ditherOutput(g, cols, rows, L);
+    maskExterior(values, coverage);
+    return values;
+  }
   const a = assets.get(s.asset);
   if (!a) return null;
   const src = sourceGray(a);
   if (!src) return null;
   const g = resample(src, a.w, a.h, cols, rows);
   applyAdjust(g, cols, rows, s.adjust, L.negative);
-  const cellPx = 25.4 / Math.max(1, L.cells) / L.interval;
-  return dither(g, cols, rows, { mode: L.dither, threshold: L.threshold, cellPx, angle: L.angle });
+  return ditherOutput(g, cols, rows, L);
 }
 
 /** Einstellungen für den Rust-Kern; fehlende Felder (ältere Dateien) mit den Standardwerten */
@@ -484,7 +329,10 @@ async function nativeAsset(s: ImageShape): Promise<boolean> {
  * Wie processImage, aber in der Desktop-App im Rust-Kern (mehrere Kerne, blockiert die Oberfläche nicht).
  * Ist das Bild dort nicht lesbar, rechnet TypeScript.
  */
-export async function processImageAsync(s: ImageShape, L: ImageOutput, cols: number, rows: number): Promise<Uint8Array | Uint8ClampedArray | null> {
+export async function processImageAsync(s: ImageShape, L: ImageOutput, cols: number, rows: number, world?: Mat): Promise<Uint8Array | Uint8ClampedArray | null> {
+  // Native processing currently knows only the unedited original. Keep edited
+  // failures outside its catch/fallback; this TS work is still synchronous.
+  if (s.edit !== undefined) return processImage(s, L, cols, rows, world);
   if (await nativeAsset(s)) {
     try {
       const buf = await native<ArrayBuffer>('image_process', { id: s.asset, cols, rows, adjust: nativeAdjust(s), layer: nativeLayer(L) });
@@ -501,6 +349,7 @@ export async function processImageAsync(s: ImageShape, L: ImageOutput, cols: num
  * m bildet lokale mm des Bildes auf Ausgabekoordinaten ab, im ist die Umkehrung. null = im Rust-Kern nicht möglich.
  */
 export async function nativeScanLines(s: ImageShape, L: ImageOutput, cols: number, rows: number, m: Mat, im: Mat): Promise<Float64Array | null> {
+  if (s.edit !== undefined) return null;
   if (!(await nativeAsset(s))) return null;
   try {
     const buf = await native<ArrayBuffer>('image_scan', { id: s.asset, cols, rows, adjust: nativeAdjust(s), layer: nativeLayer(L), w: s.w, h: s.h, m, im });
@@ -511,7 +360,12 @@ export async function nativeScanLines(s: ImageShape, L: ImageOutput, cols: numbe
 }
 
 /** Graustufen nach den Anpassungen (ohne Dithering), z. B. zum Nachzeichnen. */
-export function adjustedGray(s: ImageShape, cols: number, rows: number, negative = false): Float32Array | null {
+export function adjustedGray(s: ImageShape, cols: number, rows: number, negative = false, world?: Mat): Float32Array | null {
+  if (s.edit !== undefined) {
+    const { g, coverage } = editedGray(s, cols, rows, negative, world);
+    maskExterior(g, coverage);
+    return g;
+  }
   const a = assets.get(s.asset);
   if (!a) return null;
   const src = sourceGray(a);
@@ -526,7 +380,7 @@ export function sourceSize(id: string): { w: number; h: number } | null {
   return a?.img ? { w: a.w, h: a.h } : null;
 }
 
-function toCanvas(v: Uint8Array | Uint8ClampedArray, w: number, h: number): HTMLCanvasElement {
+function toCanvas(v: Uint8Array | Uint8ClampedArray | Float32Array, w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
@@ -553,21 +407,23 @@ const queue = new Map<ImageShape, () => void>();
 let queueTimer = 0;
 
 function resultKey(s: ImageShape, L: ImageOutput, cols: number, rows: number) {
-  return JSON.stringify([s.asset, s.adjust, L.interval, L.dither, L.negative, L.threshold, L.cells, L.angle, cols, rows]);
+  return JSON.stringify([s.asset, s.w, s.h, s.pxW, s.pxH, s.adjust, L.interval, L.dither, L.negative, L.threshold, L.cells, L.angle, cols, rows, s.edit]);
 }
 
 /**
  * Verarbeitetes Bild für die Anzeige. Ändern sich Größe oder Einstellungen, wird kurz das alte Ergebnis
  * (gestreckt) gezeigt und das neue nach einer Pause berechnet, damit Ziehen und Schieberegler flüssig bleiben.
  */
-export function displayCanvas(s: ImageShape, m: Mat, L: ImageOutput, immediate = false): HTMLCanvasElement | null {
+export function displayCanvas(s: ImageShape, m: Mat, L: ImageOutput, immediate = false, options?: ImageDisplayOptions): HTMLCanvasElement | null {
   const a = assets.get(s.asset);
   if (!a?.img) return null;
+  if (s.edit !== undefined) return editedDisplayCanvas(s, m, L, a, options);
   const { cols, rows } = outputGrid(s, m, L.interval);
   const key = resultKey(s, L, cols, rows);
   const c = results.get(s);
   if (c && c.key === key) return c.canvas;
-  if (hasNative()) return nativeDisplay(s, L, cols, rows, key, c, immediate);
+  // Edited processing is TS-only; keep its errors synchronous for the caller's boundary.
+  if (s.edit === undefined && hasNative()) return nativeDisplay(s, L, cols, rows, key, c, immediate);
   const compute = () => {
     const v = processImage(s, L, cols, rows);
     if (!v) return;
@@ -589,6 +445,304 @@ export function displayCanvas(s: ImageShape, m: Mat, L: ImageOutput, immediate =
     }, 120);
   }
   return c.canvas;
+}
+
+const IMAGE_DRAFT_MAX_SIDE = 512;
+// A validated full-detail canvas must fit: cache pressure evicts older images,
+// never silently lowers the current image's view/DPR sampling density.
+const editedDisplays = new ImageCache<string, { asset: Asset; canvas: HTMLCanvasElement }>(DEFAULT_IMAGE_MAX_PIXELS * 4, 4);
+const reducedDisplays = new WeakSet<HTMLCanvasElement>();
+const sourceIdentities = new WeakMap<Asset, number>();
+let nextSourceIdentity = 0;
+
+export interface ImageDisplayRequest {
+  id: number;
+  jobKey: string;
+  source: { rgba: Uint8ClampedArray; width: number; height: number };
+  shape: ImageShape;
+  output: ImageOutput;
+  world: Mat;
+  job: { cols: number; rows: number };
+  display: { cols: number; rows: number };
+}
+export interface ImageDisplayReply {
+  id: number;
+  phase?: number;
+  values?: Uint8ClampedArray;
+  error?: { name: string; message: string; code?: ImageProcessingErrorCode };
+}
+interface DisplayState { key: string; asset: Asset; pending: boolean; phase: number; cancelled?: boolean; error?: Error; canvas?: HTMLCanvasElement | null }
+interface DisplayPending { owner: object; key: string; asset: Asset; reduced: boolean; request: Omit<ImageDisplayRequest, 'source'> }
+const displayStates = new WeakMap<object, DisplayState>();
+const displayQueue = new Map<object, DisplayPending>();
+let displayWorker: Worker | undefined, displayRunning: DisplayPending | undefined, nextDisplayRequest = 0;
+
+/**
+ * Test-only seam: scripts/image-display-worker-fixture.ts installs a synchronous
+ * Worker so bundled Node tests (data: URL base, where `new URL()` for the real
+ * worker file cannot resolve) stay deterministic. Production never sets the hook
+ * and always uses the real worker module.
+ */
+function createDisplayWorker(): Worker {
+  const hook = (globalThis as Record<string, unknown>).__kizamubeamSyncDisplayWorker as (() => Worker) | undefined;
+  if (hook) return hook();
+  return new Worker(new URL('./imageDisplay.worker.ts', import.meta.url), { type: 'module' });
+}
+
+export function imageDisplayActivity(owner: object): { pending: true; phase: number } | null {
+  const state = displayStates.get(owner);
+  return state?.pending ? { pending: true, phase: state.phase } : null;
+}
+
+export function cancelImageDisplay(owner: object): void {
+  const state = displayStates.get(owner);
+  if (!state?.pending) return;
+  state.pending = false; state.cancelled = true;
+  displayQueue.delete(owner);
+  if (displayRunning?.owner === owner) {
+    displayWorker?.terminate(); displayWorker = undefined; displayRunning = undefined;
+    pumpImageDisplay();
+  }
+  notify();
+}
+
+function finishImageDisplay(reply: ImageDisplayReply) {
+  const current = displayRunning;
+  if (!current || current.request.id !== reply.id) return;
+  const state = displayStates.get(current.owner);
+  const relevant = state?.key === current.key && state.asset === current.asset && !state.cancelled
+    && assets.get(current.request.shape.asset) === current.asset;
+  if (reply.phase !== undefined) {
+    if (relevant) { state.phase = reply.phase; notify(); }
+    return;
+  }
+  if (relevant) {
+    state.pending = false;
+    if (reply.error) {
+      const error = new ImageProcessingError(reply.error.code ?? 'display-unavailable', reply.error.message);
+      error.name = reply.error.name; state.error = error;
+    } else if (reply.values) {
+      try {
+        const { cols, rows } = current.request.display;
+        const canvas = toCanvas(reply.values, cols, rows);
+        if (current.reduced) reducedDisplays.add(canvas);
+        editedDisplays.set(current.key, { asset: current.asset, canvas }, cols * rows * 4);
+        state.canvas = canvas;
+      } catch (cause) {
+        // Preserve unexpected presentation failures for the next render, while
+        // still releasing the worker slot and notifying the editor.
+        state.error = cause instanceof ImageProcessingError ? cause
+          : new ImageProcessingError('display-unavailable', cause instanceof Error ? cause.message : String(cause));
+      }
+    } else state.error = new ImageProcessingError('display-unavailable', 'Image display worker returned no pixels');
+  }
+  displayRunning = undefined;
+  pumpImageDisplay();
+  notify();
+}
+
+function pumpImageDisplay() {
+  if (displayRunning || !displayQueue.size) return;
+  const [owner, pending] = displayQueue.entries().next().value!;
+  displayQueue.delete(owner);
+  displayRunning = pending;
+  try {
+    if (!displayWorker) {
+      const worker = createDisplayWorker();
+      displayWorker = worker;
+      worker.onmessage = (event: MessageEvent<ImageDisplayReply>) => { if (displayWorker === worker) finishImageDisplay(event.data); };
+      const fail = (message: string) => {
+        if (displayWorker !== worker || !displayRunning) return;
+        const id = displayRunning.request.id;
+        worker.terminate(); displayWorker = undefined;
+        finishImageDisplay({ id, error: { name: 'ImageProcessingError', message, code: 'display-unavailable' } });
+      };
+      worker.onerror = (event) => { event.preventDefault(); fail(event.message); };
+      worker.onmessageerror = () => fail('Image display worker message could not be decoded');
+    }
+    if (assets.get(pending.request.shape.asset) !== pending.asset) throw new ImageProcessingError('asset-unavailable', 'Original image changed while the display was pending');
+    const source = assetRgba(pending.request.shape.asset);
+    if (!source) throw new ImageProcessingError('source-read', 'Original RGBA could not be read');
+    // postMessage copies this disposable source; never transfer/detach the original.
+    displayWorker.postMessage({ ...pending.request, source } satisfies ImageDisplayRequest);
+  } catch (cause) {
+    displayRunning = undefined;
+    const state = displayStates.get(owner);
+    if (cause instanceof ImageProcessingError) {
+      // Expected display failure: surface it through the per-image boundary on
+      // the next render instead of stopping the editor frame loop.
+      if (state?.key === pending.key) { state.pending = false; state.error = cause; notify(); }
+      return;
+    }
+    const name = cause instanceof Error ? cause.name : '';
+    if (name === 'ReferenceError' || name === 'TypeError' || name === 'DOMException') {
+      // Worker unavailable or unusable in this environment (e.g. no Worker
+      // support, terminated port, undecodable message): per-image error.
+      const wrapped = new ImageProcessingError('display-unavailable', cause instanceof Error ? cause.message : String(cause));
+      if (state?.key === pending.key) { state.pending = false; state.error = wrapped; notify(); }
+      return;
+    }
+    // Programmer error: fail fast, preserve propagation.
+    if (state?.key === pending.key) { state.pending = false; state.error = cause instanceof Error ? cause : new Error(String(cause)); }
+    throw cause;
+  }
+}
+
+export interface ImageDisplayOptions {
+  zoom?: number;
+  dpr?: number;
+  dragging?: boolean;
+  /** Stable render owner, including while the render uses an ephemeral draft. */
+  owner?: object;
+}
+
+/** Only deliberately reduced display rasters should blur when magnified. */
+export function isReducedImageDisplay(canvas: HTMLCanvasElement): boolean {
+  return reducedDisplays.has(canvas);
+}
+
+/** Validate the complete job grid before selecting a display-only sampling density. */
+function editedDisplayGrid(s: ImageShape, m: Mat, L: ImageOutput, options?: ImageDisplayOptions) {
+  const grid = outputGrid(s, m, L.interval);
+  let f = 1;
+  if (options?.zoom !== undefined) {
+    const density = options.zoom * (options.dpr ?? 1);
+    if (Number.isFinite(density) && density > 0) {
+      const { bounds } = imageRasterGeometry(s);
+      const width = Math.abs(m[0]) * bounds.width + Math.abs(m[2]) * bounds.height;
+      const height = Math.abs(m[1]) * bounds.width + Math.abs(m[3]) * bounds.height;
+      f = Math.min(1, Math.max(width * density / grid.cols, height * density / grid.rows));
+    }
+  }
+  if (options?.dragging) f = Math.min(f, IMAGE_DRAFT_MAX_SIDE / Math.max(grid.cols, grid.rows));
+  const cols = Math.max(1, Math.ceil(grid.cols * f)), rows = Math.max(1, Math.ceil(grid.rows * f));
+  return { cols, rows, f: Math.min(cols / grid.cols, rows / grid.rows), job: grid };
+}
+
+/** Direct low-res live canvases: fast positioning aid, never a final display. */
+const dragDisplays = new WeakSet<HTMLCanvasElement>();
+
+/** Downscaled working copies for live drags, bounded like the other preview caches. */
+const mipSources = new ImageCache<Asset, { rgba: Uint8ClampedArray; width: number; height: number }>(16 * 1024 * 1024, 8);
+const MIP_MAX_SIDE = 1024;
+
+function mipSource(asset: Asset, source: { rgba: Uint8ClampedArray; width: number; height: number }): { rgba: Uint8ClampedArray; width: number; height: number } {
+  const cached = mipSources.get(asset);
+  if (cached) return cached;
+  const mip = downsampleRgba(source.rgba, source.width, source.height, MIP_MAX_SIDE);
+  // Small sources return themselves; only real builds are cached.
+  if (mip.rgba === source.rgba) return source;
+  const entry = { rgba: mip.rgba, width: mip.width, height: mip.height };
+  mipSources.set(asset, entry, entry.rgba.byteLength);
+  return entry;
+}
+
+/**
+ * Drag source without a full-res read whenever possible: huge sources are
+ * sampled from the cached mip, so no per-frame getImageData stalls the UI.
+ * Only a mip miss reads (and then builds) from the full original.
+ */
+function dragSource(asset: Asset, s: ImageShape): { rgba: Uint8ClampedArray; width: number; height: number } {
+  if (Math.max(s.pxW, s.pxH) > MIP_MAX_SIDE) {
+    const cached = mipSources.get(asset);
+    if (cached) return cached;
+  }
+  const source = assetRgba(s.asset);
+  if (!source) throw new ImageProcessingError('source-read', 'Original RGBA could not be read');
+  return mipSource(asset, source);
+}
+
+function sourceIdentityOf(asset: Asset): number {
+  let id = sourceIdentities.get(asset);
+  if (id === undefined) { id = ++nextSourceIdentity; sourceIdentities.set(asset, id); }
+  return id;
+}
+
+/**
+ * Single composition site for display cache keys: jobKey covers the full job
+ * raster (source + settings + linear affine), key additionally the display
+ * grid (plus 'drag' for live previews). Both callers must stay identical.
+ */
+function displayKeys(asset: Asset, s: ImageShape, L: ImageOutput, m: Mat, cols: number, rows: number, display: { cols: number; rows: number }, tag?: string) {
+  const jobKey = JSON.stringify([sourceIdentityOf(asset), resultKey(s, L, cols, rows), m.slice(0, 4)]);
+  const key = tag === undefined ? JSON.stringify([jobKey, display.cols, display.rows]) : JSON.stringify([tag, jobKey, display.cols, display.rows]);
+  return { jobKey, key };
+}
+
+/**
+ * Live path while dragging image handles: synchronous low-res dither at display
+ * density, no worker and no full job grid, so the image stays visible and follows
+ * every move. Full job density is computed on release/idle via the worker path.
+ */
+function dragDisplayCanvas(s: ImageShape, m: Mat, L: ImageOutput, asset: Asset, cols: number, rows: number, owner: object): HTMLCanvasElement | null {
+  const { key } = displayKeys(asset, s, L, m, cols, rows, { cols, rows }, 'drag');
+  const state = displayStates.get(owner);
+  if (state?.key === key && state.asset === asset) {
+    if (state.error) throw state.error;
+    if (state.canvas) return state.canvas;
+  }
+  const cached = editedDisplays.get(key);
+  if (cached?.asset === asset) {
+    displayQueue.delete(owner);
+    displayStates.set(owner, { key, asset, pending: false, phase: 4, canvas: cached.canvas });
+    return cached.canvas;
+  }
+  const mip = dragSource(asset, s);
+  const sampling = mip.width === s.pxW && mip.height === s.pxH ? s : { ...s, pxW: mip.width, pxH: mip.height };
+  // Fast bilinear sampling: transient positioning aid, never final quality.
+  const values = processEditedPixels(mip, sampling, L, cols, rows, [...m], undefined, 'fast');
+  const canvas = toCanvas(values, cols, rows);
+  reducedDisplays.add(canvas);
+  dragDisplays.add(canvas);
+  editedDisplays.set(key, { asset, canvas }, cols * rows * 4);
+  displayStates.set(owner, { key, asset, pending: false, phase: 4, canvas });
+  return canvas;
+}
+
+/** Bounded display-only grid/cache. Job generation always uses outputGrid/processImage directly. */
+function editedDisplayCanvas(s: ImageShape, m: Mat, L: ImageOutput, asset: Asset, options?: ImageDisplayOptions): HTMLCanvasElement | null {
+  const { cols, rows, f, job } = editedDisplayGrid(s, m, L, options);
+  if (asset.w !== s.pxW || asset.h !== s.pxH) throw new ImageProcessingError('source-dimensions', 'Original dimensions do not match the image');
+  const owner = options?.owner ?? s;
+  // Live drag: fast low-res only; full density follows on release/idle.
+  if (options?.dragging) return dragDisplayCanvas(s, m, L, asset, cols, rows, owner);
+  const { jobKey, key } = displayKeys(asset, s, L, m, job.cols, job.rows, { cols, rows });
+  const cached = editedDisplays.get(key);
+  const state = displayStates.get(owner);
+  const prevCanvas = state?.asset === asset ? state.canvas : undefined;
+  if (state?.key === key && state.asset === asset) {
+    if (state.error) throw state.error;
+    // A completed owner keeps its canvas outside the bounded shared cache, so
+    // more images than cache entries cannot evict and recompute each other.
+    // Drag-only canvases are interim: idle upgrades them to full density.
+    if (state.canvas && !dragDisplays.has(state.canvas)) { displayQueue.delete(owner); return state.canvas; }
+    if (state.pending) return state.canvas ?? null;
+    // Cancelled, settled without a canvas, or only a drag canvas: queue the
+    // full job below — but an Abort stays sticky (no silent requeue on the
+    // identical key); the interim canvas stays visible meanwhile.
+    if (state.cancelled) return state.canvas ?? null;
+  }
+  if (cached?.asset === asset && !dragDisplays.has(cached.canvas)) {
+    displayQueue.delete(owner);
+    displayStates.set(owner, { key, asset, pending: false, phase: 4, canvas: cached.canvas });
+    return cached.canvas;
+  }
+  displayStates.set(owner, { key, asset, pending: true, phase: 0, canvas: prevCanvas });
+  displayQueue.set(owner, { owner, key, asset, reduced: f < 1, request: {
+    id: ++nextDisplayRequest, jobKey, shape: structuredClone(s), output: structuredClone(L), world: [...m],
+    job: { cols: job.cols, rows: job.rows }, display: { cols, rows },
+  } });
+  pumpImageDisplay();
+  // While the full-density worker runs, keep showing the interim canvas
+  // (drag preview or previous image) instead of hiding the image.
+  return editedDisplays.get(key)?.canvas ?? prevCanvas ?? null;
+}
+
+/** Draft values, not ephemeral shape identities, key the same bounded display cache. */
+export function displayCanvasDraft(s: ImageShape, m: Mat, L: ImageOutput, edit: ImageEdit, options?: ImageDisplayOptions): HTMLCanvasElement | null {
+  const a = assets.get(s.asset);
+  if (!a?.img) return null;
+  return editedDisplayCanvas({ ...s, edit }, m, L, a, { ...options, owner: options?.owner ?? s });
 }
 
 /**
@@ -638,7 +792,7 @@ const nativeTimers = new WeakMap<ImageShape, number>();
 /** Verarbeitetes Bild als PNG-Daten (für „Bearbeitetes Bild speichern“). */
 export async function processedPng(s: ImageShape, m: Mat, L: ImageOutput): Promise<string | null> {
   const { cols, rows } = outputGrid(s, m, L.interval);
-  const v = await processImageAsync(s, L, cols, rows);
+  const v = await processImageAsync(s, L, cols, rows, m);
   return v ? toCanvas(v, cols, rows).toDataURL('image/png') : null;
 }
 

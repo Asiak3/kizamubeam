@@ -5,6 +5,8 @@ import { bezierPt, segments } from './curves';
 import { shownText } from './vartext';
 import { barcodeExtent, barcodeOutline } from './barcode';
 import { forgetCenters } from './arcs';
+import { resolveImageEdits } from './imageEdits';
+import { resolveImageContour, type ImageContour, type ImageCorner } from './imageContour';
 
 export { bezierPt, segments };
 
@@ -26,6 +28,11 @@ export function shapeSubs(s: Shape): SubPath[] {
     case 'barcode':
       return barcodeOutline(s).subs;
     case 'image':
+      if (s.edit !== undefined) {
+        const resolved = resolveImageEdits(s);
+        // Invalid edits have no valid contour; render/check expose the error.
+        return resolved.ok ? [{ closed: true, nodes: resolved.quad.map(p => ({ ...p })) }] : [];
+      }
       // Umriss des Bildes (für Begrenzung, Auswahl und Rahmen)
       return [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: s.w, y: 0 }, { x: s.w, y: s.h }, { x: 0, y: s.h }] }];
     case 'rect': {
@@ -105,9 +112,22 @@ export function subsToPath2D(subs: SubPath[], p = new Path2D()): Path2D {
 
 const localCache = new WeakMap<Shape, Path2D>();
 /** Lokaler Pfad, zwischengespeichert pro Form-Objekt. Nach Änderung invalidate() aufrufen. */
-export function localPath(s: Shape): Path2D {
+export function localPath(s: Shape, world: Mat = IDENT): Path2D {
   // QR-Codes mit variablem Inhalt ändern sich ohne touch(); barcode.ts prüft selbst, ob der Inhalt noch passt
   if (s.kind === 'barcode') return barcodeOutline(s).path;
+  // Edits may change in place without touch(), including crop/perspective reset.
+  if (s.kind === 'image' && s.edit !== undefined) {
+    const resolved = resolveImageContour(s, world), p = new Path2D();
+    if (resolved.ok) {
+      // Preserve exact legacy local coordinates without a world/inverse round trip.
+      if (resolved.contour.corners.every(c => c.radius === 0)) {
+        const local = resolveImageContour(s);
+        return local.ok ? subsToPath2D([{ closed: true, nodes: local.contour.polygon }]) : p;
+      }
+      p.addPath(imageContourPath(resolved.contour), new DOMMatrix(inv(world)));
+    }
+    return p;
+  }
   let p = localCache.get(s);
   if (!p) {
     p = subsToPath2D(shapeSubs(s));
@@ -122,8 +142,88 @@ export function invalidate(s: Shape) {
 
 export function worldPath(s: Shape, m: Mat): Path2D {
   const p = new Path2D();
-  p.addPath(localPath(s), new DOMMatrix(m));
+  p.addPath(localPath(s, m), new DOMMatrix(m));
   return p;
+}
+
+/** Construct circles in final world mm before inverse-transforming for local display. */
+function imageContourPath(contour: ImageContour): Path2D {
+  const p = new Path2D();
+  const first = contour.corners[0].start;
+  p.moveTo(first.x, first.y);
+  for (let i = 0; i < contour.corners.length; i++) {
+    const c = contour.corners[i];
+    if (i) p.lineTo(c.start.x, c.start.y);
+    if (c.radius) p.arc(c.center.x, c.center.y, c.radius,
+      Math.atan2(c.start.y - c.center.y, c.start.x - c.center.x),
+      Math.atan2(c.end.y - c.center.y, c.end.x - c.center.x), !contour.clockwise);
+  }
+  p.closePath();
+  return p;
+}
+
+function onImageArc(c: ImageCorner, p: Pt): boolean {
+  // The fillet is the minor arc between tangent points, on the vertex side.
+  return (p.x - c.start.x) * (c.start.x - c.vertex.x) + (p.y - c.start.y) * (c.start.y - c.vertex.y) <= 1e-10
+    && (p.x - c.end.x) * (c.end.x - c.vertex.x) + (p.y - c.end.y) * (c.end.y - c.vertex.y) <= 1e-10;
+}
+
+function imageContourExtrema(contour: ImageContour): Pt[] {
+  return contour.corners.flatMap(c => {
+    const points = [c.start, c.end];
+    if (c.radius) for (const p of [
+      { x: c.center.x - c.radius, y: c.center.y }, { x: c.center.x + c.radius, y: c.center.y },
+      { x: c.center.x, y: c.center.y - c.radius }, { x: c.center.x, y: c.center.y + c.radius },
+    ]) if (onImageArc(c, p)) points.push(p);
+    return points;
+  });
+}
+
+/** Segment parameters at exact line/arc boundary intersections (including overlap endpoints). */
+export function imageContourSegmentCuts(contour: ImageContour, a: Pt, b: Pt): number[] {
+  const dx = b.x - a.x, dy = b.y - a.y, length2 = dx * dx + dy * dy;
+  const cuts: number[] = [];
+  for (let i = 0; i < contour.corners.length; i++) {
+    const c = contour.corners[i], end = contour.corners[(i + 1) % contour.corners.length].start;
+    const ex = end.x - c.end.x, ey = end.y - c.end.y;
+    const qx = c.end.x - a.x, qy = c.end.y - a.y, den = dx * ey - dy * ex;
+    if (den) {
+      const t = (qx * ey - qy * ex) / den, u = (qx * dy - qy * dx) / den;
+      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) cuts.push(t);
+    } else if (qx * dy - qy * dx === 0 && segHitsBox(c.end, end,
+      { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(dx), h: Math.abs(dy) })) {
+      if (!length2) cuts.push(0);
+      else {
+        const t = (qx * dx + qy * dy) / length2, u = ((end.x - a.x) * dx + (end.y - a.y) * dy) / length2;
+        cuts.push(Math.max(0, Math.min(t, u)), Math.min(1, Math.max(t, u)));
+      }
+    }
+    if (!length2) {
+      const edge2 = ex * ex + ey * ey;
+      const u = edge2 ? Math.max(0, Math.min(1, ((a.x - c.end.x) * ex + (a.y - c.end.y) * ey) / edge2)) : 0;
+      if (Math.hypot(a.x - c.end.x - u * ex, a.y - c.end.y - u * ey) < 1e-10) cuts.push(0);
+    }
+    if (!c.radius) continue;
+    if (!length2) {
+      if (Math.abs(Math.hypot(a.x - c.center.x, a.y - c.center.y) - c.radius) < 1e-10 && onImageArc(c, a)) cuts.push(0);
+      continue;
+    }
+    const t = ((c.center.x - a.x) * dx + (c.center.y - a.y) * dy) / length2;
+    const nx = a.x + t * dx - c.center.x, ny = a.y + t * dy - c.center.y;
+    const gap = c.radius * c.radius - nx * nx - ny * ny;
+    const tolerance = Math.max(c.radius * c.radius, nx * nx + ny * ny) * Number.EPSILON * 128;
+    if (gap < -tolerance) continue;
+    const half = Math.sqrt(Math.max(0, gap) / length2);
+    for (const u of [t - half, t + half]) {
+      if (u >= 0 && u <= 1 && onImageArc(c, { x: a.x + u * dx, y: a.y + u * dy })) cuts.push(u);
+    }
+  }
+  return cuts;
+}
+
+/** Exact line/arc boundary crossing, shared by image marquee and freehand lasso. */
+export function imageContourHitsSegment(contour: ImageContour, a: Pt, b: Pt): boolean {
+  return imageContourSegmentCuts(contour, a, b).length > 0;
 }
 
 function samplePoints(subs: SubPath[]): Pt[] {
@@ -315,6 +415,9 @@ function objExtents(o: Obj, parent: Mat, b: { x0: number; y0: number; x1: number
       { x: bx.x + bx.w, y: bx.y + bx.h },
       { x: bx.x, y: bx.y + bx.h },
     ]);
+  } else if (s.kind === 'image' && s.edit !== undefined) {
+    const resolved = resolveImageContour(s, m);
+    if (resolved.ok) addPts(b, IDENT, imageContourExtrema(resolved.contour));
   } else addPts(b, m, samplePoints(shapeSubs(s)));
 }
 
@@ -351,7 +454,7 @@ export function hitLeaf(o: Obj, m: Mat, p: Pt, tol: number, inside: boolean): bo
     const t = tol / Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]) || 1);
     return q.x >= b.x - t && q.x <= b.x + b.w + t && q.y >= b.y - t && q.y <= b.y + b.h + t;
   }
-  if (s.kind === 'image' || s.kind === 'barcode') {
+  if ((s.kind === 'image' && s.edit === undefined) || s.kind === 'barcode') {
     // Bilder und QR-Codes: die ganze Fläche trifft (einzelne Module wären zu kleine Ziele)
     const q = apply(inv(m), p.x, p.y);
     const t = tol / Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]) || 1);
@@ -362,7 +465,7 @@ export function hitLeaf(o: Obj, m: Mat, p: Pt, tol: number, inside: boolean): bo
   const wp = worldPath(s, m);
   ctx.lineWidth = tol * 2;
   if (ctx.isPointInStroke(wp, p.x, p.y)) return true;
-  return inside && ctx.isPointInPath(wp, p.x, p.y, 'evenodd');
+  return (inside || s.kind === 'image') && ctx.isPointInPath(wp, p.x, p.y, 'evenodd');
 }
 
 /** Schnell: Überschneidet die Kontur das Rechteck? (Für Kreuzungsauswahl) */
@@ -373,6 +476,16 @@ export function leafIntersectsBox(o: Obj, m: Mat, r: Box): boolean {
     const b = boundsOf([o], mul(m, inv(o.m)));
     if (!b) return false;
     return !(b.x > r.x + r.w || b.x + b.w < r.x || b.y > r.y + r.h || b.y + b.h < r.y);
+  }
+  if (s.kind === 'image' && s.edit !== undefined) {
+    const resolved = resolveImageContour(s, m);
+    if (!resolved.ok) return false;
+    const { contour } = resolved;
+    const boxCorners = [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y },
+      { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }];
+    if (boxCorners.some(contour.contains)) return true;
+    return contour.corners.some(c => inBox(c.start) || inBox(c.end))
+      || boxCorners.some((a, i) => imageContourHitsSegment(contour, a, boxCorners[(i + 1) % boxCorners.length]));
   }
   for (const sp of shapeSubs(s)) {
     const pts = samplePoints([sp]).map((p) => apply(m, p.x, p.y));

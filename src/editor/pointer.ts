@@ -13,6 +13,7 @@ import { genLeaves, isMarkGroup } from './generators';
 import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, LASSO_TOUCH_HINT, RULER, TOOL_HINTS } from './shared';
 import { ARC_MIN_RADIUS, arcPoint, arcSpec, arcSubPath, newArcDraft, snapAngle, type ArcDraft, type ArcMode } from './arc';
 import { OVERLAP_MOVE_PX } from '../overlapPicker';
+import { hitImageCropHandle, pointerCropTo } from '../imageCropUi';
 
 const RIGHT_PAN_KEY = 'kizamubeam.rightPan';
 /** Right-drag panning is opt-in: off unless switched on in the settings */
@@ -121,6 +122,14 @@ export class EditorPointer {
         this.drag = { type: 'builder', last: wp, pointerId: e.pointerId };
         return;
       case 'select': {
+        // Bild-Entwurf (Zuschnitt/Perspektive) fängt seine Griffe vor Auswahl/Skalierung ab.
+        const ih = this.imageDraft?.() ? hitImageCropHandle(this, sx, sy) : null;
+        if (ih) {
+          this.drag = ih.mode === 'crop'
+            ? { type: 'image-crop', mode: 'crop', handle: ih.handle }
+            : { type: 'image-crop', mode: 'perspective', handle: ih.index };
+          return;
+        }
         if (this.hitPivot(sx, sy)) {
           this.drag = { type: 'pivot' };
           return;
@@ -557,8 +566,16 @@ export class EditorPointer {
           ay = fromCenter ? 0.5 : 1 - hy;
         const A = { x: b.x + ax * b.w, y: b.y + ay * b.h };
         const H = { x: b.x + hx * b.w, y: b.y + hy * b.h };
-        let fx = hx === 0.5 || !b.w ? 1 : (wp.x - A.x) / (H.x - A.x);
-        let fy = hy === 0.5 || !b.h ? 1 : (wp.y - A.y) / (H.y - A.y);
+        // Fang nur für Bilder (andere Typen unverändert): Ecken ohne Shift bleiben
+        // seitenverhältnistreu, der Fang wirkt über die dominante Achse.
+        let pw = wp;
+        if (this.sel.length === 1 && (this.sel[0].shape as any)?.kind === 'image') {
+          try {
+            pw = this.snapPt(wp, e as never, { set: this.buildSnap([this.sel[0]]), toggle: true });
+          } catch { /* Fang ist best-effort; ungefangen weiter */ }
+        }
+        let fx = hx === 0.5 || !b.w ? 1 : (pw.x - A.x) / (H.x - A.x);
+        let fy = hy === 0.5 || !b.h ? 1 : (pw.y - A.y) / (H.y - A.y);
         const corner = d.handle % 2 === 0;
         if (corner && !e.shiftKey) {
           const s = Math.abs(fx) > Math.abs(fy) ? fx : fy;
@@ -580,6 +597,16 @@ export class EditorPointer {
         const D = about(scale(clampS(fx), clampS(fy)), A.x, A.y);
         this.sel.forEach((o, i) => (o.m = mul(D, d.orig[i])));
         this.emit('doc');
+        return;
+      }
+      case 'image-crop': {
+        // Einheitlicher, reihenfolge-bewusster Zeigerweg ohne eigene Umrechnung:
+        // cropFirst entzerrt, perspectiveFirst und Perspektiv-Ecken nicht (Griff = Speicher-Frame).
+        const draft = this.imageDraft?.();
+        const target = draft ? this.doc.objs.find((x) => x.id === draft.objId) ?? null : null;
+        if (!draft || !target || target.shape.kind !== 'image') { this.drag = null; return; }
+        const err = pointerCropTo(this, sx, sy, { aspectLock: e.shiftKey, event: e });
+        if (err) { this.hint = err; this.emit('tool'); }
         return;
       }
       case 'rotate': {
@@ -837,6 +864,11 @@ export class EditorPointer {
         if (this.sel.every((o, i) => o.m === d.orig[i])) this.dropSnapshot();
         this.hint = '';
         this.emit('sel');
+        return;
+      case 'image-crop':
+        // Entwurf bleibt aktiv (kein Snapshot, kein Anwenden bei Pointer-Down/Up).
+        this.drag = null;
+        this.redraw();
         return;
       case 'marquee': {
         const r = normBox(d.start, d.end);
