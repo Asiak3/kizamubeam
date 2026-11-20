@@ -50,6 +50,7 @@
     "test:gen-decoupling": "node scripts/run-ts.mjs scripts/generator-decoupling-test.ts",
     "test:plugins": "node scripts/run-ts.mjs scripts/plugin-runtime-test.ts && node scripts/run-ts.mjs scripts/plugin-packs-test.ts && node scripts/run-ts.mjs scripts/plugin-tools-test.ts && node scripts/run-ts.mjs scripts/plugin-dialog-test.ts && node scripts/run-ts.mjs scripts/plugin-sdk-test.ts && node scripts/run-ts.mjs scripts/plugin-examples-test.ts && node scripts/run-ts.mjs scripts/plugin-net-test.ts && node scripts/run-ts.mjs scripts/plugin-context-test.ts && node scripts/run-ts.mjs scripts/plugin-check-test.ts && node scripts/run-ts.mjs scripts/plugin-joints-test.ts",
     "test:box-composer": "node scripts/run-ts.mjs scripts/box-composer-test.ts && node scripts/run-ts.mjs scripts/box-composer-edit-test.ts",
+    "test:box-composer-advanced": "node scripts/run-ts.mjs scripts/box-composer-advanced-test.ts && node scripts/run-ts.mjs scripts/box-composer-advanced-edit-test.ts",
     "plugin:pack": "node scripts/plugin-pack.mjs",
     "plugin:check": "node scripts/run-ts.mjs scripts/plugin-check.ts",
     "plugin:core": "node scripts/build-core-plugins.mjs",
