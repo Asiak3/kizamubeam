@@ -9,6 +9,7 @@ import { loadGen } from './generators';
 import { locale, t, tBackend, tn } from './i18n';
 import { registerAsset } from './images';
 import { bedProblem, device, JobSource, laserNotify, makeJob, onDeviceChange, runBlocker, runGCode } from './laser';
+import { fireLockMessage } from './fire';
 import { isTauri, machine, RemoteHostState } from './machine';
 import { allObjs, bumpIds, leaves, PALETTE } from './model';
 import { withFonts } from './fonts';
@@ -263,8 +264,9 @@ const findJob = (id: unknown) => {
 /** Requests from clients (role already checked in Rust) */
 async function handle(ed: Editor, r: Request): Promise<unknown> {
   const p = r.params ?? {};
-  const needMachine = () => {
+  const needMachine = (allowStop = false) => {
     if (!machine.connected || machine.remote) throw new Error(t('Der Host ist gerade nicht mit dem Laser verbunden.'));
+    if (machine.fire.locked && !allowStop) throw new Error(fireLockMessage());
   };
   switch (r.method) {
     case 'line':
@@ -286,7 +288,7 @@ async function handle(ed: Editor, r: Request): Promise<unknown> {
       await machine.resume();
       return null;
     case 'stop':
-      needMachine();
+      needMachine(true);
       machine.log(t('{name} hat Stopp gedrückt.', { name: r.client.name }), 'error');
       await machine.stop();
       return null;

@@ -6,7 +6,7 @@
 use std::collections::VecDeque;
 use std::io::{ErrorKind, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -53,11 +53,18 @@ enum Kind {
     User,
     Job,
     Poll,
+    FireOff,
 }
 
 pub enum Cmd {
     /// Einzelne Zeile (Konsole, Bewegen, Home …)
     Line(String),
+    /// Fire activations are tagged so a stop also cancels late native invocations.
+    FireLine { session: u64, line: String },
+    /// Reply after cancellation and off (Smoothie: its ordered ACK), never merely on enqueue.
+    FireStop { session: u64, smoothie: bool, reply: Sender<Result<(), String>> },
+    /// Cancel and attempt off, then exit without another refill, even when off has no ACK.
+    FireClose { session: u64, smoothie: bool, reply: Sender<Result<(), String>> },
     /// Echtzeitbefehl, wird sofort und ohne Puffer gesendet (? ! ~ 0x18 0x85)
     Realtime(u8),
     Job(Vec<String>),
@@ -93,7 +100,10 @@ pub struct Streamer<P: Read + Write, E: Events> {
     /// Gesendete, noch unbestätigte Zeilen: (Länge inkl. Zeilenende, Art)
     inflight: VecDeque<(usize, Kind)>,
     inflight_bytes: usize,
-    queue: VecDeque<String>,
+    queue: VecDeque<(String, Option<u64>)>,
+    fire_seen_through: u64,
+    fire_cancelled_through: u64,
+    fire_off_replies: VecDeque<Sender<Result<(), String>>>,
     job: Option<Job>,
     last_poll: Instant,
     last_progress: Instant,
@@ -121,6 +131,9 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             inflight: VecDeque::new(),
             inflight_bytes: 0,
             queue: VecDeque::new(),
+            fire_seen_through: 0,
+            fire_cancelled_through: 0,
+            fire_off_replies: VecDeque::new(),
             job: None,
             last_poll: now.checked_sub(POLL_LINE).unwrap_or(now),
             last_progress: now,
@@ -163,6 +176,14 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
     fn commands(&mut self, cmds: &Receiver<Cmd>) -> Result<bool, String> {
         loop {
             match cmds.try_recv() {
+                Ok(Cmd::FireClose { session, smoothie, reply }) => {
+                    let (stop_reply, _ignored) = channel();
+                    let result = self.handle(Cmd::FireStop { session, smoothie, reply: stop_reply });
+                    self.fire_off_replies.clear();
+                    let _ = reply.send(result.clone());
+                    // Never pump/refill again after publishing the teardown barrier.
+                    return result.map(|_| true);
+                }
                 Ok(Cmd::Close) | Err(TryRecvError::Disconnected) => return Ok(true),
                 Ok(c) => self.handle(c)?,
                 Err(TryRecvError::Empty) => return Ok(false),
@@ -181,7 +202,30 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
         match c {
             Cmd::Line(l) => {
                 if self.job.is_none() {
-                    self.queue.push_back(l)
+                    self.queue.push_back((l, None))
+                }
+            }
+            Cmd::FireLine { session, line } => {
+                if session > self.fire_cancelled_through && self.job.is_none() {
+                    self.fire_seen_through = self.fire_seen_through.max(session);
+                    self.queue.push_back((line, Some(session)));
+                }
+            }
+            Cmd::FireStop { session, smoothie, reply } => {
+                self.fire_cancelled_through = self.fire_cancelled_through.max(session);
+                self.queue.clear();
+                // Smoothie fire off bypasses both the FIFO and pending ACKs. Keep existing
+                // inflight entries: their ACKs must not be mistaken for the off ACK.
+                if smoothie {
+                    if let Err(e) = self.send_line("fire off", Kind::FireOff) {
+                        let _ = reply.send(Err(e.clone()));
+                        return Err(e);
+                    }
+                    self.fire_off_replies.push_back(reply);
+                } else {
+                    let result = self.handle(Cmd::Stop);
+                    let _ = reply.send(result.clone());
+                    result?;
                 }
             }
             Cmd::Realtime(b) => self.write(&[b])?,
@@ -229,13 +273,14 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
                 self.queue.clear();
                 self.inflight.clear();
                 self.inflight_bytes = 0;
+                self.fire_off_replies.clear();
                 if self.job.take().is_some() {
                     self.busy.store(false, Ordering::SeqCst);
                     self.events.done(false, "Abgebrochen");
                 }
                 self.synthetic("Idle");
             }
-            Cmd::Close | Cmd::RuidaJob(_) => {}
+            Cmd::Close | Cmd::FireClose { .. } | Cmd::RuidaJob(_) => {}
         }
         Ok(())
     }
@@ -358,8 +403,15 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
         self.synthetic("Idle");
     }
 
+    fn cancel_fire(&mut self) {
+        self.fire_cancelled_through = self.fire_cancelled_through.max(self.fire_seen_through);
+        // An earlier non-Fire error must not release queued activation on this pump.
+        // Leave ordinary commands/jobs to their established error-handling policy.
+        self.queue.retain(|(_, session)| session.is_none());
+    }
+
     fn on_line(&mut self, line: &str) {
-        let lower = line.trim_start().to_ascii_lowercase();
+        let lower = line.trim().to_ascii_lowercase();
         // Marlin hängt manchmal Text an („ok T:…“ oder „ok P15 B3“)
         if lower == "ok" || lower.starts_with("ok ") {
             match self.pop_inflight() {
@@ -370,12 +422,20 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
                     }
                 }
                 Some(Kind::Poll) => {}
+                Some(Kind::FireOff) => {
+                    if let Some(reply) = self.fire_off_replies.pop_front() { let _ = reply.send(Ok(())); }
+                }
                 _ => self.events.line(line),
             }
             return;
         }
         if lower.starts_with("error") {
-            if self.pop_inflight() == Some(Kind::Job) {
+            self.cancel_fire();
+            let kind = self.pop_inflight();
+            if kind == Some(Kind::FireOff) {
+                if let Some(reply) = self.fire_off_replies.pop_front() { let _ = reply.send(Err(line.to_string())); }
+            }
+            if kind == Some(Kind::Job) {
                 if let Some(j) = &mut self.job {
                     j.acked += 1;
                     j.errors += 1;
@@ -386,6 +446,7 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             return;
         }
         if line.starts_with('<') {
+            if lower.starts_with("<alarm") { self.cancel_fire(); }
             self.events.line(line);
             let idle = line.starts_with("<Idle");
             if idle && self.job.as_ref().is_some_and(|j| j.finishing) {
@@ -393,13 +454,18 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
             }
             return;
         }
-        self.events.line(line);
         // Begrüßung nach einem Neustart: GRBL/FluidNC „Grbl …“, Marlin „start“, Smoothieware „Smoothie“
-        let reset = line.starts_with("Grbl ") || lower == "start" || line.starts_with("Smoothie");
+        let mut words = lower.split_whitespace();
+        let first = words.next();
+        let reset = lower == "start" || first == Some("smoothie") ||
+            (matches!(first, Some("grbl" | "grblhal" | "fluidnc")) && words.next().is_some());
+        if lower.starts_with("alarm") || reset { self.cancel_fire(); }
+        self.events.line(line);
         if lower.starts_with("alarm") || reset {
             // Alarm oder Neustart der Steuerung: Puffer ist verworfen, Job abbrechen
             self.inflight.clear();
             self.inflight_bytes = 0;
+            self.fire_off_replies.clear();
             self.queue.clear();
             if self.job.take().is_some() {
                 self.busy.store(false, Ordering::SeqCst);
@@ -426,11 +492,11 @@ impl<P: Read + Write, E: Events> Streamer<P, E> {
 
     fn fill(&mut self) -> Result<(), String> {
         if self.job.is_none() {
-            while let Some(l) = self.queue.front() {
+            while let Some((l, _)) = self.queue.front() {
                 if !self.fits(l.trim().len() + 1) {
                     break;
                 }
-                let l = self.queue.pop_front().unwrap();
+                let Some((l, _)) = self.queue.pop_front() else { break };
                 self.send_line(&l, Kind::User)?;
             }
             return Ok(());
@@ -529,6 +595,143 @@ mod tests {
     fn sent_lines(f: &Fake) -> Vec<String> {
         let w = f.written.lock().unwrap();
         String::from_utf8_lossy(&w).replace('?', "").lines().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn fire_stop_cancels_waiting_and_late_activation_before_reply() {
+        let fake = Fake::default();
+        let proto = Protocol { sync: true, ..Protocol::grbl(false) };
+        let mut s = Streamer::new(fake.clone(), Log::default(), Arc::new(AtomicBool::new(false)), proto);
+        s.handle(Cmd::Line("$CD".into())).unwrap();
+        s.pump().unwrap(); // A previous command has not ACKed.
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        s.handle(Cmd::Line("G0 X10".into())).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        s.handle(Cmd::FireStop { session: 1, smoothie: true, reply: tx }).unwrap();
+
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+        assert_eq!(sent_lines(&fake), ["$CD", "fire off"]);
+        // Even a native invocation delivered after stop/confirmation cannot resurrect activation.
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        s.on_bytes(b"ok\n");
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+        s.on_bytes(b"ok\n");
+        assert_eq!(rx.try_recv().unwrap(), Ok(()));
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        s.pump().unwrap();
+        assert_eq!(sent_lines(&fake), ["$CD", "fire off"]);
+        assert!(s.inflight.is_empty());
+        assert_eq!(s.inflight_bytes, 0);
+    }
+
+    #[test]
+    fn fire_stop_writes_off_before_activation_ack_and_preserves_ack_order() {
+        let fake = Fake::default();
+        let proto = Protocol { sync: true, ..Protocol::grbl(false) };
+        let mut s = Streamer::new(fake.clone(), Log::default(), Arc::new(AtomicBool::new(false)), proto);
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        s.pump().unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        s.handle(Cmd::FireStop { session: 1, smoothie: true, reply: tx }).unwrap();
+
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+        assert_eq!(sent_lines(&fake), ["fire 1", "fire off"]);
+        assert_eq!(s.inflight.len(), 2);
+        s.on_bytes(b"ok\n");
+        assert_eq!(s.inflight.len(), 1); // Activation ACK is not mistaken for off ACK.
+        assert!(matches!(rx.try_recv(), Err(TryRecvError::Empty)));
+        s.on_bytes(b"ok\n");
+        assert_eq!(rx.try_recv().unwrap(), Ok(()));
+        assert!(s.inflight.is_empty());
+        s.handle(Cmd::FireLine { session: 2, line: "fire 2".into() }).unwrap();
+        s.pump().unwrap();
+        assert_eq!(sent_lines(&fake), ["fire 1", "fire off", "fire 2"]);
+    }
+
+    #[test]
+    fn fire_stop_received_first_tombstones_late_activation() {
+        let fake = Fake::default();
+        let mut s = Streamer::new(fake.clone(), Log::default(), Arc::new(AtomicBool::new(false)), Protocol::grbl(false));
+        let (tx, rx) = std::sync::mpsc::channel();
+        s.handle(Cmd::FireStop { session: 7, smoothie: false, reply: tx }).unwrap();
+        assert_eq!(rx.try_recv().unwrap(), Ok(()));
+        s.handle(Cmd::FireLine { session: 7, line: "M3 S10".into() }).unwrap();
+        s.pump().unwrap();
+        assert_eq!(fake.written.lock().unwrap().as_slice(), b"!\x18");
+    }
+
+    #[test]
+    fn fire_stop_error_keeps_activation_cancelled() {
+        let fake = Fake::default();
+        let proto = Protocol { sync: true, ..Protocol::grbl(false) };
+        let mut s = Streamer::new(fake.clone(), Log::default(), Arc::new(AtomicBool::new(false)), proto);
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        s.handle(Cmd::FireStop { session: 1, smoothie: true, reply: tx }).unwrap();
+
+        s.on_bytes(b"error:9\n");
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        s.pump().unwrap();
+
+        assert_eq!(rx.try_recv().unwrap(), Err("error:9".into()));
+        assert_eq!(sent_lines(&fake), ["fire off"]);
+        assert!(s.inflight.is_empty());
+    }
+
+    #[test]
+    fn fire_stop_earlier_command_error_cancels_queued_and_late_fire_before_refill() {
+        let fake = Fake::default();
+        let proto = Protocol { sync: true, ..Protocol::grbl(false) };
+        let mut s = Streamer::new(fake.clone(), Log::default(), Arc::new(AtomicBool::new(false)), proto);
+        s.handle(Cmd::Line("$CD".into())).unwrap();
+        s.pump().unwrap();
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        s.handle(Cmd::Line("M114".into())).unwrap();
+
+        fake.reply.lock().unwrap().extend(b"error:9\n");
+        s.pump().unwrap(); // Reads the error and refills, before any frontend stop can arrive.
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        s.on_bytes(b"ok\n");
+        s.pump().unwrap();
+
+        assert_eq!(sent_lines(&fake), ["$CD", "M114"]);
+        assert!(s.queue.is_empty());
+    }
+
+    #[test]
+    fn fire_stop_reset_and_alarm_tombstone_late_fire_before_refill() {
+        for banner in ["ALARM:1", "Smoothie", "Smoothie build version: edge", "Grbl 1.1h", "GrblHAL 1.1f", "FluidNC v3.9.1", "start"] {
+            let fake = Fake::default();
+            let mut s = Streamer::new(fake.clone(), Log::default(), Arc::new(AtomicBool::new(false)), Protocol::grbl(false));
+            s.handle(Cmd::FireLine { session: 1, line: "M3 S10".into() }).unwrap();
+            s.on_bytes(format!("{banner}\n").as_bytes());
+            s.handle(Cmd::FireLine { session: 1, line: "M3 S10".into() }).unwrap();
+            s.pump().unwrap();
+            assert!(sent_lines(&fake).is_empty(), "{banner}");
+        }
+    }
+
+    #[test]
+    fn fire_stop_teardown_cancels_without_waiting_for_missing_off_ack() {
+        let fake = Fake::default();
+        let proto = Protocol { sync: true, ..Protocol::grbl(false) };
+        let mut s = Streamer::new(fake.clone(), Log::default(), Arc::new(AtomicBool::new(false)), proto);
+        s.handle(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+        s.pump().unwrap();
+        let (off_tx, off_rx) = std::sync::mpsc::channel();
+        s.handle(Cmd::FireStop { session: 1, smoothie: true, reply: off_tx }).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let (close_tx, close_rx) = std::sync::mpsc::channel();
+        tx.send(Cmd::FireClose { session: 1, smoothie: true, reply: close_tx }).unwrap();
+        tx.send(Cmd::FireLine { session: 1, line: "fire 1".into() }).unwrap();
+
+        s.run(rx);
+
+        assert_eq!(close_rx.try_recv().unwrap(), Ok(()));
+        assert!(matches!(off_rx.try_recv(), Err(TryRecvError::Disconnected)));
+        assert_eq!(sent_lines(&fake), ["fire 1", "fire off", "fire off"]);
     }
 
     #[test]

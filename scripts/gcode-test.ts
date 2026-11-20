@@ -1,7 +1,7 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, frameGCode, gcodeFooter, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode, zJogLines } from '../src/gcode';
+import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, fireLines, frameGCode, gcodeFooter, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode, zJogLines } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
 import { dedupPolys } from '../src/dedup';
@@ -284,6 +284,18 @@ await test('Rahmen mit Drehachse fährt zum Start zurück', () => {
   assert.deepEqual(g0, ['G21', 'G90', 'G0 X10 Y0', 'G1 X20 Y0 S0 F3000', 'G1 X20 Y5', 'G1 X10 Y5', 'G1 X10 Y0', 'M5']);
   // xTool only moves after a program end, so the frame keeps M2
   assert.deepEqual(frameGCode(job, newDevice({ fw: 'xtool' }), false)!.slice(-2), ['M5', 'M2']);
+});
+
+await test('Testfeuer: Befehle je Firmware, Leistung in %', () => {
+  const grbl = newDevice({ fw: 'grbl' });
+  assert.deepEqual(fireLines(grbl, 1), ['G1 F1000', 'M3 S10']);
+  assert.deepEqual(fireLines(grbl, 100), ['G1 F1000', 'M3 S1000']);
+  const marlin = newDevice({ fw: 'marlin' });
+  assert.ok(fireLines(marlin, 1)[0].startsWith('M3 S'));
+  assert.ok(fireLines(marlin, 100)[0].startsWith('M3 S'));
+  const sm = newDevice({ fw: 'smoothie' });
+  assert.ok(fireLines(sm, 1)[0].startsWith('fire '));
+  assert.ok(!fireLines(sm, 1)[0].includes('M3'));
 });
 
 await test('Verfahren und Testdrehung auf der Drehachse', () => {

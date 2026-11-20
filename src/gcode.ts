@@ -203,6 +203,12 @@ export interface Device {
   frameLaser: boolean;
   framePower: number;
   frameSpeed: number;
+  /** Testfeuer im Bewegen-Fenster: erst aktivieren, dann nie über die eingestellte Leistung/dauer */
+  fireEnabled: boolean;
+  /** Maximale Laserleistung für das Testfeuer in % (0 … 100) */
+  fireMaxPower: number;
+  /** Maximale Software-Laufzeit für das Testfeuer in Sekunden (größer 0 … 600); 0 ist ungültig */
+  fireMaxSeconds: number;
   /** Befehl für Air Assist an (aus immer mit M9): M8 = Flood, M7 = Mist */
   airCmd: 'M8' | 'M7';
   /** Eigene G-Code-Zeilen vor dem Job (nach Einheiten und Laser-Modus) und nach dem Job (nach Laser aus) */
@@ -279,6 +285,9 @@ export const DEFAULT_DEVICE: Device = {
   frameLaser: false,
   framePower: 1,
   frameSpeed: 3000,
+  fireEnabled: false,
+  fireMaxPower: 1,
+  fireMaxSeconds: 5,
   airCmd: 'M8',
   startScript: '',
   endScript: '',
@@ -2135,9 +2144,9 @@ export function formatDuration(sec: number): string {
 // ---------- G-Code ----------
 
 /** S-Wert für Leistung 0 … 1; bei kleiner Skala (Smoothieware 0 … 1) mit mehr Nachkommastellen */
-const sValue = (p: number, d: Device) => {
+const sValue = (p: number, d: Device, round = Math.round) => {
   const k = d.sMax > 100 ? 10 : 1000;
-  return Math.round(p * d.sMax * k) / k;
+  return round(p * d.sMax * k) / k;
 };
 
 const num = (v: number) => {
@@ -2506,6 +2515,16 @@ export function pointerGCode(d: Device, on: boolean, percent: number): string[] 
   if (d.fw === 'smoothie') return on ? [`fire ${num(p)}`] : ['fire off'];
   if (!on) return ['M5'];
   const s = sValue(p / 100, d);
+  if (d.fw === 'marlin') return [`M3 S${s}`];
+  return ['G1 F1000', `M3 S${s}`];
+}
+
+/** Testfeuer im Bewegen-Fenster: Leistung in % (0 … 100, Aufrufer muss auf fireMaxPower begrenzen). */
+export function fireLines(d: Device, percent: number): string[] {
+  // Smoothieware's manual fire command takes percent, unlike its G-code S scale (0 … 1).
+  if (d.fw === 'smoothie') return [`fire ${num(Math.floor(Math.max(0, Math.min(100, percent)) * 1000) / 1000)}`];
+  // Rounding up could exceed the device's Fire power cap (e.g. 1% of Marlin S255).
+  const s = sValue(percent / 100, d, Math.floor);
   if (d.fw === 'marlin') return [`M3 S${s}`];
   return ['G1 F1000', `M3 S${s}`];
 }

@@ -132,6 +132,7 @@ const BACKEND_MESSAGES = [
   'Keine Schnittstelle gewählt',
   'Während ein Job läuft, sind keine Befehle möglich.',
   'Es läuft bereits ein Job.',
+  'Testfeuer nicht unterstützt',
   'Die Gegenstelle hat die Verbindung beendet.',
   'Die Steuerung wurde neu gestartet',
   'Alarm, Job abgebrochen',

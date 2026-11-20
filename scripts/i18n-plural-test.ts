@@ -59,6 +59,10 @@ test('Messages from the Rust part pick the plural form', () => {
   assert.equal(tBackend('Fertig nach 1:05 min'), 'Finished after 1:05 min');
 });
 
+test('Native Fire rejection uses the UI language', () => {
+  assert.equal(tBackend('Testfeuer nicht unterstützt'), 'Test fire not supported');
+});
+
 if (failed) {
   console.log(`${failed} test(s) failed`);
   process.exit(1);

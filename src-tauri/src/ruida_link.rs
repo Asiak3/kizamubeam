@@ -443,6 +443,9 @@ impl<T: RuidaTransport, E: Events> RuidaStreamer<T, E> {
                 _ => {}
             },
             Cmd::Line(line) => self.handle_line(line.trim()),
+            Cmd::FireLine { .. } => {} // Fire is never supported on Ruida.
+            Cmd::FireStop { reply, .. } => { let _ = reply.send(Err("Testfeuer nicht unterstützt".into())); }
+            Cmd::FireClose { reply, .. } => { let _ = reply.send(Err("Testfeuer nicht unterstützt".into())); return false; }
             Cmd::Job(lines) => {
                 let plain = self.lines_to_ruida(&lines);
                 self.execute_ruida_plain(&plain, rx);

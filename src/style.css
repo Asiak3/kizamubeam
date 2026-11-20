@@ -30,6 +30,38 @@
   --ty-control-height: calc(22px * var(--ty-interface));
   color: var(--text);
 }
+/* Fire status stays reachable even when the Move panel is hidden. */
+.fire-overlay {
+  position: fixed;
+  z-index: 2000;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  padding: 10px;
+  border: 2px solid var(--text);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 4px 16px #0004;
+}
+.fire-overlay[hidden] { display: none; }
+.fire-overlay .btn, .move-fire .btn, .move-fire input { min-width: 24px; min-height: 24px; }
+.fire-overlay .btn:focus-visible, .move-fire :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.fire-overlay .fire-confirm:not(:disabled), .move-fire .fire-confirm:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--text);
+  color: #fff;
+  font-weight: 700;
+  min-height: 36px;
+  padding-inline: 14px;
+}
 /* Dunkles Design: ausdrücklich gewählt oder vom System vorgegeben */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
@@ -1525,6 +1557,45 @@ label.check {
   grid-template-columns: 1fr 1fr;
   gap: 4px;
   margin-top: 8px;
+}
+.move-fire {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.move-fire h4 {
+  margin: 0 0 6px;
+  font-size: inherit;
+}
+.move-fire-controls {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.move-fire-controls.fire-disabled {
+  opacity: .7;
+}
+.fire-hold { touch-action: none; }
+.move-fire [role='status']:empty { display: none; }
+.fire-settings-link {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.fire-settings-link:disabled {
+  color: inherit;
+  cursor: default;
+}
+.move-fire input {
+  width: 6ch;
+}
+.move-fire .note {
+  margin-top: 4px;
 }
 .console-log {
   height: 170px;

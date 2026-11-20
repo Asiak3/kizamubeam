@@ -17,6 +17,7 @@ import { resetDialogPositions } from '../dialogDrag';
 import { resetLayout } from '../dock';
 import { openToolbarDialog, setAllToolbarIconSizes, showAllBars, toolbarIconSize } from '../toolbars';
 import { openDeviceDialog, openDevicesDialog, openRotaryDialog } from '../laser';
+import { fireOverlayInPanel, setFireOverlayInPanel } from '../fireUi';
 import { openSetupWizard } from '../setupWizard';
 import { openSyncDialog } from '../syncDialog';
 import { openPacksDialog } from '../packsDialog';
@@ -235,6 +236,12 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
       },
       { kind: 'action', id: 'machines.devices', group: t('Laser'), label: t('Geräte'), hint: t('Laser anlegen, wechseln, importieren und exportieren.'), button: t('Geräte …'), run: () => openDevicesDialog(ed) },
       { kind: 'action', id: 'machines.device', group: t('Laser'), label: t('Geräteeinstellungen'), hint: t('Anschluss, Arbeitsbereich, Firmware und Job-Vorgaben des aktuellen Geräts.'), button: t('Öffnen …'), run: () => openDeviceDialog(ed) },
+      {
+        kind: 'toggle', id: 'machines.fireOverlayInPanel', group: t('Laser'), def: true,
+        label: t('Testfeuer-Overlay auch im Verschieben-Panel anzeigen'),
+        hint: t('Wenn der Bedienknopf nicht vollständig sichtbar ist, erscheint das Overlay trotzdem.'),
+        get: fireOverlayInPanel, set: setFireOverlayInPanel,
+      },
       { kind: 'action', id: 'machines.rotary', group: t('Laser'), label: t('Drehachse (Rotary)'), button: t('Öffnen …'), run: () => openRotaryDialog() },
       { kind: 'action', id: 'machines.setup', group: t('Laser'), label: t('Laser einrichten'), hint: t('Schritt für Schritt von der Verbindung bis zum ersten Testauftrag'), button: t('Assistent starten …'), run: () => openSetupWizard(ed) },
       {

@@ -29,12 +29,15 @@ import { energyPreview, energySettingsRows, saveEnergySettings } from './energyU
 import { previewSplitter } from './previewLayout';
 import { advancePlayback, analyzePlayback, computeFactors, DEFAULT_TARGET, MAX_MARKERS, MAX_TARGET, MIN_TARGET } from './previewPlayback';
 import type { PlaybackSettings } from './previewPlayback';
+import { fireLockMessage } from './fire';
+import { fireControls, fireSettings, installFireOverlay } from './fireUi';
 
 const store = loadDevices();
 /** Das gewählte Gerät (live gebunden: wechselt mit der Auswahl) */
 export let device: Device = store.devices.find((d) => d.id === store.current) ?? store.devices[0];
 const deviceListeners = new Set<() => void>();
 function deviceChanged() {
+  if (machine.fire.locked && machine.fire.state !== 'unknown') void machine.fire.stop();
   saveDevices(store);
   deviceListeners.forEach((f) => f());
 }
@@ -100,6 +103,7 @@ function applyBed(ed: Editor) {
 }
 
 export function selectDevice(ed: Editor, id: string) {
+  if (deviceEditBlocked()) return;
   const d = store.devices.find((x) => x.id === id);
   if (!d || d === device) return;
   if (machine.connected || machine.connecting) {
@@ -115,6 +119,7 @@ export function selectDevice(ed: Editor, id: string) {
 
 /** Einstellungen des gewählten Geräts ändern und speichern (Assistent „Laser einrichten“) */
 export function patchDevice(ed: Editor, patch: Partial<Device>) {
+  if (deviceEditBlocked()) return;
   Object.assign(device, patch);
   applyBed(ed);
   deviceChanged();
@@ -122,6 +127,7 @@ export function patchDevice(ed: Editor, patch: Partial<Device>) {
 
 /** Neues Gerät anlegen und auswählen */
 export function addDevice(ed: Editor, d: Device) {
+  if (deviceEditBlocked()) return;
   store.devices.push(d);
   deviceChanged();
   selectDevice(ed, d.id);
@@ -229,6 +235,7 @@ function designOk(ed: Editor): boolean {
 
 /** Warum gerade kein Job oder Rahmen laufen kann (null = es geht) */
 export function runBlocker(): string | null {
+  if (machine.fire.locked) return fireLockMessage();
   if (!machine.connected) return t('Nicht verbunden.');
   if (machine.running || uploading) return t('Es läuft bereits ein Auftrag.');
   if (machine.remote) {
@@ -427,6 +434,7 @@ export const deviceList = () => ({ devices: store.devices, current: device.id })
 // ---------- Laser-Panel ----------
 
 export function buildLaser(ed: Editor) {
+  installFireOverlay();
   applyBed(ed);
   // Die Lage auf dem Bett zählt nur, wenn absolut gelasert wird und keine Drehachse läuft
   ed.checkBedApplies = () => device.startFrom === 'absolute' && !rotaryOn(device);
@@ -462,6 +470,7 @@ export function buildLaser(ed: Editor) {
 }
 
 function stateText(): [string, string] {
+  if (machine.fire.locked) return [t('Testfeuer'), 'busy'];
   if (machine.connecting) return [t('Verbinde …'), 'busy'];
   if (!machine.connected) return [t('Nicht verbunden'), ''];
   const s = machine.status.state;
@@ -680,15 +689,15 @@ function laserTab(ed: Editor): HTMLElement {
     dot.className = `dot ${cls}`;
     const p = machine.connected ? machine.status.wpos : null;
     posTxt.textContent = p ? `X ${dec(p[0].toFixed(2))}  Y ${dec(p[1].toFixed(2))}` : '';
-    devSel.disabled = machine.connected || machine.connecting;
+    devSel.disabled = machine.connected || machine.connecting || machine.fire.locked;
     const on = machine.connected,
-      busy = machine.running || !!uploading;
+      busy = machine.running || !!uploading || machine.fire.locked;
     connBtn.textContent = on ? t('Trennen') : machine.connecting ? t('Verbinde …') : t('Verbinden');
-    connBtn.disabled = machine.connecting || (!isTauri() && !on);
+    connBtn.disabled = machine.connecting || (!isTauri() && !on) || (!on && machine.fire.locked);
     portSel.disabled = on || machine.connecting || !isTauri();
     refreshBtn.disabled = portSel.disabled;
     for (const b of [startB, frameB, contourB, homeB, originB]) b.disabled = !on || busy;
-    pauseB.disabled = !on;
+    pauseB.disabled = !on || machine.fire.locked;
     stopB.disabled = !on;
     saveB.lastChild!.textContent = device.fw === 'ruida' ? '.rd' : 'G-Code';
     saveB.title = device.fw === 'ruida' ? t('Als Ruida-Datei (.rd) speichern') : t('G-Code speichern');
@@ -810,6 +819,7 @@ function moveTab(ed: Editor): HTMLElement {
     return !!p && Number.isFinite(p[2]);
   };
   const zBlocker = (): string | null => {
+    if (machine.fire.locked) return fireLockMessage();
     if (!machine.connected || machine.running) return t('Nicht verbunden oder Maschine beschäftigt.');
     if (device.fw !== 'marlin' && machine.status.state !== 'Idle') return t('Z-Jog nur bei Stillstand (Idle).');
     if (!zKnown()) return t('Position unbekannt. Auf eine gültige Positionsmeldung warten.');
@@ -837,6 +847,7 @@ function moveTab(ed: Editor): HTMLElement {
     ),
   );
   const zNote = h('div', { class: 'note' }, t('Z+/Z− verfahren die Achse in Steuerungsrichtung (unabhängig von „Z+ fährt Richtung Material“). Freiraum prüfen. Hinweis Kopfkamera: Nach einer Z-Fahrt stimmt der Maßstab des Kamera-Overlays nicht mehr.'));
+  const fire = fireControls(() => device, () => openDeviceDialog(ed, device, undefined, 'fire'));
   root.append(
     pos,
     h('div', { class: 'move-row' }, pad,
@@ -854,6 +865,7 @@ function moveTab(ed: Editor): HTMLElement {
       clickB,
       unlock,
     ),
+    fire.root,
     modeRow,
   );
   const refresh = () => {
@@ -861,7 +873,9 @@ function moveTab(ed: Editor): HTMLElement {
     pos.textContent = machine.connected && s.wpos
       ? t('Position X {x}  Y {y} mm', { x: dec(s.wpos[0].toFixed(2)), y: dec(s.wpos[1].toFixed(2)) }) + (device.zAxis && Number.isFinite(s.wpos[2]) ? `  Z ${dec(s.wpos[2].toFixed(2))}` : '') + (s.mpos && (Math.abs(s.mpos[0] - s.wpos[0]) > 1e-3 || Math.abs(s.mpos[1] - s.wpos[1]) > 1e-3) ? t(' (Maschine {x} / {y})', { x: dec(s.mpos[0].toFixed(2)), y: dec(s.mpos[1].toFixed(2)) }) : '')
       : t('Nicht verbunden');
-    root.querySelectorAll('button').forEach((b) => ((b as HTMLButtonElement).disabled = !machine.connected || machine.running));
+    root.querySelectorAll('button').forEach((b) => {
+      if (!fire.root.contains(b)) b.disabled = !machine.connected || machine.running || machine.fire.locked;
+    });
     zSection.hidden = !device.zAxis;
     zNote.hidden = !device.zAxis;
     const zWhy = device.zAxis ? zBlocker() : null;
@@ -871,6 +885,7 @@ function moveTab(ed: Editor): HTMLElement {
     syncClickB();
     if (!fw().clearOrigin) clearO.disabled = true;
     if (!fw().unlock) unlock.disabled = true;
+    fire.refresh();
   };
   machine.on((e) => e.type !== 'line' && refresh());
   deviceListeners.add(refresh);
@@ -938,7 +953,14 @@ function consoleTab(): HTMLElement {
 let lastDeviceTab = 0;
 
 /** Einstellungen eines Geräts bearbeiten (ohne Angabe: das gewählte) */
-export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: () => void) {
+function deviceEditBlocked(): boolean {
+  if (!machine.fire.locked) return false;
+  notify(fireLockMessage(), true);
+  return true;
+}
+
+export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: () => void, initialSection?: 'fire') {
+  if (deviceEditBlocked()) return;
   const d = { ...target, energy: energyDraft(target.energy) };
   const bed = { w: d.bedW, h: d.bedH };
   const isCurrent = target === device;
@@ -1203,6 +1225,10 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   num(t('Geschwindigkeit (mm/min)'), () => d.frameSpeed, (v) => (d.frameSpeed = v));
   bool(t('Mit Laser (schwach)'), () => d.frameLaser, (v) => (d.frameLaser = v), t('Rahmen mit niedriger Leistung sichtbar machen'));
   num(t('Leistung (%)'), () => d.framePower, (v) => (d.framePower = Math.min(100, v)));
+  head(t('Testfeuer im Bewegen-Fenster'));
+  const fireRows = fireSettings(d);
+  const fireTabIndex = tabs.length - 1;
+  rows.push(...fireRows.rows);
   // Rotpunkt-Zeiger (Issue #213): Versatz je Gerät, mit visueller Darstellung statt Vorzeichenrätsel
   head(t('Rotpunkt-Zeiger (Pointer-Offset)'));
   if (!d.pointerOffset) d.pointerOffset = { x: 0, y: 0, enabled: false }; // Altgeräte aus localStorage/Presets ohne Feld
@@ -1375,7 +1401,7 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     h('span', { class: 'conn-row' }, readBtn),
     readNote,
   );
-  let activeTab = lastDeviceTab < tabs.length ? lastDeviceTab : 0;
+  let activeTab = initialSection === 'fire' ? fireTabIndex : lastDeviceTab < tabs.length ? lastDeviceTab : 0;
   const selectTab = (i: number) => {
     activeTab = lastDeviceTab = i;
     tabBtns.forEach((b, k) => b.classList.toggle('cur', k === i));
@@ -1395,8 +1421,11 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
         class: 'btn primary',
         onclick: () => {
           // Felder, die noch den Fokus haben, zuerst übernehmen
+          if (deviceEditBlocked()) return;
           (document.activeElement as HTMLElement | null)?.blur();
+          if (!fireRows.save(() => selectTab(fireTabIndex))) return;
           saveEnergySettings(energyRows, () => selectTab(energyTabIndex), () => {
+            if (deviceEditBlocked()) return;
             Object.assign(target, d, { bedW: bed.w, bedH: bed.h });
             if (isCurrent) applyBed(ed);
             deviceChanged();
@@ -1428,12 +1457,14 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     if (max > 0) panels.forEach((p) => ((p as HTMLElement).style.minHeight = `${max}px`));
     dlg.style.visibility = prevVis;
   }
+  if (initialSection === 'fire') fireRows.focusEnabled();
 }
 
 // ---------- Drehachse ----------
 
 /** Drehachse (Rotary) des gewählten Geräts einrichten, wie „Rotary Setup“ in LightBurn */
 export function openRotaryDialog() {
+  if (deviceEditBlocked()) return;
   const target = device;
   const r: Rotary = { ...DEFAULT_ROTARY, ...target.rotary };
   const rows: HTMLElement[] = [];
@@ -1519,6 +1550,7 @@ export function openRotaryDialog() {
         class: 'btn primary',
         onclick: () => {
           (document.activeElement as HTMLElement | null)?.blur();
+          if (deviceEditBlocked()) return;
           target.rotary = { ...r };
           deviceChanged();
           dlg.close();
@@ -1536,6 +1568,7 @@ export function openRotaryDialog() {
 
 /** Geräte verwalten: aus Vorlagen anlegen, bearbeiten, kopieren, löschen, auswählen */
 export function openDevicesDialog(ed: Editor) {
+  if (deviceEditBlocked()) return;
   const list = h('table', { class: 'devices' });
   const fill = () => {
     list.textContent = '';
@@ -1555,11 +1588,13 @@ export function openDevicesDialog(ed: Editor) {
         h('td', {}, h('div', { class: 'actions' },
           btn(t('Bearbeiten'), t('Einstellungen dieses Geräts'), () => openDeviceDialog(ed, d, fill)),
           btn(t('Kopieren'), t('Als neues Gerät kopieren'), () => {
+            if (deviceEditBlocked()) return;
             store.devices.push({ ...d, rotary: { ...d.rotary }, id: newDevice(d).id, name: t('{name} (Kopie)', { name: d.name }) });
             deviceChanged();
             fill();
           }),
           btn(t('Löschen'), store.devices.length < 2 ? t('Das letzte Gerät kann nicht gelöscht werden') : t('Gerät löschen'), () => {
+            if (deviceEditBlocked()) return;
             if (!confirm(t('Gerät „{name}“ löschen?', { name: d.name }))) return;
             store.devices = store.devices.filter((x) => x !== d);
             if (d === device) selectDevice(ed, store.devices[0].id);
@@ -1573,6 +1608,7 @@ export function openDevicesDialog(ed: Editor) {
   const presets = presetList();
   const { select: presetSel, details: presetInfo } = presetPicker(presets);
   const add = () => {
+    if (deviceEditBlocked()) return;
     const d = newDevice(presets[Number(presetSel.value)].preset);
     store.devices.push(d);
     deviceChanged();
