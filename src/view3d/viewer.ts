@@ -10,6 +10,14 @@ import { outlineSegments, solidBounds } from './solids';
 import { Pose, rotatePose } from './poses';
 import { DEFAULT_LOOK, LookPreset, lookTexture, resolveLook, shadeHex } from './looks';
 
+export type ViewPreset = 'iso' | 'top' | 'front';
+
+/** Darstellungsmodus der 3D-Ansicht */
+export type RenderMode = 'material' | 'shadedEdges' | 'layer' | 'xray' | 'hiddenLines' | 'wireframe';
+
+/** Hintergrund im Mockup-Modus: wie die Oberfläche, Weiß, Hellgrau, Dunkel oder Studio-Verlauf */
+export type MockupBg = 'theme' | 'white' | 'grey' | 'dark' | 'studio';
+
 export interface ViewSolid extends Solid {
   /** Teile mit gleicher Gruppe (Baugruppe) werden gemeinsam auseinandergezogen */
   group: string;
@@ -17,6 +25,8 @@ export interface ViewSolid extends Solid {
   engraving?: Engraving;
   /** Layer der Kontur (bestimmt das Material) */
   layer?: number;
+  /** Farbe des Layers für den Render-Modus „Layer-Farben“ */
+  layerColor?: string;
   /** Aussehen des Materials */
   look?: LookPreset;
 }
@@ -26,15 +36,15 @@ export interface Scene3D {
   overlaps: Overlap[];
 }
 
-export type ViewPreset = 'iso' | 'top' | 'front';
-
-/** Hintergrund im Mockup-Modus: wie die Oberfläche, Weiß, Hellgrau, Dunkel oder Studio-Verlauf */
-export type MockupBg = 'theme' | 'white' | 'grey' | 'dark' | 'studio';
-
 interface Part {
   s: ViewSolid;
   holder: THREE.Group;
   mesh: THREE.Mesh;
+  outline: THREE.LineSegments;
+  engrave: THREE.Mesh | null;
+  pbrMats: [THREE.Material, THREE.Material];
+  pbrLineColor: THREE.Color;
+  pbrLineOpacity: number;
   /** Richtung und Weg beim Auseinanderziehen (Mitte des Teils minus Mitte der Baugruppe) */
   away: THREE.Vector3;
 }
@@ -230,6 +240,8 @@ export class Viewer3D {
   private sun: THREE.DirectionalLight;
   private mockup = false;
   private mockupBg: MockupBg = 'studio';
+  private renderMode: RenderMode = 'material';
+  private modeMats: THREE.Material[] = [];
   private parts: Part[] = [];
   private explode = 0;
   private spin = false;
@@ -286,12 +298,21 @@ export class Viewer3D {
     this.fitSize();
   }
 
+  private isDarkBackground(): boolean {
+    const bg = this.mockup ? this.mockupBg : 'theme';
+    if (bg === 'dark') return true;
+    if (bg === 'white' || bg === 'grey' || bg === 'studio') return false;
+    const col = new THREE.Color(cssVar('--surface', '#ffffff'));
+    return col.r * 0.299 + col.g * 0.587 + col.b * 0.114 < 0.5;
+  }
+
   private applyTheme() {
     if (this.scene.background instanceof THREE.Texture) this.scene.background.dispose();
     const bg = this.mockup ? this.mockupBg : 'theme';
     this.scene.background =
       bg === 'studio' ? studioBackground() : new THREE.Color(bg === 'white' ? '#ffffff' : bg === 'grey' ? '#c9ccd0' : bg === 'dark' ? '#202226' : cssVar('--surface', '#ffffff'));
     if (this.grid) (this.grid.material as THREE.LineBasicMaterial).color = new THREE.Color(cssVar('--line', '#c3c7ce'));
+    if (this.parts.length) this.applyRenderMode();
     this.needsRender = true;
   }
 
@@ -304,7 +325,19 @@ export class Viewer3D {
     this.needsRender = true;
   }
 
+  private disposeModeMats() {
+    for (const m of this.modeMats) m.dispose();
+    this.modeMats = [];
+  }
+
   private clear() {
+    for (const p of this.parts) {
+      if (p.mesh.material !== p.pbrMats) {
+        p.pbrMats[0].dispose();
+        p.pbrMats[1].dispose();
+      }
+    }
+    this.disposeModeMats();
     for (const g of [this.root, this.overlapGroup])
       g.traverse((o) => {
         if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) {
@@ -348,20 +381,24 @@ export class Viewer3D {
       const geo = slabGeometry(s);
       const look = s.look ?? resolveLook(DEFAULT_LOOK);
       // Fläche (Gruppe 0) und Schnittkante (Gruppe 1) der hochgezogenen Kontur
-      const mesh = new THREE.Mesh(geo, slabMaterials(look, s.th, i));
+      const pbrMats = slabMaterials(look, s.th, i);
+      const mesh = new THREE.Mesh(geo, pbrMats);
       mesh.matrixAutoUpdate = false;
       mesh.matrix.copy(poseMatrix(s.pose));
       mesh.castShadow = mesh.receiveShadow = true;
       // Feine Umrisslinie, damit Teile gleicher Farbe unterscheidbar bleiben
-      const line = new THREE.Color(look.edge ?? shadeHex(look.color, 0.6)).multiplyScalar(look.clear > 0 ? 0.85 : 0.7);
-      mesh.add(new THREE.LineSegments(outlineGeometry(s), new THREE.LineBasicMaterial({ color: line, transparent: true, opacity: look.clear > 0 ? 0.8 : 0.55 })));
-      if (s.engraving) mesh.add(engravingMesh(s, s.engraving, look));
+      const pbrLineColor = new THREE.Color(look.edge ?? shadeHex(look.color, 0.6)).multiplyScalar(look.clear > 0 ? 0.85 : 0.7);
+      const pbrLineOpacity = look.clear > 0 ? 0.8 : 0.55;
+      const outline = new THREE.LineSegments(outlineGeometry(s), new THREE.LineBasicMaterial({ color: pbrLineColor.clone(), transparent: true, opacity: pbrLineOpacity }));
+      mesh.add(outline);
+      const engrave = s.engraving ? engravingMesh(s, s.engraving, look) : null;
+      if (engrave) mesh.add(engrave);
       mesh.userData.label = s.label;
       const holder = new THREE.Group();
       holder.add(mesh);
       this.root.add(holder);
       const c = boxOf(s).getCenter(new THREE.Vector3()).sub(centers.get(s.group)!.getCenter(new THREE.Vector3()));
-      this.parts.push({ s, holder, mesh, away: c });
+      this.parts.push({ s, holder, mesh, outline, engrave, pbrMats, pbrLineColor, pbrLineOpacity, away: c });
     });
     const red = new THREE.MeshBasicMaterial({ color: 0xe53935, transparent: true, opacity: 0.85, depthTest: false });
     for (const o of sc.overlaps)
@@ -396,6 +433,110 @@ export class Viewer3D {
     this.applyTheme();
     this.layout();
     if (refit) this.view('iso');
+  }
+
+  /** Darstellungsmodus (Material, Shaded + Kanten, Layer-Farben, Röntgen, Hidden Lines, Wireframe) */
+  setRenderMode(mode: RenderMode) {
+    if (this.renderMode === mode) return;
+    this.renderMode = mode;
+    this.applyRenderMode();
+    this.needsRender = true;
+  }
+
+  private applyRenderMode() {
+    this.disposeModeMats();
+    const mode = this.renderMode;
+    const techLine = this.isDarkBackground() ? 0xe6e8ec : 0x1e2024;
+    for (const p of this.parts) {
+      const lineMat = p.outline.material as THREE.LineBasicMaterial;
+      if (mode === 'material' || mode === 'shadedEdges') {
+        p.mesh.material = p.pbrMats;
+        p.mesh.castShadow = p.mesh.receiveShadow = true;
+        if (p.engrave) p.engrave.visible = true;
+        if (mode === 'material') {
+          lineMat.color.copy(p.pbrLineColor);
+          lineMat.opacity = p.pbrLineOpacity;
+          lineMat.transparent = true;
+          lineMat.depthTest = true;
+          p.outline.renderOrder = 0;
+        } else {
+          lineMat.color.setHex(techLine);
+          lineMat.opacity = 0.9;
+          lineMat.transparent = true;
+          lineMat.depthTest = true;
+          p.outline.renderOrder = 2;
+        }
+      } else if (mode === 'layer') {
+        const mat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(p.s.layerColor || '#888888'),
+          roughness: 0.72,
+          metalness: 0.05,
+        });
+        this.modeMats.push(mat);
+        p.mesh.material = mat;
+        p.mesh.castShadow = p.mesh.receiveShadow = true;
+        if (p.engrave) p.engrave.visible = true;
+        lineMat.color.setHex(techLine);
+        lineMat.opacity = 0.75;
+        lineMat.transparent = true;
+        lineMat.depthTest = true;
+        p.outline.renderOrder = 2;
+      } else if (mode === 'xray') {
+        const mat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(p.s.layerColor || p.s.look?.color || '#7aa2d4'),
+          roughness: 0.6,
+          metalness: 0.05,
+          transparent: true,
+          opacity: 0.22,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        });
+        this.modeMats.push(mat);
+        p.mesh.material = mat;
+        p.mesh.castShadow = p.mesh.receiveShadow = false;
+        if (p.engrave) p.engrave.visible = false;
+        lineMat.color.setHex(techLine);
+        lineMat.opacity = 0.65;
+        lineMat.transparent = true;
+        lineMat.depthTest = true;
+        p.outline.renderOrder = 2;
+      } else if (mode === 'hiddenLines') {
+        const mat = new THREE.MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: true,
+          depthTest: true,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1,
+        });
+        this.modeMats.push(mat);
+        p.mesh.material = mat;
+        p.mesh.castShadow = p.mesh.receiveShadow = false;
+        if (p.engrave) p.engrave.visible = false;
+        lineMat.color.setHex(techLine);
+        lineMat.opacity = 1;
+        lineMat.transparent = false;
+        lineMat.depthTest = true;
+        p.outline.renderOrder = 1;
+      } else {
+        // wireframe
+        const mat = new THREE.MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: false,
+          depthTest: false,
+        });
+        this.modeMats.push(mat);
+        p.mesh.material = mat;
+        p.mesh.castShadow = p.mesh.receiveShadow = false;
+        if (p.engrave) p.engrave.visible = false;
+        lineMat.color.setHex(techLine);
+        lineMat.opacity = 0.85;
+        lineMat.transparent = true;
+        lineMat.depthTest = false;
+        p.outline.renderOrder = 1;
+      }
+      lineMat.needsUpdate = true;
+    }
   }
 
   /** Mockup-Modus: ohne Raster, mit Schatten und eigenem Hintergrund (für Bilder für Kunden) */

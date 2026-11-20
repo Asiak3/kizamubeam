@@ -5149,5 +5149,11 @@
   "Wenn der Bedienknopf nicht vollständig sichtbar ist, erscheint das Overlay trotzdem.": "The overlay still appears when the control button is not fully visible.",
   "Maximale Leistung (%)": "Maximum power (%)",
   "Maximale Laufzeit (s)": "Maximum duration (s)",
-  "Dauer (s)": "Duration (s)"
+  "Dauer (s)": "Duration (s)",
+  "Darstellungsmodus der 3D-Ansicht": "3D view render mode",
+  "Shaded + Kanten": "Shaded + Edges",
+  "Layer-Farben": "Layer colors",
+  "Röntgen": "X-Ray",
+  "Hidden Lines": "Hidden lines",
+  "Wireframe": "Wireframe"
 }

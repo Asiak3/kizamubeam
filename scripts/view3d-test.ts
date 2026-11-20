@@ -888,6 +888,22 @@ test('Rohplatte: Teile darauf bleiben Teile, die Platte bekommt Löcher; die Anz
   assert.deepEqual(collectScene({ ...ed, sel: [engr] } as never, 3, false, undefined, false).loose, [], 'auch nicht, wenn nur die Gravur gewählt ist');
 });
 
+test('Darstellungsmodus Layer-Farben: collectScene übernimmt die Layer-Farbe für jedes Teil', () => {
+  const rect = (id: number, layer: number, x: number, y: number): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer, shape: { kind: 'rect', w: 20, h: 20, r: 0 } });
+  const a = rect(1, 0, 0, 0), b = rect(2, 2, 40, 0);
+  const doc = loadDoc({ version: 2, bed: { w: 300, h: 200 }, page: 0, layers: {}, pages: [{ name: 'A', objs: [a, b] }] });
+  const colors = ['#112233', '#445566', '#cc3311'];
+  const ed = {
+    doc,
+    sel: [],
+    layer: () => ({ mode: 'line', output: true, show: true, material: undefined }),
+    layerDrawColor: (i: number) => colors[i] ?? '#000000',
+  } as never;
+  const solids = collectScene(ed, 3, false).scene.solids;
+  assert.equal(solids.length, 2);
+  assert.deepEqual(solids.map((s) => s.layerColor).sort(), ['#112233', '#cc3311']);
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

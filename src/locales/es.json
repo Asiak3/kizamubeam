@@ -5149,5 +5149,11 @@
   "Wenn der Bedienknopf nicht vollständig sichtbar ist, erscheint das Overlay trotzdem.": "El aviso aparece igualmente si el botón no está completamente visible.",
   "Maximale Leistung (%)": "Potencia máxima (%)",
   "Maximale Laufzeit (s)": "Duración máxima (s)",
-  "Dauer (s)": "Duración (s)"
+  "Dauer (s)": "Duración (s)",
+  "Darstellungsmodus der 3D-Ansicht": "Modo de renderizado de la vista 3D",
+  "Shaded + Kanten": "Sombreado + bordes",
+  "Layer-Farben": "Colores de capa",
+  "Röntgen": "Rayos X",
+  "Hidden Lines": "Líneas ocultas",
+  "Wireframe": "Alambre"
 }

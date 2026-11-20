@@ -26,14 +26,23 @@ import { cleanLook, DEFAULT_LOOK, layerLook, LookPreset, MaterialLook, resolveLo
 import { lookEditor } from './lookui';
 import { library } from '../materials';
 import { onImageReady } from '../images';
-import type { MockupBg, Scene3D, Viewer3D, ViewPreset, ViewSolid } from './viewer';
+import type { MockupBg, RenderMode, Scene3D, Viewer3D, ViewPreset, ViewSolid } from './viewer';
 import { saveDataUrl } from '../files';
 import { plateAnchor } from '../multilayer';
 
 /** Hintergründe des Mockups (Liste hier, damit three.js erst mit dem Fenster geladen wird) */
 const MOCKUP_BGS: MockupBg[] = ['studio', 'white', 'grey', 'dark', 'theme'];
-// i18n-keys-start (Namen der Hintergründe, übersetzt per t(BG_NAMES[…]))
+const RENDER_MODES: RenderMode[] = ['material', 'shadedEdges', 'layer', 'xray', 'hiddenLines', 'wireframe'];
+// i18n-keys-start (Namen der Hintergründe und Render-Modi, übersetzt per t(…))
 const BG_NAMES: Record<MockupBg, string> = { studio: 'Studio', white: 'Weiß', grey: 'Grau', dark: 'Dunkel', theme: 'Wie die Oberfläche' };
+const RENDER_MODE_NAMES: Record<RenderMode, string> = {
+  material: 'Material',
+  shadedEdges: 'Shaded + Kanten',
+  layer: 'Layer-Farben',
+  xray: 'Röntgen',
+  hiddenLines: 'Hidden Lines',
+  wireframe: 'Wireframe',
+};
 // i18n-keys-end
 
 const KEY = 'kizamubeam.view3d';
@@ -46,6 +55,8 @@ interface Settings {
   marks: boolean;
   /** Aussehen für Layer ohne eigenes Material */
   look: MaterialLook;
+  /** Darstellungsmodus der 3D-Ansicht */
+  mode: RenderMode;
   /** Mockup-Modus: Schatten statt Raster, eigener Hintergrund */
   mockup: boolean;
   bg: MockupBg;
@@ -54,13 +65,14 @@ interface Settings {
 }
 
 function loadSettings(): Settings {
-  const d: Settings = { th: 3, overlaps: true, marks: true, look: DEFAULT_LOOK, mockup: false, bg: 'studio', stock: true };
+  const d: Settings = { th: 3, overlaps: true, marks: true, look: DEFAULT_LOOK, mode: 'material', mockup: false, bg: 'studio', stock: true };
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || '{}');
     if (s.th > 0 && s.th <= 50) d.th = Number(s.th);
     if (typeof s.overlaps === 'boolean') d.overlaps = s.overlaps;
     if (typeof s.marks === 'boolean') d.marks = s.marks;
     d.look = cleanLook(s.look) ?? d.look;
+    if (RENDER_MODES.includes(s.mode)) d.mode = s.mode;
     if (typeof s.stock === 'boolean') d.stock = s.stock;
     if (typeof s.mockup === 'boolean') d.mockup = s.mockup;
     if (MOCKUP_BGS.includes(s.bg)) d.bg = s.bg;
@@ -251,6 +263,7 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
       if (!looks.has(li)) looks.set(li, resolveLook(layerLook(ed.layer(li), (id) => library.get(id)?.material, fallback)));
       s.look = looks.get(li);
     }
+    if (!s.layerColor) s.layerColor = ed.layerDrawColor?.(s.layer ?? 0);
   }
   if (marks) {
     const eng = engravings(ed, solids, places, (s) => (s as ViewSolid).look?.engrave ?? BURN);
@@ -452,6 +465,11 @@ export function buildView3dPanel(ed: Editor) {
     { title: t('Hintergrund des Mockups'), hidden: !set.mockup },
     ...MOCKUP_BGS.map((b) => h('option', { value: b, selected: b === set.bg }, t(BG_NAMES[b]))),
   ) as HTMLSelectElement;
+  const modeSel = h(
+    'select',
+    { title: t('Darstellungsmodus der 3D-Ansicht') },
+    ...RENDER_MODES.map((m) => h('option', { value: m, selected: m === set.mode }, t(RENDER_MODE_NAMES[m]))),
+  ) as HTMLSelectElement;
   const shotBtn = h('button', {
     class: 'small',
     title: t('Die aktuelle Ansicht in doppelter Auflösung als PNG speichern, z. B. als Mockup für Kunden'),
@@ -468,6 +486,7 @@ export function buildView3dPanel(ed: Editor) {
     h('button', { class: 'small', title: t('Schräg von vorne'), onclick: () => view('iso') }, t('3D')),
     h('button', { class: 'small', title: t('Von oben'), onclick: () => view('top') }, t('Oben|3D')),
     h('button', { class: 'small', title: t('Von vorne'), onclick: () => view('front') }, t('Vorne|3D')),
+    h('label', { class: 'v3d-look', title: t('Darstellungsmodus der 3D-Ansicht') }, t('Darstellung'), modeSel),
     h('label', { class: 'v3d-range', title: t('Teile auseinanderziehen') }, t('Explosion'), explode),
     spinLbl,
     h('label', { class: 'v3d-check', title: t('Bereiche, in denen sich Teile durchdringen, rot zeigen') }, ovBox, t('Überschneidungen')),
@@ -543,6 +562,7 @@ export function buildView3dPanel(ed: Editor) {
           viewer.setExplode(Number(explode.value));
           viewer.setShowOverlaps(set.overlaps);
           viewer.setMockup(set.mockup, set.bg);
+          viewer.setRenderMode(set.mode);
           lastKey = '';
           update();
           viewer.setActive(isShown('view3d'));
@@ -579,6 +599,11 @@ export function buildView3dPanel(ed: Editor) {
     set.marks = markBox.checked;
     save();
     update();
+  });
+  modeSel.addEventListener('change', () => {
+    set.mode = modeSel.value as RenderMode;
+    save();
+    viewer?.setRenderMode(set.mode);
   });
   const mockChanged = () => {
     set.mockup = mockBox.checked;
