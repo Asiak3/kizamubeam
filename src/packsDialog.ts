@@ -361,11 +361,11 @@ export async function openPacksDialog(doc?: Doc) {
   let view: 'catalog' | 'installed' | 'updates' = 'catalog';
   const stateOf = (e: CatalogEntry) => catalogState(e, allPacks().find((x) => x.pack.id === e.id)?.pack, APP_VERSION);
   const updates = () => (catalog?.packs ?? []).filter((e) => stateOf(e) === 'update');
-  const catalogTab = h('button', { class: 'pack-tab', type: 'button' }, t('Katalog')) as HTMLButtonElement;
-  const installedTab = h('button', { class: 'pack-tab', type: 'button' }) as HTMLButtonElement;
-  const updatesTab = h('button', { class: 'pack-tab', type: 'button' }) as HTMLButtonElement;
+  const catalogTab = h('button', { class: 'tab', type: 'button' }, t('Katalog')) as HTMLButtonElement;
+  const installedTab = h('button', { class: 'tab', type: 'button' }) as HTMLButtonElement;
+  const updatesTab = h('button', { class: 'tab', type: 'button' }) as HTMLButtonElement;
   const catalogHeading = h('h4', {}, t('Katalog'));
-  const tabs = h('div', { class: 'pack-tabs', role: 'tablist' }, catalogTab, installedTab, updatesTab);
+  const tabs = h('div', { class: 'tab-bar pack-tabs', role: 'tablist' }, catalogTab, installedTab, updatesTab);
   const categoryButtons: { filter: Filter; button: HTMLButtonElement }[] = [];
   const sidebar = h('nav', { class: 'pack-categories' }, h('h4', {}, t('Inhalte|Erweiterungen')));
   const addCategory = (value: Filter, label: string) => {
@@ -391,9 +391,9 @@ export async function openPacksDialog(doc?: Doc) {
     catalogHeading.textContent = view === 'updates' ? t('Updates') : t('Katalog');
     catalogPanel.hidden = view === 'installed';
     installedPanel.hidden = view !== 'installed';
-    catalogTab.classList.toggle('active', view === 'catalog');
-    installedTab.classList.toggle('active', view === 'installed');
-    updatesTab.classList.toggle('active', view === 'updates');
+    catalogTab.classList.toggle('on', view === 'catalog');
+    installedTab.classList.toggle('on', view === 'installed');
+    updatesTab.classList.toggle('on', view === 'updates');
     for (const item of categoryButtons) item.button.classList.toggle('active', item.filter === filter);
     catalogTab.setAttribute('aria-selected', String(view === 'catalog'));
     installedTab.setAttribute('aria-selected', String(view === 'installed'));
