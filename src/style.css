@@ -3346,19 +3346,40 @@ body.dock-resizing #canvas {
 .gen-surface-area > .note:not(.muted) {
   min-height: 2.9em;
 }
-/* Steps of a generator dialog (#211 stage 7): numbered tabs, one step at a time */
+/* Steps of a generator dialog (#211 stage 7): numbered tabs, one step at a time; a tab bar like the panel tabs */
 .gen-steps {
-  margin-bottom: 8px;
+  gap: 2px;
+  margin: 0 0 8px;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 6px;
+}
+.gen-steps button,
+.gen-steps button:hover {
+  height: 28px;
+  margin: 0 0 -1px;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-weight: 600;
+  color: var(--muted);
+}
+.gen-steps button:hover {
+  color: var(--text);
+}
+.gen-steps button:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
 }
 .gen-steps button.on {
-  background: var(--accent-soft);
-  border-color: var(--accent);
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 .gen-steps button.invalid {
-  border-color: var(--warn, #d9822b);
   color: var(--warn, #d9822b);
+}
+.gen-steps button.invalid.on {
+  border-bottom-color: var(--warn, #d9822b);
 }
 .gen-step .jig-panel:first-child {
   margin-top: 0;
