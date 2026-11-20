@@ -2,6 +2,7 @@
 import type { Editor } from './editor';
 import { $, h } from './dom';
 import { openProject, saveProject } from './files';
+import { applyNewDocDefaults } from './laser';
 import { t } from './i18n';
 
 /** Tab i schließen, bei ungespeicherten Änderungen erst nachfragen */
@@ -60,7 +61,7 @@ export function buildTabBar(ed: Editor) {
     });
     bar.replaceChildren(
       ...tabs,
-      h('button', { class: 'ptab-new', title: t('Neues Projekt in neuem Tab (Ctrl+N)'), onclick: () => ed.newTab() }, '+'),
+      h('button', { class: 'ptab-new', title: t('Neues Projekt in neuem Tab (Ctrl+N)'), onclick: () => (ed.newTab(), applyNewDocDefaults()) }, '+'),
     );
   };
   ed.onTabsChange = render;
@@ -82,7 +83,7 @@ export function buildTabBar(ed: Editor) {
       return run(() => ed.switchTab((ed.tabIndex + (e.shiftKey ? n - 1 : 1)) % n));
     }
     if (e.shiftKey) return;
-    if (k === 'n') return run(() => ed.newTab());
+    if (k === 'n') return run(() => (ed.newTab(), applyNewDocDefaults()));
     if (k === 'o') return run(() => void openProject(ed));
     if (k === 's') return run(() => void saveProject(ed));
   });

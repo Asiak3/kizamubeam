@@ -123,7 +123,7 @@ export class EditorKeyboard {
     if (e.altKey && (k === '+' || k === '±' || e.code === 'NumpadAdd')) return run(() => void this.booleanSel('union'));
     if (e.altKey && (k === '-' || k === '–' || e.code === 'NumpadSubtract')) return run(() => void this.booleanSel('subtract'));
     if (e.altKey && (k === '*' || e.code === 'NumpadMultiply')) return run(() => void this.booleanSel('intersect'));
-    if (e.altKey && k === 'w') return run(() => ((this.filled = !this.filled), this.emit('view')));
+    if (e.altKey && k === 'w') return run(() => this.setFilled(!this.filled));
     // Alt+J / Alt+B (Mac: Option, dort liefert e.key ein Sonderzeichen, daher e.code)
     if (e.altKey && !e.shiftKey && e.code === 'KeyJ') return run(() => this.joinSel());
     if (e.altKey && !e.shiftKey && e.code === 'KeyB') return run(() => this.breakApartSel());

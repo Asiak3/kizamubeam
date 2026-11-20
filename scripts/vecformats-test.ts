@@ -6,7 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { zlibSync } from 'fflate';
 const { buildDxf, buildPdf } = await import('../src/vecexport');
 const { importPdf, importPdfPages, encodePng, pageMatrix } = await import('../src/pdfimport');
-const { importDxf } = await import('../src/importers');
+const { importDxf, importSvg } = await import('../src/importers');
 type SubPath = import('../src/model').SubPath;
 type ExportItem = import('../src/vecexport').ExportItem;
 type ImportedPath = import('../src/importers').ImportedPath;
@@ -412,6 +412,64 @@ await test('PNG-Kodierer erzeugt gültige Kopfzeilen', async () => {
   const png = encodePng(1, 1, new Uint8Array([1, 2, 3, 4]));
   assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   assert.equal(new TextDecoder().decode(png.subarray(12, 16)), 'IHDR');
+});
+
+await test('DXF: Fallback-Einheit greift bei fehlendem oder einheitenlosem $INSUNITS', () => {
+  const dxfNoHeader = ['0', 'SECTION', '2', 'ENTITIES', '0', 'LINE', '10', '0', '20', '0', '11', '2', '21', '0', '0', 'ENDSEC', '0', 'EOF'].join('\r\n');
+  const dxfUnitless = ['0', 'SECTION', '2', 'HEADER', '9', '$INSUNITS', '70', '0', '0', 'ENDSEC', dxfNoHeader].join('\r\n');
+  const len = (r: ReturnType<typeof importDxf>) => {
+    const n = (r.items[0] as ImportedPath).subs[0].nodes;
+    return Math.hypot(n[1].x - n[0].x, n[1].y - n[0].y);
+  };
+  near(len(importDxf(dxfNoHeader)), 2, 1e-6, 'Default mm');
+  near(len(importDxf(dxfNoHeader, { dxfFallbackUnit: 25.4 })), 50.8, 1e-6, 'Zoll-Fallback ohne Header');
+  near(len(importDxf(dxfUnitless, { dxfFallbackUnit: 25.4 })), 50.8, 1e-6, 'Zoll-Fallback bei $INSUNITS=0');
+});
+
+await test('SVG: Auto-DPI erkennt Adobe-Illustrator-Kommentar trotz Bereinigung', () => {
+  type MiniEl = {
+    localName: string;
+    attrs: Record<string, string>;
+    children: MiniEl[];
+    textContent: string;
+    getAttribute(k: string): string | null;
+    hasAttribute(k: string): boolean;
+    getAttributeNames(): string[];
+    getElementsByTagName(tag: string): MiniEl[];
+  };
+  const makeEl = (localName: string, attrs: Record<string, string>, children: MiniEl[] = []): MiniEl => ({
+    localName,
+    attrs,
+    children,
+    textContent: '',
+    getAttribute: (k) => (k in attrs ? attrs[k] : null),
+    hasAttribute: (k) => k in attrs,
+    getAttributeNames: () => Object.keys(attrs),
+    getElementsByTagName: (tag) => children.filter((c) => c.localName === tag),
+  });
+  const prevParser = (globalThis as Record<string, unknown>).DOMParser;
+  (globalThis as Record<string, unknown>).DOMParser = class {
+    parseFromString() {
+      const rectEl = makeEl('rect', { x: '0', y: '0', width: '72', height: '72', stroke: '#000000', fill: 'none' });
+      const root = makeEl('svg', { width: '72', height: '72', viewBox: '0 0 72 72' }, [rectEl]);
+      return { documentElement: root, getElementsByTagName: (tag: string) => root.getElementsByTagName(tag) };
+    }
+  };
+  try {
+    const aiSvg = '<!-- Generator: Adobe Illustrator 27.0.0, SVG Export Plug-In -->\n<svg width="72" height="72" viewBox="0 0 72 72"><rect x="0" y="0" width="72" height="72" stroke="#000" fill="none"/></svg>';
+    const plainSvg = '<svg width="72" height="72" viewBox="0 0 72 72"><rect x="0" y="0" width="72" height="72" stroke="#000" fill="none"/></svg>';
+    const widthOf = (r: ReturnType<typeof importSvg>) => {
+      const xs = (r.items[0] as ImportedPath).subs[0].nodes.map((n) => n.x);
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    near(widthOf(importSvg(aiSvg, { svgDpi: '96' })), (72 * 25.4) / 96, 1e-6, '96 DPI');
+    near(widthOf(importSvg(aiSvg, { svgDpi: '72' })), 25.4, 1e-6, '72 DPI');
+    near(widthOf(importSvg(aiSvg, { svgDpi: 'auto' })), 25.4, 1e-6, 'Auto erkennt Illustrator-Kommentar (72 DPI)');
+    near(widthOf(importSvg(plainSvg, { svgDpi: 'auto' })), (72 * 25.4) / 96, 1e-6, 'Auto ohne Illustrator bleibt 96 DPI');
+  } finally {
+    if (prevParser === undefined) delete (globalThis as Record<string, unknown>).DOMParser;
+    else (globalThis as Record<string, unknown>).DOMParser = prevParser;
+  }
 });
 
 if (failed) {

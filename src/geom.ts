@@ -7,6 +7,7 @@ import { barcodeExtent, barcodeOutline } from './barcode';
 import { forgetCenters } from './arcs';
 import { resolveImageEdits } from './imageEdits';
 import { resolveImageContour, type ImageContour, type ImageCorner } from './imageContour';
+import { t } from './i18n';
 
 export { bezierPt, segments };
 
@@ -18,6 +19,43 @@ export interface Box {
 }
 
 const K = 0.5522847498; // Bézier-Näherung für Viertelkreise
+
+/** Kurvenqualität (Tempo vs. Genauigkeit) für die Kurven-Abtastung bei Rahmen und Treffertest. */
+export type CurveQuality = 'coarse' | 'balanced' | 'fine';
+const CURVE_QUALITY_KEY = 'kizamubeam.curveQuality';
+export const DEFAULT_CURVE_QUALITY: CurveQuality = 'balanced';
+
+export function loadCurveQuality(): CurveQuality {
+  try {
+    const v = JSON.parse(localStorage.getItem(CURVE_QUALITY_KEY) ?? JSON.stringify(DEFAULT_CURVE_QUALITY));
+    if (v === 'coarse' || v === 'balanced' || v === 'fine') return v;
+  } catch {
+    /* Speicher nicht verfügbar oder beschädigt */
+  }
+  return DEFAULT_CURVE_QUALITY;
+}
+
+export function saveCurveQuality(q: CurveQuality) {
+  if (q !== 'coarse' && q !== 'balanced' && q !== 'fine') throw new Error(t('Ungültige Kurvenqualität.'));
+  try {
+    localStorage.setItem(CURVE_QUALITY_KEY, JSON.stringify(q));
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+  curveQualityCache = q;
+}
+
+/** Zwischenspeicher: Rahmen/Treffertest sind heiß, kein Speicherzugriff pro Kurve. */
+let curveQualityCache: CurveQuality | null = null;
+function currentCurveQuality(): CurveQuality {
+  if (!curveQualityCache) curveQualityCache = loadCurveQuality();
+  return curveQualityCache;
+}
+
+/** Abtastschritt je Qualität: grob 1/8, ausgewogen 1/16 (heutiges Verhalten), fein 1/32. */
+function curveStep(q: CurveQuality): number {
+  return q === 'coarse' ? 1 / 8 : q === 'fine' ? 1 / 32 : 1 / 16;
+}
 
 /** Grundformen als Knotenpfade (lokale Koordinaten). */
 export function shapeSubs(s: Shape): SubPath[] {
@@ -228,11 +266,12 @@ export function imageContourHitsSegment(contour: ImageContour, a: Pt, b: Pt): bo
 
 function samplePoints(subs: SubPath[]): Pt[] {
   const pts: Pt[] = [];
+  const step = curveStep(currentCurveQuality());
   for (const sp of subs) {
     if (sp.nodes.length === 1) pts.push(sp.nodes[0]);
     for (const s of segments(sp)) {
       if (!s.curve) pts.push(s.a, s.b);
-      else for (let t = 0; t <= 1.0001; t += 1 / 16) pts.push(bezierPt(s.a, s.c1, s.c2, s.b, t));
+      else for (let t = 0; t <= 1.0001; t += step) pts.push(bezierPt(s.a, s.c1, s.c2, s.b, t));
     }
   }
   return pts;
@@ -367,23 +406,30 @@ export function drawText(ctx: CanvasRenderingContext2D, t: TextShape, m: Mat, mo
   ctx.scale(lay.k, lay.k);
   ctx.font = lay.font;
   ctx.textBaseline = 'alphabetic';
+  // Schrift noch nicht geladen: Browser formt mit (arabische Verbindung inklusive);
+  // Zeile rechtsbündig an ihrer rechten Kante ausrichten
+  if (t.rtl) ctx.direction = 'rtl';
+  ctx.textAlign = t.rtl ? 'right' : 'left';
   if (mode === 'stroke') {
     const s = Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) * lay.k;
     ctx.lineWidth = px / s;
   }
   for (const ln of lay.lines) {
+    const lx = t.rtl ? ln.x + ln.w : ln.x;
     if (!lay.spacing) {
-      if (mode === 'fill') ctx.fillText(ln.text, ln.x, ln.y);
-      else ctx.strokeText(ln.text, ln.x, ln.y);
+      if (mode === 'fill') ctx.fillText(ln.text, lx, ln.y);
+      else ctx.strokeText(ln.text, lx, ln.y);
       continue;
     }
-    let x = ln.x;
+    let x = lx;
     for (const ch of ln.text) {
       if (mode === 'fill') ctx.fillText(ch, x, ln.y);
       else ctx.strokeText(ch, x, ln.y);
-      x += ctx.measureText(ch).width + lay.spacing;
+      x += (t.rtl ? -1 : 1) * (ctx.measureText(ch).width + lay.spacing);
     }
   }
+  ctx.direction = 'ltr';
+  ctx.textAlign = 'start';
   ctx.restore();
 }
 

@@ -163,11 +163,17 @@ export function nearestLayer(rgb: [number, number, number] | null): number {
 
 const UNIT_MM: Record<string, number> = { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96, '': 25.4 / 96 };
 
-function lengthMm(v: string | null): number | null {
+/** Illustrator-Dateien an Namensraum, Generator oder Kommentar erkennen (für die Auto-DPI-Wahl) */
+function isIllustratorSvg(root: Element, text: string): boolean {
+  if (root.getAttributeNames().some((n) => n === 'xmlns:i' || n.startsWith('xmlns:i:'))) return true;
+  return /adobe illustrator/i.test(root.getAttribute('generator') ?? '') || /adobe illustrator/i.test(text.slice(0, 4000));
+}
+function lengthMm(v: string | null, pxMm = 25.4 / 96): number | null {
   if (!v) return null;
   const m = /^\s*([-+]?[\d.]+(?:e[-+]?\d+)?)\s*(mm|cm|in|pt|pc|px|%)?\s*$/i.exec(v);
   if (!m || m[2] === '%') return null;
-  return parseFloat(m[1]) * UNIT_MM[(m[2] ?? '').toLowerCase()];
+  const u = (m[2] ?? '').toLowerCase();
+  return parseFloat(m[1]) * (u === 'px' || u === '' ? pxMm : UNIT_MM[u]);
 }
 
 /** Zahlenliste aus Attributen wie points oder viewBox */
@@ -426,9 +432,15 @@ function sanitizeSvgText(input: string): string {
   return s;
 }
 
+export type SvgDpi = '96' | '72' | 'auto';
+
 export interface ImportParseOptions {
   /** Hinweise zu übersprungenen Inhalten (z. B. Texte) in notes aufnehmen; Formen werden so oder so übersprungen */
   reportSkipped?: boolean;
+  /** Auflösung größenloser SVG-Einheiten (px); 'auto' nimmt 72 DPI bei Illustrator-Dateien, sonst 96 */
+  svgDpi?: SvgDpi;
+  /** DXF-Einheit in mm pro Einheit, wenn $INSUNITS fehlt oder unbekannt ist (Default 1 = mm) */
+  dxfFallbackUnit?: number;
 }
 
 export function importSvg(text: string, opts?: ImportParseOptions): ImportResult {
@@ -442,13 +454,15 @@ export function importSvg(text: string, opts?: ImportParseOptions): ImportResult
   const notes: string[] = [];
   let skippedText = 0;
 
-  // Seitenmaßstab: Benutzereinheiten → mm
+  // Seitenmaßstab: Benutzereinheiten → mm. Illustrator speichert 72 DPI, sonst 96.
+  const dpi = opts?.svgDpi ?? '96';
+  const pxMm = dpi === '72' ? 25.4 / 72 : dpi === 'auto' && isIllustratorSvg(root, text) ? 25.4 / 72 : 25.4 / 96;
   const vb = nums(root.getAttribute('viewBox'));
-  const wmm = lengthMm(root.getAttribute('width')),
-    hmm = lengthMm(root.getAttribute('height'));
-  let base: Mat = [25.4 / 96, 0, 0, 25.4 / 96, 0, 0];
+  const wmm = lengthMm(root.getAttribute('width'), pxMm),
+    hmm = lengthMm(root.getAttribute('height'), pxMm);
+  let base: Mat = [pxMm, 0, 0, pxMm, 0, 0];
   if (vb.length === 4 && vb[2] > 0 && vb[3] > 0) {
-    const sx = wmm !== null ? wmm / vb[2] : hmm !== null ? hmm / vb[3] : 25.4 / 96;
+    const sx = wmm !== null ? wmm / vb[2] : hmm !== null ? hmm / vb[3] : pxMm;
     const sy = hmm !== null ? hmm / vb[3] : sx;
     const s = Math.min(sx, sy); // preserveAspectRatio xMidYMid meet (Standard)
     base = [s, 0, 0, s, -vb[0] * s, -vb[1] * s];
@@ -608,9 +622,10 @@ const INSUNITS_MM: Record<number, number> = { 1: 25.4, 2: 304.8, 4: 1, 5: 10, 6:
 
 export function importDxf(text: string, opts?: ImportParseOptions): ImportResult {
   const reportSkipped = opts?.reportSkipped ?? true;
+  const fallback = opts?.dxfFallbackUnit && Number.isFinite(opts.dxfFallbackUnit) && opts.dxfFallbackUnit > 0 ? opts.dxfFallbackUnit : 1;
   const pairs = dxfPairs(text);
   if (!pairs.some(([c, v]) => c === 0 && v === 'SECTION')) throw new Error(t('Keine gültige DXF-Datei'));
-  let unit = 1;
+  let unit = fallback;
   const layerColor = new Map<string, number>();
   // Echtfarben (Gruppencode 420, ab AutoCAD 2004) gehen vor dem Farbindex
   const layerTrue = new Map<string, [number, number, number]>();
@@ -687,7 +702,7 @@ export function importDxf(text: string, opts?: ImportParseOptions): ImportResult
   }
   // Einheit aus dem Kopf
   const hdr = pairs.findIndex(([c, v]) => c === 9 && v === '$INSUNITS');
-  if (hdr >= 0) unit = INSUNITS_MM[parseInt(pairs[hdr + 1]?.[1] ?? '4', 10)] ?? 1;
+  if (hdr >= 0) unit = INSUNITS_MM[parseInt(pairs[hdr + 1]?.[1] ?? '4', 10)] ?? fallback;
 
   const items: ImportedPath[] = [];
   const skipped = new Map<string, number>();

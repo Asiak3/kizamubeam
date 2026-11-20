@@ -133,6 +133,92 @@ await test('Menu: Edit → Settings, overlap item gone from File', () => {
   assert.ok(!ui.includes('Überlappungsauswahl einstellen'));
 });
 
+await test('Core settings: no split group headings inside a section', () => {
+  const src = readFileSync(new URL('../src/settings/core.ts', import.meta.url), 'utf8');
+  const sections = src.split(/registerSettingsSection\(\{/).slice(1);
+  for (const sec of sections) {
+    const seen = new Set<string>();
+    let prev = '';
+    for (const m of sec.matchAll(/\bgroup:\s*t\('([^']+)'\)/g)) {
+      const g = m[1];
+      if (g !== prev) {
+        assert.ok(!seen.has(g), `split group heading "${g}"`);
+        seen.add(g);
+        prev = g;
+      }
+    }
+  }
+});
+
+await test('Alt+W and tab bar new-file triggers persist/apply settings', () => {
+  const kb = readFileSync(new URL('../src/editor/keyboard.ts', import.meta.url), 'utf8');
+  assert.ok(kb.includes("if (e.altKey && k === 'w') return run(() => this.setFilled(!this.filled));"));
+  const tb = readFileSync(new URL('../src/tabsBar.ts', import.meta.url), 'utf8');
+  assert.ok(tb.includes('onclick: () => (ed.newTab(), applyNewDocDefaults())'));
+  assert.ok(tb.includes("if (k === 'n') return run(() => (ed.newTab(), applyNewDocDefaults()));"));
+});
+
+await test('jobOriginDefault defaults to null (keep device) and validates 0..8', async () => {
+  const store = new Map<string, string>();
+  const prevStorage = (globalThis as Record<string, unknown>).localStorage;
+  (globalThis as Record<string, unknown>).localStorage = {
+    getItem: (k: string) => store.get(k) ?? null,
+    setItem: (k: string, v: string) => void store.set(k, v),
+    removeItem: (k: string) => void store.delete(k),
+  };
+  try {
+    const { loadJobOriginDefault, saveJobOriginDefault } = await import('../src/editor/document');
+    assert.equal(loadJobOriginDefault(), null, 'unset key must not coerce null to 0');
+    saveJobOriginDefault(6);
+    assert.equal(loadJobOriginDefault(), 6);
+    saveJobOriginDefault(0);
+    assert.equal(loadJobOriginDefault(), 0);
+    saveJobOriginDefault(null);
+    assert.equal(loadJobOriginDefault(), null);
+    assert.throws(() => saveJobOriginDefault(9));
+    assert.throws(() => saveJobOriginDefault(-1));
+  } finally {
+    if (prevStorage === undefined) delete (globalThis as Record<string, unknown>).localStorage;
+    else (globalThis as Record<string, unknown>).localStorage = prevStorage;
+  }
+});
+
+await test('placeNew with importAutoGroup=false inserts, shifts, and selects all imported objects', async () => {
+  const { EditorImages } = await import('../src/editor/imageops');
+  const makeObj = (id: number, x: number) => ({
+    id, m: [1, 0, 0, 1, x, 10] as [number, number, number, number, number, number], layer: 0,
+    shape: { kind: 'rect' as const, w: 10, h: 10, r: 0 },
+  });
+  const makeEd = (importAutoGroup: boolean) => ({
+    importAutoGroup,
+    importCenterInBed: false,
+    importAutoSelect: true,
+    doc: { bed: { w: 100, h: 100 }, objs: [] as unknown[] },
+    sel: [] as unknown[],
+    tool: 'rect',
+    hint: '',
+    snapshot() {},
+    setTool(t: string) { this.tool = t; },
+    setSel(xs: unknown[]) { this.sel = xs; },
+    emit() {},
+  });
+  // Outside bed (x = 120, 140) so both objects must shift together by the same vector
+  const a = makeObj(1, 120), b = makeObj(2, 140);
+  const edUngrouped = makeEd(false);
+  EditorImages.prototype.placeNew.call(edUngrouped as never, [a, b], 'import');
+  assert.equal(edUngrouped.doc.objs.length, 2, 'must not drop second object');
+  assert.equal(edUngrouped.sel.length, 2, 'both objects selected');
+  assert.ok(Math.abs((b.m[4] - a.m[4]) - 20) < 1e-9, 'relative offset preserved after centering');
+  assert.ok(Math.abs(a.m[4] - 35) < 1e-9 && Math.abs(b.m[4] - 55) < 1e-9, `centered: ${a.m[4]}, ${b.m[4]}`);
+
+  const c = makeObj(3, 10), d = makeObj(4, 30);
+  const edGrouped = makeEd(true);
+  EditorImages.prototype.placeNew.call(edGrouped as never, [c, d], 'import');
+  assert.equal(edGrouped.doc.objs.length, 1);
+  assert.equal((edGrouped.doc.objs[0] as { shape: { kind: string; children: unknown[] } }).shape.kind, 'group');
+  assert.equal((edGrouped.doc.objs[0] as { shape: { kind: string; children: unknown[] } }).shape.children.length, 2);
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

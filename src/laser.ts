@@ -17,6 +17,7 @@ import { materialTab } from './materialui';
 import { cameraTab } from './cameraui';
 import { dockWindow, windowBody } from './dock';
 import { loadCheckSettings } from './check';
+import { loadCutSelectedDefault, loadJobOriginDefault } from './editor/document';
 import { openCheck } from './checkPanel';
 import { presetList } from './packs';
 import { laserTypeLabel, presetPicker } from './packsDialog';
@@ -36,7 +37,7 @@ const store = loadDevices();
 /** Das gewählte Gerät (live gebunden: wechselt mit der Auswahl) */
 export let device: Device = store.devices.find((d) => d.id === store.current) ?? store.devices[0];
 const deviceListeners = new Set<() => void>();
-function deviceChanged() {
+export function deviceChanged() {
   if (machine.fire.locked && machine.fire.state !== 'unknown') void machine.fire.stop();
   saveDevices(store);
   deviceListeners.forEach((f) => f());
@@ -123,6 +124,31 @@ export function patchDevice(ed: Editor, patch: Partial<Device>) {
   Object.assign(device, patch);
   applyBed(ed);
   deviceChanged();
+}
+
+/**
+ * Dateiwerte für Nur-Auswahl/Ursprung aufs Gerät übernehmen (pro Datei gespeichert,
+ * Stand aus dem geöffneten Dokument). Fehlt der Wert (alte Datei), bleibt das Gerät.
+ */
+export function applyDocJobSettings(ed: Editor) {
+  if (deviceEditBlocked()) return;
+  const d = ed.doc;
+  let touched = false;
+  if (typeof d.cutSelected === 'boolean' && device.cutSelected !== d.cutSelected) { device.cutSelected = d.cutSelected; touched = true; }
+  if (Number.isInteger(d.jobOrigin) && (d.jobOrigin as number) >= 0 && (d.jobOrigin as number) <= 8 && device.jobOrigin !== d.jobOrigin) {
+    device.jobOrigin = d.jobOrigin as number; touched = true;
+  }
+  if (touched) deviceChanged();
+}
+
+/** Neue Datei: Gerät auf die Standardwerte aus den Einstellungen setzen (passiert sonst nichts) */
+export function applyNewDocDefaults() {
+  if (deviceEditBlocked()) return;
+  const cut = loadCutSelectedDefault(), origin = loadJobOriginDefault();
+  let touched = false;
+  if (device.cutSelected !== cut) { device.cutSelected = cut; touched = true; }
+  if (origin !== null && device.jobOrigin !== origin) { device.jobOrigin = origin; touched = true; }
+  if (touched) deviceChanged();
 }
 
 /** Neues Gerät anlegen und auswählen */

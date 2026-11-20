@@ -41,7 +41,7 @@ import { maybeOfferSetup, openSetupWizard } from './setupWizard';
 import { maybeCheckForUpdates, nightlyBuild, nightlyWarning, openUpdateDialog } from './updateDialog';
 import { openPacksDialog } from './packsDialog';
 import { openGridDialog } from './gridDialog';
-import { buildLaser, frameJob, isPositionPick, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob, togglePositionPick } from './laser';
+import { applyNewDocDefaults, buildLaser, frameJob, isPositionPick, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob, togglePositionPick } from './laser';
 import { openLayerDialog, setAdjustOpener } from './layerdialog';
 import { imageLayerFields, liveLayerRaster } from './imageLayerFields';
 import { openMaterialTestDialog } from './materialtest';
@@ -231,7 +231,7 @@ type MenuItem = [label: string, key: string, action: () => void, checked?: () =>
 function buildMenu(ed: Editor) {
   const menus: [string, MenuItem[]][] = [
     [t('Datei'), [
-      [t('Neu'), 'Ctrl+N', () => ed.newTab()],
+      [t('Neu'), 'Ctrl+N', () => (ed.newTab(), applyNewDocDefaults())],
       [t('Neu aus Vorlage …'), '', () => openTemplateLibrary(ed)],
       [t('Öffnen …'), 'Ctrl+O', () => openProject(ed)],
       [t('Speichern …'), 'Ctrl+S', () => saveProject(ed)],
@@ -431,7 +431,7 @@ function buildMenu(ed: Editor) {
       [t('Vergrößern'), '+', () => ed.zoomAt(1.25)],
       [t('Verkleinern'), '-', () => ed.zoomAt(0.8)],
       'sep',
-      [t('Drahtgitter / Gefüllt'), 'Alt+W', () => ((ed.filled = !ed.filled), ed.emit('view'))],
+      [t('Drahtgitter / Gefüllt'), 'Alt+W', () => ed.setFilled(!ed.filled)],
       { sub: t('Mittelpunkte zeigen'), items: [
         [t('Aus|Mittelpunkte'), '', () => ed.setSnap({ centers: 'off' }), () => ed.centerMarks === 'off'],
         [t('Bei Auswahl und unter dem Mauszeiger'), '', () => ed.setSnap({ centers: 'auto' }), () => ed.centerMarks === 'auto'],
@@ -633,7 +633,7 @@ function buildBars(ed: Editor) {
     L = t('Laser');
   const tool = (id: Tool, icon: string, label: string): Action => ({ id: `tool:${id}`, cat: W, icon, label, run: () => ed.setTool(id), on: () => ed.tool === id });
   const list: Action[] = [
-    { id: 'new', cat: F, icon: 'new', label: t('Neues Projekt in neuem Tab (Ctrl+N)'), run: () => ed.newTab() },
+    { id: 'new', cat: F, icon: 'new', label: t('Neues Projekt in neuem Tab (Ctrl+N)'), run: () => (ed.newTab(), applyNewDocDefaults()) },
     { id: 'open', cat: F, icon: 'open', label: t('Öffnen'), run: () => openProject(ed) },
     { id: 'save', cat: F, icon: 'save', label: t('Speichern'), run: () => saveProject(ed) },
     { id: 'import', cat: F, icon: 'import', label: t('Importieren: Bilder, SVG, DXF, PDF, AI, LightBurn, 3D-Modelle (Ctrl+I)'), run: () => importFile(ed) },
@@ -667,7 +667,7 @@ function buildBars(ed: Editor) {
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
     { id: 'zoomsel', cat: V, icon: 'zoomsel', label: t('Auf Auswahl zoomen'), run: () => ed.zoomSelection(), enabled: sel1 },
     { id: 'view3d', cat: V, icon: 'view3d', label: t('3D-Ansicht: Baugruppen zusammengesteckt ansehen'), run: () => toggleWindow('view3d') },
-    { id: 'wire', cat: V, short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt (Alt+W)'), run: () => ((ed.filled = !ed.filled), ed.emit('view')), on: () => ed.filled },
+    { id: 'wire', cat: V, short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt (Alt+W)'), run: () => ed.setFilled(!ed.filled), on: () => ed.filled },
     {
       id: 'theme', cat: V, icon: 'moon', label: t('Dunkles Design'), run: () => applyTheme(ed, isDark() ? 'light' : 'dark'),
       dyn: () => (isDark() ? { icon: 'sun', label: t('Helles Design') } : { icon: 'moon', label: t('Dunkles Design') }),
@@ -1612,7 +1612,7 @@ function buildStatus(ed: Editor) {
   const step = numInput('', (v) => v > 0 && ed.setSnap({ step: v }), t('Rasterweite (mm)'));
   step.style.width = '40px';
   step.value = String(ed.gridStep);
-  const filled = h('input', { type: 'checkbox', checked: ed.filled, onchange: (e: Event) => ((ed.filled = (e.target as HTMLInputElement).checked), ed.emit('view')) }) as HTMLInputElement;
+  const filled = h('input', { type: 'checkbox', checked: ed.filled, onchange: (e: Event) => ed.setFilled((e.target as HTMLInputElement).checked) }) as HTMLInputElement;
   const zoom = h('span', {});
   root.append(
     coords, selInfo, hint,

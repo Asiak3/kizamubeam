@@ -212,13 +212,14 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
     const fSize = numInput('small', plain(['size'], (v) => v > 0 && ed.updateTexts({ size: v })), t('Schriftgröße (mm)'), formula('size'));
     const fHs = numInput('small', (v) => ed.updateTexts({ hSpace: v }), t('Zeichenabstand (mm)'));
     const fVs = numInput('small', (v) => ed.updateTexts({ vSpace: v }), t('Zeilenabstand (mm)'));
-    const tog = (label: string, key: 'bold' | 'italic' | 'upper', title: string) => {
+    const tog = (label: string, key: 'bold' | 'italic' | 'upper' | 'rtl', title: string) => {
       const b = h('button', { class: 'toggle', title }, label);
       b.addEventListener('click', () => ed.updateTexts({ [key]: !b.classList.contains('on') } as Partial<TextShape>)); return b;
     };
     const bBold = tog(t('F'), 'bold', t('Fett')); bBold.style.fontWeight = '700';
     const bItal = tog(t('K'), 'italic', t('Kursiv')); bItal.style.fontStyle = 'italic';
     const bUp = tog('AB', 'upper', t('Großbuchstaben'));
+    const bRtl = tog(t('RTL'), 'rtl', t('Schreibrichtung rechts-nach-links (Hebräisch/Arabisch, Best-Effort)'));
     const alignBtns = (['left', 'center', 'right'] as const).map((a) => {
       const b = iconBtn(a === 'left' ? 'alignTextL' : a === 'center' ? 'alignTextC' : 'alignTextR', a === 'left' ? t('Ausrichtung links') : a === 'center' ? t('Ausrichtung mittig') : t('Ausrichtung rechts'), () => ed.updateTexts({ align: a }));
       b.classList.add('toolbar-text-align'); b.dataset.align = a; return b;
@@ -248,7 +249,7 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
     const pathProps = h('span', { class: 'field' }, h('label', {}, t('Versatz'), fPOff), h('label', {}, t('Abstand|Text auf Pfad'), fPDist), bPFlip, bPOff);
     const el = h('div', { class: 'field' },
       h('span', { icon: 'text', class: 'icon-inline', style: 'color: var(--muted)', title: t('Textleiste') }),
-      h('label', {}, t('Schrift'), fontPicker.el), h('label', {}, t('Höhe'), fSize), bBold, bItal, bUp, ...alignBtns, sep(),
+      h('label', {}, t('Schrift'), fontPicker.el), h('label', {}, t('Höhe'), fSize), bBold, bItal, bUp, bRtl, ...alignBtns, sep(),
       h('label', {}, t('Abst. H'), fHs), h('label', {}, 'V', fVs), sep(),
       h('label', {}, t('Max. Breite'), fMaxW), h('label', {}, t('Max. Höhe'), fMaxH), bShrink, bWrap, sep(),
       bWeld, bOnPath, pathProps, bVar, vtProps);
@@ -258,7 +259,7 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
       if (!available()) fontPicker.close();
       fontPicker.sync(tx.font); bindField(fSize, 'size', f2(tx.size), (o) => o.shape.kind === 'text');
       setVal(fHs, f2(tx.hSpace)); setVal(fVs, f2(tx.vSpace));
-      bBold.classList.toggle('on', tx.bold); bItal.classList.toggle('on', tx.italic); bUp.classList.toggle('on', tx.upper);
+      bBold.classList.toggle('on', tx.bold); bItal.classList.toggle('on', tx.italic); bUp.classList.toggle('on', tx.upper); bRtl.classList.toggle('on', !!tx.rtl);
       alignBtns.forEach((b) => b.classList.toggle('on', b.dataset.align === tx.align)); bWeld.classList.toggle('on', !!tx.weld);
       const tvt = ts.length ? (ts[0].shape as TextShape).vt : undefined;
       bVar.classList.toggle('on', !!tvt); bVar.hidden = !ts.length; vtProps.hidden = !tvt;

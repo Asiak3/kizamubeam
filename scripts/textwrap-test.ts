@@ -75,7 +75,22 @@ await test('Textrahmen mit Höchsthöhe: Schrift wird kleiner, bis der Block pas
   const ls = textLines(t, font);
   const h = (ls.length - 1) * f.size * 1.2 + f.size;
   assert.ok(h <= 12 + 1e-9, `Höhe ${h}`);
-  for (const l of ls) assert.ok(l.w <= 40 + 1e-9);
+  for (const l of ls) assert.ok(l.w <= 40 + 1e-9, `Zeile „${l.text}“ ist ${l.w} mm breit`);
+});
+
+await test('RTL: Glyphen stehen visuell rückwärts und laufen von links nach rechts ohne Lücke rechts', () => {
+  const rtl = textLines(text({ text: 'ABC', rtl: true, align: 'left', hSpace: 1 }), font)[0];
+  const ltr = textLines(text({ text: 'ABC', rtl: false, align: 'left', hSpace: 1 }), font)[0];
+  const names = (gs: typeof rtl.glyphs) => gs.map((g) => g.name);
+  assert.deepEqual(names(rtl.glyphs), names(ltr.glyphs).reverse());
+  assert.equal(rtl.xs.length, 3);
+  assert.ok(rtl.xs[0] === 0 && rtl.xs[0] < rtl.xs[1] && rtl.xs[1] < rtl.xs[2], `xs=${rtl.xs}`);
+  const lastAdv = ((rtl.glyphs[2].advanceWidth ?? 0) * 5) / font.unitsPerEm;
+  assert.ok(Math.abs(rtl.xs[2] + lastAdv - rtl.w) < 1e-6, `rechts bündig: ${rtl.xs[2] + lastAdv} vs ${rtl.w}`);
+
+  const rtlRight = textLines(text({ text: 'ABC', rtl: true, align: 'right', hSpace: 0.5 }), font)[0];
+  assert.ok(Math.abs(rtlRight.x + rtlRight.w) < 1e-9);
+  assert.ok(rtlRight.xs[0] < rtlRight.xs[1] && rtlRight.xs[1] < rtlRight.xs[2]);
 });
 
 if (failed) {

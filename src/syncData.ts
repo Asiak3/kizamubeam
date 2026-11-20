@@ -10,7 +10,8 @@ export const SETTINGS_KEYS = [
   'nest', 'joints', 'hinges', 'slots', 'qr', 'barcode', 'printcut', 'jigfill', 'focustest', 'materialtest', 'warp', 'calib', 'view3d',
   'workpieces', 'overlap-picker', 'rightPan', 'zoomInverted', 'rememberToolOptions', 'toolOptions',
   'selectAfterDraw', 'textDefaults', 'nudgeSteps', 'clickTolerance', 'snapTolerance', 'canvasDark', 'handleSize',
-  'crosshair', 'bedCenterCross', 'importAutoSelect', 'importCenterInBed', 'importSkippedNote', 'patternfill', 'uiTypography', 'electricityTariff', 'electricityCurrency',
+  'crosshair', 'bedCenterCross', 'importAutoSelect', 'importCenterInBed', 'importSkippedNote', 'importAutoGroup', 'svgDpi', 'dxfFallbackUnit', 'canvasFilled', 'imageSmoothing', 'curveQuality', 'patternfill', 'uiTypography', 'electricityTariff', 'electricityCurrency',
+  'cutSelectedDefault', 'jobOriginDefault',
 ].map((k) => PRE + k);
 /** Schlüssel mit diesem Anfang zählen auch zu den Einstellungen (letzte Werte der Generatoren und der Werkzeuge aus Erweiterungen) */
 export const SETTINGS_PREFIXES = [PRE + 'gen.', PRE + 'tool.'];
@@ -27,7 +28,7 @@ const PACKS_STORE = PRE + 'packs';
  * Sicherungen der FluidNC-Konfiguration, altes Einzelgerät, Abgleich selbst, Dialogpositionen und -größen (hängen am Bildschirm), ausgeschaltete und geprüfte Erweiterungen und ihre Netzwerk-Freigaben (je Rechner). Jeder Schlüssel im Code muss in
  * einer dieser Listen stehen (npm run test:sync prüft das).
  */
-export const LOCAL_KEYS = ['autosave', 'tabs', 'updateLastCheck', 'setupOffered', 'fluidBackups', 'materialtest.last', 'device', 'sync', 'syncKnown', 'syncFp', 'syncExport', 'dialogPos', 'dialogSize', 'previewSidebarWidth', 'packs.disabled', 'packs.verified', 'pluginNet', 'pluginNetOff', 'firePending', 'fireOverlayInPanel'].map(
+export const LOCAL_KEYS = ['autosave', 'autosaveInterval', 'tabs', 'updateLastCheck', 'setupOffered', 'fluidBackups', 'materialtest.last', 'device', 'sync', 'syncKnown', 'syncFp', 'syncExport', 'dialogPos', 'dialogSize', 'previewSidebarWidth', 'packs.disabled', 'packs.verified', 'pluginNet', 'pluginNetOff', 'firePending', 'fireOverlayInPanel'].map(
   (k) => PRE + k,
 );
 export const BROWSER_STORES = [TEMPLATES_STORE, PACKS_STORE];

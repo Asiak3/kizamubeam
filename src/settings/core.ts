@@ -9,8 +9,10 @@ import { isTauri } from '../machine';
 import { DEFAULT_GRID, GridSettings } from '../grid';
 import type { BoolBase } from '../ops';
 import { loadCheckSettings, saveCheckSettings } from '../check';
+import { type CurveQuality, loadCurveQuality, saveCurveQuality } from '../geom';
 import { autoInstallFonts, setAutoInstallFonts } from '../fontCatalog';
 import { loadOverlapSettings, OVERLAP_HOLD_MS, OverlapSettings, saveOverlapSettings } from '../overlapPicker';
+import { loadAutosaveInterval, loadCutSelectedDefault, loadJobOriginDefault, saveCutSelectedDefault, saveJobOriginDefault, setAutosaveInterval } from '../editor/document';
 import { defaultUpdateChannel, openUpdateDialog, setUpdateAutoCheck, setUpdateChannel, updateAutoCheck, updateChannel } from '../updateDialog';
 import type { Channel } from '../updates';
 import { resetDialogPositions } from '../dialogDrag';
@@ -25,6 +27,7 @@ import { openFontManager } from '../fontManager';
 import { agentLevels, agentSettings, configureAgent, openAgentDialog } from '../agentui';
 import { configureHost, hostSettings, openRemoteHostDialog } from '../remoteHost';
 import { registerSettingsSection } from './registry';
+import type { SvgDpi } from '../importers';
 import { typographySettingsFields } from './typography';
 import { electricityCurrencyField, electricityTariffField } from '../energyUi';
 
@@ -70,6 +73,13 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         set: (v) => setUpdateAutoCheck(v),
       },
       { kind: 'action', id: 'general.updateNow', group: t('Updates'), label: t('Jetzt nach Updates suchen'), button: t('Jetzt suchen …'), run: () => openUpdateDialog() },
+      {
+        kind: 'number', id: 'general.autosaveInterval', group: t('Speichern'), label: t('Automatisches Sichern alle'), unit: t('Minuten'), integer: true, min: 0, max: 1440, def: 0,
+        keywords: t('Auto-save Sicherung Intervall Minuten'),
+        hint: t('Sichert das Projekt alle paar Minuten im Zwischenspeicher dieses Rechners. 0 = aus (nur kurze Verzögerung nach Änderungen).'),
+        get: () => loadAutosaveInterval(),
+        set: (v) => setAutosaveInterval(ed, v),
+      },
       {
         kind: 'action', id: 'general.sync', label: t('Einstellungen übertragen'), keywords: t('Export Import Sync Ordner'),
         hint: t('Einstellungen, Geräte, Materialien und mehr als Datei sichern oder über einen Ordner zwischen Rechnern abgleichen.'),
@@ -130,6 +140,25 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         keywords: t('Mitte Zentrum Bett Kreuz'),
         hint: t('Kleines Kreuz in der Mitte des Arbeitsbereichs.'),
         get: () => ed.bedCenterCross, set: (v) => ed.setBedCenterCross(v),
+      },
+      {
+        kind: 'toggle', id: 'appearance.canvasFilled', group: t('Arbeitsfläche'), label: t('Füll-Layer gefüllt anzeigen'), def: true,
+        keywords: t('Füllung Drahtgitter Alt W'),
+        hint: t('Aus zeigt Füll-Layer nur als Linien (wie Alt+W und die Werkzeugleiste).'),
+        get: () => ed.filled, set: (v) => ed.setFilled(v),
+      },
+      {
+        kind: 'toggle', id: 'appearance.imageSmoothing', group: t('Arbeitsfläche'), label: t('Kantenglättung beim Zoomen'), def: true,
+        keywords: t('Glättung Bilder Zoomen weich'),
+        hint: t('Bilder verkleinert glätten. Vektorlinien sind immer kantengeglättet.'),
+        get: () => ed.imageSmoothing, set: (v) => ed.setImageSmoothing(v),
+      },
+      {
+        kind: 'select', id: 'appearance.curveQuality', group: t('Arbeitsfläche'), label: t('Kurvenqualität'), def: 'balanced',
+        options: () => [['coarse', t('Grob (schnell)')], ['balanced', t('Ausgewogen')], ['fine', t('Fein (genau)')]],
+        keywords: t('Kurven Qualität Tempo Genauigkeit'),
+        hint: t('Abtastung von Kurven für Rahmen und Treffertest: grob ist schneller, fein genauer.'),
+        get: () => loadCurveQuality(), set: (v) => (saveCurveQuality(v as CurveQuality), ed.redraw()),
       },
       {
         kind: 'action', id: 'appearance.toolbars', group: t('Fenster und Leisten'), label: t('Funktionsleisten'), hint: t('Knöpfe und Reihenfolge der Leisten wählen.'),
@@ -224,6 +253,45 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         keywords: t('Import Hinweis übersprungen Text DXF SVG'),
         hint: t('Nicht übernommene Inhalte (z. B. Texte, vorher in Pfade umwandeln) werden als Hinweis gemeldet; ausgeschaltet werden sie still ignoriert.'),
         get: () => ed.importSkippedNote, set: (v) => ed.setImportSkippedNote(v),
+      },
+      {
+        kind: 'toggle', id: 'workspace.importAutoGroup', group: t('Import'), label: t('Importiertes automatisch gruppieren'), def: true,
+        keywords: t('Import Gruppe gruppieren'),
+        hint: t('Neu importierte Objekte werden wie bisher zu einer Gruppe zusammengefasst; ausgeschaltet bleiben sie einzeln.'),
+        get: () => ed.importAutoGroup, set: (v) => ed.setImportAutoGroup(v),
+      },
+      {
+        kind: 'select', id: 'workspace.dxfFallbackUnit', group: t('Import'), label: t('DXF-Einheit bei fehlender Angabe'), def: '1',
+        keywords: t('DXF Einheit Fallback Import INSUNITS'),
+        hint: t('Wird verwendet, wenn die DXF-Datei keine gültige Einheit enthält; entspricht dem bisherigen Millimeter-Verhalten.'),
+        options: () => [['1', t('Millimeter')], ['10', t('Zentimeter')], ['25.4', t('Zoll')], ['0.001', t('Mikrometer')]],
+        get: () => String(ed.dxfFallbackUnitMm), set: (v) => ed.setDxfFallbackUnit(Number(v)),
+      },
+      {
+        kind: 'select', id: 'workspace.svgDpi', group: t('Import'), label: t('SVG-Auflösung für einheitenlose Maße'), def: '96',
+        keywords: t('SVG DPI Auflösung Illustrator Import'),
+        hint: t('Einheitenlose und px-Maße werden wie bisher mit 96 DPI gelesen; Illustrator-Dateien erkennt die Automatik an 72 DPI.'),
+        options: () => [['96', t('96 DPI')], ['72', t('72 DPI')], ['auto', t('Automatisch (Illustrator 72, sonst 96)')]],
+        get: () => ed.svgDpi, set: (v) => ed.setSvgDpi(v as SvgDpi),
+      },
+      {
+        kind: 'toggle', id: 'workspace.cutSelectedDefault', group: t('Auftrag'), label: t('Standard: nur Auswahl lasern'), def: false,
+        keywords: t('Nur Auswahl Standard Vorgabe Datei'),
+        hint: t('Neue Dateien starten mit „Nur Auswahl“. Der Stand wird pro Datei gespeichert und beim Öffnen übernommen.'),
+        get: () => loadCutSelectedDefault(), set: (v) => saveCutSelectedDefault(v),
+      },
+      {
+        kind: 'select', id: 'workspace.jobOriginDefault', group: t('Auftrag'), label: t('Standard-Job-Ursprung'), def: '',
+        keywords: t('Ursprung Standard Vorgabe Datei Position'),
+        hint: t('Startpunkt neuer Dateien (Zeilen von oben nach unten, je links nach rechts). Der Stand wird pro Datei gespeichert und beim Öffnen übernommen.'),
+        options: () => [
+          ['', t('Vom Gerät behalten')],
+          ['0', t('Oben links')], ['1', t('Oben Mitte')], ['2', t('Oben rechts')],
+          ['3', t('Mitte links')], ['4', t('Mitte')], ['5', t('Mitte rechts')],
+          ['6', t('Unten links')], ['7', t('Unten Mitte')], ['8', t('Unten rechts')],
+        ],
+        get: () => { const v = loadJobOriginDefault(); return v === null ? '' : String(v); },
+        set: (v) => saveJobOriginDefault(v === '' ? null : Number(v)),
       },
     ],
   });
@@ -338,6 +406,12 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         kind: 'toggle', id: 'machines.checkBeforeLaser', group: t('Laser'), label: t('Vor dem Lasern prüfen und bei Problemen nachfragen'), def: true, keywords: t('Konstruktion prüfen'),
         get: () => loadCheckSettings().beforeLaser,
         set: (v) => saveCheckSettings({ ...loadCheckSettings(), beforeLaser: v }),
+      },
+      {
+        kind: 'toggle', id: 'machines.ignoreOutOfBounds', group: t('Laser'), label: t('Formen außerhalb ignorieren'), def: false, keywords: t('Arbeitsbereich außerhalb Bett Prüfung'),
+        hint: t('Formen außerhalb des Arbeitsbereichs werden in der Konstruktionsprüfung kommentarlos ignoriert statt gemeldet. Der Laser-Start prüft weiter.'),
+        get: () => loadCheckSettings().ignoreOutOfBounds === true,
+        set: (v) => saveCheckSettings({ ...loadCheckSettings(), ignoreOutOfBounds: v }),
       },
       { kind: 'action', id: 'machines.devices', group: t('Laser'), label: t('Geräte'), hint: t('Laser anlegen, wechseln, importieren und exportieren.'), button: t('Geräte …'), run: () => openDevicesDialog(ed) },
       { kind: 'action', id: 'machines.device', group: t('Laser'), label: t('Geräteeinstellungen'), hint: t('Anschluss, Arbeitsbereich, Firmware und Job-Vorgaben des aktuellen Geräts.'), button: t('Öffnen …'), run: () => openDeviceDialog(ed) },

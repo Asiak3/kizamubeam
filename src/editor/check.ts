@@ -11,8 +11,9 @@ import type { Params } from '../generators/types';
 export class EditorCheck {
   /** Aktuelle Seite prüfen; ausgeblendete Befunde fallen weg. Ergebnis steht danach in checkIssues. */
   runCheck(this: Editor): CheckIssue[] {
+    const settings = loadCheckSettings();
     const issues = checkDesign({
-      objs: this.doc.objs, allObjs: this.doc.pages.flatMap((pg) => pg.objs), pages: this.doc.pages.map((pg) => pg.objs), layer: (i) => this.layer(i), bed: this.doc.bed, settings: loadCheckSettings(), skipBed: !this.checkBedApplies(),
+      objs: this.doc.objs, allObjs: this.doc.pages.flatMap((pg) => pg.objs), pages: this.doc.pages.map((pg) => pg.objs), layer: (i) => this.layer(i), bed: this.doc.bed, settings, skipBed: !this.checkBedApplies() || settings.ignoreOutOfBounds === true,
     });
     this.checkIssues = issues.filter((x) => !this.checkIgnored.has(x.key));
     if (this.checkActive) this.checkActive = this.checkIssues.find((x) => x.key === this.checkActive!.key) ?? null;

@@ -2,7 +2,7 @@
 import { allObjs, DEFAULT_ADJUST, IDENT, ImageAdjust, ImageLayer, ImageShape, inv, leaves, Mat, mul, newId, Obj, Pt, SubPath, translate } from '../model';
 import { addAsset, adjustedGray, assetImage, imageRasterGeometry, registerAsset, sourceSize } from '../images';
 import type { LbrnResult } from '../lbrn';
-import { ImportResult, transformSubs } from '../importers';
+import { ImportResult, SvgDpi, transformSubs } from '../importers';
 import { traceGray, TraceOptions } from '../trace';
 import { backgroundAlpha, BgOptions, opaqueBounds } from '../bgremove';
 import { centerlineGray } from '../centerline';
@@ -13,6 +13,9 @@ import type { Editor } from '../editor';
 const IMPORT_AUTO_SELECT_KEY = 'kizamubeam.importAutoSelect';
 const IMPORT_CENTER_IN_BED_KEY = 'kizamubeam.importCenterInBed';
 const IMPORT_SKIPPED_NOTE_KEY = 'kizamubeam.importSkippedNote';
+const IMPORT_AUTO_GROUP_KEY = 'kizamubeam.importAutoGroup';
+const SVG_DPI_KEY = 'kizamubeam.svgDpi';
+const DXF_FALLBACK_UNIT_KEY = 'kizamubeam.dxfFallbackUnit';
 
 /** Importiertes nach dem Import auswählen: an, bis in den Einstellungen abgewählt (Opt-out) */
 export function loadImportAutoSelect(): boolean {
@@ -39,9 +42,39 @@ export function loadImportSkippedNote(): boolean {
   }
 }
 
-function saveImportFlag(key: string, on: boolean) {
+/** Mehrere importierte Objekte zu einer Gruppe zusammenfassen: an, bis abgewählt (Opt-out) */
+export function loadImportAutoGroup(): boolean {
   try {
-    localStorage.setItem(key, JSON.stringify(on));
+    return JSON.parse(localStorage.getItem(IMPORT_AUTO_GROUP_KEY) ?? 'true') !== false;
+  } catch {
+    return true;
+  }
+}
+/** SVG-Auflösung größenloser Einheiten: 96, 72 oder automatisch (Illustrator erkennen) */
+export type { SvgDpi } from '../importers';
+export function loadSvgDpi(): SvgDpi {
+  try {
+    const v = JSON.parse(localStorage.getItem(SVG_DPI_KEY) ?? '"96"');
+    return v === '72' || v === 'auto' ? v : '96';
+  } catch {
+    return '96';
+  }
+}
+/** DXF-Einheit in mm pro Einheit bei fehlender/unbekannter $INSUNITS-Angabe (Default 1 = mm) */
+export function loadDxfFallbackUnit(): number {
+  try {
+    const v = Number(JSON.parse(localStorage.getItem(DXF_FALLBACK_UNIT_KEY) ?? '1'));
+    return Number.isFinite(v) && v > 0 ? v : 1;
+  } catch {
+    return 1;
+  }
+}
+function saveImportFlag(key: string, on: boolean) {
+  saveImportValue(key, on);
+}
+function saveImportValue(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     /* storage unavailable */
   }
@@ -203,18 +236,22 @@ export class EditorImages {
   /** Objekte als ein Element einfügen (rückgängig machbar); before läuft nach dem Undo-Zwischenstand, z. B. für Layer */
   placeNew(this: Editor, objs: Obj[], label: string, before?: () => void, opts?: { select?: boolean }) {
     if (!objs.length) return;
-    let o: Obj = objs[0];
-    if (objs.length > 1) o = { id: newId(), m: IDENT, layer: objs[0].layer, shape: { kind: 'group', children: objs } };
-    const b = boundsOf([o]);
+    const placed: Obj[] =
+      objs.length > 1 && (this.importAutoGroup ?? true)
+        ? [{ id: newId(), m: IDENT, layer: objs[0].layer, shape: { kind: 'group', children: objs } }]
+        : objs;
+    const b = boundsOf(placed);
     const bed = this.doc.bed;
-    if (b && (this.importCenterInBed || b.x < -1e-6 || b.y < -1e-6 || b.x + b.w > bed.w + 1e-6 || b.y + b.h > bed.h + 1e-6))
-      o.m = mul(translate(bed.w / 2 - (b.x + b.w / 2), bed.h / 2 - (b.y + b.h / 2)), o.m);
+    if (b && (this.importCenterInBed || b.x < -1e-6 || b.y < -1e-6 || b.x + b.w > bed.w + 1e-6 || b.y + b.h > bed.h + 1e-6)) {
+      const shift = translate(bed.w / 2 - (b.x + b.w / 2), bed.h / 2 - (b.y + b.h / 2));
+      for (const o of placed) o.m = mul(shift, o.m);
+    }
     this.snapshot(t('Objekt hinzufügen'));
     before?.();
-    this.doc.objs.push(o);
+    this.doc.objs.push(...placed);
     if (opts?.select ?? this.importAutoSelect ?? true) {
       this.setTool('select');
-      this.setSel([o]);
+      this.setSel(placed);
     }
     this.hint = label;
     this.emit('doc');
@@ -232,6 +269,19 @@ export class EditorImages {
   setImportSkippedNote(this: Editor, on: boolean) {
     this.importSkippedNote = on;
     saveImportFlag(IMPORT_SKIPPED_NOTE_KEY, on);
+  }
+  setImportAutoGroup(this: Editor, on: boolean) {
+    this.importAutoGroup = on;
+    saveImportFlag(IMPORT_AUTO_GROUP_KEY, on);
+  }
+  setSvgDpi(this: Editor, v: SvgDpi) {
+    this.svgDpi = v;
+    saveImportValue(SVG_DPI_KEY, v);
+  }
+  setDxfFallbackUnit(this: Editor, mmPerUnit: number) {
+    if (!Number.isFinite(mmPerUnit) || mmPerUnit <= 0) throw new Error(t('Einstellung konnte nicht gespeichert werden.'));
+    this.dxfFallbackUnitMm = mmPerUnit;
+    saveImportValue(DXF_FALLBACK_UNIT_KEY, mmPerUnit);
   }
 
   /**

@@ -57,9 +57,11 @@ export interface CheckSettings {
   engraveLayers: number[];
   /** Vor dem Lasern prüfen und bei Problemen nachfragen */
   beforeLaser: boolean;
+  /** Formen außerhalb des Arbeitsbereichs kommentarlos ignorieren statt zu melden */
+  ignoreOutOfBounds: boolean;
 }
 
-export const DEFAULT_CHECK: CheckSettings = { minWeb: 1, beam: 0.15, tol: 0.05, closeGap: 1, engraveLayers: [], beforeLaser: true };
+export const DEFAULT_CHECK: CheckSettings = { minWeb: 1, beam: 0.15, tol: 0.05, closeGap: 1, engraveLayers: [], beforeLaser: true, ignoreOutOfBounds: false };
 
 /** A finding of the geometric checks: a message code and its numbers instead of a text */
 export type GeomCode = 'double' | 'double-whole' | 'unjoined' | 'open' | 'open-fill' | 'hole-lost' | 'hole-small' | 'web' | 'web-cut';

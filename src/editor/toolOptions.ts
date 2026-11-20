@@ -115,6 +115,7 @@ export class EditorToolOptions {
         align: st.align === 'center' || st.align === 'right' ? st.align : 'left',
         hSpace: num(st.hSpace, -100, 100, d.hSpace),
         vSpace: num(st.vSpace, -100, 100, d.vSpace),
+        rtl: bool(st.rtl, d.rtl ?? false),
       } satisfies Omit<TextShape, 'kind' | 'text'>;
     } catch {
       /* Standardwerte */

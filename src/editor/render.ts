@@ -98,6 +98,42 @@ const CANVAS_DARK_KEY = 'kizamubeam.canvasDark';
 const HANDLE_SIZE_KEY = 'kizamubeam.handleSize';
 const CROSSHAIR_KEY = 'kizamubeam.crosshair';
 const BED_CENTER_CROSS_KEY = 'kizamubeam.bedCenterCross';
+const CANVAS_FILLED_KEY = 'kizamubeam.canvasFilled';
+const IMAGE_SMOOTHING_KEY = 'kizamubeam.imageSmoothing';
+/** Kantenglättung beim Bild-Zoomen: true = heutiges automatisches Verhalten (vergrößert scharf, verkleinert geglättet) */
+export const DEFAULT_IMAGE_SMOOTHING = true;
+
+export function loadCanvasFilled(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(CANVAS_FILLED_KEY) ?? 'true') !== false;
+  } catch {
+    return true;
+  }
+}
+
+export function saveCanvasFilled(on: boolean) {
+  try {
+    localStorage.setItem(CANVAS_FILLED_KEY, JSON.stringify(on));
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+}
+
+export function loadImageSmoothing(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(IMAGE_SMOOTHING_KEY) ?? 'true') !== false;
+  } catch {
+    return true;
+  }
+}
+
+export function saveImageSmoothing(on: boolean) {
+  try {
+    localStorage.setItem(IMAGE_SMOOTHING_KEY, JSON.stringify(on));
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+}
 export const DEFAULT_HANDLE_SIZE = 8;
 export const MIN_HANDLE_SIZE = 4;
 export const MAX_HANDLE_SIZE = 16;
@@ -239,6 +275,20 @@ export class EditorRender {
   setBedCenterCross(this: Editor, on: boolean) {
     this.bedCenterCross = on;
     saveBedCenterCross(on);
+    this.redraw();
+  }
+
+  /** Füll-Layer gefüllt anzeigen (Edit → Settings → Darstellung → Arbeitsfläche; Alt+W) */
+  setFilled(this: Editor, on: boolean) {
+    this.filled = on;
+    saveCanvasFilled(on);
+    this.emit('view');
+  }
+
+  /** Kantenglättung beim Bild-Zoomen (Edit → Settings → Darstellung → Arbeitsfläche) */
+  setImageSmoothing(this: Editor, on: boolean) {
+    this.imageSmoothing = on;
+    saveImageSmoothing(on);
     this.redraw();
   }
   /** Layerfarbe zum Zeichnen: Schwarz wird auf dunklem Grund hell dargestellt */
@@ -443,9 +493,9 @@ export class EditorRender {
       ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
       if (outline) { ctx.save(); ctx.clip(outline); }
       if (cv) {
-        // Vergrößert scharfe Punkte zeigen, verkleinert glätten
+        // Vergrößert scharfe Punkte zeigen, verkleinert glätten (abschaltbar über die Kantenglättung)
         const scr = (z * Math.hypot(m[0], m[1]) * box.w) / cv.width;
-        ctx.imageSmoothingEnabled = edited ? isReducedImageDisplay(cv) : scr < 1.5;
+        ctx.imageSmoothingEnabled = (this.imageSmoothing ?? DEFAULT_IMAGE_SMOOTHING) && (edited ? isReducedImageDisplay(cv) : scr < 1.5);
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(cv, box.x, box.y, box.w, box.h);
       } else {

@@ -240,6 +240,8 @@ export interface TextShape {
   hSpace: number;
   /** zusätzlicher Zeilenabstand in mm */
   vSpace: number;
+  /** Schreibrichtung rechts-nach-links (Hebräisch/Arabisch); Best-Effort ohne arabische Buchstaben-Verbindung */
+  rtl?: boolean;
   /** Buchstaben schweißen: überlappende Glyphen zu einer Kontur verschmelzen */
   weld?: boolean;
   /** Text auf Pfad: die Grundlinie folgt dieser Kurve */
@@ -659,6 +661,10 @@ export interface Doc {
   meshes?: Record<string, string>;
   /** Frei gestaltete, gestapelte Platten für die 3D-Ansicht. */
   multiLayerAssemblies?: MultiLayerAssembly[];
+  /** Nur Auswahl lasern: Stand beim Speichern, wird beim Öffnen aufs Gerät übernommen */
+  cutSelected?: boolean;
+  /** Job-Ursprung 0 … 8: Stand beim Speichern, wird beim Öffnen aufs Gerät übernommen */
+  jobOrigin?: number;
 }
 
 /** Eine Platte referenziert ein oberstes Objekt; dessen Inhalt bleibt vollständig editierbar. */

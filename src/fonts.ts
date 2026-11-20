@@ -339,7 +339,10 @@ function linesOf(t: TextShape, font: opentype.Font) {
   const width = (s: string) => advancesOf(font.stringToGlyphs(s)).reduce((a, b) => a + b, 0);
   const lines = ww ? paras.flatMap((p) => wrapParagraph(p, ww, width)) : paras;
   return lines.map((line, li) => {
-    const glyphs = font.stringToGlyphs(line);
+    const raw = font.stringToGlyphs(line);
+    // RTL: Glyphenfolge umkehren und dann von links nach rechts setzen (reine Absätze;
+    // arabische Buchstaben-Verbindung leistet opentype.js nicht — Best-Effort)
+    const glyphs = t.rtl ? [...raw].reverse() : raw;
     let advances = advancesOf(glyphs);
     let w = advances.reduce((a, b) => a + b, 0);
     const sx = t.maxW && t.maxW > 0 && w > t.maxW ? t.maxW / w : 1;

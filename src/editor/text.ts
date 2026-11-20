@@ -11,7 +11,7 @@ import { RULER } from './shared';
 
 /** Standardwerte des Textwerkzeugs (Schrift, Größe, Stil); auch Rückfall für Tests ohne Konstruktor */
 export const DEFAULT_TEXT_DEFAULTS = {
-  font: 'Arial', size: 10, bold: false, italic: false, upper: false, align: 'left', hSpace: 0, vSpace: 0,
+  font: 'Arial', size: 10, bold: false, italic: false, upper: false, align: 'left', hSpace: 0, vSpace: 0, rtl: false,
 } as const;
 
 /** Längste Kontur einer Form (z. B. die äußere bei mehreren) als Kurve für Text auf Pfad */
