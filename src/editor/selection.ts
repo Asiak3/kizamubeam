@@ -1,7 +1,7 @@
 import type { Editor } from '../editor';
 import { apply, Obj, Pt } from '../model';
 import { boundsOf, shapeSubs } from '../geom';
-import { insideLasso, lassoTouchMode, touchHit } from '../lasso';
+import { imageEnclosedByLasso, insideLasso, lassoTouchMode, touchHit } from '../lasso';
 import { TOOL_HINTS } from './shared';
 import { t } from '../i18n';
 
@@ -51,7 +51,8 @@ export class EditorSelection {
         if(!this.selectable(o))return false;
         // Object lasso is deliberately fully enclosing, never bbox intersection.
         const b=boundsOf([o]);
-        const enclosed=!!b && [{x:b.x,y:b.y},{x:b.x+b.w,y:b.y},{x:b.x+b.w,y:b.y+b.h},{x:b.x,y:b.y+b.h}].every(contains) &&
+        const enclosed=o.shape.kind==='image' && o.shape.edit!==undefined ? imageEnclosedByLasso(d.points,o) :
+          !!b && [{x:b.x,y:b.y},{x:b.x+b.w,y:b.y},{x:b.x+b.w,y:b.y+b.h},{x:b.x,y:b.y+b.h}].every(contains) &&
           // Concave lassos may cut through a box despite enclosing all corners.
           !d.points.some(p=>p.x>b.x && p.x<b.x+b.w && p.y>b.y && p.y<b.y+b.h);
         // Touch lasso (CCW): crossing an outline also hits; modes still apply via combine().

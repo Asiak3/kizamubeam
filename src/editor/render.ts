@@ -1,6 +1,8 @@
 // Editor: Zeichnen der Arbeitsfläche.
 import { apply, IDENT, ImageShape, inv, leaves, Mat, mul, noLaserLeaves, Node, Obj, PALETTE, Pt, SubPath, TextShape, visibleLeaves } from '../model';
-import { displayCanvas } from '../images';
+import { displayCanvas, displayCanvasDraft, ImageProcessingError, isReducedImageDisplay, imageDisplayActivity, cancelImageDisplay } from '../images';
+import { resolveImageContour } from '../imageContour';
+import { resolveImageRasterGeometry } from '../imageRaster';
 import { EdgePick } from '../joints';
 import { bezierPt, Box, boundsOf, drawText, localPath, segments, shapeSubs, subsToPath2D, textOutline, worldPath } from '../geom';
 import { SNAP_LABELS } from '../snap';
@@ -15,7 +17,68 @@ import { curvaturePreview } from './vector';
 import { arcSubPath } from './arc';
 import { GRID_MIN_PX, gridLevels, gridLines, LEVEL_ALPHA } from '../grid';
 import { closurePreview } from '../shaper';
+import { renderImageCropOverlay } from '../imageCropUi';
+import { imageDraftEdit } from './imageHandles';
 import { groupFactor, withBaselineTypography } from '../uiTypography';
+
+const imageErrorStatuses = new WeakMap<Editor, HTMLSpanElement>();
+const imageProgressStatuses = new WeakMap<Editor, { root: HTMLSpanElement; label: HTMLSpanElement; progress: HTMLProgressElement; button: HTMLButtonElement; owners: object[]; cursor?: string }>();
+
+function showImageDisplayProgress(editor: Editor, owners: object[]) {
+  let status = imageProgressStatuses.get(editor);
+  for (const previous of status?.owners ?? []) if (!owners.includes(previous)) cancelImageDisplay(previous);
+  if (!owners.length) {
+    if (status) {
+      status.owners = []; status.root.hidden = true;
+      if (status.cursor !== undefined && editor.canvas.style.cursor === 'progress') editor.canvas.style.cursor = status.cursor;
+      if (document.activeElement === status.button) editor.canvas.focus();
+    }
+    return;
+  }
+  if (!status) {
+    const parent = document.getElementById('status');
+    if (!parent) return;
+    const root = document.createElement('span'), label = document.createElement('span');
+    const progress = document.createElement('progress'), button = document.createElement('button');
+    root.setAttribute('role', 'group'); root.setAttribute('aria-label', t('Bild'));
+    label.setAttribute('role', 'status'); label.setAttribute('aria-live', 'polite');
+    progress.max = 4; progress.setAttribute('aria-label', t('Vorschau'));
+    button.type = 'button'; button.textContent = t('Abbrechen');
+    button.style.minWidth = button.style.minHeight = '24px';
+    root.append(label, progress, button); parent.append(root);
+    status = { root, label, progress, button, owners: [] };
+    imageProgressStatuses.set(editor, status);
+    const cancel = () => { for (const owner of imageProgressStatuses.get(editor)?.owners ?? []) cancelImageDisplay(owner); };
+    button.onclick = cancel;
+    root.onkeydown = (event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); cancel(); } };
+  }
+  status.owners = owners; status.root.hidden = false;
+  if (editor.canvas.style.cursor !== 'progress') status.cursor = editor.canvas.style.cursor;
+  editor.canvas.style.cursor = 'progress';
+  // One worker executes at a time: queued images must not hide its phase progress.
+  status.progress.value = Math.max(...owners.map(owner => imageDisplayActivity(owner)?.phase ?? 0));
+  const text = `${t('Vorschau')} ${status.progress.value} / ${status.progress.max}`;
+  if (status.label.textContent !== text) status.label.textContent = text;
+}
+
+/** Keep image failures in the existing status bar without replacing tool hints or stealing focus. */
+function showImageErrors(editor: Editor, errors: string[]) {
+  let status = imageErrorStatuses.get(editor);
+  if (!status) {
+    if (!errors.length) return;
+    const root = document.getElementById('status');
+    if (!root) return;
+    status = document.createElement('span');
+    status.className = 'hint';
+    status.setAttribute('role', 'status');
+    status.setAttribute('aria-live', 'polite');
+    status.setAttribute('aria-atomic', 'true');
+    root.append(status);
+    imageErrorStatuses.set(editor, status);
+  }
+  const text = errors.join('\n');
+  if (status.textContent !== text) status.textContent = text;
+}
 
 function rectPath(w: number, h: number): Path2D {
   const p = new Path2D();
@@ -323,29 +386,84 @@ export class EditorRender {
       }
     }
     // Bilder liegen unter den Vektoren und zeigen das Ergebnis der Bildverarbeitung
+    const imageErrors: string[] = [];
+    const pendingImageDisplays: object[] = [];
     for (const [o, m, selected] of images) {
       const s = o.shape as ImageShape;
-      const cv = displayCanvas(s, m, this.imgOutput(o.layer));
+      // Live-Vorschau: aktiver Entwurf speist die Pixel, sonst das Modell.
+      const draftEdit = imageDraftEdit(this, o.id);
+      const eff: ImageShape = draftEdit ? { ...s, edit: draftEdit } : s;
+      let cv: HTMLCanvasElement | null = null;
+      const geometry = eff.edit === undefined ? null : resolveImageRasterGeometry(eff);
+      if (eff.edit !== undefined) {
+        let error = '';
+        if (geometry && !geometry.ok && geometry.reason !== 'geometry' && geometry.reason !== 'invalid-rounding') error = t('Ungültiger Bildzuschnitt oder ungültige Perspektive. Zuschnitt und Perspektive zurücksetzen oder das Bild ersetzen.');
+        else if (!geometry?.ok || !resolveImageContour(eff, m).ok) error = t('Bildverarbeitung fehlgeschlagen. Bildeinstellungen prüfen oder das Bild ersetzen.');
+        else {
+          const output = this.imgOutput(o.layer);
+          // Validate now; completed worker errors surface through this same boundary.
+          const displayOptions = { zoom: z, dpr, dragging: this.drag?.type === 'image-crop', owner: o };
+          try {
+            cv = draftEdit ? displayCanvasDraft(eff, m, output, draftEdit, displayOptions) : displayCanvas(eff, m, output, true, displayOptions);
+            if (imageDisplayActivity(o)) pendingImageDisplays.push(o);
+          }
+          catch (cause) {
+            if (!(cause instanceof ImageProcessingError)) throw cause;
+            error = t('Bildverarbeitung fehlgeschlagen. Bildeinstellungen prüfen oder das Bild ersetzen.');
+          }
+        }
+        if (error) {
+          imageErrors.push(`${o.id}: ${error}`);
+          // Original dimensions locate an explicitly marked error, never a valid contour.
+          ctx.save();
+          ctx.transform(...m);
+          const w = Number.isFinite(s.w) && s.w > 0 ? s.w : 32;
+          const h = Number.isFinite(s.h) && s.h > 0 ? s.h : 32;
+          ctx.strokeStyle = this.colors.sel;
+          ctx.lineWidth = 2 * px;
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w, h); ctx.moveTo(w, 0); ctx.lineTo(0, h); ctx.stroke();
+          ctx.restore();
+          const at = this.toScreen(apply(m, 0, 0));
+          ctx.save(); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          ctx.font = '12px sans-serif'; ctx.textBaseline = 'top';
+          const tw = ctx.measureText(error).width;
+          ctx.fillStyle = '#ffffff'; ctx.fillRect(at.x, at.y, tw + 8, 20);
+          ctx.fillStyle = '#111111'; ctx.fillText(error, at.x + 4, at.y + 3);
+          ctx.restore();
+          continue;
+        }
+      } else cv = displayCanvas(eff, m, this.imgOutput(o.layer));
+      const edited = eff.edit !== undefined;
+      // Sampling fills the raster rectangle, not the smaller rounded visible bounds.
+      const box = geometry?.ok ? { x: geometry.bounds.x, y: geometry.bounds.y,
+        w: geometry.bounds.width, h: geometry.bounds.height } : { x: 0, y: 0, w: s.w, h: s.h };
+      const outline = edited ? localPath(eff, m) : null;
       ctx.save();
       if (faded.has(o)) ctx.globalAlpha = FADE;
       ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      if (outline) { ctx.save(); ctx.clip(outline); }
       if (cv) {
         // Vergrößert scharfe Punkte zeigen, verkleinert glätten
-        const scr = (z * Math.hypot(m[0], m[1]) * s.w) / cv.width;
-        ctx.imageSmoothingEnabled = scr < 1.5;
+        const scr = (z * Math.hypot(m[0], m[1]) * box.w) / cv.width;
+        ctx.imageSmoothingEnabled = edited ? isReducedImageDisplay(cv) : scr < 1.5;
         ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(cv, 0, 0, s.w, s.h);
+        ctx.drawImage(cv, box.x, box.y, box.w, box.h);
       } else {
         ctx.fillStyle = 'rgba(128,128,128,0.25)';
-        ctx.fillRect(0, 0, s.w, s.h);
+        if (outline) ctx.fill(outline);
+        else ctx.fillRect(0, 0, s.w, s.h);
       }
+      if (outline) ctx.restore();
       const k = 1 / Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]) || 1);
       ctx.strokeStyle = this.layerDrawColor(o.layer);
       ctx.lineWidth = (selected ? 1.5 : 1) * px * k;
       ctx.setLineDash(selected ? [5 * px * k, 3 * px * k] : []);
-      ctx.strokeRect(0, 0, s.w, s.h);
+      if (outline) ctx.stroke(outline);
+      else ctx.strokeRect(0, 0, s.w, s.h);
       ctx.restore();
     }
+    showImageErrors(this, imageErrors);
+    showImageDisplayProgress(this, pendingImageDisplays);
     for (const bt of batches.values()) {
       const a = bt.faded ? FADE : 1;
       ctx.strokeStyle = ctx.fillStyle = bt.color;
@@ -579,7 +697,7 @@ export class EditorRender {
       for (const M of this.arrayPreview.slice(1)) {
         for (const [leaf, m] of visibleLeaves(this.sel, M)) {
           const s = leaf.shape;
-          const local = s.kind === 'text' ? textOutline(s)?.path : s.kind === 'image' ? rectPath(s.w, s.h) : localPath(s);
+          const local = s.kind === 'text' ? textOutline(s)?.path : s.kind === 'image' && s.edit === undefined ? rectPath(s.w, s.h) : localPath(s, m);
           if (local) p.addPath(local, new DOMMatrix(m));
         }
       }
@@ -906,6 +1024,8 @@ export class EditorRender {
       ctx.stroke();
       ctx.restore();
     }
+    // Bild-Entwurf: 8 Zuschnitt-Griffe bzw. 4 Perspektiv-Ecken in Bild-lokalen Achsen
+    renderImageCropOverlay(this, ctx);
   }
 
   /** Befunde aus „Konstruktion prüfen“: Stellen farbig nach Schwere, der angeklickte Befund kräftiger */

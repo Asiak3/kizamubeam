@@ -1,4 +1,6 @@
 import { t } from './i18n';
+import type { ImageCrop, ImageQuad } from './imageGeometry';
+import type { ImageCut, ImageCutLink } from './imageCut';
 import type { ProjectParam } from './params';
 import type { SeriesTable, TemplateInfo } from './templates';
 import { conditionHolds } from './params';
@@ -88,7 +90,23 @@ export interface ImageAdjust {
 
 export const DEFAULT_ADJUST: ImageAdjust = { brightness: 0, contrast: 0, gamma: 1, sharpen: 0, sharpenRadius: 1, denoise: 0 };
 
-/** Rasterbild. Lokale Fläche 0..w × 0..h in mm; die Bilddaten liegen im Asset-Speicher (images.ts). */
+/** Reihenfolge von Zuschnitt und Perspektive je Bild: cropFirst (Standard, auch bei fehlendem Feld)
+ *  wählt im Original aus, perspectiveFirst schneidet achsparallel auf dem entzerrten Ergebnis zu. */
+export type ImageEditOrder = 'cropFirst' | 'perspectiveFirst';
+
+/** Nondestructive geometry; neither field changes the original asset or dimensions. */
+export interface ImageEdit {
+  /** Normalized source axes (cropFirst) or result-frame axes (perspectiveFirst). */
+  crop?: ImageCrop;
+  /** Full original rectangle's TL/TR/BR/BL destinations in original image-local mm, before crop. */
+  perspective?: ImageQuad;
+  /** Application order; absent (including all legacy files) means cropFirst. */
+  order?: ImageEditOrder;
+  /** Tangent radii in final world mm, in visible contour order; unused entries are retained. */
+  cornerRadii?: readonly number[];
+}
+
+/** Rasterbild. Originalfläche 0..w × 0..h in mm; die Bilddaten liegen im Asset-Speicher (images.ts). */
 export interface ImageShape {
   kind: 'image';
   asset: string;
@@ -99,6 +117,9 @@ export interface ImageShape {
   pxH: number;
   name?: string;
   adjust: ImageAdjust;
+  edit?: ImageEdit;
+  /** Optionale Schnittkontur (Modus und ggf. verknüpfte Vektorkontur). */
+  cut?: ImageCutLink;
 }
 
 export type DitherMode = 'threshold' | 'ordered' | 'atkinson' | 'floyd' | 'stucki' | 'jarvis' | 'newsprint' | 'halftone' | 'sketch' | 'grayscale';
@@ -144,6 +165,8 @@ export interface ImageLayer {
   angle: number;
   /** Schwellwert-Verfahren: Grenze 0 … 255 */
   threshold: number;
+  /** Eigene Schnittparameter je Bildlayer; ohne Feld bleibt der Schnitt aus. */
+  cut?: ImageCut;
 }
 
 /** Verfahren mit veränderlicher Leistung (Min. bis Max.); alle anderen brennen mit Max. oder gar nicht */
@@ -321,6 +344,8 @@ export interface Obj {
   /** Not lasered (still drawn, faded): e.g. a part that is already cut or parked for later.
    * Schließt die Laser-Ausgabe immer aus, auch bei sichtbarem Objekt und eingeschalteter Ausgabe. */
   noLaser?: boolean;
+  /** Rückverweis der Schnittkontur auf ihr Bild; prevNoLaser sichert den Zustand vor der Zuordnung. */
+  cutLink?: { imageId: number; prevNoLaser: boolean };
   /** Mit dem Verbindungs-Werkzeug angelegte Verbindungen zu anderen Teilen (für die 3D-Ansicht) */
   mates?: Mate[];
   /** Formeln mit Projekt-Parametern für Lage, Größe, Drehung und Formmaße (nur oberste Ebene) */
@@ -835,6 +860,8 @@ export function cloneObjs(objs: Obj[]): Obj[] {
   const asms = new Map<string, string>();
   const texts: TextShape[] = [];
   const mated: Obj[] = [];
+  const cuts: ImageShape[] = [];
+  const links: Obj[] = [];
   const re = (x: Obj) => {
     const id = newId();
     ids.set(x.id, id);
@@ -851,6 +878,8 @@ export function cloneObjs(objs: Obj[]): Obj[] {
       x.shape.mark = `${asms.get(a)}/${part}`;
     }
     if (x.shape.kind === 'text' && x.shape.path?.link !== undefined) texts.push(x.shape);
+    if (x.shape.kind === 'image' && x.shape.cut?.contourId !== undefined) cuts.push(x.shape);
+    if (x.cutLink) links.push(x);
     if (x.mates) mated.push(x);
   };
   const out = objs.map((o) => {
@@ -862,6 +891,16 @@ export function cloneObjs(objs: Obj[]): Obj[] {
     const link = ids.get(s.path!.link!);
     if (link !== undefined) s.path!.link = link;
     else delete s.path!.link;
+  }
+  // Bildkonturen bleiben anders als Textlinks auch dann verknüpft, wenn die Kontur nicht
+  // mitkopiert wurde: die hängende ID blockiert den aktivierten Schnitt (Review-Vorgabe).
+  for (const s of cuts) {
+    const target = ids.get(s.cut!.contourId!);
+    if (target !== undefined) s.cut!.contourId = target;
+  }
+  for (const x of links) {
+    const target = ids.get(x.cutLink!.imageId);
+    if (target !== undefined) x.cutLink!.imageId = target;
   }
   // Verbindungen bleiben nur zwischen mitkopierten Teilen erhalten
   for (const x of mated) {

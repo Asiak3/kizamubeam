@@ -20,6 +20,7 @@ import { EditorDocument } from './editor/document';
 import { EditorHinges } from './editor/hinges';
 import { EditorPattern } from './editor/pattern';
 import { EditorImages, loadImportAutoSelect, loadImportCenterInBed, loadImportSkippedNote } from './editor/imageops';
+import { EditorImageHandles } from './editor/imageHandles';
 import { EditorJoints } from './editor/joints';
 import { EditorKeyboard, loadNudgeSteps, type NudgeSteps } from './editor/keyboard';
 import { EditorNodes } from './editor/nodes';
@@ -668,6 +669,7 @@ export interface Editor
     EditorWarp,
     EditorNotes,
     EditorImages,
+    EditorImageHandles,
     EditorTabs,
     EditorRelations,
     EditorSketch,
@@ -706,6 +708,7 @@ const PARTS = [
   EditorWarp,
   EditorNotes,
   EditorImages,
+  EditorImageHandles,
   EditorTabs,
   EditorRelations,
   EditorSketch,

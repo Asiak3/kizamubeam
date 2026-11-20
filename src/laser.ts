@@ -1693,6 +1693,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
   const stat = (k: string, v: string) => [h('dt', {}, k), h('dd', {}, v)];
   const subLabel = (layer: number, sub: number) => {
     const L = layerOf(layer);
+    if (sub === -2) return `${L.name} – ${t('Bildschnitt')}`;
     if (sub < 0) return L.name;
     const custom = L.sub?.[sub]?.name?.trim();
     return `${L.name} – ${custom || t('Sublayer {n}', { n: sub + 1 })}`;
@@ -1700,7 +1701,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
   const layerRows = analysis.layerTimes.map((lt) => {
     const swatch = h('span', { class: 'preview-layer-swatch' });
     swatch.style.background = layerColor(lt.layer);
-    return h('div', { class: `preview-layer${lt.sub >= 0 ? ' sub' : ''}` },
+    return h('div', { class: `preview-layer${lt.sub >= 0 ? ' sub' : ''}${lt.sub === -2 ? ' cut' : ''}` },
       swatch,
       h('span', { class: 'preview-layer-name' }, subLabel(lt.layer, lt.sub)),
       h('span', { class: 'preview-layer-time' }, formatDuration(lt.seconds)),

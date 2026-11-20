@@ -2,6 +2,7 @@
 import type { Editor } from '../editor';
 import { commandMatches } from '../commandKeys';
 import { t } from '../i18n';
+import { handleImageCropKey } from '../imageCropUi';
 
 /** Schrittweiten der Pfeiltasten in mm (normal, mit Umschalt, mit Alt); frei belegbar, Default wie bisher */
 export interface NudgeSteps { normal: number; shift: number; alt: number }
@@ -72,6 +73,8 @@ export class EditorKeyboard {
       e.preventDefault();
       return;
     }
+    // Bild-Entwurf: Pfeile stupsen, Esc bricht ab, Enter wendet an (vor allen anderen Tasten).
+    if (this.imageDraft?.() && handleImageCropKey(this, e)) { e.preventDefault(); return; }
     if (e.code === 'Space') {
       this.space = true;
       e.preventDefault();

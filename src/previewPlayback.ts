@@ -143,12 +143,15 @@ export function analyzePlayback(mv: Moves, est: Estimate, settings: PlaybackSett
     }
   }
 
+  // Der Bildschnitt (sub = -2) wird nach Haupt- und Sublayern desselben Layers einsortiert.
+  // Zeitmarken bleiben von der Anzeigesortierung unberührt.
+  const subRank = (s: number) => (s === -2 ? Number.MAX_SAFE_INTEGER : s === -1 ? 0 : s + 1);
   const layerTimes: LayerTime[] = [...layerMap.entries()]
     .map(([key, seconds]) => {
       const [layer, sub] = key.split(':').map(Number);
       return { layer, sub, seconds, share: total > 0 ? seconds / total : 0 };
     })
-    .sort((a, b) => a.layer - b.layer || a.sub - b.sub);
+    .sort((a, b) => a.layer - b.layer || subRank(a.sub) - subRank(b.sub));
 
   return { segmentProcess, processTimes, layerTimes, markers, factors: computeFactors(processTimes, settings) };
 }

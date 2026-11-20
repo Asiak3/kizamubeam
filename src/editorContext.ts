@@ -5,6 +5,7 @@ import { RULER } from './editor/shared';
 import { defaultLayer, homeLayer, layerLabel } from './model';
 import { selectAssembly } from './asmSelect';
 import { assignLayerAsk } from './layerAssign';
+import { EDIT_TITLE, runImageEdit } from './imageCropUi';
 
 export interface ContextCallbacks {
   adjust: () => void; trace: () => void; background: () => void; saveBitmap: () => void | Promise<unknown>;
@@ -48,9 +49,21 @@ export function editorContextGroups(ed: Editor, callbacks: ContextCallbacks, bla
   const imageActions = [action('trace', t('Bild nachzeichnen …'), callbacks.trace, editable && images.length === 1),
     action('adjust', t('Bild anpassen …'), callbacks.adjust, editable && images.length > 0),
     action('bgremove', t('Hintergrund entfernen …'), callbacks.background, editable && images.length === 1),
+    action('imageedit', EDIT_TITLE(), () => runImageEdit(ed), editable && images.length === 1 && count === 1),
     action('crop', t('Bild zuschneiden (Formen werden entfernt)'), () => ed.cropImageSel(false), editable && images.length === 1 && count > 1),
     action('mask', t('Maske anwenden (Formen werden entfernt)'), () => ed.cropImageSel(true), editable && images.length === 1 && count > 1),
     action('save-bitmap', t('Bearbeitetes Bild speichern …'), callbacks.saveBitmap, images.length === 1)];
+  // Schnittkontur: nur zuweisen, wenn genau ein Bild und eine geschlossene Kontur gewählt sind.
+  // Die vollständige Konturprüfung bleibt im Modell/Job; hier wird nur die Auswahl eingegrenzt.
+  const oneImage = images.length === 1 ? images[0] : undefined;
+  const paths = ed.sel.filter((o) => o.shape.kind === 'path');
+  const closedPath = paths.length === 1 && paths[0].shape.kind === 'path' &&
+    paths[0].shape.subs.length === 1 && paths[0].shape.subs[0].closed && paths[0].shape.subs[0].nodes.length >= 3;
+  imageActions.push(
+    action('assign-image-cut', t('Bildschnitt-Kontur zuweisen'), () => ed.assignImageCutSel(),
+      editable && count === 2 && !!oneImage && closedPath),
+    action('unassign-image-cut', t('Bildschnitt-Kontur lösen'), () => ed.unassignImageCutSel(),
+      editable && !!oneImage && oneImage.shape.kind === 'image' && oneImage.shape.cut?.mode === 'contour'));
   const vectorActions = [action('tool:node', t('Knoten bearbeiten'), () => ed.setTool('node'), editable && !!ed.nodeTarget()),
     action('tolines', t('In Pfad umwandeln'), () => ed.convertSelToPath(), editable && ed.sel.some((o) => !['path', 'image'].includes(o.shape.kind))),
     action('vectorfit', t('Pfade vereinfachen / glätten…'), callbacks.vectorFit, editable && ed.nodeTargets().length > 0),

@@ -1,6 +1,6 @@
 // Editor: Bilder und Import.
 import { allObjs, DEFAULT_ADJUST, IDENT, ImageAdjust, ImageLayer, ImageShape, inv, leaves, Mat, mul, newId, Obj, Pt, SubPath, translate } from '../model';
-import { addAsset, adjustedGray, assetImage, registerAsset, sourceSize } from '../images';
+import { addAsset, adjustedGray, assetImage, imageRasterGeometry, registerAsset, sourceSize } from '../images';
 import type { LbrnResult } from '../lbrn';
 import { ImportResult, transformSubs } from '../importers';
 import { traceGray, TraceOptions } from '../trace';
@@ -385,11 +385,12 @@ export class EditorImages {
     const f = Math.min(1, Math.sqrt(4e6 / (src.w * src.h)));
     const cols = Math.max(2, Math.round(src.w * f)),
       rows = Math.max(2, Math.round(src.h * f));
-    const g = adjustedGray(s, cols, rows);
+    const g = adjustedGray(s, cols, rows, false, o.m);
     if (!g) return [];
     // Bildpunkte → lokale mm → Welt
     const subs = (opt.centerline ? centerlineGray : traceGray)(g, cols, rows, opt);
-    return transformSubs(subs, mul(o.m, [s.w / cols, 0, 0, s.h / rows, 0, 0]));
+    const box = s.edit !== undefined ? imageRasterGeometry(s).bounds : { x: 0, y: 0, width: s.w, height: s.h };
+    return transformSubs(subs, mul(o.m, [box.width / cols, 0, 0, box.height / rows, box.x, box.y]));
   }
   /** Vorschau-Konturen (orange gestrichelt) setzen oder entfernen */
   setPreview(this: Editor, subs: SubPath[] | null) {

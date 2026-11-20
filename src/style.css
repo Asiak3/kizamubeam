@@ -1273,6 +1273,11 @@ dialog::backdrop {
 .offset-dialog {
   margin: 110px 330px auto auto;
 }
+/* Modeless Bild-Dialog über der Andockleiste halten: .dock-edge (z-index 3)
+   malt und klickt sonst durch den Dialog (Titel-Tooltip, Übernehmen blockiert) */
+.image-crop-dialog {
+  z-index: 40;
+}
 /* Manual layer assignment for groups on several layers (#255) */
 .layer-assign-map th,
 .layer-assign-map td {
