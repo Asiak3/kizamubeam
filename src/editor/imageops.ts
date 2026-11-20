@@ -10,6 +10,43 @@ import { bezierPt, boundsOf, segments, shapeSubs, subsToPath2D, textOutline } fr
 import { dec, t, tn } from '../i18n';
 import type { Editor } from '../editor';
 
+const IMPORT_AUTO_SELECT_KEY = 'kizamubeam.importAutoSelect';
+const IMPORT_CENTER_IN_BED_KEY = 'kizamubeam.importCenterInBed';
+const IMPORT_SKIPPED_NOTE_KEY = 'kizamubeam.importSkippedNote';
+
+/** Importiertes nach dem Import auswählen: an, bis in den Einstellungen abgewählt (Opt-out) */
+export function loadImportAutoSelect(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(IMPORT_AUTO_SELECT_KEY) ?? 'true') !== false;
+  } catch {
+    return true;
+  }
+}
+/** Import in Bettmitte legen: aus, bis in den Einstellungen gewählt (Opt-in) */
+export function loadImportCenterInBed(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(IMPORT_CENTER_IN_BED_KEY) ?? 'false') === true;
+  } catch {
+    return false;
+  }
+}
+/** Hinweise zu übersprungenen Inhalten (z. B. DXF-Text) anzeigen: an, bis abgewählt (Opt-out) */
+export function loadImportSkippedNote(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(IMPORT_SKIPPED_NOTE_KEY) ?? 'true') !== false;
+  } catch {
+    return true;
+  }
+}
+
+function saveImportFlag(key: string, on: boolean) {
+  try {
+    localStorage.setItem(key, JSON.stringify(on));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 export class EditorImages {
   selImages(this: Editor): Obj[] {
     return this.sel.filter((o) => o.shape.kind === 'image');
@@ -164,21 +201,37 @@ export class EditorImages {
 
   /** Objekte einfügen: liegen sie außerhalb des Betts, werden sie mittig platziert. Mehrere werden gruppiert. */
   /** Objekte als ein Element einfügen (rückgängig machbar); before läuft nach dem Undo-Zwischenstand, z. B. für Layer */
-  placeNew(this: Editor, objs: Obj[], label: string, before?: () => void) {
+  placeNew(this: Editor, objs: Obj[], label: string, before?: () => void, opts?: { select?: boolean }) {
     if (!objs.length) return;
     let o: Obj = objs[0];
     if (objs.length > 1) o = { id: newId(), m: IDENT, layer: objs[0].layer, shape: { kind: 'group', children: objs } };
     const b = boundsOf([o]);
     const bed = this.doc.bed;
-    if (b && (b.x < -1e-6 || b.y < -1e-6 || b.x + b.w > bed.w + 1e-6 || b.y + b.h > bed.h + 1e-6))
+    if (b && (this.importCenterInBed || b.x < -1e-6 || b.y < -1e-6 || b.x + b.w > bed.w + 1e-6 || b.y + b.h > bed.h + 1e-6))
       o.m = mul(translate(bed.w / 2 - (b.x + b.w / 2), bed.h / 2 - (b.y + b.h / 2)), o.m);
     this.snapshot(t('Objekt hinzufügen'));
     before?.();
     this.doc.objs.push(o);
-    this.setTool('select');
-    this.setSel([o]);
+    if (opts?.select ?? this.importAutoSelect ?? true) {
+      this.setTool('select');
+      this.setSel([o]);
+    }
     this.hint = label;
     this.emit('doc');
+  }
+
+  /** Import-Verhalten umschalten (Edit → Settings → Arbeitsfläche und Fangen → Import) */
+  setImportAutoSelect(this: Editor, on: boolean) {
+    this.importAutoSelect = on;
+    saveImportFlag(IMPORT_AUTO_SELECT_KEY, on);
+  }
+  setImportCenterInBed(this: Editor, on: boolean) {
+    this.importCenterInBed = on;
+    saveImportFlag(IMPORT_CENTER_IN_BED_KEY, on);
+  }
+  setImportSkippedNote(this: Editor, on: boolean) {
+    this.importSkippedNote = on;
+    saveImportFlag(IMPORT_SKIPPED_NOTE_KEY, on);
   }
 
   /**
@@ -243,7 +296,7 @@ export class EditorImages {
       const o: Obj = objs.length > 1 ? { id: newId(), m: IDENT, layer: objs[0].layer, shape: { kind: 'group', children: objs } } : objs[0];
       const b = boundsOf([o]);
       const bed = this.doc.bed;
-      if (b && (b.x < -1e-6 || b.y < -1e-6 || b.x + b.w > bed.w + 1e-6 || b.y + b.h > bed.h + 1e-6))
+      if (b && (this.importCenterInBed || b.x < -1e-6 || b.y < -1e-6 || b.x + b.w > bed.w + 1e-6 || b.y + b.h > bed.h + 1e-6))
         o.m = mul(translate(bed.w / 2 - (b.x + b.w / 2), bed.h / 2 - (b.y + b.h / 2)), o.m);
       groups.push(o);
     }
@@ -264,8 +317,10 @@ export class EditorImages {
     });
     this.clearPageState();
     this.doc.page = start;
-    this.setTool('select');
-    this.setSel(groups[0] ? [groups[0]] : []);
+    if (this.importAutoSelect ?? true) {
+      this.setTool('select');
+      this.setSel(groups[0] ? [groups[0]] : []);
+    }
     const notes = [...new Set(pages.flatMap((p) => p.notes))];
     this.hint = [tn('{name}: {n} Seite importiert.', '{name}: {n} Seiten importiert, ab Seite 2 auf neuen Projektseiten.', pages.length, { name }), ...notes].join(' ');
     this.emit('doc');

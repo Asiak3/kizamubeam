@@ -98,6 +98,7 @@ export class EditorCommands {
       if (typeof patch.sides === 'number') this.polySides = patch.sides;
       if (typeof patch.star === 'boolean') this.polyStar = patch.star;
     }
+    this.saveToolOptions();
     const objs = this.sel.filter((o) => o.shape.kind === kind);
     if (!objs.length) return;
     this.snapshot(t('Form-Eigenschaften'));

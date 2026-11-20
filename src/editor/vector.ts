@@ -111,7 +111,7 @@ export class EditorVector {
     const o: Obj = { id: newId(), m: IDENT, layer: this.currentLayer, shape: { kind: 'path', subs: [{ nodes, closed: d.closed }] } };
     this.doc.objs.push(o);
     this.emit('doc');
-    this.setTool('select');
+    if (this.selectAfterDraw ?? true) this.setTool('select');
     this.setSel([o]);
   }
 

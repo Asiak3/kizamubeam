@@ -426,7 +426,13 @@ function sanitizeSvgText(input: string): string {
   return s;
 }
 
-export function importSvg(text: string): ImportResult {
+export interface ImportParseOptions {
+  /** Hinweise zu übersprungenen Inhalten (z. B. Texte) in notes aufnehmen; Formen werden so oder so übersprungen */
+  reportSkipped?: boolean;
+}
+
+export function importSvg(text: string, opts?: ImportParseOptions): ImportResult {
+  const reportSkipped = opts?.reportSkipped ?? true;
   const safeText = sanitizeSvgText(text);
   const doc = new DOMParser().parseFromString(safeText, 'image/svg+xml');
   const root = doc.documentElement;
@@ -554,7 +560,7 @@ export function importSvg(text: string): ImportResult {
         const w = attr(el, 'width'),
           h = attr(el, 'height');
         if (!href.startsWith('data:image/') || w <= 0 || h <= 0) {
-          notes.push(t('Verknüpftes Bild übersprungen (nur eingebettete Bilder werden übernommen).'));
+          if (reportSkipped) notes.push(t('Verknüpftes Bild übersprungen (nur eingebettete Bilder werden übernommen).'));
           return;
         }
         items.push({ kind: 'image', href, m: mul(mul(base, mm), [w, 0, 0, h, attr(el, 'x'), attr(el, 'y')]), layer: layerFor(st) });
@@ -570,7 +576,7 @@ export function importSvg(text: string): ImportResult {
     if (pb.subs.length) items.push({ kind: 'path', subs: transformSubs(pb.subs, mul(base, mm)), layer: layerFor(st) });
   };
   walk(root, IDENT, {}, 0);
-  if (skippedText) notes.push(tn('{n} Text übersprungen (in der Quelldatei vorher in Pfade umwandeln).', '{n} Texte übersprungen (in der Quelldatei vorher in Pfade umwandeln).', skippedText));
+  if (skippedText && reportSkipped) notes.push(tn('{n} Text übersprungen (in der Quelldatei vorher in Pfade umwandeln).', '{n} Texte übersprungen (in der Quelldatei vorher in Pfade umwandeln).', skippedText));
   return { items: items.filter((it) => it.kind === 'image' || it.subs.length), notes: [...new Set(notes)] };
 }
 
@@ -600,7 +606,8 @@ function dxfPairs(text: string): [number, string][] {
 
 const INSUNITS_MM: Record<number, number> = { 1: 25.4, 2: 304.8, 4: 1, 5: 10, 6: 1000, 8: 0.0000254, 9: 0.0254, 10: 914.4 };
 
-export function importDxf(text: string): ImportResult {
+export function importDxf(text: string, opts?: ImportParseOptions): ImportResult {
+  const reportSkipped = opts?.reportSkipped ?? true;
   const pairs = dxfPairs(text);
   if (!pairs.some(([c, v]) => c === 0 && v === 'SECTION')) throw new Error(t('Keine gültige DXF-Datei'));
   let unit = 1;
@@ -788,7 +795,7 @@ export function importDxf(text: string): ImportResult {
   };
   // Einheit anwenden, y bleibt nach oben (der Aufrufer spiegelt am Bett)
   for (const e of entities) emit(e, [unit, 0, 0, unit, 0, 0], null, null, 0);
-  if (skipped.size) notes.push(t('Übersprungen: {list}.', { list: [...skipped].map(([what, n]) => `${n}× ${what}`).join(', ') }));
+  if (skipped.size && reportSkipped) notes.push(t('Übersprungen: {list}.', { list: [...skipped].map(([what, n]) => `${n}× ${what}`).join(', ') }));
   return { items: joinPaths(items), notes, yUp: true };
 }
 

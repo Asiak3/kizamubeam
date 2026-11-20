@@ -4,6 +4,29 @@ import { hitLeaf } from './geom';
 import { t } from './i18n';
 
 export const OVERLAP_HOLD_MS = 550;
+export const DEFAULT_CLICK_TOLERANCE_PX = 4;
+const CLICK_TOLERANCE_KEY = 'kizamubeam.clickTolerance';
+const CLICK_MIN = 1, CLICK_MAX = 32;
+/** Klick-Auswahltoleranz in px (teilt sich durch den Zoom); frei einstellbar, Default wie bisher */
+export function loadClickTolerance(): number {
+  try {
+    const v = JSON.parse(localStorage.getItem(CLICK_TOLERANCE_KEY) ?? 'null');
+    if (typeof v === 'number' && Number.isFinite(v) && v >= CLICK_MIN && v <= CLICK_MAX) return v;
+  } catch {
+    /* Standardwert */
+  }
+  return DEFAULT_CLICK_TOLERANCE_PX;
+}
+/** Klick-Toleranz speichern (Edit → Settings → Maus und Tastatur); false bei ungültigen Werten */
+export function saveClickTolerance(v: number): boolean {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < CLICK_MIN || v > CLICK_MAX) return false;
+  try {
+    localStorage.setItem(CLICK_TOLERANCE_KEY, JSON.stringify(v));
+    return true;
+  } catch {
+    return false;
+  }
+}
 // Pointer coordinates are CSS pixels, independent of devicePixelRatio.
 export const OVERLAP_MOVE_PX = 6;
 export interface OverlapSettings { trigger:'right'|'left'|'off'; delay:number }
@@ -29,7 +52,7 @@ export function saveOverlapSettings(v: OverlapSettings): boolean {
 export function overlapCandidates(ed: Editor, point: Pt): Obj[] {
   return [...ed.doc.objs].reverse().filter(top=>ed.selectable(top) && [...visibleLeaves([top])].some(([leaf,m])=>{
     const layer=ed.layer(leaf.layer);
-    return layer.show && !layer.locked && !leaf.locked && hitLeaf(leaf,m,point,4/ed.view.zoom,ed.filled && layer.mode==='fill');
+    return layer.show && !layer.locked && !leaf.locked && hitLeaf(leaf,m,point,(ed.clickTolerance ?? DEFAULT_CLICK_TOLERANCE_PX)/ed.view.zoom,ed.filled && layer.mode==='fill');
   }));
 }
 

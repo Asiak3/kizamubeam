@@ -9,6 +9,11 @@ import { t } from '../i18n';
 import type { Editor } from '../editor';
 import { RULER } from './shared';
 
+/** Standardwerte des Textwerkzeugs (Schrift, Größe, Stil); auch Rückfall für Tests ohne Konstruktor */
+export const DEFAULT_TEXT_DEFAULTS = {
+  font: 'Arial', size: 10, bold: false, italic: false, upper: false, align: 'left', hSpace: 0, vSpace: 0,
+} as const;
+
 /** Längste Kontur einer Form (z. B. die äußere bei mehreren) als Kurve für Text auf Pfad */
 function linkCurve(s: Shape): SubPath | null {
   const subs = shapeSubs(s).filter((sp) => sp.nodes.length > 1);
@@ -27,7 +32,7 @@ export class EditorText {
     if (c.x < 0 || c.y < 0 || c.x > bed.w || c.y > bed.h) c = { x: bed.w / 2, y: bed.h / 2 };
     const e = barcodeExtent(shape);
     const o: Obj = { id: newId(), m: translate(c.x - (e.x0 + e.x1) / 2, c.y - (e.y0 + e.y1) / 2), layer: this.currentLayer, shape };
-    this.placeNew([o], isLinear(shape) ? t('Strichcode eingefügt. Doppelklick öffnet ihn zum Bearbeiten.') : t('QR-Code eingefügt. Doppelklick öffnet ihn zum Bearbeiten.'));
+    this.placeNew([o], isLinear(shape) ? t('Strichcode eingefügt. Doppelklick öffnet ihn zum Bearbeiten.') : t('QR-Code eingefügt. Doppelklick öffnet ihn zum Bearbeiten.'), undefined, { select: true });
   }
   /** Inhalt oder Einstellungen eines QR- oder Strichcodes ändern; die Mitte bleibt, wo sie war */
   updateBarcode(this: Editor, o: Obj, patch: Partial<BarcodeShape>) {
@@ -140,7 +145,7 @@ export class EditorText {
    */
   createText(this: Editor, at: Pt, frameW = 0) {
     this.snapshot(frameW ? t('Textrahmen erstellen') : t('Text erstellen'));
-    const shape: TextShape = { kind: 'text', text: '', ...this.textDefaults };
+    const shape: TextShape = { kind: 'text', text: '', ...(this.textDefaults ?? DEFAULT_TEXT_DEFAULTS) };
     let p = at;
     if (frameW) {
       Object.assign(shape, { fit: 'wrap', maxW: frameW });
@@ -172,7 +177,9 @@ export class EditorText {
     this.emit('sel');
   }
   updateTexts(this: Editor, patch: Partial<TextShape>) {
+    this.textDefaults ??= { ...DEFAULT_TEXT_DEFAULTS };
     Object.assign(this.textDefaults, Object.fromEntries(Object.entries(patch).filter(([k]) => k !== 'text' && k !== 'path' && k !== 'vt' && k !== 'maxW' && k !== 'maxH' && k !== 'fit')));
+    this.saveTextDefaults();
     const ts = this.selTexts();
     if (!ts.length) return;
     this.snapshot(t('Text-Eigenschaften'));

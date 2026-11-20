@@ -10,7 +10,7 @@ import { lassoTouchMode } from '../lasso';
 import { MAX_VECTOR_SAMPLES } from '../vectorFit';
 import { closureOf } from '../shaper';
 import { genLeaves, isMarkGroup } from './generators';
-import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, LASSO_TOUCH_HINT, RULER, SNAP_PX, TOOL_HINTS } from './shared';
+import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, LASSO_TOUCH_HINT, RULER, TOOL_HINTS } from './shared';
 import { ARC_MIN_RADIUS, arcPoint, arcSpec, arcSubPath, newArcDraft, snapAngle, type ArcDraft, type ArcMode } from './arc';
 import { OVERLAP_MOVE_PX } from '../overlapPicker';
 
@@ -19,6 +19,16 @@ const RIGHT_PAN_KEY = 'kizamubeam.rightPan';
 export function loadRightPan(): boolean {
   try {
     return JSON.parse(localStorage.getItem(RIGHT_PAN_KEY) ?? 'false') === true;
+  } catch {
+    return false;
+  }
+}
+
+const ZOOM_INVERTED_KEY = 'kizamubeam.zoomInverted';
+/** Inverted wheel-zoom direction is opt-in: off unless switched on in the settings */
+export function loadZoomInverted(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(ZOOM_INVERTED_KEY) ?? 'false') === true;
   } catch {
     return false;
   }
@@ -145,7 +155,7 @@ export class EditorPointer {
           }
           if (!this.sel.includes(o)) return;
           // Wird an einem Fangpunkt der Auswahl gegriffen, fängt genau dieser Punkt
-          const own = findSnap(buildSnapSet(this.sel, (l) => this.layer(l.layer).show), wp, SNAP_PX / this.view.zoom);
+          const own = findSnap(buildSnapSet(this.sel, (l) => this.layer(l.layer).show), wp, this.snapTol().normal / this.view.zoom);
           this.drag = {
             type: 'move', start: wp, orig: this.sel.map((x) => x.m), moved: false,
             toggleRotate: was && !e.shiftKey && !ctrl, sx, sy,
@@ -378,6 +388,16 @@ export class EditorPointer {
     }
   }
 
+  /** Invert the mouse-wheel zoom direction (Edit → Settings → Mouse and keyboard) */
+  setZoomInverted(this: Editor, on: boolean) {
+    this.zoomInverted = on;
+    try {
+      localStorage.setItem(ZOOM_INVERTED_KEY, JSON.stringify(on));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+
   onMove(this: Editor, e: PointerEvent) {
     if(this.drag?.type==='freehand-edit' && this.drag.pointerId!==e.pointerId)return;
     if(this.drag?.type==='lasso'&&this.drag.pointerId!==e.pointerId)return;
@@ -385,6 +405,7 @@ export class EditorPointer {
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
     this.cursor = wp;
+    this.cursorOnCanvas = true;
     const d = this.drag;
     this.emit('view');
     if (!d && this.outlinePreview) {
@@ -845,7 +866,7 @@ export class EditorPointer {
         this.hint = '';
         if (d.obj) {
           this.emit('doc');
-          this.setTool('select');
+          if (this.selectAfterDraw ?? true) this.setTool('select');
           this.setSel([d.obj]);
         }
         return;
@@ -965,7 +986,10 @@ export class EditorPointer {
     e.preventDefault();
     if (e.ctrlKey && pinchGestureActive(this.canvas)) return;
     const { sx, sy } = this.evPt(e);
-    if (e.deltaY) this.zoomAt(canvasWheelFactor(e, Math.log(1.0015)), sx, sy);
+    if (e.deltaY) {
+      const factor = canvasWheelFactor(e, Math.log(1.0015));
+      this.zoomAt(this.zoomInverted && factor > 0 ? 1 / factor : factor, sx, sy);
+    }
   }
 
   newShape(this: Editor): Shape {
@@ -1055,6 +1079,7 @@ export class EditorPointer {
       this.arcDraft = null;
       this.hint = TOOL_HINTS.arc;
     }
+    this.saveToolOptions();
     if (this.arcDraft) this.arcHint(this.arcDraft);
     this.redraw();
     this.emit('tool');
@@ -1086,7 +1111,7 @@ export class EditorPointer {
     const o: Obj = { id: newId(), m: IDENT, layer: this.currentLayer, shape: { kind: 'path', subs: [{ nodes: sub.nodes, closed: false }] } };
     this.doc.objs.push(o);
     this.emit('doc');
-    this.setTool('select');
+    if (this.selectAfterDraw ?? true) this.setTool('select');
     this.setSel([o]);
     return true;
   }
@@ -1108,7 +1133,7 @@ export class EditorPointer {
     const o: Obj = { id: newId(), m: IDENT, layer: this.currentLayer, shape: { kind: 'path', subs: [d] } };
     this.doc.objs.push(o);
     this.emit('doc');
-    this.setTool('select');
+    if (this.selectAfterDraw ?? true) this.setTool('select');
     this.setSel([o]);
   }
 

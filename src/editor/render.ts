@@ -29,6 +29,82 @@ function closedPath(subs: SubPath[], m: Mat): Path2D {
   return p;
 }
 
+// Anzeigewünsche der Arbeitsfläche (Phase 3 der Settings-Quick-Wins): eigenes Thema-unabhängiges
+// Dunkel, Griffgröße, Fadenkreuz und Bettmittel-Kreuz. Alles Opt-in, Defaults = heutiges Verhalten.
+const CANVAS_DARK_KEY = 'kizamubeam.canvasDark';
+const HANDLE_SIZE_KEY = 'kizamubeam.handleSize';
+const CROSSHAIR_KEY = 'kizamubeam.crosshair';
+const BED_CENTER_CROSS_KEY = 'kizamubeam.bedCenterCross';
+export const DEFAULT_HANDLE_SIZE = 8;
+export const MIN_HANDLE_SIZE = 4;
+export const MAX_HANDLE_SIZE = 16;
+
+export function loadCanvasDark(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(CANVAS_DARK_KEY) ?? 'false') === true;
+  } catch {
+    return false;
+  }
+}
+
+export function saveCanvasDark(on: boolean) {
+  try {
+    localStorage.setItem(CANVAS_DARK_KEY, JSON.stringify(on));
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+}
+
+export function loadHandleSize(): number {
+  try {
+    const v = JSON.parse(localStorage.getItem(HANDLE_SIZE_KEY) ?? String(DEFAULT_HANDLE_SIZE));
+    if (Number.isFinite(v) && v >= MIN_HANDLE_SIZE && v <= MAX_HANDLE_SIZE) return Math.round(v);
+  } catch {
+    /* Speicher nicht verfügbar oder beschädigt */
+  }
+  return DEFAULT_HANDLE_SIZE;
+}
+
+export function saveHandleSize(v: number) {
+  try {
+    localStorage.setItem(HANDLE_SIZE_KEY, JSON.stringify(v));
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+}
+
+export function loadShowCrosshair(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(CROSSHAIR_KEY) ?? 'false') === true;
+  } catch {
+    return false;
+  }
+}
+
+export function saveShowCrosshair(on: boolean) {
+  try {
+    localStorage.setItem(CROSSHAIR_KEY, JSON.stringify(on));
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+}
+
+export function loadBedCenterCross(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(BED_CENTER_CROSS_KEY) ?? 'false') === true;
+  } catch {
+    return false;
+  }
+}
+
+export function saveBedCenterCross(on: boolean) {
+  try {
+    localStorage.setItem(BED_CENTER_CROSS_KEY, JSON.stringify(on));
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+}
+
 /** Sehr dunkle Layerfarben auf dunklem Grund aufhellen (Farbton bleibt), Schwarz wird Hellgrau. */
 const darkColorCache = new Map<string, string>();
 
@@ -63,7 +139,43 @@ export class EditorRender {
     return Math.hypot(f.x - c.x, f.y - c.y) < 8;
   }
   setDark(this: Editor, dark: boolean) {
-    this.dark = dark;
+    this.themeDark = dark;
+    this.dark = this.canvasDark || dark;
+    this.redraw();
+  }
+
+  /** Griff- und Knotengröße als Faktor (Standard 8 px); Fadenkreuz und Bettmitte s. unten */
+  handleScale(this: Editor): number {
+    return (this.handleSize ?? DEFAULT_HANDLE_SIZE) / DEFAULT_HANDLE_SIZE;
+  }
+
+  /** Dunkle Arbeitsfläche unabhängig vom UI-Design (Edit → Settings → Darstellung → Arbeitsfläche) */
+  setCanvasDark(this: Editor, on: boolean) {
+    this.canvasDark = on;
+    saveCanvasDark(on);
+    this.dark = on || this.themeDark;
+    this.redraw();
+  }
+
+  /** Griff- und Knotengröße in px (Edit → Settings → Darstellung → Arbeitsfläche) */
+  setHandleSize(this: Editor, v: number) {
+    if (!Number.isFinite(v) || v < MIN_HANDLE_SIZE || v > MAX_HANDLE_SIZE) throw new Error(t('Die Griffgröße muss zwischen 4 und 16 px liegen.'));
+    this.handleSize = Math.round(v);
+    saveHandleSize(this.handleSize);
+    this.redraw();
+  }
+
+  /** Vollbild-Fadenkreuz an der Zeigerposition (Edit → Settings → Darstellung → Arbeitsfläche) */
+  setShowCrosshair(this: Editor, on: boolean) {
+    this.showCrosshair = on;
+    saveShowCrosshair(on);
+    this.redraw();
+  }
+
+  /** Kreuz in der Bettmitte (Edit → Settings → Darstellung → Arbeitsfläche) */
+  setBedCenterCross(this: Editor, on: boolean) {
+    this.bedCenterCross = on;
+    saveBedCenterCross(on);
     this.redraw();
   }
   /** Layerfarbe zum Zeichnen: Schwarz wird auf dunklem Grund hell dargestellt */
@@ -546,8 +658,9 @@ export class EditorRender {
         ctx.fillStyle = T.handleFill;
         ctx.strokeStyle = T.sel;
         ctx.lineWidth = 1;
-        ctx.fillRect(h.x - 4, h.y - 4, 8, 8);
-        ctx.strokeRect(h.x - 4 + 0.5, h.y - 4 + 0.5, 7, 7);
+        const hz = this.handleSize ?? DEFAULT_HANDLE_SIZE, hh = hz / 2;
+        ctx.fillRect(h.x - hh, h.y - hh, hz, hz);
+        ctx.strokeRect(h.x - hh + 0.5, h.y - hh + 0.5, hz - 1, hz - 1);
       });
       if (this.rotateMode) {
         const c = this.toScreen(this.rotationCenter()!);
@@ -648,14 +761,16 @@ export class EditorRender {
           ctx.setLineDash([3, 3]);
           ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(s.x, s.y); ctx.stroke();
           ctx.setLineDash([]);
-          ctx.fillRect(s.x - 3.5, s.y - 3.5, 7, 7);
-          ctx.strokeRect(s.x - 3 + 0.5, s.y - 3 + 0.5, 6, 6);
+          const ah = 3.5 * this.handleScale();
+          ctx.fillRect(s.x - ah, s.y - ah, 2 * ah, 2 * ah);
+          ctx.strokeRect(s.x - ah + 0.5, s.y - ah + 0.5, 2 * ah - 1, 2 * ah - 1);
         }
       } else {
         for (const pt of [arcDraft.start, arcDraft.mid, arcDraft.end].slice(0, arcDraft.phase)) {
           const q = this.toScreen(pt);
-          ctx.fillRect(q.x - 3.5, q.y - 3.5, 7, 7);
-          ctx.strokeRect(q.x - 3 + 0.5, q.y - 3 + 0.5, 6, 6);
+          const ah = 3.5 * this.handleScale();
+          ctx.fillRect(q.x - ah, q.y - ah, 2 * ah, 2 * ah);
+          ctx.strokeRect(q.x - ah + 0.5, q.y - ah + 0.5, 2 * ah - 1, 2 * ah - 1);
         }
       }
       ctx.restore();
@@ -699,7 +814,7 @@ export class EditorRender {
             const pickedHandle=this.handleSelection(o).has(`${si}:${ni}:${which}`);
             ctx.fillStyle = hot ? '#ff6020' : pickedHandle?T.sel:T.handleFill;
             ctx.beginPath();
-            ctx.arc(hq.x, hq.y, 3.5, 0, Math.PI * 2);
+            ctx.arc(hq.x, hq.y, 3.5 * this.handleScale(), 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
           }
@@ -710,7 +825,7 @@ export class EditorRender {
           ctx.lineWidth = 1.5;
           ctx.strokeStyle = hot ? '#ff6020' : col;
           ctx.fillStyle = hot ? '#ff6020' : picked ? col : T.handleFill;
-          const r = picked ? 4.5 : 3.5;
+          const r = (picked ? 4.5 : 3.5) * this.handleScale();
           ctx.fillRect(q.x - r, q.y - r, 2 * r, 2 * r);
           ctx.strokeRect(q.x - r, q.y - r, 2 * r, 2 * r);
         });
@@ -748,14 +863,14 @@ export class EditorRender {
           ctx.stroke();
           ctx.fillStyle = T.handleFill;
           ctx.beginPath();
-          ctx.arc(hq.x, hq.y, 3.5, 0, Math.PI * 2);
+          ctx.arc(hq.x, hq.y, 3.5 * this.handleScale(), 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
         }
         ctx.lineWidth = i === active ? 2 : 1.5;
         ctx.strokeStyle = i === 0 ? '#20a040' : T.sel;
         ctx.fillStyle = T.handleFill;
-        const r = 3.5;
+        const r = 3.5 * this.handleScale();
         ctx.fillRect(q.x - r, q.y - r, 2 * r, 2 * r);
         ctx.strokeRect(q.x - r, q.y - r, 2 * r, 2 * r);
       }
@@ -766,6 +881,30 @@ export class EditorRender {
       ctx.strokeStyle = '#20a040';
       ctx.lineWidth = this.draftCloseHit() ? 2 : 1.5;
       ctx.strokeRect(q.x - 5, q.y - 5, 10, 10);
+    }
+    // Bettmittel-Kreuz (Edit → Settings → Darstellung → Arbeitsfläche)
+    if (this.bedCenterCross) {
+      const bed = this.doc.bed;
+      const c = this.toScreen({ x: bed.w / 2, y: bed.h / 2 });
+      ctx.strokeStyle = T.sel;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(c.x - 9, c.y); ctx.lineTo(c.x + 9, c.y);
+      ctx.moveTo(c.x, c.y - 9); ctx.lineTo(c.x, c.y + 9);
+      ctx.stroke();
+    }
+    // Vollbild-Fadenkreuz an der Zeigerposition (Edit → Settings → Darstellung → Arbeitsfläche)
+    if (this.showCrosshair && this.cursorOnCanvas) {
+      const c = this.toScreen(this.cursor);
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = T.sel;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, c.y); ctx.lineTo(this.w, c.y);
+      ctx.moveTo(c.x, 0); ctx.lineTo(c.x, this.h);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 

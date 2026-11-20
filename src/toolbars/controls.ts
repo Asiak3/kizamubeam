@@ -295,11 +295,11 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
     const tolerance = h('input', { type: 'number', min: 0.001, max: 100, step: 0.01, 'aria-label': t('Freihandtoleranz in Millimetern'), style: 'width: 7ch' });
     tolerance.addEventListener('change', () => {
       const v = tolerance.valueAsNumber;
-      if (Number.isFinite(v) && v >= 0.001 && v <= 100) { ed.pencilTolerance = v; refresh(); }
+      if (Number.isFinite(v) && v >= 0.001 && v <= 100) { ed.pencilTolerance = v; ed.saveToolOptions(); refresh(); }
       else tolerance.value = String(ed.pencilTolerance);
     });
     const closed = h('input', { type: 'checkbox' });
-    closed.addEventListener('change', () => { ed.pencilClosed = closed.checked; refresh(); });
+    closed.addEventListener('change', () => { ed.pencilClosed = closed.checked; ed.saveToolOptions(); refresh(); });
     const el = h('span', { class: 'field' }, h('label', {}, t('Anpassungstoleranz (mm)'), tolerance), h('label', { class: 'check' }, closed, t('Geschlossener Pfad')));
     return { el, update() { el.hidden = ed.tool !== 'pencil'; setVal(tolerance, String(ed.pencilTolerance)); closed.checked = ed.pencilClosed; } };
   });
@@ -317,7 +317,7 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
   });
   register('shaper', t('Form erkennen'), () => ed.tool === 'shaper', () => {
     const recognize = h('input', { type: 'checkbox' });
-    recognize.addEventListener('change', () => { ed.shaperRecognize = recognize.checked; ed.shaperRebuild(); refresh(); });
+    recognize.addEventListener('change', () => { ed.shaperRecognize = recognize.checked; ed.saveToolOptions(); ed.shaperRebuild(); refresh(); });
     const shaperNum = (get: () => number, min: number, max: number, aria: string, set: (v: number) => void) => {
       const input = h('input', { type: 'number', min, max, step: 0.1, 'aria-label': aria, style: 'width: 7ch' });
       input.addEventListener('change', () => {
@@ -326,9 +326,9 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
         else input.value = String(get());
       }); return input;
     };
-    const close = shaperNum(() => ed.shaperCloseGap, 0.2, 20, t('Schließabstand in Millimetern'), (v) => (ed.shaperCloseGap = v));
-    const smooth = shaperNum(() => ed.shaperSmoothing, 0, 20, t('Glättung in Millimetern'), (v) => (ed.shaperSmoothing = v));
-    const tolerance = shaperNum(() => ed.shaperTolerance, 0.2, 20, t('Schnittbreite in Millimetern'), (v) => (ed.shaperTolerance = v));
+    const close = shaperNum(() => ed.shaperCloseGap, 0.2, 20, t('Schließabstand in Millimetern'), (v) => { ed.shaperCloseGap = v; ed.saveToolOptions(); });
+    const smooth = shaperNum(() => ed.shaperSmoothing, 0, 20, t('Glättung in Millimetern'), (v) => { ed.shaperSmoothing = v; ed.saveToolOptions(); });
+    const tolerance = shaperNum(() => ed.shaperTolerance, 0.2, 20, t('Schnittbreite in Millimetern'), (v) => { ed.shaperTolerance = v; ed.saveToolOptions(); });
     const pick = h('select', { 'aria-label': t('Formvorschlag der letzten Geste') });
     pick.addEventListener('change', () => { const s = ed.shaperEdit; if (!s || !ed.shaperEditValid()) return; s.pick = pick.value as ShaperKind | 'freehand'; ed.shaperRebuild(); });
     const el = h('span', { class: 'field' }, h('label', { class: 'check' }, recognize, t('Form erkennen')), h('label', {}, t('Schließen (mm)'), close), h('label', {}, t('Glättung (mm)'), smooth), h('label', {}, t('Schnittbreite (mm)'), tolerance), pick);

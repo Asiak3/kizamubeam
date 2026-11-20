@@ -431,7 +431,7 @@ const pdfFontFallback: FallbackResolver = async (families, bold, italic) => {
 };
 
 /** Dateiinhalt anhand von Endung bzw. Dateikopf lesen; Fehler werden geworfen */
-async function parseFile(name: string, bytes: Uint8Array, bedH: () => number, bedW: () => number = () => device.bedW): Promise<ParsedFile> {
+async function parseFile(name: string, bytes: Uint8Array, bedH: () => number, bedW: () => number = () => device.bedW, reportSkipped = true): Promise<ParsedFile> {
   const ext = (/\.([a-z0-9]+)$/i.exec(name)?.[1] ?? '').toLowerCase();
   if (ext === 'rd' || (!ext && isRuidaFile(bytes))) {
     return { kind: 'lbrn', res: importRuida(bytes, bedW(), bedH(), device.ruidaOrigin ?? 'top-right') };
@@ -452,8 +452,8 @@ async function parseFile(name: string, bytes: Uint8Array, bedH: () => number, be
     return { kind: 'pdf', pages: await importPdfPages(bytes, { fallback: pdfFontFallback }) };
   }
   if (ext === 'svg' || head.startsWith('<svg') || (head.startsWith('<?xml') && head.includes('<svg')))
-    return { kind: 'vectors', res: importSvg(new TextDecoder().decode(bytes)) };
-  if (ext === 'dxf' || /^\s*0\s*\r?\n\s*SECTION/.test(head)) return { kind: 'vectors', res: importDxf(new TextDecoder().decode(bytes)) };
+    return { kind: 'vectors', res: importSvg(new TextDecoder().decode(bytes), { reportSkipped }) };
+  if (ext === 'dxf' || /^\s*0\s*\r?\n\s*SECTION/.test(head)) return { kind: 'vectors', res: importDxf(new TextDecoder().decode(bytes), { reportSkipped }) };
   if (ext === 'tif' || ext === 'tiff' || isTiff(bytes)) return { kind: 'image', ...(await decodeTiff(bytes)) };
   const mime = MIME[ext] ?? sniffImage(bytes);
   if (!mime) throw new Error(t('Dateiformat wird nicht unterstützt (SVG, DXF, PDF, AI, RD, PNG, JPG, BMP, GIF, WebP, TIFF).'));
@@ -471,7 +471,7 @@ export async function importBytesOrThrow(ed: Editor, name: string, bytes: Uint8A
     await insertAssetFile(ed, new TextDecoder().decode(bytes));
     return;
   }
-  const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w);
+  const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w, ed.importSkippedNote ?? true);
   if (f.kind === 'vectors') await ed.importVectors(f.res, name);
   else if (f.kind === 'pdf') await ed.importPdfPages(f.pages, name);
   else if (f.kind === 'lbrn') ed.importLbrn(f.res, name);
@@ -480,7 +480,7 @@ export async function importBytesOrThrow(ed: Editor, name: string, bytes: Uint8A
 
 /** Datei zu Objekten machen, ohne sie einzufügen (für die Bibliothek); notes: Hinweise des Imports */
 export async function fileObjs(ed: Editor, name: string, bytes: Uint8Array): Promise<{ objs: Obj[]; notes: string[] }> {
-  const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w);
+  const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w, ed.importSkippedNote ?? true);
   if (f.kind === 'image') return { objs: [await ed.imageObj(f.dataUrl, f.dpi, name)], notes: [] };
   if (f.kind === 'lbrn') {
     for (const [id, url] of Object.entries(f.res.assets)) registerAsset(id, url);

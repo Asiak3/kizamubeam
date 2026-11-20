@@ -93,10 +93,43 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
       },
       ...typographySettingsFields(),
       {
+        kind: 'text', id: 'appearance.textFont', group: t('Textwerkzeug'), label: t('Standardschrift'), def: 'Arial',
+        keywords: t('Schriftart Text Default'),
+        get: () => ed.textDefaults.font, set: (v) => ed.updateTexts({ font: v || 'Arial' }),
+      },
+      {
+        kind: 'number', id: 'appearance.textSize', group: t('Textwerkzeug'), label: t('Standardschriftgröße (mm)'), min: 1, max: 500, def: 10,
+        keywords: t('Schriftgröße Text Default'),
+        get: () => ed.textDefaults.size, set: (v) => ed.updateTexts({ size: v }),
+      },
+      {
         kind: 'select', id: 'appearance.toolbarIconSize', label: t('Symbolgröße'), def: 'm',
         options: () => [['s', t('Klein|Symbole')], ['m', t('Normal|Symbole')], ['l', t('Groß|Symbole')]],
         get: () => toolbarIconSize(),
         set: (v) => setAllToolbarIconSizes(v as 's' | 'm' | 'l'),
+      },
+      {
+        kind: 'toggle', id: 'appearance.canvasDark', group: t('Arbeitsfläche'), label: t('Dunkle Arbeitsfläche'), def: false,
+        keywords: t('Hintergrund dunkel Canvas Design'),
+        hint: t('Dunkler Hintergrund unabhängig vom Design. Aus folgen Oberfläche und Design-Einstellung.'),
+        get: () => ed.canvasDark, set: (v) => ed.setCanvasDark(v),
+      },
+      {
+        kind: 'number', id: 'appearance.handleSize', group: t('Arbeitsfläche'), label: t('Griffgröße (px)'), unit: 'px', integer: true, min: 4, max: 16, def: 8,
+        keywords: t('Griffe Knoten Anfasser Größe'),
+        get: () => ed.handleSize, set: (v) => ed.setHandleSize(v),
+      },
+      {
+        kind: 'toggle', id: 'appearance.crosshair', group: t('Arbeitsfläche'), label: t('Vollbild-Fadenkreuz'), def: false,
+        keywords: t('Fadenkreuz Cursor Linien'),
+        hint: t('Linien über die ganze Fläche an der Zeigerposition.'),
+        get: () => ed.showCrosshair, set: (v) => ed.setShowCrosshair(v),
+      },
+      {
+        kind: 'toggle', id: 'appearance.bedCenterCross', group: t('Arbeitsfläche'), label: t('Bettmittel-Kreuz'), def: false,
+        keywords: t('Mitte Zentrum Bett Kreuz'),
+        hint: t('Kleines Kreuz in der Mitte des Arbeitsbereichs.'),
+        get: () => ed.bedCenterCross, set: (v) => ed.setBedCenterCross(v),
       },
       {
         kind: 'action', id: 'appearance.toolbars', group: t('Fenster und Leisten'), label: t('Funktionsleisten'), hint: t('Knöpfe und Reihenfolge der Leisten wählen.'),
@@ -137,6 +170,18 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         get: () => ed.snapObjects, set: (v) => ed.setSnap({ objects: v }),
       },
       { kind: 'toggle', id: 'workspace.snapGrid', group: t('Fangen'), label: t('Am Raster fangen'), def: false, keywords: t('Fang'), get: () => ed.snapGrid, set: (v) => ed.setSnap({ grid: v }) },
+      {
+        kind: 'number', id: 'workspace.snapTolerance', group: t('Fangen'), label: t('Fangdistanz (px)'), min: 1, max: 64, def: 8,
+        keywords: t('Fangdistanz Fangen Einrasten'),
+        hint: t('Abstand in Bildschirmpunkten, ab dem Objekte einrasten; Alt verstärkt und zeigt Ausrichtungshilfen.'),
+        get: () => ed.snapTolerance.normal, set: (v) => ed.setSnapTolerance({ normal: v }),
+      },
+      {
+        kind: 'number', id: 'workspace.snapToleranceAlt', group: t('Fangen'), label: t('Fangdistanz mit Alt (px)'), min: 1, max: 64, def: 20,
+        keywords: t('Fangdistanz Fangen Einrasten'),
+        hint: t('Abstand in Bildschirmpunkten, ab dem Objekte einrasten; Alt verstärkt und zeigt Ausrichtungshilfen.'),
+        get: () => ed.snapTolerance.alt, set: (v) => ed.setSnapTolerance({ alt: v }),
+      },
       { kind: 'number', id: 'workspace.gridStep', group: t('Fangen'), label: t('Rasterweite (mm)'), min: 0.001, max: 1000, def: 1, keywords: t('Fang'), get: () => ed.gridStep, set: (v) => ed.setSnap({ step: v }) },
       {
         kind: 'select', id: 'workspace.centers', group: t('Fangen'), label: t('Mittelpunkte zeigen'), def: 'auto',
@@ -162,6 +207,24 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         kind: 'toggle', id: 'workspace.boolKeep', group: t('Boolesche Operationen'), label: t('Originale behalten'), def: false, keywords: t('Vereinen Abziehen Schnittmenge'),
         get: () => ed.boolKeep, set: (v) => ed.setBoolOptions({ keep: v }),
       },
+      {
+        kind: 'toggle', id: 'workspace.importAutoSelect', group: t('Import'), label: t('Importiertes nach dem Import auswählen'), def: true,
+        keywords: t('Import Auswahl Selektion'),
+        hint: t('Neu importierte Objekte werden wie bisher gleich ausgewählt; ausgeschaltet bleibt die bisherige Auswahl bestehen.'),
+        get: () => ed.importAutoSelect, set: (v) => ed.setImportAutoSelect(v),
+      },
+      {
+        kind: 'toggle', id: 'workspace.importCenterInBed', group: t('Import'), label: t('Import in Bettmitte legen'), def: false,
+        keywords: t('Import Mitte Zentrum Bett'),
+        hint: t('Neu importierte Objekte werden immer mittig auf den Arbeitsbereich gelegt; ausgeschaltet nur, wenn sie außerhalb liegen.'),
+        get: () => ed.importCenterInBed, set: (v) => ed.setImportCenterInBed(v),
+      },
+      {
+        kind: 'toggle', id: 'workspace.importSkippedNote', group: t('Import'), label: t('Hinweise zu übersprungenen Inhalten anzeigen'), def: true,
+        keywords: t('Import Hinweis übersprungen Text DXF SVG'),
+        hint: t('Nicht übernommene Inhalte (z. B. Texte, vorher in Pfade umwandeln) werden als Hinweis gemeldet; ausgeschaltet werden sie still ignoriert.'),
+        get: () => ed.importSkippedNote, set: (v) => ed.setImportSkippedNote(v),
+      },
     ],
   });
 
@@ -184,6 +247,48 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         keywords: t('Rechtsklick Ziehen Mitteltaste Leertaste'),
         hint: t('Mitteltaste und Leertaste + Ziehen verschieben immer. Ein Rechtsklick ohne Bewegung öffnet weiter das Kontextmenü bzw. beendet die Linie.'),
         get: () => ed.rightPan, set: (v) => ed.setRightPan(v),
+      },
+      {
+        kind: 'toggle', id: 'input.rememberToolOptions', group: t('Werkzeuge'), label: t('Werkzeugschalter merken'), def: false,
+        keywords: t('Optionen Ecken Stern Radius Toleranz Bogen Formerkennung Start'),
+        hint: t('Merkt sich z. B. Ecken, Stern, Eckenradius, Toleranzen und Bogenmodus für den nächsten Start. Ausgeschaltet bleiben die Schalter flüchtig wie bisher.'),
+        get: () => ed.rememberToolOptions, set: (v) => ed.setRememberToolOptions(v),
+      },
+      {
+        kind: 'toggle', id: 'input.selectAfterDraw', group: t('Zeichnen'), label: t('Nach dem Zeichnen zur Auswahl wechseln'), def: true,
+        keywords: t('Auswahlwerkzeug Selektion Form anlegen Bogen Linie'),
+        hint: t('Ausgeschaltet bleibt das Zeichenwerkzeug nach dem Anlegen aktiv; das neue Objekt ist trotzdem ausgewählt.'),
+        get: () => ed.selectAfterDraw, set: (v) => ed.setSelectAfterDraw(v),
+      },
+      {
+        kind: 'number', id: 'input.nudgeStep', group: t('Tastatur'), label: t('Schrittweite Pfeiltasten (mm)'), min: 0.001, max: 1000, def: 1,
+        keywords: t('Pfeiltasten Nudge Schrittweite Tastatur'),
+        hint: t('Gilt für Objekte und Knoten; die Pfeiltasten verschieben um diese Weiten.'),
+        get: () => ed.nudgeSteps.normal, set: (v) => ed.setNudgeSteps({ normal: v }),
+      },
+      {
+        kind: 'number', id: 'input.nudgeStepShift', group: t('Tastatur'), label: t('Schrittweite mit Umschalt (mm)'), min: 0.001, max: 1000, def: 10,
+        keywords: t('Pfeiltasten Nudge Schrittweite Tastatur'),
+        hint: t('Gilt für Objekte und Knoten; die Pfeiltasten verschieben um diese Weiten.'),
+        get: () => ed.nudgeSteps.shift, set: (v) => ed.setNudgeSteps({ shift: v }),
+      },
+      {
+        kind: 'number', id: 'input.nudgeStepAlt', group: t('Tastatur'), label: t('Schrittweite mit Alt (mm)'), min: 0.001, max: 1000, def: 0.1,
+        keywords: t('Pfeiltasten Nudge Schrittweite Tastatur'),
+        hint: t('Gilt für Objekte und Knoten; die Pfeiltasten verschieben um diese Weiten.'),
+        get: () => ed.nudgeSteps.alt, set: (v) => ed.setNudgeSteps({ alt: v }),
+      },
+      {
+        kind: 'number', id: 'input.clickTolerance', group: t('Auswahl'), label: t('Klick-Toleranz (px)'), min: 1, max: 32, def: 4,
+        keywords: t('Klick Auswahl Toleranz Treffer'),
+        hint: t('Wie genau ein Klick treffen muss, um ein Objekt auszuwählen.'),
+        get: () => ed.clickTolerance, set: (v) => ed.setClickTolerance(v),
+      },
+      {
+        kind: 'toggle', id: 'input.zoomInverted', group: t('Zoomen'), label: t('Mausrad-Zoomrichtung umkehren'), def: false,
+        keywords: t('Zoom Richtung invertieren Scrollrad'),
+        hint: t('Standard: Nach oben scrollen vergrößert. Umgekehrt schaltet diese Option ein: Nach oben scrollen verkleinert.'),
+        get: () => ed.zoomInverted, set: (v) => ed.setZoomInverted(v),
       },
       {
         kind: 'select', id: 'input.overlapTrigger', group: t('Überlappungsauswahl'), label: t('Überlappungsauswahl'), def: 'right', keywords: t('Objekt unter dem Mauszeiger auswählen Rechtsklick Linksklick'),

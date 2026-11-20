@@ -19,18 +19,19 @@ import { EditorCommands } from './editor/commands';
 import { EditorDocument } from './editor/document';
 import { EditorHinges } from './editor/hinges';
 import { EditorPattern } from './editor/pattern';
-import { EditorImages } from './editor/imageops';
+import { EditorImages, loadImportAutoSelect, loadImportCenterInBed, loadImportSkippedNote } from './editor/imageops';
 import { EditorJoints } from './editor/joints';
-import { EditorKeyboard } from './editor/keyboard';
+import { EditorKeyboard, loadNudgeSteps, type NudgeSteps } from './editor/keyboard';
 import { EditorNodes } from './editor/nodes';
 import { EditorObjects } from './editor/objects';
 import { EditorPaths } from './editor/paths';
-import { EditorPointer, loadRightPan } from './editor/pointer';
-import { EditorRender } from './editor/render';
+import { EditorPointer, loadRightPan, loadZoomInverted } from './editor/pointer';
+import { EditorRender, loadBedCenterCross, loadCanvasDark, loadHandleSize, loadShowCrosshair } from './editor/render';
 import { EditorShapeOps } from './editor/shapeops';
-import { EditorSnapping } from './editor/snapping';
+import { EditorSnapping, loadSnapTolerance, type SnapTolerance } from './editor/snapping';
+import { EditorToolOptions, loadRememberToolOptions, loadSelectAfterDraw } from './editor/toolOptions';
 import { EditorGuides } from './editor/guides';
-import { EditorText } from './editor/text';
+import { DEFAULT_TEXT_DEFAULTS, EditorText } from './editor/text';
 import { EditorGenerators } from './editor/generators';
 import { EditorParams } from './editor/params';
 import { EditorNest } from './editor/nest';
@@ -44,7 +45,7 @@ import { EditorRelations, RelPick } from './editor/relations';
 import { EditorSketch, SketchSession } from './editor/sketch';
 import type { RelMode } from './relations';
 import { t } from './i18n';
-import { installOverlapPicker } from './overlapPicker';
+import { installOverlapPicker, loadClickTolerance, saveClickTolerance, DEFAULT_CLICK_TOLERANCE_PX } from './overlapPicker';
 import { EditorFreehand } from './editor/freehand';
 import type { FreehandMode } from './freehandEdit';
 import { EditorSelection } from './editor/selection';
@@ -128,9 +129,7 @@ export class Editor {
   polySides = 6;
   polyStar = false;
   rectRadius = 0;
-  textDefaults: Omit<TextShape, 'kind' | 'text'> = {
-    font: 'Arial', size: 10, bold: false, italic: false, upper: false, align: 'left', hSpace: 0, vSpace: 0,
-  };
+  textDefaults: Omit<TextShape, 'kind' | 'text'> = { ...DEFAULT_TEXT_DEFAULTS };
   cursor: Pt = { x: 0, y: 0 };
   /** Linienwerkzeug: Pfad im Entstehen (Weltkoordinaten) */
   draft: SubPath | null = null;
@@ -169,6 +168,41 @@ export class Editor {
   suppressContextMenu = false;
   /** Drag with the right mouse button pans the view (opt-in, Edit → Settings → Mouse and keyboard) */
   rightPan = loadRightPan();
+  /** Eigenes Dunkel für die Arbeitsfläche, unabhängig vom UI-Design (opt-in, Default: Design folgen) */
+  canvasDark = loadCanvasDark();
+  /** Vom UI-Design vorgegebener Dunkel-Wert; wirksam ist canvasDark || themeDark */
+  themeDark = false;
+  /** Griff- und Knotengröße in px (Default 8 = heutiges Aussehen) */
+  handleSize = loadHandleSize();
+  /** Vollbild-Fadenkreuz an der Zeigerposition (opt-in) */
+  showCrosshair = loadShowCrosshair();
+  /** Kreuz in der Bettmitte (opt-in) */
+  bedCenterCross = loadBedCenterCross();
+  /** Zeiger auf der Fläche (für das Fadenkreuz; pointerleave setzt zurück) */
+  cursorOnCanvas = false;
+  /** Inverted mouse-wheel zoom direction (opt-in, Edit → Settings → Mouse and keyboard) */
+  zoomInverted = loadZoomInverted();
+  /** Werkzeugschalter über Neustarts merken (Opt-in, Edit → Settings → Maus und Tastatur) */
+  rememberToolOptions = loadRememberToolOptions();
+  /** Nach dem Zeichnen zur Auswahl wechseln (Edit → Settings → Maus und Tastatur) */
+  selectAfterDraw = loadSelectAfterDraw();
+  /** Schrittweiten der Pfeiltasten in mm (Edit → Settings → Maus und Tastatur) */
+  nudgeSteps: NudgeSteps = loadNudgeSteps();
+  /** Klick-Auswahltoleranz in px (Edit → Settings → Maus und Tastatur) */
+  clickTolerance = loadClickTolerance();
+  /** Fangdistanzen in px, normal und mit Alt (Edit → Settings → Arbeitsfläche und Fangen) */
+  snapTolerance: SnapTolerance = loadSnapTolerance();
+  /** Importiertes nach dem Import auswählen (Opt-out, an) */
+  importAutoSelect = loadImportAutoSelect();
+  /** Import in Bettmitte legen (Opt-in, aus) */
+  importCenterInBed = loadImportCenterInBed();
+  /** Hinweise zu übersprungenen Inhalten anzeigen (Opt-out, an) */
+  importSkippedNote = loadImportSkippedNote();
+  /** Klick-Toleranz ändern und merken */
+  setClickTolerance(v: number) {
+    if (!saveClickTolerance(v)) throw new Error(t('Einstellung konnte nicht gespeichert werden.'));
+    this.clickTolerance = v;
+  }
   onCanvasContext: ((event: MouseEvent) => void) | null = null;
   hint = '';
 
@@ -318,6 +352,8 @@ export class Editor {
     this.loadSnapSettings();
     this.loadGridSettings();
     this.loadBoolSettings();
+    this.loadToolOptions();
+    this.loadTextDefaults();
     // Texte werden mit den Schriftkonturen gezeichnet; nach dem Laden einer Schrift neu zeichnen
     onFontLoaded(() => this.emit('sel'));
     onImageReady(() => this.redraw());
@@ -335,7 +371,12 @@ export class Editor {
     canvas.addEventListener('pointercancel', (e) => this.cancelPointerDrag(e));
     canvas.addEventListener('lostpointercapture', (e) => this.cancelPointerDrag(e));
     canvas.addEventListener('pointerleave', () => {
-      if (this.drag || (!this.nodeHover && !this.segHover && !this.snapHit && !this.alignGuides.length)) return;
+      const hideCrosshair = this.cursorOnCanvas && this.showCrosshair;
+      this.cursorOnCanvas = false;
+      if (this.drag || (!this.nodeHover && !this.segHover && !this.snapHit && !this.alignGuides.length)) {
+        if (hideCrosshair) this.redraw();
+        return;
+      }
       this.nodeHover = this.segHover = null;
       this.clearSnap();
       this.redraw();
@@ -500,7 +541,7 @@ export class Editor {
   }
   /** Oberstes Objekt der Ebene 0 unter dem Weltpunkt. */
   hitTest(p: Pt): Obj | null {
-    const tol = 4 / this.view.zoom;
+    const tol = (this.clickTolerance ?? DEFAULT_CLICK_TOLERANCE_PX) / this.view.zoom;
     for (let i = this.doc.objs.length - 1; i >= 0; i--) {
       const top = this.doc.objs[i];
       if (!this.selectable(top)) continue;
@@ -531,9 +572,10 @@ export class Editor {
     const b = this.selBounds();
     if (!b) return -1;
     const hs = this.handlePoints(b);
+    const tol = Math.max(5, this.handleSize / 2 + 1);
     for (let i = 0; i < 8; i++) {
       if (this.rotateMode && i % 2 === 1) continue;
-      if (Math.abs(hs[i].x - sx) <= 5 && Math.abs(hs[i].y - sy) <= 5) return i;
+      if (Math.abs(hs[i].x - sx) <= tol && Math.abs(hs[i].y - sy) <= tol) return i;
     }
     return -1;
   }
@@ -616,6 +658,7 @@ export interface Editor
     EditorCommands,
     EditorObjects,
     EditorText,
+    EditorToolOptions,
     EditorGenerators,
     EditorParams,
     EditorNest,
@@ -653,6 +696,7 @@ const PARTS = [
   EditorCommands,
   EditorObjects,
   EditorText,
+  EditorToolOptions,
   EditorGenerators,
   EditorParams,
   EditorNest,
