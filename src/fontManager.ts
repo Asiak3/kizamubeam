@@ -128,7 +128,7 @@ export async function openFontManager(ed: Editor) {
     value: firstText?.shape.kind === 'text' && firstText.shape.text.trim() ? firstText.shape.text.split('\n')[0].slice(0, 60) : 'KizamuBeam 0123',
   }) as HTMLInputElement;
   const tabBtns = (['google', 'own', 'fav'] as Tab[]).map((id) => {
-    const b = h('button', { class: 'toggle' }, { google: t('Google Fonts'), own: t('Eigene Schriften'), fav: t('Favoriten') }[id]);
+    const b = h('button', { class: 'tab', type: 'button' }, { google: t('Google Fonts'), own: t('Eigene Schriften'), fav: t('Favoriten') }[id]);
     b.onclick = () => ((tab = id), (shown = PAGE), fill());
     return [id, b] as const;
   });
@@ -325,7 +325,7 @@ export async function openFontManager(ed: Editor) {
 
   const dlg = h('dialog', { class: 'packs-dialog font-dialog' },
     h('h3', {}, t('Schriften')),
-    h('div', { class: 'font-tabs' }, ...tabBtns.map(([, b]) => b)),
+    h('div', { class: 'tab-bar', role: 'tablist' }, ...tabBtns.map(([, b]) => b)),
     h('div', { class: 'font-tools' }, search, cat, sort),
     h('label', { class: 'font-sample-label' }, t('Vorschau'), ' ', sampleIn),
     list,

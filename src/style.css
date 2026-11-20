@@ -2084,31 +2084,75 @@ table.devices .actions {
   max-height: 92vh;
   overflow-y: auto;
 }
-.sub-tabs {
+/* Tab bars in dialogs (#409): the look of the panel tabs (.dg-tab) */
+.tab-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
+  align-items: flex-end;
+  gap: 2px;
+  margin: 0 0 8px;
+  border-bottom: 1px solid var(--line);
 }
-.sub-tabs .btn.active,
-.sub-tab.active .btn {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.sub-tab {
+.tab-bar .tab,
+.tab-bar .tab:hover {
   display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 28px;
+  margin: 0 0 -1px;
+  padding: 0 10px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
 }
-.sub-tab .btn:first-child {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+.tab-bar .tab:hover {
+  color: var(--text);
 }
-.sub-tab .sub-del {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
-  border-left: none;
-  padding: 0 6px;
+.tab-bar .tab.on {
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
-.sub-tab.off .btn:first-child {
+.tab-bar .tab.invalid {
+  color: var(--warn, #d9822b);
+}
+.tab-bar .tab.invalid.on {
+  border-bottom-color: var(--warn, #d9822b);
+}
+.tab-bar button:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+/* A command at the end of a tab bar (+ Sub-Layer, reload) */
+.tab-bar > .btn {
+  align-self: center;
+  margin: 0 0 4px auto;
+}
+/* Sub-layer tab: name and delete button (×) in one tab, like the panel tabs */
+.tab-bar .sub-tab > button {
+  padding: 0;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.tab-bar .sub-tab .sub-del {
+  padding: 0 4px;
+  margin-right: -4px;
+  border-radius: 3px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.tab-bar .sub-tab .sub-del:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.sub-tab.off > button:first-child {
   opacity: 0.6;
   text-decoration: line-through;
 }
@@ -3311,10 +3355,6 @@ body.dock-resizing #canvas {
   min-width: 320px;
   margin-top: 4px;
 }
-.gen-surface-area .conn-row button.on {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
 .gen-surface {
   position: absolute;
   inset: 0;
@@ -3350,20 +3390,6 @@ body.dock-resizing #canvas {
    height, so a message that comes or goes must not make it jump (#411) */
 .gen-surface-area > .note:not(.muted) {
   min-height: 2.9em;
-}
-/* Steps of a generator dialog (#211 stage 7): numbered tabs, one step at a time */
-.gen-steps {
-  margin-bottom: 8px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 6px;
-}
-.gen-steps button.on {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-.gen-steps button.invalid {
-  border-color: var(--warn, #d9822b);
-  color: var(--warn, #d9822b);
 }
 .gen-step .jig-panel:first-child {
   margin-top: 0;
@@ -4247,28 +4273,7 @@ input.bound {
   margin-top: 14px;
 }
 .pack-tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--line);
   margin-bottom: 12px;
-}
-.pack-tab {
-  appearance: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-weight: 600;
-  padding: 7px 10px;
-  cursor: pointer;
-}
-.pack-tab:hover {
-  color: var(--text);
-}
-.pack-tab.active {
-  border-bottom-color: var(--accent);
-  color: var(--text);
 }
 .pack-panel > h4,
 .pack-section-heading h4 {
@@ -4964,7 +4969,6 @@ input.bound {
 .font-dialog {
   width: min(680px, 96vw);
 }
-.font-tabs,
 .font-tools {
   display: flex;
   gap: 6px;

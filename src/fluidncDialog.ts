@@ -244,10 +244,10 @@ export async function openFluidFiles(ed: Editor) {
   const note = h('div', { class: 'note' });
   const nameIn = h('input', { type: 'text', value: 'kizamubeam.gcode', spellcheck: false, title: t('Dateiname auf der Steuerung') }) as HTMLInputElement;
   const tabs = (['sd', 'localfs'] as FluidFs[]).map((k) =>
-    h('button', { class: 'btn', onclick: () => ((fs = k), load()) }, k === 'sd' ? t('SD-Karte') : t('Flash')) as HTMLButtonElement);
+    h('button', { class: 'tab', type: 'button', onclick: () => ((fs = k), load()) }, k === 'sd' ? t('SD-Karte') : t('Flash')) as HTMLButtonElement);
   const dlg = dialog('fluid-files-dialog',
     h('h3', {}, t('Dateien auf der Steuerung')),
-    h('div', { class: 'conn-row' }, ...tabs, h('button', { class: 'btn', onclick: () => load() }, t('Neu lesen'))),
+    h('div', { class: 'tab-bar', role: 'tablist' }, ...tabs, h('button', { class: 'btn', onclick: () => load() }, t('Neu lesen'))),
     list,
     h('div', { class: 'conn-row' },
       nameIn,
@@ -258,7 +258,7 @@ export async function openFluidFiles(ed: Editor) {
   );
 
   async function load() {
-    tabs.forEach((b, i) => b.classList.toggle('primary', (['sd', 'localfs'] as FluidFs[])[i] === fs));
+    tabs.forEach((b, i) => b.classList.toggle('on', (['sd', 'localfs'] as FluidFs[])[i] === fs));
     list.textContent = '';
     note.textContent = t('Lese Dateiliste …');
     note.classList.remove('error');

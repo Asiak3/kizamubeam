@@ -118,7 +118,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   // The canvas fills a box that grows with the dialog; its own size never feeds back into the layout
   const box = h('div', { class: 'gen-surface-box', style: `min-height:${H}px` }, canvas, fitButton);
   const note = h('div', { class: 'note' });
-  const tabs = spec.views.map((v) => h('button', { class: 'small', onclick: () => change({ view: v.id }) }, v.label));
+  const tabs = spec.views.map((v) => h('button', { class: 'tab', type: 'button', onclick: () => change({ view: v.id }) }, v.label));
   const syncTabs = () => tabs.forEach((b, i) => b.classList.toggle('on', spec.views[i].id === st.view));
 
   // ---- Drawing ----
@@ -646,7 +646,7 @@ export function surfaceArea(g: Generator, p: Params, set: (patch: Params) => voi
   };
 
   const el = h('div', { class: 'gen-surface-area' },
-    spec.views.length > 1 ? h('div', { class: 'conn-row' }, ...tabs) : null,
+    spec.views.length > 1 ? h('div', { class: 'tab-bar', role: 'tablist' }, ...tabs) : null,
     box,
     note,
     typeof spec.help === 'string' && spec.help ? h('div', { class: 'note muted' }, spec.help) : null,

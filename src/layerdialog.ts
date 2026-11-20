@@ -45,7 +45,7 @@ export function openLayerDialog(ed: Editor, i: number) {
     h('label', { class: 'check', title }, h('input', { type: 'checkbox', checked: get(), onchange: (e: Event) => (set((e.target as HTMLInputElement).checked), after?.()) }), label);
   const row = (label: string, el: HTMLElement, title?: string) => [h('label', { title }, label), el];
 
-  const tabBar = h('div', { class: 'sub-tabs' });
+  const tabBar = h('div', { class: 'tab-bar', role: 'tablist' });
   /** Sub-Layer k entfernen; danach den benachbarten Reiter (oder den Layer) zeigen */
   const removeSub = (k: number) => {
     if (k < 0 || k >= subs.length) return;
@@ -59,18 +59,17 @@ export function openLayerDialog(ed: Editor, i: number) {
   const render = () => {
     const e = cur();
     tabBar.replaceChildren(
-      h('button', { type: 'button', class: `btn small${tab < 0 ? ' active' : ''}`, onclick: () => ((tab = -1), render()) }, t('Layer')),
+      h('button', { type: 'button', class: `tab${tab < 0 ? ' on' : ''}`, onclick: () => ((tab = -1), render()) }, t('Layer')),
       ...subs.map((s, k) =>
-        h('span', { class: `sub-tab${tab === k ? ' active' : ''}${s.output ? '' : ' off'}` },
+        h('span', { class: `tab sub-tab${tab === k ? ' on' : ''}${s.output ? '' : ' off'}` },
           h('button', {
             type: 'button',
-            class: 'btn small',
             title: s.output ? '' : t('Nicht ausgegeben'),
             onclick: () => ((tab = k), render()),
           }, ((s.name ?? '').trim() || t('Sub-Layer {n}', { n: k + 1 }))),
           h('button', {
             type: 'button',
-            class: 'btn small sub-del',
+            class: 'sub-del',
             title: t('Sub-Layer entfernen'),
             onclick: (ev: Event) => (ev.stopPropagation(), removeSub(k)),
           }, '×'),
