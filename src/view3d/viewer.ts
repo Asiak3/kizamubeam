@@ -44,6 +44,8 @@ interface Part {
   outline: THREE.LineSegments;
   hiddenOutline: THREE.LineSegments | null;
   engrave: THREE.Mesh | null;
+  engravePbrMat: THREE.Material | null;
+  engraveAlphaMap: THREE.CanvasTexture | null;
   pbrMats: [THREE.Material, THREE.Material];
   pbrLineColor: THREE.Color;
   pbrLineOpacity: number;
@@ -227,6 +229,21 @@ function engravingBump(cv: HTMLCanvasElement): THREE.CanvasTexture {
   return tx;
 }
 
+/** Alpha-Maske einer Gravur/Füllung als Graustufenbild für technische Render-Modi */
+function engravingAlpha(cv: HTMLCanvasElement): THREE.CanvasTexture {
+  const out = document.createElement('canvas');
+  out.width = cv.width;
+  out.height = cv.height;
+  const src = cv.getContext('2d')!.getImageData(0, 0, cv.width, cv.height);
+  const d = src.data;
+  for (let i = 0; i < d.length; i += 4) d[i] = d[i + 1] = d[i + 2] = d[i + 3];
+  for (let i = 3; i < d.length; i += 4) d[i] = 255;
+  out.getContext('2d')!.putImageData(src, 0, 0);
+  const tx = new THREE.CanvasTexture(out);
+  tx.flipY = false;
+  return tx;
+}
+
 const cssVar = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
 export class Viewer3D {
@@ -360,6 +377,13 @@ export class Viewer3D {
         p.pbrMats[0].dispose();
         p.pbrMats[1].dispose();
       }
+      if (p.engrave && p.engravePbrMat && p.engrave.material !== p.engravePbrMat) {
+        const em = p.engravePbrMat as THREE.MeshStandardMaterial;
+        if (em.map instanceof THREE.CanvasTexture) em.map.dispose();
+        if (em.bumpMap instanceof THREE.CanvasTexture) em.bumpMap.dispose();
+        em.dispose();
+      }
+      p.engraveAlphaMap?.dispose();
     }
     this.disposeModeMats();
     for (const g of [this.root, this.overlapGroup])
@@ -416,13 +440,15 @@ export class Viewer3D {
       const outline = new THREE.LineSegments(outlineGeometry(s), new THREE.LineBasicMaterial({ color: pbrLineColor.clone(), transparent: true, opacity: pbrLineOpacity }));
       mesh.add(outline);
       const engrave = s.engraving ? engravingMesh(s, s.engraving, look) : null;
+      const engravePbrMat = engrave ? (engrave.material as THREE.Material) : null;
+      const engraveAlphaMap = s.engraving ? engravingAlpha(s.engraving.canvas) : null;
       if (engrave) mesh.add(engrave);
       mesh.userData.label = s.label;
       const holder = new THREE.Group();
       holder.add(mesh);
       this.root.add(holder);
       const c = boxOf(s).getCenter(new THREE.Vector3()).sub(centers.get(s.group)!.getCenter(new THREE.Vector3()));
-      this.parts.push({ s, holder, mesh, outline, hiddenOutline: null, engrave, pbrMats, pbrLineColor, pbrLineOpacity, away: c });
+      this.parts.push({ s, holder, mesh, outline, hiddenOutline: null, engrave, engravePbrMat, engraveAlphaMap, pbrMats, pbrLineColor, pbrLineOpacity, away: c });
     });
     const red = new THREE.MeshBasicMaterial({ color: 0xe53935, transparent: true, opacity: 0.85, depthTest: false });
     for (const o of sc.overlaps)
@@ -488,7 +514,10 @@ export class Viewer3D {
       if (mode === 'material' || mode === 'shadedEdges') {
         p.mesh.material = p.pbrMats;
         p.mesh.castShadow = p.mesh.receiveShadow = true;
-        if (p.engrave) p.engrave.visible = true;
+        if (p.engrave && p.engravePbrMat) {
+          p.engrave.material = p.engravePbrMat;
+          p.engrave.visible = true;
+        }
         lineMat.depthFunc = THREE.LessEqualDepth;
         if (mode === 'material') {
           lineMat.color.copy(p.pbrLineColor);
@@ -512,7 +541,10 @@ export class Viewer3D {
         this.modeMats.push(mat);
         p.mesh.material = mat;
         p.mesh.castShadow = p.mesh.receiveShadow = true;
-        if (p.engrave) p.engrave.visible = true;
+        if (p.engrave && p.engravePbrMat) {
+          p.engrave.material = p.engravePbrMat;
+          p.engrave.visible = true;
+        }
         lineMat.color.setHex(techLine);
         lineMat.opacity = 0.75;
         lineMat.transparent = true;
@@ -532,7 +564,10 @@ export class Viewer3D {
         this.modeMats.push(mat);
         p.mesh.material = mat;
         p.mesh.castShadow = p.mesh.receiveShadow = false;
-        if (p.engrave) p.engrave.visible = false;
+        if (p.engrave && p.engravePbrMat) {
+          p.engrave.material = p.engravePbrMat;
+          p.engrave.visible = true;
+        }
         lineMat.color.setHex(techLine);
         lineMat.opacity = 0.65;
         lineMat.transparent = true;
@@ -551,7 +586,23 @@ export class Viewer3D {
         this.modeMats.push(mat);
         p.mesh.material = mat;
         p.mesh.castShadow = p.mesh.receiveShadow = false;
-        if (p.engrave) p.engrave.visible = false;
+        if (p.engrave && p.engraveAlphaMap) {
+          const em = new THREE.MeshBasicMaterial({
+            color: techLine,
+            alphaMap: p.engraveAlphaMap,
+            transparent: true,
+            opacity: 0.7,
+            depthWrite: false,
+            depthTest: true,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
+          });
+          this.modeMats.push(em);
+          p.engrave.material = em;
+          p.engrave.visible = true;
+        }
         lineMat.color.setHex(techLine);
         lineMat.opacity = 1;
         lineMat.transparent = false;
@@ -570,7 +621,23 @@ export class Viewer3D {
         this.modeMats.push(mat);
         p.mesh.material = mat;
         p.mesh.castShadow = p.mesh.receiveShadow = false;
-        if (p.engrave) p.engrave.visible = false;
+        if (p.engrave && p.engraveAlphaMap) {
+          const em = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            alphaMap: p.engraveAlphaMap,
+            transparent: true,
+            opacity: 0.55,
+            depthWrite: false,
+            depthTest: true,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
+          });
+          this.modeMats.push(em);
+          p.engrave.material = em;
+          p.engrave.visible = true;
+        }
         lineMat.color.setHex(0xffffff);
         lineMat.opacity = 0.95;
         lineMat.transparent = true;
@@ -611,7 +678,20 @@ export class Viewer3D {
         this.modeMats.push(mat);
         p.mesh.material = mat;
         p.mesh.castShadow = p.mesh.receiveShadow = false;
-        if (p.engrave) p.engrave.visible = false;
+        if (p.engrave && p.engraveAlphaMap) {
+          const em = new THREE.MeshBasicMaterial({
+            color: techLine,
+            alphaMap: p.engraveAlphaMap,
+            transparent: true,
+            opacity: 0.5,
+            depthWrite: false,
+            depthTest: false,
+            side: THREE.DoubleSide,
+          });
+          this.modeMats.push(em);
+          p.engrave.material = em;
+          p.engrave.visible = true;
+        }
         lineMat.color.setHex(techLine);
         lineMat.opacity = 0.85;
         lineMat.transparent = true;
