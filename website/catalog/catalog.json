@@ -1,7 +1,7 @@
 {
  "format": "kizamubeam-catalog",
  "version": 1,
- "generated": "2026-11-19T20:15:58.485Z",
+ "generated": "2026-11-20T09:18:49.412Z",
  "packs": [
   {
    "id": "org.kizamubeam.box-composer",
@@ -15,11 +15,11 @@
     "pt-BR": "Compositor de caixas"
    },
    "description": {
-    "en": "Box with freely placed inner walls (experimental).",
-    "de": "Kasten mit frei gesetzten Innenwänden (experimentell).",
-    "es": "Caja con paredes interiores colocadas libremente (experimental).",
-    "it": "Scatola con pareti interne posizionate liberamente (sperimentale).",
-    "pt-BR": "Caixa com paredes internas posicionadas livremente (experimental)."
+    "en": "Box with freely placed inner walls.",
+    "de": "Kasten mit frei gesetzten Innenwänden.",
+    "es": "Caja con paredes interiores colocadas libremente.",
+    "it": "Scatola con pareti interne posizionate liberamente.",
+    "pt-BR": "Caixa com paredes internas posicionadas livremente."
    },
    "author": "Asiak3",
    "devices": 0,
@@ -34,8 +34,8 @@
    "codeSize": 40726,
    "source": "https://github.com/KizamuBeam/kizamubeam/tree/main/plugins/box-composer",
    "file": "org.kizamubeam.box-composer.kzp",
-   "sha256": "0be3cd5e0a661e3063dffce36f6a40657709258d090e6005d72752a5757ff04c",
-   "size": 78918
+   "sha256": "3d2645fca4e9e204f7fdf424d92f86650866365649bdbd4ea66b930fd48447a5",
+   "size": 78484
   },
   {
    "id": "org.kizamubeam.example",

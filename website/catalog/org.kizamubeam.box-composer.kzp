@@ -12,11 +12,11 @@
   "pt-BR": "Compositor de caixas"
  },
  "description": {
-  "en": "Box with freely placed inner walls (experimental).",
-  "de": "Kasten mit frei gesetzten Innenwänden (experimentell).",
-  "es": "Caja con paredes interiores colocadas libremente (experimental).",
-  "it": "Scatola con pareti interne posizionate liberamente (sperimentale).",
-  "pt-BR": "Caixa com paredes internas posicionadas livremente (experimental)."
+  "en": "Box with freely placed inner walls.",
+  "de": "Kasten mit frei gesetzten Innenwänden.",
+  "es": "Caja con paredes interiores colocadas libremente.",
+  "it": "Scatola con pareti interne posizionate liberamente.",
+  "pt-BR": "Caixa com paredes internas posicionadas livremente."
  },
  "author": "Asiak3",
  "plugins": [
@@ -302,7 +302,7 @@
    "texts": {
     "en": {
      "name": "Box composer",
-     "desc": "Box with freely placed inner walls: T joints, corners, free ends and crossings. Experimental: please test-cut the joints before a large job.",
+     "desc": "Box with freely placed inner walls: T joints, corners, free ends and crossings.",
      "keys": "box divider compartment organizer insert",
      "label": "Box composer {width} × {depth} × {height}",
      "width": "Width",
@@ -398,7 +398,7 @@
     },
     "de": {
      "name": "Box-Composer",
-     "desc": "Kasten mit frei gesetzten Innenwänden: T-Stöße, Ecken, freie Enden und Kreuzungen. Experimentell: bitte die Verbindungen vor einem großen Auftrag zur Probe schneiden.",
+     "desc": "Kasten mit frei gesetzten Innenwänden: T-Stöße, Ecken, freie Enden und Kreuzungen.",
      "keys": "Kasten Box Fächer Einsatz Trennwand Sortierkasten",
      "label": "Box-Composer {width} × {depth} × {height}",
      "width": "Breite",
@@ -494,7 +494,7 @@
     },
     "es": {
      "name": "Compositor de cajas",
-     "desc": "Caja con paredes interiores colocadas libremente: uniones en T, esquinas, extremos libres y cruces. Experimental: corta una prueba de las uniones antes de un trabajo grande.",
+     "desc": "Caja con paredes interiores colocadas libremente: uniones en T, esquinas, extremos libres y cruces.",
      "keys": "caja divisor compartimentos organizador inserto",
      "label": "Compositor de cajas {width} × {depth} × {height}",
      "width": "Ancho",
@@ -590,7 +590,7 @@
     },
     "it": {
      "name": "Compositore di scatole",
-     "desc": "Scatola con pareti interne posizionate liberamente: giunti a T, angoli, estremità libere e incroci. Sperimentale: taglia una prova dei giunti prima di un lavoro grande.",
+     "desc": "Scatola con pareti interne posizionate liberamente: giunti a T, angoli, estremità libere e incroci.",
      "keys": "scatola divisorio scomparti organizer inserto",
      "label": "Compositore di scatole {width} × {depth} × {height}",
      "width": "Larghezza",
@@ -686,7 +686,7 @@
     },
     "pt-BR": {
      "name": "Compositor de caixas",
-     "desc": "Caixa com paredes internas posicionadas livremente: juntas em T, cantos, extremidades livres e cruzamentos. Experimental: corte um teste das juntas antes de um trabalho grande.",
+     "desc": "Caixa com paredes internas posicionadas livremente: juntas em T, cantos, extremidades livres e cruzamentos.",
      "keys": "caixa divisória compartimentos organizador inserto",
      "label": "Compositor de caixas {width} × {depth} × {height}",
      "width": "Largura",
