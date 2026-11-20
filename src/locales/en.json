@@ -5155,5 +5155,9 @@
   "Layer-Farben": "Layer colors",
   "Röntgen": "X-Ray",
   "Hidden Lines": "Hidden lines",
-  "Wireframe": "Wireframe"
+  "Wireframe": "Wireframe",
+  "Blueprint": "Blueprint",
+  "Bemaßung": "Dimensions",
+  "Außenmaße in mm im Blueprint-Modus anzeigen": "Show outer dimensions in mm in blueprint mode",
+  "Seite|3D": "Side"
 }

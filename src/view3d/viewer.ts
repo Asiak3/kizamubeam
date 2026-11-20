@@ -9,11 +9,12 @@ import type { Engraving } from './engrave';
 import { outlineSegments, solidBounds } from './solids';
 import { Pose, rotatePose } from './poses';
 import { DEFAULT_LOOK, LookPreset, lookTexture, resolveLook, shadeHex } from './looks';
+import { BlueprintLabels, BlueprintViewport, computeBlueprintLayout, computeOrthoScale, drawBlueprintOverlay } from './blueprint';
 
 export type ViewPreset = 'iso' | 'top' | 'front';
 
 /** Darstellungsmodus der 3D-Ansicht */
-export type RenderMode = 'material' | 'shadedEdges' | 'layer' | 'xray' | 'hiddenLines' | 'wireframe';
+export type RenderMode = 'material' | 'shadedEdges' | 'layer' | 'xray' | 'hiddenLines' | 'wireframe' | 'blueprint';
 
 /** Hintergrund im Mockup-Modus: wie die Oberfläche, Weiß, Hellgrau, Dunkel oder Studio-Verlauf */
 export type MockupBg = 'theme' | 'white' | 'grey' | 'dark' | 'studio';
@@ -41,6 +42,7 @@ interface Part {
   holder: THREE.Group;
   mesh: THREE.Mesh;
   outline: THREE.LineSegments;
+  hiddenOutline: THREE.LineSegments | null;
   engrave: THREE.Mesh | null;
   pbrMats: [THREE.Material, THREE.Material];
   pbrLineColor: THREE.Color;
@@ -229,8 +231,10 @@ const cssVar = (name: string, fallback: string) => getComputedStyle(document.doc
 
 export class Viewer3D {
   private renderer: THREE.WebGLRenderer;
+  private overlay: HTMLCanvasElement;
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(35, 1, 0.1, 10000);
+  private orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10000);
   private controls: OrbitControls;
   private root = new THREE.Group();
   private overlapGroup = new THREE.Group();
@@ -241,6 +245,7 @@ export class Viewer3D {
   private mockup = false;
   private mockupBg: MockupBg = 'studio';
   private renderMode: RenderMode = 'material';
+  private blueprintLabels: BlueprintLabels = { iso: '3D', front: 'Vorne', top: 'Oben', side: 'Seite', dims: true };
   private modeMats: THREE.Material[] = [];
   private parts: Part[] = [];
   private explode = 0;
@@ -269,7 +274,10 @@ export class Viewer3D {
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     this.scene.environmentIntensity = 0.55;
     pmrem.dispose();
-    host.append(this.renderer.domElement);
+    this.overlay = document.createElement('canvas');
+    this.overlay.style.pointerEvents = 'none';
+    this.overlay.hidden = true;
+    host.append(this.renderer.domElement, this.overlay);
     this.camera.up.set(0, 0, 1);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
@@ -299,6 +307,7 @@ export class Viewer3D {
   }
 
   private isDarkBackground(): boolean {
+    if (this.renderMode === 'blueprint') return true;
     const bg = this.mockup ? this.mockupBg : 'theme';
     if (bg === 'dark') return true;
     if (bg === 'white' || bg === 'grey' || bg === 'studio') return false;
@@ -308,10 +317,17 @@ export class Viewer3D {
 
   private applyTheme() {
     if (this.scene.background instanceof THREE.Texture) this.scene.background.dispose();
-    const bg = this.mockup ? this.mockupBg : 'theme';
-    this.scene.background =
-      bg === 'studio' ? studioBackground() : new THREE.Color(bg === 'white' ? '#ffffff' : bg === 'grey' ? '#c9ccd0' : bg === 'dark' ? '#202226' : cssVar('--surface', '#ffffff'));
-    if (this.grid) (this.grid.material as THREE.LineBasicMaterial).color = new THREE.Color(cssVar('--line', '#c3c7ce'));
+    if (this.renderMode === 'blueprint') {
+      this.scene.background = new THREE.Color('#0b3b8c');
+    } else {
+      const bg = this.mockup ? this.mockupBg : 'theme';
+      this.scene.background =
+        bg === 'studio' ? studioBackground() : new THREE.Color(bg === 'white' ? '#ffffff' : bg === 'grey' ? '#c9ccd0' : bg === 'dark' ? '#202226' : cssVar('--surface', '#ffffff'));
+    }
+    if (this.grid) {
+      (this.grid.material as THREE.LineBasicMaterial).color = new THREE.Color(cssVar('--line', '#c3c7ce'));
+      this.grid.visible = !this.mockup && this.renderMode !== 'blueprint';
+    }
     if (this.parts.length) this.applyRenderMode();
     this.needsRender = true;
   }
@@ -319,8 +335,16 @@ export class Viewer3D {
   private fitSize() {
     const w = Math.max(1, this.host.clientWidth),
       h = Math.max(1, this.host.clientHeight);
+    const pr = this.renderer.getPixelRatio();
     this.renderer.setSize(w, h, false);
-    this.camera.aspect = w / h;
+    this.overlay.width = Math.max(1, Math.round(w * pr));
+    this.overlay.height = Math.max(1, Math.round(h * pr));
+    if (this.renderMode === 'blueprint') {
+      const vp = computeBlueprintLayout(w, h).iso;
+      this.camera.aspect = vp.w / Math.max(1, vp.h);
+    } else {
+      this.camera.aspect = w / h;
+    }
     this.camera.updateProjectionMatrix();
     this.needsRender = true;
   }
@@ -398,7 +422,7 @@ export class Viewer3D {
       holder.add(mesh);
       this.root.add(holder);
       const c = boxOf(s).getCenter(new THREE.Vector3()).sub(centers.get(s.group)!.getCenter(new THREE.Vector3()));
-      this.parts.push({ s, holder, mesh, outline, engrave, pbrMats, pbrLineColor, pbrLineOpacity, away: c });
+      this.parts.push({ s, holder, mesh, outline, hiddenOutline: null, engrave, pbrMats, pbrLineColor, pbrLineOpacity, away: c });
     });
     const red = new THREE.MeshBasicMaterial({ color: 0xe53935, transparent: true, opacity: 0.85, depthTest: false });
     for (const o of sc.overlaps)
@@ -435,24 +459,37 @@ export class Viewer3D {
     if (refit) this.view('iso');
   }
 
-  /** Darstellungsmodus (Material, Shaded + Kanten, Layer-Farben, Röntgen, Hidden Lines, Wireframe) */
+  /** Beschriftungen und Bemaßung für den Blueprint-Modus setzen */
+  setBlueprintLabels(labels: Partial<BlueprintLabels>) {
+    this.blueprintLabels = { ...this.blueprintLabels, ...labels };
+    this.needsRender = true;
+  }
+
+  /** Darstellungsmodus (Material, Shaded + Kanten, Layer-Farben, Röntgen, Hidden Lines, Wireframe, Blueprint) */
   setRenderMode(mode: RenderMode) {
     if (this.renderMode === mode) return;
     this.renderMode = mode;
-    this.applyRenderMode();
+    this.applyMockup();
+    this.applyTheme();
+    this.fitSize();
     this.needsRender = true;
   }
 
   private applyRenderMode() {
     this.disposeModeMats();
     const mode = this.renderMode;
+    this.overlay.hidden = mode !== 'blueprint';
     const techLine = this.isDarkBackground() ? 0xe6e8ec : 0x1e2024;
+    const b = mode === 'blueprint' ? this.bounds() : null;
+    const dashStep = b && !b.isEmpty() ? Math.max(1.5, Math.min(8, b.getBoundingSphere(new THREE.Sphere()).radius * 0.035)) : 3;
     for (const p of this.parts) {
       const lineMat = p.outline.material as THREE.LineBasicMaterial;
+      if (p.hiddenOutline) p.hiddenOutline.visible = false;
       if (mode === 'material' || mode === 'shadedEdges') {
         p.mesh.material = p.pbrMats;
         p.mesh.castShadow = p.mesh.receiveShadow = true;
         if (p.engrave) p.engrave.visible = true;
+        lineMat.depthFunc = THREE.LessEqualDepth;
         if (mode === 'material') {
           lineMat.color.copy(p.pbrLineColor);
           lineMat.opacity = p.pbrLineOpacity;
@@ -480,6 +517,7 @@ export class Viewer3D {
         lineMat.opacity = 0.75;
         lineMat.transparent = true;
         lineMat.depthTest = true;
+        lineMat.depthFunc = THREE.LessEqualDepth;
         p.outline.renderOrder = 2;
       } else if (mode === 'xray') {
         const mat = new THREE.MeshStandardMaterial({
@@ -499,6 +537,7 @@ export class Viewer3D {
         lineMat.opacity = 0.65;
         lineMat.transparent = true;
         lineMat.depthTest = true;
+        lineMat.depthFunc = THREE.LessEqualDepth;
         p.outline.renderOrder = 2;
       } else if (mode === 'hiddenLines') {
         const mat = new THREE.MeshBasicMaterial({
@@ -517,7 +556,51 @@ export class Viewer3D {
         lineMat.opacity = 1;
         lineMat.transparent = false;
         lineMat.depthTest = true;
+        lineMat.depthFunc = THREE.LessEqualDepth;
         p.outline.renderOrder = 1;
+      } else if (mode === 'blueprint') {
+        const mat = new THREE.MeshBasicMaterial({
+          colorWrite: false,
+          depthWrite: true,
+          depthTest: true,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1,
+        });
+        this.modeMats.push(mat);
+        p.mesh.material = mat;
+        p.mesh.castShadow = p.mesh.receiveShadow = false;
+        if (p.engrave) p.engrave.visible = false;
+        lineMat.color.setHex(0xffffff);
+        lineMat.opacity = 0.95;
+        lineMat.transparent = true;
+        lineMat.depthTest = true;
+        lineMat.depthFunc = THREE.LessEqualDepth;
+        p.outline.renderOrder = 1;
+        if (!p.hiddenOutline) {
+          p.hiddenOutline = new THREE.LineSegments(
+            p.outline.geometry,
+            new THREE.LineDashedMaterial({
+              color: 0xffffff,
+              dashSize: dashStep,
+              gapSize: dashStep * 0.65,
+              transparent: true,
+              opacity: 0.35,
+              depthTest: true,
+              depthFunc: THREE.GreaterDepth,
+              depthWrite: false,
+            }),
+          );
+          p.hiddenOutline.computeLineDistances();
+          p.hiddenOutline.renderOrder = 2;
+          p.mesh.add(p.hiddenOutline);
+        } else {
+          const hm = p.hiddenOutline.material as THREE.LineDashedMaterial;
+          hm.dashSize = dashStep;
+          hm.gapSize = dashStep * 0.65;
+          hm.needsUpdate = true;
+        }
+        p.hiddenOutline.visible = true;
       } else {
         // wireframe
         const mat = new THREE.MeshBasicMaterial({
@@ -533,6 +616,7 @@ export class Viewer3D {
         lineMat.opacity = 0.85;
         lineMat.transparent = true;
         lineMat.depthTest = false;
+        lineMat.depthFunc = THREE.LessEqualDepth;
         p.outline.renderOrder = 1;
       }
       lineMat.needsUpdate = true;
@@ -549,9 +633,9 @@ export class Viewer3D {
   }
 
   private applyMockup() {
-    if (this.grid) this.grid.visible = !this.mockup;
-    if (this.ground) this.ground.visible = this.mockup;
-    this.sun.castShadow = this.mockup;
+    if (this.grid) this.grid.visible = !this.mockup && this.renderMode !== 'blueprint';
+    if (this.ground) this.ground.visible = this.mockup && this.renderMode !== 'blueprint';
+    this.sun.castShadow = this.mockup && this.renderMode !== 'blueprint';
     if (this.ground) (this.ground.material as THREE.ShadowMaterial).opacity = this.mockupBg === 'dark' ? 0.5 : 0.28;
     // Sonne und Schattenbereich passend zu den Teilen (auch auseinandergezogen)
     const b = this.bounds();
@@ -572,6 +656,78 @@ export class Viewer3D {
     this.needsRender = true;
   }
 
+  private setupOrtho(vp: BlueprintViewport, center: THREE.Vector3, size: THREE.Vector3, pxPerMm: number, dist: number) {
+    const hw = vp.w / (2 * pxPerMm);
+    const hh = vp.h / (2 * pxPerMm);
+    this.orthoCam.left = -hw;
+    this.orthoCam.right = hw;
+    this.orthoCam.top = hh;
+    this.orthoCam.bottom = -hh;
+    this.orthoCam.near = 0.1;
+    this.orthoCam.far = dist * 4 + Math.max(size.x, size.y, size.z);
+    if (vp.id === 'front') {
+      this.orthoCam.position.set(center.x, center.y - dist, center.z);
+      this.orthoCam.up.set(0, 0, 1);
+    } else if (vp.id === 'top') {
+      this.orthoCam.position.set(center.x, center.y, center.z + dist);
+      this.orthoCam.up.set(0, 1, 0);
+    } else {
+      this.orthoCam.position.set(center.x + dist, center.y, center.z);
+      this.orthoCam.up.set(0, 0, 1);
+    }
+    this.orthoCam.lookAt(center);
+    this.orthoCam.updateProjectionMatrix();
+    this.orthoCam.updateMatrixWorld();
+  }
+
+  private renderFrame(w: number, h: number, overlayCtx?: CanvasRenderingContext2D | null, overlayScale = 1) {
+    if (this.renderMode !== 'blueprint') {
+      this.renderer.setScissorTest(false);
+      this.renderer.setViewport(0, 0, w, h);
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
+    const layout = computeBlueprintLayout(w, h);
+    const b = this.bounds();
+    const empty = b.isEmpty();
+    const size = empty ? null : b.getSize(new THREE.Vector3());
+    const center = empty ? new THREE.Vector3() : b.getCenter(new THREE.Vector3());
+    const pxPerMm = size ? computeOrthoScale(size, layout) : 1;
+    const dist = (size ? size.length() : 100) * 2 + 100;
+
+    const renderVp = (vp: BlueprintViewport, cam: THREE.Camera) => {
+      const vy = h - vp.y - vp.h;
+      this.renderer.setViewport(vp.x, vy, vp.w, vp.h);
+      this.renderer.setScissor(vp.x, vy, vp.w, vp.h);
+      this.renderer.render(this.scene, cam);
+    };
+
+    const isoAspect = layout.iso.w / Math.max(1, layout.iso.h);
+    if (Math.abs(this.camera.aspect - isoAspect) > 1e-4) {
+      this.camera.aspect = isoAspect;
+      this.camera.updateProjectionMatrix();
+    }
+    this.renderer.setScissorTest(true);
+    renderVp(layout.iso, this.camera);
+    if (size) {
+      for (const vp of [layout.front, layout.top, layout.side]) {
+        this.setupOrtho(vp, center, size, pxPerMm, dist);
+        renderVp(vp, this.orthoCam);
+      }
+    } else {
+      // Leere Szene: untere Bereiche ebenfalls mit Hintergrundfarbe füllen
+      for (const vp of [layout.front, layout.top, layout.side]) renderVp(vp, this.orthoCam);
+    }
+    this.renderer.setScissorTest(false);
+
+    if (overlayCtx) {
+      overlayCtx.save();
+      overlayCtx.setTransform(overlayScale, 0, 0, overlayScale, 0, 0);
+      drawBlueprintOverlay(overlayCtx, w, h, layout, size, pxPerMm, this.blueprintLabels);
+      overlayCtx.restore();
+    }
+  }
+
   /** Aktuelle Ansicht als PNG (data:-URL) in scale-facher Auflösung */
   snapshot(scale = 2): string {
     const w = Math.max(1, this.host.clientWidth),
@@ -579,8 +735,24 @@ export class Viewer3D {
     const pr = this.renderer.getPixelRatio();
     this.renderer.setPixelRatio(scale);
     this.renderer.setSize(w, h, false);
-    this.renderer.render(this.scene, this.camera);
-    const url = this.renderer.domElement.toDataURL('image/png');
+    this.renderFrame(w, h);
+    let url: string;
+    if (this.renderMode === 'blueprint') {
+      const tmp = document.createElement('canvas');
+      tmp.width = Math.max(1, Math.round(w * scale));
+      tmp.height = Math.max(1, Math.round(h * scale));
+      const ctx = tmp.getContext('2d')!;
+      ctx.drawImage(this.renderer.domElement, 0, 0, tmp.width, tmp.height);
+      const layout = computeBlueprintLayout(w, h);
+      const b = this.bounds();
+      const size = b.isEmpty() ? null : b.getSize(new THREE.Vector3());
+      const pxPerMm = size ? computeOrthoScale(size, layout) : 1;
+      ctx.scale(scale, scale);
+      drawBlueprintOverlay(ctx, w, h, layout, size, pxPerMm, this.blueprintLabels);
+      url = tmp.toDataURL('image/png');
+    } else {
+      url = this.renderer.domElement.toDataURL('image/png');
+    }
     this.renderer.setPixelRatio(pr);
     this.renderer.setSize(w, h, false);
     this.needsRender = true;
@@ -662,7 +834,9 @@ export class Viewer3D {
       this.controls.update();
       if (this.needsRender) {
         this.needsRender = false;
-        this.renderer.render(this.scene, this.camera);
+        const w = Math.max(1, this.host.clientWidth),
+          h = Math.max(1, this.host.clientHeight);
+        this.renderFrame(w, h, this.overlay.getContext('2d'), this.renderer.getPixelRatio());
       }
       requestAnimationFrame(loop);
     };
@@ -671,8 +845,32 @@ export class Viewer3D {
 
   private hover(e: PointerEvent) {
     const r = this.renderer.domElement.getBoundingClientRect();
-    const p = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    this.raycaster.setFromCamera(p, this.camera);
+    const px = e.clientX - r.left;
+    const py = e.clientY - r.top;
+    let cam: THREE.Camera = this.camera;
+    let ndcX = (px / r.width) * 2 - 1;
+    let ndcY = -(py / r.height) * 2 + 1;
+    if (this.renderMode === 'blueprint') {
+      const layout = computeBlueprintLayout(r.width, r.height);
+      const vp = [layout.iso, layout.front, layout.top, layout.side].find((v) => px >= v.x && px <= v.x + v.w && py >= v.y && py <= v.y + v.h);
+      if (!vp) {
+        this.onHover(null);
+        return;
+      }
+      ndcX = ((px - vp.x) / Math.max(1, vp.w)) * 2 - 1;
+      ndcY = -((py - vp.y) / Math.max(1, vp.h)) * 2 + 1;
+      if (vp.id !== 'iso') {
+        const b = this.bounds();
+        if (b.isEmpty()) {
+          this.onHover(null);
+          return;
+        }
+        const size = b.getSize(new THREE.Vector3());
+        this.setupOrtho(vp, b.getCenter(new THREE.Vector3()), size, computeOrthoScale(size, layout), size.length() * 2 + 100);
+        cam = this.orthoCam;
+      }
+    }
+    this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), cam);
     const hit = this.raycaster.intersectObjects(this.parts.map((x) => x.mesh), false)[0];
     this.onHover(hit ? String(hit.object.userData.label) : null);
   }
@@ -685,5 +883,6 @@ export class Viewer3D {
     this.controls.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
+    this.overlay.remove();
   }
 }

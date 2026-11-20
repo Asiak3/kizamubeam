@@ -32,7 +32,7 @@ import { plateAnchor } from '../multilayer';
 
 /** Hintergründe des Mockups (Liste hier, damit three.js erst mit dem Fenster geladen wird) */
 const MOCKUP_BGS: MockupBg[] = ['studio', 'white', 'grey', 'dark', 'theme'];
-const RENDER_MODES: RenderMode[] = ['material', 'shadedEdges', 'layer', 'xray', 'hiddenLines', 'wireframe'];
+const RENDER_MODES: RenderMode[] = ['material', 'shadedEdges', 'layer', 'xray', 'hiddenLines', 'wireframe', 'blueprint'];
 // i18n-keys-start (Namen der Hintergründe und Render-Modi, übersetzt per t(…))
 const BG_NAMES: Record<MockupBg, string> = { studio: 'Studio', white: 'Weiß', grey: 'Grau', dark: 'Dunkel', theme: 'Wie die Oberfläche' };
 const RENDER_MODE_NAMES: Record<RenderMode, string> = {
@@ -42,6 +42,7 @@ const RENDER_MODE_NAMES: Record<RenderMode, string> = {
   xray: 'Röntgen',
   hiddenLines: 'Hidden Lines',
   wireframe: 'Wireframe',
+  blueprint: 'Blueprint',
 };
 // i18n-keys-end
 
@@ -57,6 +58,8 @@ interface Settings {
   look: MaterialLook;
   /** Darstellungsmodus der 3D-Ansicht */
   mode: RenderMode;
+  /** Außenbemaßung im Blueprint-Modus anzeigen */
+  dims: boolean;
   /** Mockup-Modus: Schatten statt Raster, eigener Hintergrund */
   mockup: boolean;
   bg: MockupBg;
@@ -65,7 +68,7 @@ interface Settings {
 }
 
 function loadSettings(): Settings {
-  const d: Settings = { th: 3, overlaps: true, marks: true, look: DEFAULT_LOOK, mode: 'material', mockup: false, bg: 'studio', stock: true };
+  const d: Settings = { th: 3, overlaps: true, marks: true, look: DEFAULT_LOOK, mode: 'material', dims: true, mockup: false, bg: 'studio', stock: true };
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || '{}');
     if (s.th > 0 && s.th <= 50) d.th = Number(s.th);
@@ -73,6 +76,7 @@ function loadSettings(): Settings {
     if (typeof s.marks === 'boolean') d.marks = s.marks;
     d.look = cleanLook(s.look) ?? d.look;
     if (RENDER_MODES.includes(s.mode)) d.mode = s.mode;
+    if (typeof s.dims === 'boolean') d.dims = s.dims;
     if (typeof s.stock === 'boolean') d.stock = s.stock;
     if (typeof s.mockup === 'boolean') d.mockup = s.mockup;
     if (MOCKUP_BGS.includes(s.bg)) d.bg = s.bg;
@@ -470,6 +474,8 @@ export function buildView3dPanel(ed: Editor) {
     { title: t('Darstellungsmodus der 3D-Ansicht') },
     ...RENDER_MODES.map((m) => h('option', { value: m, selected: m === set.mode }, t(RENDER_MODE_NAMES[m]))),
   ) as HTMLSelectElement;
+  const dimsBox = h('input', { type: 'checkbox', checked: set.dims }) as HTMLInputElement;
+  const dimsLbl = h('label', { class: 'v3d-check', hidden: set.mode !== 'blueprint', title: t('Außenmaße in mm im Blueprint-Modus anzeigen') }, dimsBox, t('Bemaßung'));
   const shotBtn = h('button', {
     class: 'small',
     title: t('Die aktuelle Ansicht in doppelter Auflösung als PNG speichern, z. B. als Mockup für Kunden'),
@@ -487,6 +493,7 @@ export function buildView3dPanel(ed: Editor) {
     h('button', { class: 'small', title: t('Von oben'), onclick: () => view('top') }, t('Oben|3D')),
     h('button', { class: 'small', title: t('Von vorne'), onclick: () => view('front') }, t('Vorne|3D')),
     h('label', { class: 'v3d-look', title: t('Darstellungsmodus der 3D-Ansicht') }, t('Darstellung'), modeSel),
+    dimsLbl,
     h('label', { class: 'v3d-range', title: t('Teile auseinanderziehen') }, t('Explosion'), explode),
     spinLbl,
     h('label', { class: 'v3d-check', title: t('Bereiche, in denen sich Teile durchdringen, rot zeigen') }, ovBox, t('Überschneidungen')),
@@ -562,6 +569,7 @@ export function buildView3dPanel(ed: Editor) {
           viewer.setExplode(Number(explode.value));
           viewer.setShowOverlaps(set.overlaps);
           viewer.setMockup(set.mockup, set.bg);
+          viewer.setBlueprintLabels({ iso: t('3D'), front: t('Vorne|3D'), top: t('Oben|3D'), side: t('Seite|3D'), dims: set.dims });
           viewer.setRenderMode(set.mode);
           lastKey = '';
           update();
@@ -602,8 +610,14 @@ export function buildView3dPanel(ed: Editor) {
   });
   modeSel.addEventListener('change', () => {
     set.mode = modeSel.value as RenderMode;
+    dimsLbl.hidden = set.mode !== 'blueprint';
     save();
     viewer?.setRenderMode(set.mode);
+  });
+  dimsBox.addEventListener('change', () => {
+    set.dims = dimsBox.checked;
+    save();
+    viewer?.setBlueprintLabels({ dims: set.dims });
   });
   const mockChanged = () => {
     set.mockup = mockBox.checked;

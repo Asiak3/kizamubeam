@@ -5155,5 +5155,9 @@
   "Layer-Farben": "Colori dei livelli",
   "Röntgen": "Raggi X",
   "Hidden Lines": "Linee nascoste",
-  "Wireframe": "Wireframe"
+  "Wireframe": "Wireframe",
+  "Blueprint": "Blueprint",
+  "Bemaßung": "Quote",
+  "Außenmaße in mm im Blueprint-Modus anzeigen": "Mostra dimensioni esterne in mm in modalità blueprint",
+  "Seite|3D": "Lato"
 }

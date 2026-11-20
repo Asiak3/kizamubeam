@@ -5155,5 +5155,9 @@
   "Layer-Farben": "Cores das camadas",
   "Röntgen": "Raio-X",
   "Hidden Lines": "Linhas ocultas",
-  "Wireframe": "Wireframe"
+  "Wireframe": "Wireframe",
+  "Blueprint": "Planta",
+  "Bemaßung": "Cotas",
+  "Außenmaße in mm im Blueprint-Modus anzeigen": "Mostrar dimensões externas em mm no modo planta",
+  "Seite|3D": "Lado"
 }

@@ -16,6 +16,7 @@ import type { Obj, Mate } from '../src/model';
 import type { JointOptions } from '../src/joints';
 const { loadDoc, IDENT } = await import('../src/model');
 const { collectScene } = await import('../src/view3d/panel');
+const { computeBlueprintLayout, computeOrthoScale } = await import('../src/view3d/blueprint');
 
 let failed = 0;
 function test(name: string, fn: () => void) {
@@ -902,6 +903,29 @@ test('Darstellungsmodus Layer-Farben: collectScene übernimmt die Layer-Farbe f�
   const solids = collectScene(ed, 3, false).scene.solids;
   assert.equal(solids.length, 2);
   assert.deepEqual(solids.map((s) => s.layerColor).sort(), ['#112233', '#cc3311']);
+});
+
+test('Blueprint-Layout: 4 Ansichten ohne Überlappung und einheitlicher Orthografik-Maßstab', () => {
+  const layout = computeBlueprintLayout(800, 600);
+  assert.equal(layout.iso.w, 800);
+  assert.equal(layout.iso.y, 0);
+  assert.equal(layout.front.x, 0);
+  assert.equal(layout.front.y, layout.iso.h);
+  assert.equal(layout.front.h, 600 - layout.iso.h);
+  assert.equal(layout.top.x, layout.front.w);
+  assert.equal(layout.side.x, layout.front.w);
+  assert.equal(layout.top.y, layout.front.y);
+  assert.equal(layout.side.y, layout.top.y + layout.top.h);
+  assert.equal(layout.top.h + layout.side.h, layout.front.h);
+  assert.equal(layout.front.w + layout.top.w, 800);
+
+  // Einheitlicher Maßstab: das größte Projektionsmaß passt mit Rand in alle 3 Ortho-Ansichten
+  const size = { x: 200, y: 120, z: 80 };
+  const s = computeOrthoScale(size, layout);
+  assert.ok(s > 0);
+  assert.ok(size.x * s <= layout.front.w * 0.65 && size.z * s <= layout.front.h * 0.65);
+  assert.ok(size.x * s <= layout.top.w * 0.65 && size.y * s <= layout.top.h * 0.65);
+  assert.ok(size.y * s <= layout.side.w * 0.65 && size.z * s <= layout.side.h * 0.65);
 });
 
 if (failed) {

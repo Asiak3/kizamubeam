@@ -5155,5 +5155,9 @@
   "Layer-Farben": "Colores de capa",
   "Röntgen": "Rayos X",
   "Hidden Lines": "Líneas ocultas",
-  "Wireframe": "Alambre"
+  "Wireframe": "Alambre",
+  "Blueprint": "Plano",
+  "Bemaßung": "Acotación",
+  "Außenmaße in mm im Blueprint-Modus anzeigen": "Mostrar dimensiones exteriores en mm en modo plano",
+  "Seite|3D": "Lateral"
 }
