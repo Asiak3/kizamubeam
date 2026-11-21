@@ -20,7 +20,7 @@ interface ActionBase {
   id: string;
   /** Rubrik im Anpassen-Dialog */
   cat: string;
-  /** Name in Listen und Tooltip (mit Tastenkürzel) */
+  /** Name in Listen und Tooltip; das Tastenkürzel kommt aus shortcut */
   label: string;
   run: () => void;
   enabled?: () => boolean;
@@ -28,6 +28,8 @@ interface ActionBase {
   on?: () => boolean;
   /** Symbol und Tooltip, die sich zur Laufzeit ändern */
   dyn?: () => { icon?: string; label?: string };
+  /** Aktuelles Tastenkürzel für Tooltip und Menüzeile (#453) */
+  shortcut?: () => string;
   /** Kleiner Knopf (Optionen zu einem Nachbarn) */
   small?: boolean;
   /** Knopfgruppe: zeigt die zuletzt benutzte Aktion, der Pfeil daneben klappt die übrigen auf.

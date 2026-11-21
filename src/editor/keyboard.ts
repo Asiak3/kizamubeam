@@ -49,7 +49,8 @@ export class EditorKeyboard {
   onKey(this: Editor, e: KeyboardEvent) {
     if (e.defaultPrevented) return;
     const el = e.target as HTMLElement;
-    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+    // Function keys (F1 = shortcut overview) also work while a field has the focus
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable) && !/^F[0-9]+$/.test(e.key)) return;
     const ctrl = e.ctrlKey || e.metaKey;
     const k = e.key.toLowerCase();
     const run = (f: () => void) => {
@@ -80,53 +81,20 @@ export class EditorKeyboard {
       e.preventDefault();
       return;
     }
-    if (ctrl && e.shiftKey) {
-      if (k === 'h') return run(() => this.mirror(true));
-      if (k === 'v') return run(() => this.mirror(false));
-      if (k === 'z') return run(() => this.doRedo());
-      if (commandMatches('tolines', e)) return run(() => this.convertSelToPath());
-      if (k === 'a') return run(() => this.onGridArray?.());
-    }
     const nodeMode = this.tool === 'node' && !!this.nodeTarget();
     if (commandMatches('selectall', e) && nodeMode) return run(() => this.selectAllNodes());
-    if (ctrl) {
-      if (k === 'z') return run(() => this.doUndo());
-      if (k === 'y') return run(() => this.doRedo());
-      if (commandMatches('copy', e)) return run(() => this.copy());
-      if (commandMatches('cut', e)) return run(() => this.cut());
-      if (commandMatches('paste', e)) {
-        // Kein preventDefault: das paste-Ereignis bringt Bilder und SVG aus anderen Programmen.
-        // Kommt es nicht (manche Webviews), wird die interne Zwischenablage eingefügt.
-        clearTimeout(this.pasteTimer);
-        this.pasteTimer = window.setTimeout(() => this.paste(), 80);
-        return;
-      }
-      if (k === 'i') return run(() => this.onImport?.());
-      if (commandMatches('duplicate', e)) return run(() => this.duplicate());
-      if (commandMatches('selectall', e)) return run(() => this.selectAll());
-      if (commandMatches('group', e)) return run(() => this.group());
-      if (commandMatches('ungroup', e)) return run(() => this.ungroup());
-      if (k === 'r') return run(() => this.setTool('rect'));
-      if (k === 'e') return run(() => this.setTool('ellipse'));
-      if (k === 'l') return run(() => this.setTool('line'));
-      if (k === 't') return run(() => this.setTool('text'));
-      if (commandMatches('tool:node', e) || (e.code === 'Backquote' && !e.altKey && !e.shiftKey)) return run(() => this.setTool('node'));
-      if (k === 'k') return run(() => this.setTool('trim'));
-      if (k === '0') return run(() => this.zoomPage());
+    if (commandMatches('paste', e)) {
+      // Kein preventDefault: das paste-Ereignis bringt Bilder und SVG aus anderen Programmen.
+      // Kommt es nicht (manche Webviews), wird die interne Zwischenablage eingefügt.
+      clearTimeout(this.pasteTimer);
+      this.pasteTimer = window.setTimeout(() => this.paste(), 80);
       return;
     }
-    if (k === 'pageup' && !e.altKey) return run(() => this.setPage(this.doc.page - 1));
-    // UI-level image/preview commands must not also trigger unmodified node keys.
-    if (commandMatches('trace', e) || commandMatches('preview', e)) return;
-    if (k === 'pagedown' && !e.altKey) return run(() => this.setPage(this.doc.page + 1));
-    // Boolesche Operationen: Alt + Plus / Minus / Stern (Mac: Option liefert ±, – bzw. ein Sonderzeichen, daher auch Ziffernblock-Codes)
-    if (e.altKey && (k === '+' || k === '±' || e.code === 'NumpadAdd')) return run(() => void this.booleanSel('union'));
-    if (e.altKey && (k === '-' || k === '–' || e.code === 'NumpadSubtract')) return run(() => void this.booleanSel('subtract'));
-    if (e.altKey && (k === '*' || e.code === 'NumpadMultiply')) return run(() => void this.booleanSel('intersect'));
-    if (e.altKey && k === 'w') return run(() => this.setFilled(!this.filled));
-    // Alt+J / Alt+B (Mac: Option, dort liefert e.key ein Sonderzeichen, daher e.code)
-    if (e.altKey && !e.shiftKey && e.code === 'KeyJ') return run(() => this.joinSel());
-    if (e.altKey && !e.shiftKey && e.code === 'KeyB') return run(() => this.breakApartSel());
+    // Mit Ctrl nur Tastenkürzel; Esc, Enter und die Knotentasten wirken ohne Ctrl
+    if (ctrl) {
+      this.onCommandKey?.(e);
+      return;
+    }
     if (k === 'escape')
       return run(() => {
         if (this.drag) return this.cancelDrag();
@@ -164,6 +132,8 @@ export class EditorKeyboard {
         return run(() => { this.draft!.nodes.pop(); if (!this.draft!.nodes.length) { this.draft = null; this.continuedFrom = null; } this.redraw(); });
       if (k === 'delete' || k === 'backspace') return run(() => {});
     }
+    // Tastenkürzel (#453): alles Belegbare nach den Tasten mit fester Bedeutung im jeweiligen Modus
+    if (this.onCommandKey?.(e)) return;
     if (k === 'delete' || k === 'backspace') return run(() => this.deleteSel());
     const steps = this.nudgeSt();
     const step = e.shiftKey ? steps.shift : e.altKey ? steps.alt : steps.normal;
@@ -171,15 +141,5 @@ export class EditorKeyboard {
     if (k === 'arrowright') return run(() => this.nudge(step, 0));
     if (k === 'arrowup') return run(() => this.nudge(0, -step));
     if (k === 'arrowdown') return run(() => this.nudge(0, step));
-    if (k === '.') return run(() => this.rotateBy(-90));
-    if (k === ',') return run(() => this.rotateBy(90));
-    if (k === '+' || k === '=') return run(() => this.zoomAt(1.25));
-    if (k === '-') return run(() => this.zoomAt(0.8));
-    if (this.sel.length > 1) {
-      const map: Record<string, Parameters<Editor['align']>[0]> = {
-        l: 'left', r: 'right', t: 'top', b: 'bottom', c: 'hcenter', e: 'vcenter',
-      };
-      if (map[k]) return run(() => this.align(map[k]));
-    }
   }
 }

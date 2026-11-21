@@ -67,6 +67,13 @@ const CONTROL_MUTATION_EVENTS = [
   'compositionupdate', 'compositionend', 'submit', 'reset', 'wheel',
 ] as const;
 
+/** Tooltip with the shortcut after the name: `Name (Ctrl+X): explanation` */
+function labelWithShortcut(label: string, shortcut?: string): string {
+  if (!shortcut) return label;
+  const i = label.indexOf(': ');
+  return i < 0 ? `${label} (${shortcut})` : `${label.slice(0, i)} (${shortcut})${label.slice(i)}`;
+}
+
 /** Split legacy-style labels: explanation after ': ' is dropped, `(shortcut)` becomes kbd. */
 function menuLabelParts(label: string): { name: string; shortcut?: string } {
   const name = label.split(': ')[0];
@@ -363,8 +370,10 @@ export class ToolbarRenderer {
         const action = resolve(snapshot);
         const dynamic = action?.dyn?.();
         const iconName = dynamic?.icon ?? action?.icon;
-        const fullLabel = dynamic?.label ?? action?.label ?? '';
-        const { name, shortcut } = menuLabelParts(fullLabel);
+        const raw = dynamic?.label ?? action?.label ?? '', key = action?.shortcut?.();
+        const fullLabel = labelWithShortcut(raw, key);
+        const parts = menuLabelParts(raw);
+        const name = parts.name, shortcut = key || parts.shortcut;
         button.title = fullLabel;
         button.setAttribute('aria-label', fullLabel);
         button.disabled = !action || action.enabled?.() === false;
@@ -418,7 +427,7 @@ export class ToolbarRenderer {
   private paint(button: HTMLButtonElement, action?: ToolbarAction): void {
     const dynamic = action?.dyn?.();
     const icon = dynamic?.icon ?? action?.icon;
-    const label = dynamic?.label ?? action?.label ?? '';
+    const label = labelWithShortcut(dynamic?.label ?? action?.label ?? '', action?.shortcut?.());
     button.className = `ib${icon ? '' : ' text'}${action?.small ? ' small' : ''}`;
     button.title = label;
     button.setAttribute('aria-label', label);

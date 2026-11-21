@@ -4,6 +4,7 @@
 import type { Editor } from './editor';
 import { h } from './dom';
 import { t } from './i18n';
+import { withShortcut } from './commandKeys';
 import { dockWindow, isShown, onWindowShow, setBadge } from './dock';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -14,8 +15,8 @@ const clock = (ms: number) => {
 
 export function buildHistoryPanel(ed: Editor) {
   const body = dockWindow('history', t('Verlauf'), { bodyId: 'history' });
-  const btnUndo = h('button', { class: 'small', title: t('Rückgängig (Ctrl+Z)'), onclick: () => ed.doUndo() }, t('Rückgängig'));
-  const btnRedo = h('button', { class: 'small', title: t('Wiederholen (Ctrl+Y)'), onclick: () => ed.doRedo() }, t('Wiederholen'));
+  const btnUndo = h('button', { class: 'small', title: withShortcut(t('Rückgängig'), 'undo'), onclick: () => ed.doUndo() }, t('Rückgängig'));
+  const btnRedo = h('button', { class: 'small', title: withShortcut(t('Wiederholen'), 'redo'), onclick: () => ed.doRedo() }, t('Wiederholen'));
   const list = h('div', { class: 'hist-list' });
   body.append(h('div', { class: 'hist-bar' }, btnUndo, btnRedo), list);
 

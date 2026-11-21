@@ -5782,6 +5782,66 @@ label.settings-label input {
 .settings-keys td:first-child {
   width: 38%;
 }
+/* Settings → keyboard shortcuts (#453) */
+.shortcut-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+.shortcut-filter {
+  flex: 1;
+  min-width: 0;
+}
+.shortcut-status:empty {
+  display: none;
+}
+.shortcut-table {
+  width: 100%;
+}
+/* Lines between the rows so name, key and buttons of a row are easy to follow */
+.shortcut-table td {
+  padding: 4px 8px 4px 4px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--line);
+}
+.shortcut-table tbody tr:not(.shortcut-cat):not(.shortcut-ask-row):hover td {
+  background: var(--accent-soft);
+}
+.shortcut-table th {
+  padding: 12px 0 4px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.shortcut-ask {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent-soft);
+}
+.shortcut-ask > span {
+  flex: 1 1 auto;
+}
+.shortcut-table tr.customized kbd {
+  font-weight: 600;
+}
+.shortcut-table kbd.capturing {
+  color: var(--accent);
+}
+.shortcut-buttons {
+  white-space: nowrap;
+  text-align: right;
+}
+.shortcut-buttons .btn.small {
+  margin-left: 4px;
+  padding: 1px 8px;
+}
 .form > .form-title {
   grid-column: 1 / -1;
 }

@@ -64,7 +64,7 @@ strokes. Generators retain their parameters; groups are refused intact. No open
 cutting lines, gap detection, nested groups or live derived geometry yet.
 
 Context menus now cover vectors, bitmaps, components and blank canvas using shared
-shortcut defaults. No configurable-keybinding UI is included. Temporary isolation
+shortcut defaults (changeable since #453). Temporary isolation
 filters editing/rendering/snapping, not output; groups stay whole. No persistent
 visibility/output flags are changed by isolation.
 

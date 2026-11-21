@@ -10,6 +10,8 @@ interface ToolbarActionBase {
   enabled?: () => boolean;
   on?: () => boolean;
   dyn?: () => { icon?: string; label?: string };
+  /** Current keyboard shortcut for the tooltip and menu rows */
+  shortcut?: () => string;
 }
 
 export type ToolbarAction = ToolbarActionBase & ({ icon: string; short?: string } | { icon?: string; short: string });
