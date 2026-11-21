@@ -13,6 +13,8 @@ import { segments } from './curves';
 import { copySub, extract } from './pathtools';
 import { t, tn } from './i18n';
 import { geomText } from './checkText';
+import { isFallbackFont } from './fonts';
+import { boxesOf, containsStrict } from './polyTopology';
 import { checkFits, FitFinding } from './fitcheck';
 import { AsmFinding, checkAssemblies } from './asmcheck';
 
@@ -70,6 +72,10 @@ export interface CheckInput {
   allObjs?: Obj[];
   /** Objekte je Seite: gezeichnete Formen schneiden Löcher und Kerben in Baugruppen wie beim Lasern (nur dieselbe Seite) */
   pages?: Obj[][];
+  /** Manuelle Schnittreihenfolge (Issue #153): Optimierer aus, Stapelreihenfolge schneidet — dann prüft
+   * checkCutOrder, ob innere Formen nach ihrer äußeren geschnitten würden. Undefiniert/falsch = keine
+   * Prüfung (z. B. Plugins, Optimierer an); den Wert setzt laser.ts aus den Geräte-Schaltern. */
+  manualOrder?: boolean;
 }
 
 function collect(inp: CheckInput): Contour[] {
@@ -223,8 +229,100 @@ function checkImageCuts(inp: CheckInput, out: CheckIssue[]) {
       msg: imageCutIssueText(path.reason, s.name ?? t('Bild')), objs: [o], lines: [], pts: [] });
   }
 }
+/**
+ * Texte, deren Schrift nicht installiert ist (Issue #233): Sie werden still mit Roboto gezeichnet und der
+ * Nutzer merkt es erst am Werkstück. Ein Befund je Schrift (fett/kursiv getrennt); `null` (noch nicht
+ * geladen) meldet nichts — nach dem Laden läuft die Prüfung erneut (onFontLoaded in checkPanel).
+ * Nur Texte, die auch gelasert würden (outputLeaves + Layer-Ausgabe, keine geparkten Objekte).
+ * Der dritte Parameter ist nur für Tests (stubt isFallbackFont ohne geladene Schriften).
+ */
+export function checkFallbackFonts(
+  inp: CheckInput,
+  out: CheckIssue[],
+  isFallback: (family: string, bold: boolean, italic: boolean) => boolean | null = isFallbackFont,
+) {
+  const parked = parkedObjs(inp.objs, inp.bed, inp.layer);
+  const by = new Map<string, { font: string; tops: Obj[]; lines: Pt[][]; count: number }>();
+  for (const top of inp.objs) {
+    if (parked.has(top)) continue;
+    for (const [o, m] of outputLeaves([top])) {
+      const s = o.shape;
+      if (s.kind !== 'text' || !inp.layer(o.layer).output) continue;
+      if (isFallback(s.font, s.bold, s.italic) !== true) continue;
+      const key = `${s.font}|${s.bold}|${s.italic}`;
+      let g = by.get(key);
+      if (!g) { g = { font: s.font, tops: [], lines: [], count: 0 }; by.set(key, g); }
+      if (!g.tops.includes(top)) g.tops.push(top);
+      g.count++;
+      const b = boundsOf([o], mul(m, inv(o.m)));
+      if (b) g.lines.push(boxLine(b));
+    }
+  }
+  for (const [key, g] of by)
+    out.push({
+      key: `font:${key}`,
+      kind: 'font',
+      level: 'warn',
+      msg: tn('Schrift „{font}“ ist nicht installiert — 1 Text wird mit Roboto gezeichnet.',
+        'Schrift „{font}“ ist nicht installiert — {n} Texte werden mit Roboto gezeichnet.', g.count, { font: g.font }),
+      objs: g.tops,
+      lines: g.lines,
+      pts: [],
+    });
+}
 
 const ORDER: Record<CheckLevel, number> = { error: 0, warn: 1, info: 2 };
+
+/**
+ * Manuelle Schnittreihenfolge (Issue #153, V2): Bei ausgeschaltetem Optimierer ist die Stapel-/
+ * Dokumentreihenfolge die Schnittreihenfolge. Wird dabei eine innere Form nach ihrer äußeren geschnitten,
+ * warnt schon die Prüfung — vorher stand das nur im Laser-Log und war leicht zu übersehen.
+ * Je Layer ein Befund (warn, ohne Fix); dieselbe Zähllogik wie countManualViolations in gcode.ts
+ * (Dokumentreihenfolge, nur geschlossene Schnittkonturen, deckungsgleiche Rahmen zählen nicht).
+ * Meldungstexte bewusst identisch zum Job (Übersetzungen vorhanden).
+ */
+function checkCutOrder(inp: CheckInput, cs: Contour[], out: CheckIssue[]) {
+  if (!inp.manualOrder) return;
+  const parked = parkedObjs(inp.objs, inp.bed, inp.layer);
+  const byLayer = new Map<number, Contour[]>();
+  for (const c of cs) {
+    if (!c.cut || !c.closed || parked.has(c.top)) continue;
+    const g = byLayer.get(c.layer);
+    if (g) g.push(c);
+    else byLayer.set(c.layer, [c]);
+  }
+  for (const [layer, polys] of byLayer) {
+    if (polys.length < 2) continue;
+    const boxes = boxesOf(polys);
+    const inner: Contour[] = [];
+    for (let j = 0; j < polys.length; j++) {
+      for (let i = 0; i < j; i++) {
+        // deckungsgleiche Konturen (gleicher Rahmen) sind Doppellinien, kein innen/außen (#221)
+        const a = boxes[i],
+          b = boxes[j];
+        if (a.x0 === b.x0 && a.y0 === b.y0 && a.x1 === b.x1 && a.y1 === b.y1) continue;
+        if (containsStrict(polys, boxes, j, i)) {
+          inner.push(polys[j]);
+          break;
+        }
+      }
+    }
+    if (!inner.length) continue;
+    out.push({
+      key: `order:${layer}`,
+      kind: 'order',
+      level: 'warn',
+      msg: tn(
+        'Manuelle Reihenfolge: {n} innere Form wird nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.',
+        'Manuelle Reihenfolge: {n} innere Formen werden nach ihrer äußeren Form geschnitten (innen-vor-außen verletzt) — „Innere Formen zuerst“ aktivieren oder Stapelreihenfolge im Objekte-Fenster ändern.',
+        inner.length,
+      ),
+      objs: [...new Set(inner.map((c) => c.top))],
+      lines: inner.map((c) => boxLine({ x: c.box.x0, y: c.box.y0, w: c.box.x1 - c.box.x0, h: c.box.y1 - c.box.y0 })),
+      pts: [],
+    });
+  }
+}
 
 /** Alle Prüfungen für die Objekte einer Seite; Ergebnis nach Schwere sortiert */
 export function checkDesign(inp: CheckInput): CheckIssue[] {
@@ -249,6 +347,8 @@ export function checkDesign(inp: CheckInput): CheckIssue[] {
   geom.forEach(withText(out));
   checkImport(inp, out);
   checkLooseEngravings(inp, out);
+  checkFallbackFonts(inp, out);
+  checkCutOrder(inp, cs, out);
   const fits: FitFinding[] = [];
   checkFits(inp.objs, inp.layer, inp.settings.beam, fits);
   for (const f of fits)

@@ -13,7 +13,7 @@ export class EditorCheck {
   runCheck(this: Editor): CheckIssue[] {
     const settings = loadCheckSettings();
     const issues = checkDesign({
-      objs: this.doc.objs, allObjs: this.doc.pages.flatMap((pg) => pg.objs), pages: this.doc.pages.map((pg) => pg.objs), layer: (i) => this.layer(i), bed: this.doc.bed, settings, skipBed: !this.checkBedApplies() || settings.ignoreOutOfBounds === true,
+      objs: this.doc.objs, allObjs: this.doc.pages.flatMap((pg) => pg.objs), pages: this.doc.pages.map((pg) => pg.objs), layer: (i) => this.layer(i), bed: this.doc.bed, settings, skipBed: !this.checkBedApplies() || settings.ignoreOutOfBounds === true, manualOrder: this.manualOrder(),
     });
     this.checkIssues = issues.filter((x) => !this.checkIgnored.has(x.key));
     if (this.checkActive) this.checkActive = this.checkIssues.find((x) => x.key === this.checkActive!.key) ?? null;

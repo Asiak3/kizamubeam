@@ -12,6 +12,8 @@ import { homeLayer, isOff, layerLabel, Obj, PALETTE } from './model';
 import { openShowIfDialog } from './paramsPanel';
 import { $, h } from './dom';
 import { t, tn } from './i18n';
+import { isFallbackFont, onFontLoaded } from './fonts';
+import { openFontManager } from './fontManager';
 import { isShown, onWindowShow, setBadge } from './dock';
 import { ContextCallbacks, openEditorContextMenu } from './editorContext';
 import { closeEditorMenu } from './contextMenu';
@@ -176,6 +178,14 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
             title: t('Sichtbar, wenn: {src} (Klick: ändern)', { src: o.showIf }),
             onclick: (e: Event) => (e.stopPropagation(), openShowIfDialog(ed, [o])),
           }, 'ƒ')
+        : null,
+      // Fehlende Schrift (#233): Roboto springt still ein (null = lädt noch, dann neu zeichnen via onFontLoaded)
+      o.shape.kind === 'text' && isFallbackFont(o.shape.font, o.shape.bold, o.shape.italic) === true
+        ? h('span', {
+            class: 'ot-warn',
+            title: t('Schrift „{font}“ ist nicht installiert — Text wird mit Roboto gezeichnet (Klick: Schriften öffnen)', { font: o.shape.font }),
+            onclick: (e: Event) => (e.stopPropagation(), void openFontManager(ed)),
+          }, '⚠')
         : null,
       isTop
         ? toggleBtn('ot-laser', !o.noLaser, o.noLaser ? 'laseroff' : 'laser', o.noLaser ? t('Wieder lasern') : t('Nicht lasern (bleibt sichtbar)'), () =>
@@ -366,6 +376,8 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
       render();
     });
   };
+  // Ersatzschrift-Marker (#233) erscheinen, sobald die Schrift fertig geladen ist
+  onFontLoaded(() => scheduleRender());
   ed.on((what) => {
     if (what === 'doc') scheduleRender();
     else if (what === 'sel' || what === 'tool') {

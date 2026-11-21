@@ -252,6 +252,20 @@ body {
   color: var(--muted);
   font-size: calc(10px * var(--ty-interface));
 }
+/* Fehlende Schrift (#233): Warnung in der Textleiste, Klick öffnet die Schriftenverwaltung */
+.fontpick-fallback {
+  border: 1px solid var(--warn, #d9822b);
+  border-radius: 4px;
+  background: none;
+  color: var(--warn, #d9822b);
+  font: inherit;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fontpick-fallback:hover {
+  background: var(--accent-soft);
+}
 .fontpick-pop {
   position: fixed;
   z-index: 120;
@@ -1334,6 +1348,15 @@ dialog {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+}
+.laser-tab .job-order {
+  margin: 4px 0;
+}
+.laser-tab .job-order summary {
+  cursor: pointer;
+}
+.laser-tab .job-order .btn {
+  margin-top: 6px;
 }
 label.check {
   display: inline-flex;
@@ -3624,6 +3647,13 @@ input.bound {
   color: var(--accent);
   font-style: italic;
   font-weight: 600;
+  padding: 0 4px;
+  cursor: pointer;
+}
+/* Fehlende Schrift (#233): Roboto springt ein, Klick öffnet die Schriftenverwaltung */
+.ot-warn {
+  color: var(--warn, #d9822b);
+  font-weight: 700;
   padding: 0 4px;
   cursor: pointer;
 }

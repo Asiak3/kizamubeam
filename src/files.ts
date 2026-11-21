@@ -8,7 +8,7 @@ import { IDENT, Mat, mul, Obj, pageName, TextShape, visibleLeaves, PALETTE, type
 import { boundsOf, subsToD, shapeSubs, textLayout, textOutline } from './geom';
 import { assetImage, assetRgba, assetUrl, flipImageV, hashId, processedPng, readDpi, registerAsset } from './images';
 import { DEFAULT_IMAGE_MAX_PIXELS, rasterizeImage, resolveImageRasterGeometry } from './imageRaster';
-import { convertLbrn, finishLbrnTexts, isLbrn, LbrnResult, TextMeasure } from './lbrn';
+import { convertLbrn, cutOrderGroupOverride, finishLbrnTexts, isLbrn, LbrnResult, loadCutOrderApply, TextMeasure } from './lbrn';
 import { loadFont, textToSubs } from './fonts';
 import { importDxf, importSvg, ImportResult, ImportParseOptions, PathBuilder, transformSubs } from './importers';
 import { buildDxf, buildPdf, ExportItem, ExportPage, LayerInfo } from './vecexport';
@@ -86,7 +86,7 @@ async function measureText(t: TextShape): Promise<TextMeasure> {
 }
 
 /** Aus LightBurn-Projekt (.lbrn2) ein KizamuBeam-Projekt (JSON) machen; Hinweise für die Statusleiste */
-async function lbrnProjectJson(ed: Editor, text: string): Promise<{ json: string; notes: string[] }> {
+async function lbrnProjectJson(ed: Editor, text: string): Promise<{ json: string; notes: string[]; cutOrder: LbrnResult['cutOrder'] }> {
   const bed = { ...ed.doc.bed };
   const r = await convertLbrn(text, { bedH: bed.h, assetId: hashId, flipImage: flipImageV });
   await finishLbrnTexts(r, measureText);
@@ -94,7 +94,7 @@ async function lbrnProjectJson(ed: Editor, text: string): Promise<{ json: string
   const doc: Record<string, unknown> = { version: 2, bed, pages: [{ name: pageName(0), objs: r.objs }], page: 0, layers: r.layers, assets: r.assets };
   if (r.projectNotes) doc.notes = { process: r.projectNotes };
   if (r.vt) doc.vt = r.vt;
-  return { json: JSON.stringify(doc), notes: r.notes };
+  return { json: JSON.stringify(doc), notes: r.notes, cutOrder: r.cutOrder };
 }
 
 const isLbrnName = (name: string) => /\.lbrn2?$/i.test(name);
@@ -104,12 +104,26 @@ export async function openProject(ed: Editor) {
   const apply = async (text: string, name: string) => {
     try {
       if (isLbrnName(name) || isLbrn(text)) {
-        const { json, notes } = await lbrnProjectJson(ed, text);
+        const { json, notes, cutOrder } = await lbrnProjectJson(ed, text);
         ed.openInTab(json, tabNameFromPath(name));
         // Erst als KizamuBeam-Projekt gespeichert gilt die Datei als gesichert
         ed.tab.saved = '';
         ed.updateChanged();
-        ed.hint = [t('LightBurn-Projekt geöffnet.'), ...notes].join(' ');
+        // CutOrder (#153-Nr.3): Datei-Vorgabe als Job-Override übernehmen (Opt-out), Hinweis mit Rückgängig-Weg
+        const extra: string[] = [];
+        if (cutOrder && loadCutOrderApply()) {
+          const g = cutOrderGroupOverride(cutOrder);
+          // Nur mit Gruppen-Info anfassen — sonst bliebe ein manueller Override auf der Strecke
+          if (g !== null) void import('./laser').then((m) => m.applyImportedCutOrder(cutOrder));
+          extra.push(
+            g === null
+              ? t('CutOrder aus der Datei gelesen — Ebenen-Reihenfolge gilt ohnehin.')
+              : g
+                ? t('CutOrder übernommen: „Gruppen zusammenhalten“ an — gilt nur für diesen Job („Zurück zum Preset“ im Laser-Panel macht es rückgängig).')
+                : t('CutOrder übernommen: „Gruppen zusammenhalten“ aus — gilt nur für diesen Job („Zurück zum Preset“ im Laser-Panel macht es rückgängig).'),
+          );
+        }
+        ed.hint = [t('LightBurn-Projekt geöffnet.'), ...notes, ...extra].join(' ');
         ed.emit('tool');
         return;
       }

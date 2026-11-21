@@ -347,6 +347,8 @@ export class Editor {
   checkIgnored = new Set<string>();
   /** Lage auf dem Bett prüfen? (von laser.ts gesetzt: nicht bei Start ab Benutzer-Ursprung/Position oder mit Drehachse) */
   checkBedApplies: () => boolean = () => true;
+  /** Manuelle Schnittreihenfolge laut Geräte-Schaltern? (von laser.ts gesetzt: alle drei Optimierungen aus) */
+  manualOrder: () => boolean = () => false;
 
   // Zeichnen der Arbeitsfläche
   get colors() {

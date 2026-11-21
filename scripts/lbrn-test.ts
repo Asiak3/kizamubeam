@@ -2,7 +2,7 @@
 // Die Testdatei ist von Hand nachgebaut (Aufbau wie bei LightBurn 1.5), keine echte Kundendatei.
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-const { buildSubs, convertLbrn, finishLbrnTexts, imageInfo, isLbrn, lbText, parsePrims, parseVerts, parseXml } = await import('../src/lbrn');
+const { buildSubs, convertLbrn, cutOrderGroupOverride, finishLbrnTexts, imageInfo, isLbrn, lbText, loadCutOrderApply, parsePrims, parseVerts, parseXml } = await import('../src/lbrn');
 type TextShape = import('../src/model').TextShape;
 const { apply, leaves } = await import('../src/model');
 const { shapeSubs } = await import('../src/geom');
@@ -344,6 +344,36 @@ await test('Notizen und variabler Text', async () => {
   assert.equal(r.projectNotes, 'Pappel 3 mm\nFokus 2 mm tiefer');
   assert.equal(r.vt?.current, 7);
   assert.equal(r.vt?.autoAdvance, true);
+});
+
+await test('CutOrder: UIPrefs-Attribute werden als Ränge gelesen, ByGroup schaltet Gruppen ein', async () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<LightBurnProject AppVersion="1.5.06" FormatVersion="1" MaterialHeight="0" MirrorX="False" MirrorY="False">
+    <UIPrefs ByLayer="0" ByGroup="1" ByPriority="2"/>
+</LightBurnProject>`;
+  const r = await convertLbrn(xml, { bedH: BED, assetId: async () => 'x' });
+  assert.deepEqual(r.cutOrder, { byLayer: 0, byGroup: 1, byPriority: 2 });
+  assert.equal(cutOrderGroupOverride(r.cutOrder), true);
+});
+
+await test('CutOrder: Kinder-Elemente, Großschreibung egal, −1 schaltet Gruppen aus', async () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<LightBurnProject AppVersion="1.5.06" FormatVersion="1" MaterialHeight="0" MirrorX="False" MirrorY="False">
+    <UIPrefs><bygroup Value="-1"/><ByLayer Value="3"/></UIPrefs>
+</LightBurnProject>`;
+  const r = await convertLbrn(xml, { bedH: BED, assetId: async () => 'x' });
+  assert.deepEqual(r.cutOrder, { byLayer: 3, byGroup: -1, byPriority: undefined });
+  assert.equal(cutOrderGroupOverride(r.cutOrder), false);
+});
+
+await test('CutOrder: ohne UIPrefs kein CutOrder, Mapping lässt das Preset gelten', async () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<LightBurnProject AppVersion="1.5.06" FormatVersion="1" MaterialHeight="0" MirrorX="False" MirrorY="False">
+</LightBurnProject>`;
+  const r = await convertLbrn(xml, { bedH: BED, assetId: async () => 'x' });
+  assert.equal(r.cutOrder, undefined);
+  assert.equal(cutOrderGroupOverride(r.cutOrder), null);
+  assert.equal(loadCutOrderApply(), true);
 });
 
 await test('Keine LightBurn-Datei', async () => {

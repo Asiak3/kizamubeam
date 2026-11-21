@@ -6,6 +6,7 @@ import { h } from './dom';
 import { dec, t, tn } from './i18n';
 import { dockWindow, isShown, onWindowShow, setBadge, showWindow } from './dock';
 import { CheckIssue, CheckKind, CheckSettings, fixLabel, loadCheckSettings, saveCheckSettings } from './check';
+import { onFontLoaded } from './fonts';
 import { objLabel } from './objectsPanel';
 import { onPluginResult } from './plugins/generator';
 import { isCutLayer, layerLabel, PALETTE } from './model';
@@ -24,6 +25,8 @@ const KIND_NAMES = (): Record<CheckKind, string> => ({
   insert: t('Stecken'),
   engrave: t('Gravur'),
   image: t('Bildfehler'),
+  font: t('Schrift'),
+  order: t('Schnittreihenfolge'),
 });
 
 let openPanel: (() => void) | null = null;
@@ -173,6 +176,10 @@ export function buildCheckPanel(ed: Editor) {
   });
   // Generators that are plugins compute in their Worker: check again when a result arrives
   onPluginResult(() => {
+    if (isShown('check')) run();
+  });
+  // Ersatzschrift-Befunde (#233) stehen erst fest, wenn die Schrift geladen ist
+  onFontLoaded(() => {
     if (isShown('check')) run();
   });
   onWindowShow('check', () => {

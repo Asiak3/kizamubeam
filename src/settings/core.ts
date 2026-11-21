@@ -10,6 +10,7 @@ import { DEFAULT_GRID, GridSettings } from '../grid';
 import type { BoolBase } from '../ops';
 import { loadCheckSettings, saveCheckSettings } from '../check';
 import { type CurveQuality, loadCurveQuality, saveCurveQuality } from '../geom';
+import { loadCutOrderApply, saveCutOrderApply } from '../lbrn';
 import { autoInstallFonts, setAutoInstallFonts } from '../fontCatalog';
 import { loadOverlapSettings, OVERLAP_HOLD_MS, OverlapSettings, saveOverlapSettings } from '../overlapPicker';
 import { loadAutosaveInterval, loadCutSelectedDefault, loadJobOriginDefault, saveCutSelectedDefault, saveJobOriginDefault, setAutosaveInterval } from '../editor/document';
@@ -79,6 +80,13 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         hint: t('Sichert das Projekt alle paar Minuten im Zwischenspeicher dieses Rechners. 0 = aus (nur kurze Verzögerung nach Änderungen).'),
         get: () => loadAutosaveInterval(),
         set: (v) => setAutosaveInterval(ed, v),
+      },
+      {
+        kind: 'toggle', id: 'general.cutOrderApply', group: t('Dateiimport'), label: t('CutOrder aus LightBurn-Dateien übernehmen'), def: true,
+        keywords: 'CutOrder LightBurn Reihenfolge Import lbrn',
+        hint: t('Reihenfolge-Vorgabe aus .lbrn/.lbrn2 gilt für den nächsten Job (im Laser-Panel änderbar). Übernommene Werte bleiben bis „Zurück zum Preset“ aktiv. Aus = Dateireihenfolge wie bisher.'),
+        get: () => loadCutOrderApply(),
+        set: (v) => saveCutOrderApply(v),
       },
       {
         kind: 'action', id: 'general.sync', label: t('Einstellungen übertragen'), keywords: t('Export Import Sync Ordner'),

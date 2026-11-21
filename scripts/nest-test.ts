@@ -4,7 +4,8 @@ import { strict as assert } from 'node:assert';
 import ClipperLib from 'clipper-lib';
 import type { Mat, Obj, Pt } from '../src/model';
 const { DEFAULT_NEST, nest, grow, regionArea } = await import('../src/nest');
-import type { NestOptions, NestPart, NestResult, Poly } from '../src/nest';
+import type { NestOptions, NestPart, NestPlacement, NestResult, Poly } from '../src/nest';
+import type { NestUnit } from '../src/editor/nest';
 const { EditorNest, DEFAULT_NEST_SETTINGS } = await import('../src/editor/nest');
 const { t } = await import('../src/i18n');
 const { loadDoc, defaultLayer, IDENT, translate, leaves } = await import('../src/model');
@@ -276,6 +277,27 @@ await test('Editor: verschachteln, Überlauf auf neue Seite, ein Undo-Schritt', 
       const b = worldBox(o);
       assert.ok(b.x0 >= -1e-6 && b.y0 >= -1e-6 && b.x1 <= 200 + 1e-6 && b.y1 <= 140 + 1e-6, `${o.id} außerhalb: ${JSON.stringify(b)}`);
     }
+});
+
+await test('Editor: Schnittreihenfolge (#153) bleibt je Seite relativ zur Stapelreihenfolge', () => {
+  const a = rectObj(0, 0, 20, 20), b = rectObj(30, 0, 20, 20), c = rectObj(60, 0, 20, 20), d = rectObj(90, 0, 20, 20);
+  const ed = fakeEditor([a, b, c, d]);
+  const units: NestUnit[] = [a, b, c, d].map((o) => ({ objs: [o], region: [] }));
+  // Platzierungsreihenfolge absichtlich anders als die Stapelreihenfolge, auf zwei Seiten verteilt
+  const r: NestResult = {
+    placed: [
+      { key: 2, sheet: 1, angle: 0, m: translate(0, 0) },
+      { key: 0, sheet: 0, angle: 0, m: translate(0, 0) },
+      { key: 3, sheet: 1, angle: 0, m: translate(30, 0) },
+      { key: 1, sheet: 0, angle: 0, m: translate(30, 0) },
+    ],
+    unplaced: [], sheets: 2, usage: [0.5, 0.5],
+  };
+  const out = ed.applyNest(units, r, null);
+  assert.equal(out.newPages, 1);
+  // Manuelle Reihenfolge = Stapelreihenfolge: je Seite relativ erhalten, nicht Platzierungsreihenfolge
+  assert.deepEqual(ed.doc.pages[0].objs.map((o) => o.id), [a.id, b.id]);
+  assert.deepEqual(ed.doc.pages[1].objs.map((o) => o.id), [c.id, d.id]);
 });
 
 await test('Editor: Reststück als Platte bleibt liegen, neue Seiten bekommen eine Kopie', async () => {

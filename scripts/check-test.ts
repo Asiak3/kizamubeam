@@ -1,10 +1,30 @@
 // Tests für „Konstruktion prüfen“. Aufruf: npm run test:check
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import type { CheckIssue } from '../src/check';
+// Textgeometrie misst über einen Canvas-Context (kein Canvas in Node): Minimal-Stub nur für Maße,
+// damit boundsOf() auch für Texte funktioniert. Echte Schriften werden nicht geladen (isFallbackFont → null).
+{
+  const g = globalThis as Record<string, unknown>;
+  const doc = (g.document ?? {}) as { createElement?: (tag: string) => unknown };
+  const prev = doc.createElement;
+  doc.createElement = (tag: string) => {
+    if (tag === 'canvas') return { getContext: () => ({ font: '', measureText: (s: string) => ({ width: [...s].length * 6 }) }), style: {} };
+    return prev ? prev(tag) : { style: {} };
+  };
+  g.document = doc;
+  // Konturen-Cache baut Path2D-Objekte (nur als Zeichen-Handle, Geometrie steckt in subs)
+  (g as Record<string, unknown>).Path2D ??= class {
+    moveTo() {}
+    lineTo() {}
+    bezierCurveTo() {}
+    closePath() {}
+    rect() {}
+  };
+}
+import type { CheckInput, CheckIssue } from '../src/check';
 import type { Layer, Obj, Shape, SubPath } from '../src/model';
 const { defaultLayer, IDENT, translate } = await import('../src/model');
-const { checkDesign, DEFAULT_CHECK, removeSpans } = await import('../src/check');
+const { checkDesign, checkFallbackFonts, DEFAULT_CHECK, removeSpans } = await import('../src/check');
 const { buildGen, defaultParams, GENERATORS, getGenerator } = await import('../src/generators/index');
 await import('./builtin-generators');
 const { library } = await import('../src/materials');
@@ -32,8 +52,8 @@ const path = (subs: SubPath[], layer = 1) => obj({ kind: 'path', subs }, 0, 0, l
 
 const layers: Record<number, Layer> = {};
 const layerOf = (i: number) => (layers[i] ??= defaultLayer(i));
-const run = (objs: Obj[], settings = {}): CheckIssue[] =>
-  checkDesign({ objs, layer: layerOf, bed: { w: 400, h: 400 }, settings: { ...DEFAULT_CHECK, ...settings } });
+const run = (objs: Obj[], settings = {}, extra: Partial<CheckInput> = {}): CheckIssue[] =>
+  checkDesign({ objs, layer: layerOf, bed: { w: 400, h: 400 }, settings: { ...DEFAULT_CHECK, ...settings }, ...extra });
 const kinds = (xs: CheckIssue[]) => xs.map((x) => x.kind).sort();
 
 test('Saubere Teile: keine Befunde', () => {
@@ -482,6 +502,97 @@ test('Steckprüfung: Fehlt ein Teil, hängen andere lose; Teile auf anderen Seit
   const half = all.slice(0, 1);
   const xs = checkDesign({ objs: half, allObjs: all, layer: layerOf, bed: { w: 400, h: 400 }, settings: DEFAULT_CHECK });
   assert.deepEqual(asmOnly(xs), []);
+});
+
+// Ersatzschrift (#233): echte Roboto-Binär seeden, damit loadedFont im Node-Test den Cache trifft
+// (der Bundler kann die ?inline-Woffs nicht laden — ohne Seed würde loadFont async crashen).
+// Läufe: Gruppierung per Stub, still-Pfade (false/null, noLaser, Layer aus, geparkt) sowie Gruppe + Routing.
+const { withFonts } = await import('../src/fonts');
+const { readFileSync } = await import('node:fs');
+const robotoBuf = (() => {
+  const b = readFileSync('node_modules/@fontsource/roboto/files/roboto-latin-400-normal.woff');
+  return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
+})();
+await withFonts([
+  { family: 'Fehlt', bold: false, italic: false, buf: robotoBuf },
+  { family: 'Fehlt', bold: true, italic: false, buf: robotoBuf },
+  { family: 'Fehlt', bold: false, italic: true, buf: robotoBuf },
+], async () => {
+test('Ersatzschrift (#233): ein Befund je Schrift, fett/kursiv getrennt, Level warn', () => {
+  const t = (font: string, x = 10, y = 10, extra: Record<string, unknown> = {}, layer = 1) =>
+    obj({ kind: 'text', text: 'A', font, size: 10, bold: false, italic: false, upper: false, align: 'left', hSpace: 0, vSpace: 0, ...extra } as Shape, x, y, layer);
+  const a = t('Fehlt'), b = t('Fehlt', 60, 10), c = t('Fehlt', 10, 60, { bold: true }), d = t('Fehlt', 70, 60, { italic: true });
+  const inp = { objs: [a, b, c, d], layer: layerOf, bed: { w: 400, h: 400 }, settings: { ...DEFAULT_CHECK } };
+  const out: CheckIssue[] = [];
+  checkFallbackFonts(inp, out, () => true);
+  assert.deepEqual(out.map((x) => x.key).sort(), ['font:Fehlt|false|false', 'font:Fehlt|false|true', 'font:Fehlt|true|false']);
+  assert.deepEqual(out.map((x) => x.kind), ['font', 'font', 'font']);
+  assert.deepEqual(out.map((x) => x.level), ['warn', 'warn', 'warn']);
+  const plain = out.find((x) => x.key === 'font:Fehlt|false|false')!;
+  assert.deepEqual(plain.objs, [a, b]);
+  assert.match(plain.msg, /Fehlt/);
+  assert.match(plain.msg, /2 Texte/);
+  assert.equal(plain.lines.length, 2);
+});
+
+test('Ersatzschrift (#233): geladen oder noch ladend meldet nichts; ohne Laserbeteiligung still', () => {
+  const t = (font: string, x = 10, y = 10): Obj =>
+    obj({ kind: 'text', text: 'A', font, size: 10, bold: false, italic: false, upper: false, align: 'left', hSpace: 0, vSpace: 0 } as Shape, x, y);
+  const runStub = (objs: Obj[], stub: () => boolean | null, layer = layerOf): CheckIssue[] => {
+    const out: CheckIssue[] = [];
+    checkFallbackFonts({ objs, layer, bed: { w: 400, h: 400 }, settings: { ...DEFAULT_CHECK } }, out, stub);
+    return out;
+  };
+  assert.deepEqual(runStub([t('Fehlt')], () => false), []);
+  assert.deepEqual(runStub([t('Fehlt')], () => null), []);
+  const still = t('Fehlt');
+  still.noLaser = true;
+  assert.deepEqual(runStub([still], () => true), []);
+  const off = (i: number) => ({ ...defaultLayer(i), output: false });
+  assert.deepEqual(runStub([t('Fehlt')], () => true, off), []);
+  // Geparkt (außerhalb des Betts, Platte drinnen): kein Befund
+  assert.deepEqual(runStub([rect(50, 50, 10, 10), t('Fehlt', 500, 500)], () => true), []);
+});
+
+test('Ersatzschrift (#233): Text in Gruppe nennt die Gruppe, checkDesign stürzt ohne geladene Schrift nicht ab', () => {
+  const leaf = { kind: 'text', text: 'A', font: 'Fehlt', size: 10, bold: false, italic: false, upper: false, align: 'left', hSpace: 0, vSpace: 0 } as Shape;
+  const g: Obj = { id: 900, m: IDENT, layer: 1, shape: { kind: 'group', children: [{ id: 901, m: translate(20, 20), layer: 1, shape: leaf }] } };
+  const out: CheckIssue[] = [];
+  checkFallbackFonts({ objs: [g], layer: layerOf, bed: { w: 400, h: 400 }, settings: { ...DEFAULT_CHECK } }, out, () => true);
+  assert.equal(out.length, 1);
+  assert.deepEqual(out[0].objs, [g]);
+  assert.equal(out[0].lines.length, 1);
+  // Echte Prüfung mit realer Ersatzschrift-Erkennung: geseedet = installiert (false) → kein Befund;
+  // null (lädt noch) nimmt denselben !== true-Zweig wie oben per Stub — kein Absturz ohne geladene Schrift
+  assert.deepEqual(kinds(run([obj(leaf, 10, 10)])).filter((k) => k === 'font'), []);
+});
+});
+
+test('Schnittreihenfolge (#153): außen vor innen warnt bei manuellem Auftrag (warn, ohne Fix)', () => {
+  const outer = rect(100, 60, 10, 10);
+  const inner = ellipse(5, 40, 40);
+  const xs = run([outer, inner], {}, { manualOrder: true });
+  assert.deepEqual(kinds(xs), ['order']);
+  assert.equal(xs[0].level, 'warn');
+  assert.equal(xs[0].key, 'order:1');
+  assert.match(xs[0].msg, /innen-vor-außen/);
+  assert.deepEqual(xs[0].objs, [inner]);
+  assert.equal(xs[0].lines.length, 1);
+  assert.equal(xs[0].fix, undefined);
+});
+
+test('Schnittreihenfolge (#153): innen vor außen ist sauber; ohne manualOrder still', () => {
+  const outer = rect(100, 60, 10, 10);
+  const inner = ellipse(5, 40, 40);
+  assert.deepEqual(run([inner, outer], {}, { manualOrder: true }), []);
+  assert.deepEqual(run([outer, inner]), []);
+  assert.deepEqual(run([outer, inner], {}, { manualOrder: false }), []);
+});
+
+test('Schnittreihenfolge (#153): deckungsgleiche Konturen sind Doppellinien, kein Reihenfolge-Befund', () => {
+  const xs = run([rect(50, 50, 10, 10), rect(50, 50, 10, 10)], {}, { manualOrder: true });
+  assert.ok(kinds(xs).includes('double'));
+  assert.ok(!kinds(xs).includes('order'));
 });
 
 if (failed) {

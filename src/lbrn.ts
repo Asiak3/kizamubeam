@@ -123,6 +123,13 @@ export interface LbrnResult {
    * auf das Gerät angewendet — im Laser-Panel übernehmen.
    */
   optimizer?: { innerFirst?: boolean; travel?: boolean; group?: boolean };
+  /**
+   * CutOrder der Datei (Issue #153-Nr.3): Reihenfolge der Optimierer-Kriterien aus `UIPrefs`
+   * (`ByLayer`/`ByGroup`/`ByPriority` mit Rang 0… oder −1 = nicht enthalten), tolerant gelesen.
+   * Ebenen laufen in KizamuBeam ohnehin in Prioritäts-Reihenfolge; mappbar ist nur die Gruppe
+   * (s. cutOrderGroupOverride). Anwendung nur per Opt-out-Einstellung (loadCutOrderApply).
+   */
+  cutOrder?: { byLayer?: number; byGroup?: number; byPriority?: number };
 }
 
 export interface LbrnText {
@@ -268,6 +275,36 @@ export interface LbrnOptions {
 }
 
 export const isLbrn = (text: string) => /^\s*(<\?xml[^>]*>\s*)?<LightBurnProject[\s>]/.test(text.slice(0, 600));
+
+/**
+ * CutOrder-Mapping (Issue #153-Nr.3, rein): `ByGroup`-Rang ≥ 0 schaltet „Gruppen zusammenhalten"
+ * für den Job an, −1 schaltet sie aus, fehlend lässt das Preset gelten. ByLayer/ByPriority brauchen
+ * keinen Schalter — Ebenen laufen ohnehin in Prioritäts-Reihenfolge (gcode.ts).
+ */
+export function cutOrderGroupOverride(co: { byGroup?: number } | undefined): boolean | null {
+  if (!co || co.byGroup === undefined) return null;
+  return co.byGroup >= 0;
+}
+
+const CUTORDER_KEY = 'kizamubeam.cutOrderApply';
+
+/** Opt-out-Einstellung (Standard an): CutOrder aus LightBurn-Dateien für den nächsten Job übernehmen. */
+export function loadCutOrderApply(): boolean {
+  try {
+    const v = localStorage.getItem(CUTORDER_KEY);
+    return v === null ? true : v !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function saveCutOrderApply(v: boolean) {
+  try {
+    localStorage.setItem(CUTORDER_KEY, v ? '1' : '0');
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+}
 
 // ---------- Pfade ----------
 
@@ -668,6 +705,36 @@ export async function convertLbrn(text: string, opts: LbrnOptions): Promise<Lbrn
             group: f(group),
           }),
         );
+      }
+    }
+  }
+
+  // CutOrder (Issue #153-Nr.3): UIPrefs mit der Kriterien-Reihenfolge — Rang 0… oder −1
+  // (nicht enthalten). Gleiches tolerantes Lesen wie oben (Attribute oder Kinder, egal welche
+  // Großschreibung); Unbekanntes wird ignoriert. Nur Daten — angewendet wird in files.ts.
+  {
+    const ux = proj.children.find((c) => /uiprefs/i.test(c.tag));
+    if (ux) {
+      const raw: Record<string, string> = {};
+      for (const [k, v] of Object.entries(ux.attrs)) raw[k.toLowerCase()] = v;
+      for (const c of ux.children) {
+        const v = c.attrs.Value ?? (c.attrs as Record<string, string>).value;
+        if (v !== undefined && v !== '') raw[c.tag.toLowerCase()] = v;
+      }
+      const rank = (...names: string[]): number | undefined => {
+        for (const nm of names) {
+          const v = raw[nm];
+          if (v === undefined) continue;
+          const n = Number(v);
+          if (isFinite(n) && Math.floor(n) === n) return n;
+        }
+        return undefined;
+      };
+      const byLayer = rank('bylayer', 'orderbylayer', 'layer');
+      const byGroup = rank('bygroup', 'orderbygroup', 'group');
+      const byPriority = rank('bypriority', 'orderbypriority', 'priority');
+      if (byLayer !== undefined || byGroup !== undefined || byPriority !== undefined) {
+        res.cutOrder = { byLayer, byGroup, byPriority };
       }
     }
   }

@@ -1,7 +1,7 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, flattenSub, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, fireLines, frameGCode, gcodeFooter, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, Rotary, rotaryMoves, rotaryTestLines, sameMoves, startHere, writeGCode, zJogLines } from '../src/gcode';
+import { buildJob, burns, effOrderOf, flattenSub, isManualOrder, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, fireLines, frameGCode, gcodeFooter, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, OrderOpts, Rotary, rotaryMoves, rotaryTestLines, sameMoves, sharpestCorner, startHere, writeGCode, zJogLines } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
 import { dedupPolys } from '../src/dedup';
@@ -423,12 +423,13 @@ await test('Statusbericht: Werkstück-Nullpunkt erst bekannt, wenn die Steuerung
 
 // ---------- Erweiterte Schnitt-Einstellungen ----------
 
-const cutJob = (objs: Obj[], patch: Partial<Layer>, dev: Partial<Device> = {}) =>
+const cutJob = (objs: Obj[], patch: Partial<Layer>, dev: Partial<Device> = {}, order?: OrderOpts) =>
   buildJob({
     doc: loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} }),
     layer: (i: number) => normalizeLayer({ ...defaultLayer(i), mode: 'line' as const, speed: 600, power: 80, ...patch }),
     imgLayer: () => defaultImageLayer(),
     device: { ...newDevice({ fw: 'fluidnc' }), startFrom: 'absolute' as const, returnHome: false, optInnerFirst: false, optTravel: false, ...dev },
+    ...(order ? { order } : {}),
   });
 const square = (x = 100, y = 100, w = 10, id = 1): Obj => ({ id, m: [1, 0, 0, 1, x, y], layer: 1, shape: { kind: 'rect', w, h: w, r: 0 } as never });
 const hLine = (): Obj => ({ id: 9, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 100, y: 200 }, { x: 110, y: 200 }] }] } });
@@ -1108,6 +1109,97 @@ await test('Manuell: gesetzter Startpunkt gilt auch ohne Optimierung', async () 
   const job = await cutJob(objs, {}, { optInnerFirst: false, optTravel: false, optGroup: false });
   // gesetzter Knoten nodes[0]=(100,300) → Maschine (100,100); ohne fixed wäre es der nächste Knoten
   assert.deepEqual(firstRapid(job.moves), [100, 100]);
+});
+
+// Issue #153 V3: Job-Override der Schnittreihenfolge — Default Geräte-Preset, pro Job überstimmbar
+const orderOuter: Obj = { id: 5, m: [1, 0, 0, 1, 50, 50], layer: 1, shape: { kind: 'rect', w: 100, h: 100, r: 0 } as never };
+const orderInner: Obj = { id: 6, m: [1, 0, 0, 1, 80, 80], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } as never };
+const manualOff = { optInnerFirst: false, optTravel: false, optGroup: false };
+
+await test('Job-Override: ohne order gilt das Geräte-Preset (manuell warnt)', async () => {
+  const job = await cutJob([orderOuter, orderInner], {}, manualOff);
+  assert.ok(job.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(job.warnings));
+});
+
+await test('Job-Override: innerFirst-Override unterdrückt die Manuell-Warnung und sortiert um', async () => {
+  const base = await cutJob([orderOuter, orderInner], {}, manualOff);
+  const over = await cutJob([orderOuter, orderInner], {}, manualOff, { innerFirst: true, travel: false, group: false, cornerStart: false });
+  assert.ok(!over.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(over.warnings));
+  assert.ok(!sameMoves(base.moves, over.moves, base.offset), 'Override sortiert um');
+});
+
+await test('Job-Override: effOrderOf löst Override oder Preset, isManualOrder erkennt manuell', () => {
+  const dev = { ...newDevice({ fw: 'fluidnc' }), optInnerFirst: true, optTravel: false, optGroup: false };
+  assert.deepEqual(effOrderOf(dev, {}), { innerFirst: true, travel: false, group: false, cornerStart: false });
+  assert.deepEqual(effOrderOf(dev, { travel: true }), { innerFirst: true, travel: true, group: false, cornerStart: false });
+  assert.deepEqual(effOrderOf(dev, { innerFirst: null }), { innerFirst: true, travel: false, group: false, cornerStart: false });
+  assert.deepEqual(effOrderOf(dev, { cornerStart: true }), { innerFirst: true, travel: false, group: false, cornerStart: true });
+  assert.equal(isManualOrder({ innerFirst: false, travel: false, group: false, cornerStart: false }), true);
+  assert.equal(isManualOrder({ innerFirst: false, travel: false, group: false, cornerStart: true }), true);
+  assert.equal(isManualOrder({ innerFirst: true, travel: false, group: false, cornerStart: false }), false);
+  assert.equal(isManualOrder({ innerFirst: false, travel: true, group: false, cornerStart: false }), false);
+  assert.equal(isManualOrder(effOrderOf(dev, {})), false);
+});
+await test('Job-Override: Override aus bildet Geräte-Preset exakt ab', async () => {
+  const off = await cutJob([orderOuter, orderInner], {}, manualOff);
+  const on = await cutJob([orderOuter, orderInner], {}, { optInnerFirst: true, optTravel: true }, { innerFirst: false, travel: false, group: false, cornerStart: false });
+  assert.ok(sameMoves(off.moves, on.moves, off.offset), 'Override aus = Preset aus');
+  assert.deepEqual(on.warnings, off.warnings);
+});
+
+// Issue #153 V4: Ecke-Start — geschlossene Konturen beginnen an der schärfsten Ecke
+// Rechteck, Start mitten auf der Oberkante (Welt (150,100) → Maschine (150,300)); schärfste Ecke idx 1 (200,100) → Maschine (200,300)
+const cornerPts = [{ x: 150, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }, { x: 100, y: 200 }, { x: 100, y: 100 }];
+const cornerObj: Obj = { id: 7, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: true, nodes: cornerPts }] } };
+const cornerFixed: Obj = { id: 8, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: true, nodes: cornerPts, start: true }] } };
+const cornerOrder: OrderOpts = { innerFirst: false, travel: false, group: false, cornerStart: true };
+
+await test('Ecke-Start: geschlossene Kontur beginnt an der schärfsten Ecke', async () => {
+  const plain = await cutJob([cornerObj], {}, manualOff);
+  assert.deepEqual(firstRapid(plain.moves), [150, 300]);
+  const job = await cutJob([cornerObj], {}, manualOff, cornerOrder);
+  assert.deepEqual(firstRapid(job.moves), [200, 300]);
+});
+
+await test('Ecke-Start: gesetzter Startpunkt gewinnt über Ecke-Start', async () => {
+  const job = await cutJob([cornerFixed], {}, manualOff, cornerOrder);
+  assert.deepEqual(firstRapid(job.moves), [150, 300]);
+  const travel = await cutJob([cornerFixed], {}, { optInnerFirst: false, optTravel: true, optGroup: false }, { innerFirst: false, travel: true, group: false, cornerStart: true });
+  assert.deepEqual(firstRapid(travel.moves), [150, 300]);
+});
+
+await test('Ecke-Start: Geräte-Preset wirkt ohne Override', async () => {
+  const job = await cutJob([cornerObj], {}, { ...manualOff, optCornerStart: true });
+  assert.deepEqual(firstRapid(job.moves), [200, 300]);
+});
+
+await test('Ecke-Start: mit Leerweg-Optik gilt die schärfste Ecke statt des nächsten Knotens', async () => {
+  const travel = { optInnerFirst: false, optTravel: true, optGroup: false };
+  const plain = await cutJob([cornerObj], {}, travel);
+  // nächster Knoten zu (0,0) ist Bett-(100,200) → Maschine (100,200)
+  assert.deepEqual(firstRapid(plain.moves), [100, 200]);
+  const job = await cutJob([cornerObj], {}, travel, { innerFirst: false, travel: true, group: false, cornerStart: true });
+  assert.deepEqual(firstRapid(job.moves), [200, 300]);
+});
+
+await test('Ecke-Start: ohne Flag kein Verhalten (gleiche Moves und Warnungen)', async () => {
+  const plain = await cutJob([cornerObj], {}, manualOff);
+  const explicit = await cutJob([cornerObj], {}, manualOff, { innerFirst: false, travel: false, group: false, cornerStart: false });
+  assert.ok(sameMoves(plain.moves, explicit.moves, plain.offset), 'ohne Flag identisch');
+  assert.deepEqual(explicit.warnings, plain.warnings);
+});
+
+await test('sharpestCorner: schärfste Ecke, Gleichstand, glatt/offen', () => {
+  // Start mitten auf der Kante → erste echte Ecke in Punktreihenfolge
+  assert.equal(sharpestCorner({ pts: cornerPts, closed: true }), 1);
+  // alle 90° → erste Ecke (Index 0, keine Rotation)
+  assert.equal(sharpestCorner({ pts: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }], closed: true }), 0);
+  // Trapez: spitzer Winkel (68° innen, 112° Richtungswechsel) bei Index 1 ist am schärfsten
+  assert.equal(sharpestCorner({ pts: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 8, y: 5 }, { x: 0, y: 5 }], closed: true }), 1);
+  // 16-Eck: Richtungswechsel 22,5° < 30° → keine echte Ecke
+  const poly16 = { pts: Array.from({ length: 16 }, (_, k) => ({ x: Math.cos((k * 2 * Math.PI) / 16), y: Math.sin((k * 2 * Math.PI) / 16) })), closed: true };
+  assert.equal(sharpestCorner(poly16), -1);
+  assert.equal(sharpestCorner({ pts: cornerPts, closed: false }), -1);
 });
 
 await test('xTool status report without a state word', () => {

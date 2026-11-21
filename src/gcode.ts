@@ -196,6 +196,8 @@ export interface Device {
   optTravel: boolean;
   /** … Formen einer Gruppe zusammenhängend schneiden (Tie-Break unter gleichrangigen Formen) */
   optGroup: boolean;
+  /** Geschlossene Konturen an der schärfsten Ecke beginnen: der Einstich liegt unauffällig in der Ecke (Issue #153, Ecke-Start) */
+  optCornerStart: boolean;
   /** Nach dem Job zum Startpunkt zurückfahren */
   returnHome: boolean;
   homeOnConnect: boolean;
@@ -281,6 +283,7 @@ export const DEFAULT_DEVICE: Device = {
   optInnerFirst: true,
   optTravel: true,
   optGroup: false,
+  optCornerStart: false,
   returnHome: true,
   homeOnConnect: false,
   limitSwitches: 'unknown',
@@ -704,6 +707,9 @@ export interface JobInput {
   device: Device;
   /** Nur diese Objekte (für „Nur Auswahl lasern“) */
   only?: Obj[] | null;
+  /** Schnittreihenfolge für diesen Job (V3, #153): Default ist das Geräte-Preset; ein Override
+   * gilt nur für diesen Job und wird nicht gespeichert */
+  order?: OrderOpts;
   /** Aktuelle Werkstückposition des Lasers (für „Aktuelle Position“) */
   position?: Pt | null;
   /** Für die Vorschau: Lage auf dem Bett zeigen, unabhängig von „Starten ab“ */
@@ -797,10 +803,52 @@ export interface OrderOpts {
   travel: boolean;
   /** Formen desselben Top-Level-Objekts bevorzugt nacheinander (Tie-Break, Containment schlägt Kohäsion) */
   group: boolean;
+  /** Geschlossene Konturen an der schärfsten Ecke beginnen (keine Umsortierung: zählt nicht als Optimierung für die manuelle Reihenfolge) */
+  cornerStart: boolean;
+}
+
+/** Job-Override der Schnittreihenfolge (V3, #153): null/undefined folgt dem Geräte-Preset, sitzungsweit, nicht gespeichert */
+export interface OrderOverride { innerFirst?: boolean | null; travel?: boolean | null; group?: boolean | null; cornerStart?: boolean | null }
+/** Effektive Schalter: Override oder Preset — eine Stelle für Job, Prüfung (manualOrder) und Anzeige */
+export const effOrderOf = (device: Device, o: OrderOverride): OrderOpts => ({
+  innerFirst: o.innerFirst ?? device.optInnerFirst,
+  travel: o.travel ?? device.optTravel,
+  group: o.group ?? device.optGroup,
+  cornerStart: o.cornerStart ?? device.optCornerStart,
+});
+/** Manuell ist die Reihenfolge nur, wenn kein Optimierer umsortiert (Ecke-Start rotiert nur den Anfangspunkt, dann warnt die Prüfung weiter) */
+export const isManualOrder = (o: OrderOpts): boolean => !o.innerFirst && !o.travel && !o.group;
+
+/** Kosinus-Grenze für Ecke-Start (#153): nur Richtungswechsel ab 30° gelten als Ecke —
+ * feine Tessellierung glatter Kurven behält ihren gespeicherten Anfang */
+const CORNER_MIN_COS = Math.cos(Math.PI / 6);
+/** Schärfste Ecke einer geschlossenen Kontur (Ecke-Start, #153): Index mit maximalem Richtungswechsel
+ * (Gleichstand: erste Ecke in Punktreihenfolge); -1 bei offener Kontur, zu wenigen Punkten oder ohne
+ * echte Ecke (z. B. Kreis: dort ist jeder Tessellierungspunkt gleich „scharf“) */
+export function sharpestCorner(p: Poly): number {
+  const n = p.pts.length;
+  if (!p.closed || n < 3) return -1;
+  let best = -1,
+    bestCos = CORNER_MIN_COS;
+  for (let j = 0; j < n; j++) {
+    const a = p.pts[(j + n - 1) % n],
+      b = p.pts[j],
+      c = p.pts[(j + 1) % n];
+    const ix = b.x - a.x,
+      iy = b.y - a.y,
+      ox = c.x - b.x,
+      oy = c.y - b.y;
+    const li = Math.hypot(ix, iy),
+      lo = Math.hypot(ox, oy);
+    if (li < 1e-9 || lo < 1e-9) continue;
+    const cos = (ix * ox + iy * oy) / (li * lo);
+    if (cos < bestCos) [bestCos, best] = [cos, j];
+  }
+  return best;
 }
 
 /** Leerweg-Schritt der Reihenfolge (Nearest-Neighbor); separater Haken für manuelle Reihenfolge (#153) */
-function orderTravel(polys: Poly[], from: Pt, avail: (i: number) => boolean, lastGrp: string | number | undefined): { idx: number; at: number; rev: boolean } {
+function orderTravel(polys: Poly[], from: Pt, avail: (i: number) => boolean, lastGrp: string | number | undefined, corner: boolean): { idx: number; at: number; rev: boolean } {
   const n = polys.length;
   const boxes = orderBoxes.get(polys) ?? [];
   let best = -1,
@@ -823,9 +871,16 @@ function orderTravel(polys: Poly[], from: Pt, avail: (i: number) => boolean, las
       const d = (p.pts[0].x - from.x) ** 2 + (p.pts[0].y - from.y) ** 2;
       if (same !== bestSame || d < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [d, i, 0, false, same];
     } else if (p.closed) {
-      for (let j = 0; j < p.pts.length; j++) {
-        const d = (p.pts[j].x - from.x) ** 2 + (p.pts[j].y - from.y) ** 2;
-        if (same !== bestSame || d < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [d, i, j, false, same];
+      // Ecke-Start (#153): nur die schärfste Ecke ist Kandidat (fixierte sind hier nie: obiger Zweig)
+      const only = corner ? sharpestCorner(p) : -1;
+      if (only >= 0) {
+        const d = (p.pts[only].x - from.x) ** 2 + (p.pts[only].y - from.y) ** 2;
+        if (same !== bestSame || d < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [d, i, only, false, same];
+      } else {
+        for (let j = 0; j < p.pts.length; j++) {
+          const d = (p.pts[j].x - from.x) ** 2 + (p.pts[j].y - from.y) ** 2;
+          if (same !== bestSame || d < bestD) [bestD, best, bestIdx, bestRev, bestSame] = [d, i, j, false, same];
+        }
       }
     } else {
       const a = p.pts[0],
@@ -845,7 +900,7 @@ const orderBoxes = new WeakMap<readonly Poly[], Box[]>();
 function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
   const n = polys.length;
 
-  if (!o.innerFirst && !o.travel && !o.group) return polys;
+  if (!o.innerFirst && !o.travel && !o.group && !o.cornerStart) return polys;
 
   const boxes = boxesOf(polys);
   orderBoxes.set(polys, boxes);
@@ -870,7 +925,7 @@ function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
     const avail = (i: number) => !done[i] && (!o.innerFirst || pending[i] <= 0);
     let pick: number, at: number, rev: boolean;
     if (o.travel) {
-      ({ idx: pick, at, rev } = orderTravel(polys, cur, avail, o.group ? lastGrp : undefined));
+      ({ idx: pick, at, rev } = orderTravel(polys, cur, avail, o.group ? lastGrp : undefined, o.cornerStart));
     } else if (o.group && lastGrp !== undefined) {
       // ohne Leerweg-Optik: Dokumentreihenfolge, bevorzugt aus derselben Gruppe
       pick = -1;
@@ -894,6 +949,11 @@ function orderPolys(polys: Poly[], from: Pt, o: OrderOpts): Poly[] {
     for (const c of containers[pick!]) pending[c]--;
     const p = polys[pick!];
     let q = o.travel && p.closed && at ? startAt(p, at) : p;
+    // Ecke-Start ohne Leerweg-Optik (#153): geschlossene Kontur an der schärfsten Ecke beginnen
+    if (!o.travel && o.cornerStart && p.closed && !p.fixed) {
+      const c = sharpestCorner(p);
+      if (c > 0) q = startAt(p, c);
+    }
     if (o.travel && rev) q = { pts: [...q.pts].reverse(), closed: false, grp: q.grp, ...(q.off ? { off: q.off.slice().reverse() } : {}) };
     out.push(q);
     lastGrp = q.grp;
@@ -1412,7 +1472,7 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, si: number
   const sMin = Math.max(0, e.minPower) / 100;
   for (let p = 0; p < passes; p++) {
     pass(p);
-    const order = ord.innerFirst || ord.travel || ord.group ? orderPolys(cuts, { x: mv.lastX(), y: mv.lastY() }, ord) : cuts;
+    const order = ord.innerFirst || ord.travel || ord.group || ord.cornerStart ? orderPolys(cuts, { x: mv.lastX(), y: mv.lastY() }, ord) : cuts;
     for (const poly of order) {
       const path = contourPath(poly, lead);
       if (path.pts.length < 2) continue;
@@ -1747,6 +1807,8 @@ export function imageCutIssueText(reason: 'missing-contour' | 'invalid-contour' 
 
 export async function buildJob(inp: JobInput): Promise<Job> {
   const { doc, device } = inp;
+  /** Effektive Schnittreihenfolge: Job-Override oder Geräte-Preset (eine Stelle für Warnung und Ausgabe) */
+  const orderOpts: OrderOpts = inp.order ?? effOrderOf(device, {});
   const layerOf = (i: number) => normalizeLayer(inp.layer(i));
   const warnings: string[] = [];
   let roots = inp.only ?? doc.objs;
@@ -1981,7 +2043,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
   if (kerfMerged) warnings.push(tn('Kerf-Vertrag: {n} berührende Kontur per Union zusammengefasst.', 'Kerf-Vertrag: {n} berührende Konturen per Union zusammengefasst.', kerfMerged));
   if (kerfFillOps) warnings.push(t('Kerf-Vertrag: Kerf wirkt bei Füllen auf die Hüll-Geometrie vor der Schraffur.'));
   // Manuelle Reihenfolge (#153, alle Optimierer-Schalter aus): dort meldet die genauere Prüfung beim Ausgeben
-  if (!device.optInnerFirst && (device.optTravel || device.optGroup)) {
+  if (!orderOpts.innerFirst && (orderOpts.travel || orderOpts.group)) {
     // Ohne Innere-Formen-Priorisierung auf mögliche Schnittreihenfolge-Probleme hinweisen (#222).
     let nested = false;
     outer: for (const b of buckets.values()) {
@@ -2073,7 +2135,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
       const entry = { ...cut, mode: 'line' as const } as CutEntry;
       const pass = (p: number) => (mv.zCur = useZ ? cut.zOffset + p * cut.zStep : 0);
       if (!useZ && (cut.zOffset || cut.zStep)) zSkipped = true;
-      const ord = { innerFirst: device.optInnerFirst, travel: device.optTravel, group: device.optGroup };
+      const ord = { innerFirst: device.optInnerFirst, travel: device.optTravel, group: device.optGroup, cornerStart: device.optCornerStart };
       for (const polys of bk.cuts) {
         emitEntry(mv, entry, polys, li, -2, flip, pass, ord);
         mv.zCur = 0;
@@ -2085,11 +2147,6 @@ export async function buildJob(inp: JobInput): Promise<Job> {
       if (!useZ && (e.zOffset || e.zStep)) zSkipped = true;
       // Z je Durchgang: erster Durchgang beim Z-Versatz, jeder weitere um zStep tiefer
       const pass = (p: number) => (mv.zCur = useZ ? e.zOffset + p * e.zStep : 0);
-      const orderOpts = {
-        innerFirst: device.optInnerFirst,
-        travel: device.optTravel,
-        group: device.optGroup,
-      };
 
       if (!orderOpts.innerFirst && !orderOpts.travel && !orderOpts.group && e.mode === 'line') {
         manualViolations += countManualViolations(polys);

@@ -2,7 +2,7 @@ import type { Editor } from '../editor';
 import { ICONS } from '../icons';
 import type { BarcodeShape, GenShape, ImageShape, Obj, ObjBindKey, TextShape } from '../model';
 import { evaluate, formatNumber, namesIn } from '../params';
-import { onFontListChanged, refreshFonts, requestLocalFonts, systemFonts } from '../fonts';
+import { isFallbackFont, onFontListChanged, refreshFonts, requestLocalFonts, systemFonts } from '../fonts';
 import { openFontManager } from '../fontManager';
 import { createFontPicker } from '../fontPicker';
 import { f2, h, iconBtn, numInput, sep, setIcon, setVal } from '../dom';
@@ -208,6 +208,12 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
       },
       openManager: () => { if (available()) void openFontManager(ed); },
     });
+    // Fehlende Schrift (#233): Roboto springt still ein — Warnung mit Weg zum Font-Manager
+    const fbWarn = h('button', {
+      type: 'button', class: 'fontpick-fallback', hidden: true,
+      title: '',
+      onclick: () => { if (available()) void openFontManager(ed); },
+    }) as HTMLButtonElement;
     pickers.add(fontPicker);
     const fSize = numInput('small', plain(['size'], (v) => v > 0 && ed.updateTexts({ size: v })), t('Schriftgröße (mm)'), formula('size'));
     const fHs = numInput('small', (v) => ed.updateTexts({ hSpace: v }), t('Zeichenabstand (mm)'));
@@ -249,7 +255,7 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
     const pathProps = h('span', { class: 'field' }, h('label', {}, t('Versatz'), fPOff), h('label', {}, t('Abstand|Text auf Pfad'), fPDist), bPFlip, bPOff);
     const el = h('div', { class: 'field' },
       h('span', { icon: 'text', class: 'icon-inline', style: 'color: var(--muted)', title: t('Textleiste') }),
-      h('label', {}, t('Schrift'), fontPicker.el), h('label', {}, t('Höhe'), fSize), bBold, bItal, bUp, bRtl, ...alignBtns, sep(),
+      h('label', {}, t('Schrift'), fontPicker.el), fbWarn, h('label', {}, t('Höhe'), fSize), bBold, bItal, bUp, bRtl, ...alignBtns, sep(),
       h('label', {}, t('Abst. H'), fHs), h('label', {}, 'V', fVs), sep(),
       h('label', {}, t('Max. Breite'), fMaxW), h('label', {}, t('Max. Höhe'), fMaxH), bShrink, bWrap, sep(),
       bWeld, bOnPath, pathProps, bVar, vtProps);
@@ -257,6 +263,13 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
       const ts = ed.selTexts(), tx = ts.length ? ts[0].shape as TextShape : ed.textDefaults;
       el.classList.toggle('group-disabled', !ts.length && ed.tool !== 'text');
       if (!available()) fontPicker.close();
+      // Ersatzschrift-Hinweis (#233): nur bei Auswahl; null = Schrift lädt noch (refresh kommt via onFontLoaded → emit('sel'))
+      const fb = ts.length ? isFallbackFont(tx.font, tx.bold, tx.italic) : null;
+      fbWarn.hidden = fb !== true;
+      if (fb === true) {
+        fbWarn.title = t('Schrift „{font}“ ist nicht installiert — Text wird mit Roboto gezeichnet (Klick: Schriften öffnen)', { font: tx.font });
+        fbWarn.textContent = t('Roboto statt „{font}“', { font: tx.font });
+      }
       fontPicker.sync(tx.font); bindField(fSize, 'size', f2(tx.size), (o) => o.shape.kind === 'text');
       setVal(fHs, f2(tx.hSpace)); setVal(fVs, f2(tx.vSpace));
       bBold.classList.toggle('on', tx.bold); bItal.classList.toggle('on', tx.italic); bUp.classList.toggle('on', tx.upper); bRtl.classList.toggle('on', !!tx.rtl);
