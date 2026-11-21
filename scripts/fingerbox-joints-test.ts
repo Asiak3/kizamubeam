@@ -85,13 +85,13 @@ for (const dims of [
 }
 const g=getGenerator('box-divided')!;
 const base={...defaultParams(g),width:100,depth:80,height:50,thickness:3,finger:10,compartmentsX:2,compartmentsY:2,ratiosX:'1:1',ratiosY:'1:1'};
-const legacy=buildGen(g,{...base,jointLayout:'legacy',partLayout:'rows'});
-const old=structuredClone(legacy.parts[0].shape); old.v=1; delete old.params.jointLayout; delete old.params.partLayout;
+const legacy=buildGen(g,{...base,jointLayout:'legacy',partLayout:'rows',faces:'legacy'});
+const old=structuredClone(legacy.parts[0].shape); old.v=1; delete old.params.jointLayout; delete old.params.partLayout; delete old.params.faces;
 const cached=structuredClone(old.subs); loadGen(old);
-assert.equal(old.v,4); assert.equal(old.params.jointLayout,'legacy'); assert.equal(old.params.partLayout,'rows'); assert.deepEqual(old.subs,cached);
+assert.equal(old.v,5); assert.equal(old.params.jointLayout,'legacy'); assert.equal(old.params.partLayout,'rows'); assert.equal(old.params.faces,'legacy'); assert.deepEqual(old.subs,cached);
 // v2 boxes keep their joints and their row layout
-const v2=structuredClone(buildGen(g,{...base,partLayout:'rows'}).parts[0].shape); v2.v=2; delete v2.params.partLayout;
-loadGen(v2); assert.equal(v2.v,4); assert.equal(v2.params.jointLayout,'current'); assert.equal(v2.params.partLayout,'rows');
+const v2=structuredClone(buildGen(g,{...base,partLayout:'rows'}).parts[0].shape); v2.v=2; delete v2.params.partLayout; delete v2.params.faces;
+loadGen(v2); assert.equal(v2.v,5); assert.equal(v2.params.faces,'legacy'); assert.equal(v2.params.jointLayout,'current'); assert.equal(v2.params.partLayout,'rows');
 const regenerated=buildGen(g,normalizeParams(g,old.params));
 assert.deepEqual(regenerated.parts.map(p => p.shape.subs), legacy.parts.map(p => p.shape.subs));
 assert.equal(defaultParams(g).jointLayout,'current');

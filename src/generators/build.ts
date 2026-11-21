@@ -112,6 +112,23 @@ export function flipY(sp: SubPath): SubPath {
   };
 }
 
+/**
+ * Subpath mirrored at the y axis (x → −x), e.g. a part turned over on the work area (#463). The nodes run backwards
+ * (closed contours from the same first node), so a contour keeps its sense of rotation (outline and holes stay what
+ * they were).
+ */
+export function mirrorX(sp: SubPath): SubPath {
+  const f = (p: Pt) => ({ x: -p.x, y: p.y });
+  const ns = !sp.closed ? [...sp.nodes].reverse() : sp.nodes.length ? [sp.nodes[0], ...sp.nodes.slice(1).reverse()] : [];
+  return {
+    ...sp,
+    nodes: ns.map((n) => {
+      const { cin, cout, ...rest } = n;
+      return { ...rest, ...f(n), ...(cout ? { cin: f(cout) } : {}), ...(cin ? { cout: f(cin) } : {}) };
+    }),
+  };
+}
+
 /** Ausdehnung von Unterpfaden (Knoten und Anfasser; bei Kreisbögen bis 90° liegen die Anfasser innerhalb) */
 export function subsBounds(subs: SubPath[]) {
   let x0 = Infinity,

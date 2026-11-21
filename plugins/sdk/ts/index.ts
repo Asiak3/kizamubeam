@@ -67,7 +67,8 @@ export interface GenResult {
   distribute?: { rotate?: boolean };
   /**
    * Where each part sits in space for the 3D view, by part key: a point (x, y) of the outline at height s lies at
-   * o + x·u + y·v + s·n (mm; X right, Y back, Z up)
+   * o + x·u + y·v + s·n (mm; X right, Y back, Z up). The face that lies up on the work area (cut and engraved) faces
+   * −(u×v): for outer parts of a box it should point out of the box (#463).
    */
   poses?: { poses: Record<string, Pose>; spin?: Record<string, number> };
 }

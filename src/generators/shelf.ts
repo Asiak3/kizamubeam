@@ -1,12 +1,14 @@
 // Baugruppe „Steckregal“: zwei Seiten und mehrere Böden, ohne Leim und Schrauben gesteckt (Kreuzschlitze).
 // Die Seiten haben Schlitze von der Rückkante bis zur halben Tiefe, die Böden Schlitze von der Vorderkante bis
 // zur halben Tiefe; der Boden wird von vorne über die Seiten geschoben. Die Böden stehen um den Überstand über.
+// Outer faces up (#463): both sides and the top board lie on the work area seen from outside (side 1 mirrored);
+// faces: hidden, 'legacy' in shelves saved before (side 1 and the top board inner face up).
 import type { Pt } from '../model';
 import { t, locale } from '../i18n';
-import { arrangeParts, polySub } from './build';
+import { arrangeParts, mirrorX, polySub } from './build';
 import { cleanup, offsetOrtho } from './panelJoints';
 import type { Generator, Issue, Params } from './types';
-import { pose, neg, X, Y, Z, type AsmPoses, type Pose } from './pose';
+import { pose, neg, X, Y, Z, type AsmPoses, type Pose, type V3 } from './pose';
 
 export interface ShelfParams {
   width: number;
@@ -19,6 +21,7 @@ export interface ShelfParams {
   overhang: number;
   play: number;
   kerf: number;
+  faces?: string;
 }
 
 const P = (p: Params) => p as unknown as ShelfParams;
@@ -61,17 +64,21 @@ export function boardOutline(p: ShelfParams): Pt[] {
   return cleanup(pts);
 }
 
+/** Side 1 and the top board (of two or more) lie on the work area seen from outside: their x runs the other way */
+const turnedOver = (p: ShelfParams, key: string) => p.faces !== 'legacy' && (key === 'side1' || (p.shelves > 1 && key === `board${p.shelves}`));
+
 function shelfPoses(p: ShelfParams): AsmPoses {
   const th = p.thickness;
   const out: Record<string, Pose> = {};
-  sideCenters(p).forEach((x, i) => (out[`side${i + 1}`] = pose([x - th / 2, p.depth / 2, p.height / 2], Y, neg(Z), X)));
-  shelfHeights(p).forEach((z, i) => (out[`board${i + 1}`] = pose([p.width / 2, p.depth / 2, z], X, Y, Z)));
+  const u = (key: string, a: V3) => (turnedOver(p, key) ? neg(a) : a);
+  sideCenters(p).forEach((x, i) => (out[`side${i + 1}`] = pose([x - th / 2, p.depth / 2, p.height / 2], u(`side${i + 1}`, Y), neg(Z), X)));
+  shelfHeights(p).forEach((z, i) => (out[`board${i + 1}`] = pose([p.width / 2, p.depth / 2, z], u(`board${i + 1}`, X), Y, Z)));
   return { poses: out };
 }
 
 export const SHELF: Generator = {
   id: 'shelf',
-  version: 2,
+  version: 3,
   kind: 'assembly',
   name: t('Steckregal'),
   icon: 'shelf',
@@ -90,6 +97,7 @@ export const SHELF: Generator = {
   },
   schema: [
     { key: 'partLayout', type: 'data', label: '', def: 'nest', resetOnNew: true },
+    { key: 'faces', type: 'data', label: '', def: 'out', resetOnNew: true },
     { key: 'width', type: 'length', label: t('Breite'), min: 30, max: 3000, def: 300, title: t('Länge der Böden') },
     { key: 'depth', type: 'length', label: t('Tiefe'), min: 20, max: 1000, def: 150 },
     { key: 'height', type: 'length', label: t('Höhe'), min: 30, max: 3000, def: 300 },
@@ -101,8 +109,8 @@ export const SHELF: Generator = {
     { key: 'play', type: 'length', label: t('Steckspiel'), min: -1, max: 2, def: 0.1, title: t('Die Schlitze werden um so viel breiter als die Materialdicke; negativ = Presspassung') },
     { key: 'kerf', type: 'length', label: t('Schnittfuge (Kerf)'), min: 0, max: 2, def: 0.15, title: t('Breite des Laserschnitts: Die Kontur wird um die Hälfte nach außen versetzt, Schlitze werden schmaler. Der Kerf des Layers wirkt beim Lasern zusätzlich.') },
   ],
-  // Saved objects keep their packParts layout; new ones are nested compactly.
-  migrate(p, from) { return from < 2 ? { ...p, partLayout: 'packed' } : p; },
+  // Saved objects keep their packParts layout; new ones are nested compactly. 3 (#463): saved shelves keep their faces
+  migrate(p, from) { return { ...p, ...(from < 2 ? { partLayout: 'packed' } : {}), ...(from < 3 ? { faces: 'legacy' } : {}) }; },
   validate(raw) {
     const p = P(raw);
     const out: Issue[] = [];
@@ -125,7 +133,7 @@ export const SHELF: Generator = {
       { key: 'side1', subs: [polySub(side)] },
       { key: 'side2', subs: [polySub(side)] },
       ...shelfHeights(p).map((_, i) => ({ key: `board${i + 1}`, subs: [polySub(board)] })),
-    ];
+    ].map((it) => (turnedOver(p, it.key) ? { ...it, subs: it.subs.map(mirrorX) } : it));
     const parts = arrangeParts(items, 5 + p.kerf, raw.partLayout);
     const zs = shelfHeights(p);
     return {

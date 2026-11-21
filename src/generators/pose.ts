@@ -3,6 +3,9 @@
 // Every part is a plate: the flat outline (local, mm, y down as on the workspace) extruded by the material
 // thickness along n. A point (x, y) of the outline at height s (0 … thickness) lies in space at
 // o + x·u + y·v + s·n. Space: X to the right (width), Y to the back (depth), Z up.
+// The face that lies up on the work area (the laser side, engraved) faces −(u×v), whatever n is. Outer parts of a
+// box lie outer face up (#463): −(u×v) points out of the box. To turn a part over, mirror its outline (x → −x,
+// mirrorX in build.ts) and negate u: the solid stays where it is, only its faces swap.
 // Pure geometry without DOM or three.js, so plugins can provide the same data.
 export type V3 = [number, number, number];
 

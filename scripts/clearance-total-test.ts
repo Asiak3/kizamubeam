@@ -87,7 +87,7 @@ test('new box with dividers: the teeth and slots of the dividers get the clearan
 });
 
 test('migrate: clearance doubled, the dividers of a saved box keep theirs; the old maximum fits the new range', () => {
-  assert.deepEqual(FINGERBOX.migrate!({ clearance: 0.3, jointLayout: 'current', partLayout: 'rows' }, 3), { clearance: 0.6, dividerClearance: '0.3', jointLayout: 'current', partLayout: 'rows' });
+  assert.deepEqual(FINGERBOX.migrate!({ clearance: 0.3, jointLayout: 'current', partLayout: 'rows' }, 3), { clearance: 0.6, dividerClearance: '0.3', jointLayout: 'current', partLayout: 'rows', faces: 'legacy' });
   assert.deepEqual(BOX.migrate!({ clearance: -0.25, partLayout: 'rows' }, 2), { clearance: -0.5, partLayout: 'rows' });
   assert.deepEqual(DRAWER.migrate!({ clearance: 0.5, partLayout: 'packed' }, 2), { clearance: 1, partLayout: 'packed' });
   // Up to date: nothing changes

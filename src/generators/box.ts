@@ -10,7 +10,7 @@ import type { Pt, SubPath } from '../model';
 import { t, locale } from '../i18n';
 import type { Generator, GenPart, Issue, Params } from './types';
 import { layoutParts } from './build';
-import { neg, pose, X, Y, Z, type Pose } from './pose';
+import { neg, pose, X, Y, Z, type Pose, type V3 } from './pose';
 import { fieldCount, panelCut, type EdgeSpec, type PanelSpec, type Pattern } from './panelJoints';
 
 export { cleanup, fieldCount, offsetOrtho } from './panelJoints';
@@ -70,17 +70,25 @@ const PART_NAMES: Record<string, () => string> = {
   right: () => t('Seitenwand rechts'),
 };
 
-/** Box: Boden auf Z = 0, Vorderwand bei Y = 0, linke Wand bei X = 0 */
-export function boxPoses(p: BoxParams): Record<string, Pose> {
+/** The box parts that lie on the work area seen from outside only since #463 (see boxPoses) */
+export const TURNED_OVER = ['top', 'back', 'left'];
+
+/**
+ * Box: Boden auf Z = 0, Vorderwand bei Y = 0, linke Wand bei X = 0. Every outer part lies outer face up on the work
+ * area (#463): back, left and top are seen from outside, so their x runs the other way (their outlines are symmetric
+ * in x). legacy: the orientation before #463 (back, left and top inner face up), for saved parts that are not.
+ */
+export function boxPoses(p: BoxParams, legacy = false): Record<string, Pose> {
   const { W, D, H } = boxOuter(p);
   const th = p.thickness;
   const down = neg(Z);
+  const turn = (a: V3) => (legacy ? a : neg(a));
   return {
     bottom: pose([W / 2, D / 2, 0], X, Y, Z),
-    top: pose([W / 2, D / 2, H - th], X, Y, Z),
+    top: pose([W / 2, D / 2, H - th], turn(X), Y, Z),
     front: pose([W / 2, 0, H / 2], X, down, Y),
-    back: pose([W / 2, D - th, H / 2], X, down, Y),
-    left: pose([0, D / 2, H / 2], Y, down, X),
+    back: pose([W / 2, D - th, H / 2], turn(X), down, Y),
+    left: pose([0, D / 2, H / 2], turn(Y), down, X),
     right: pose([W - th, D / 2, H / 2], Y, down, X),
   };
 }
