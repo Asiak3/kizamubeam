@@ -3,7 +3,6 @@
 // New application-wide preferences belong here (or are added with addSettingsFields) instead of in a
 // dialog of their own.
 import type { Editor } from '../editor';
-import { h } from '../dom';
 import { LANGUAGES, langPref, LangPref, t } from '../i18n';
 import { isTauri } from '../machine';
 import { DEFAULT_GRID, GridSettings } from '../grid';
@@ -28,6 +27,7 @@ import { openFontManager } from '../fontManager';
 import { agentLevels, agentSettings, configureAgent, openAgentDialog } from '../agentui';
 import { configureHost, hostSettings, openRemoteHostDialog } from '../remoteHost';
 import { registerSettingsSection } from './registry';
+import { shortcutEditor, type ShortcutCommand } from '../shortcutsSettings';
 import type { SvgDpi } from '../importers';
 import { typographySettingsFields } from './typography';
 import { electricityCurrencyField, electricityTariffField } from '../energyUi';
@@ -39,8 +39,10 @@ export interface CoreSettingsHooks {
   theme(): ThemeMode;
   setTheme(m: ThemeMode): void;
   setLanguage(p: LangPref): void;
-  /** Rows of the shortcut overview (key, meaning) */
-  shortcuts(): [string, string][];
+  /** Commands that can get a keyboard shortcut */
+  shortcutCommands(): ShortcutCommand[];
+  /** Keys and mouse actions with a fixed meaning (key, meaning) */
+  fixedKeys(): [string, string][];
 }
 
 export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
@@ -378,8 +380,8 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
       },
       {
         kind: 'custom', id: 'input.shortcuts', label: t('Tastenkürzel'), keywords: 'shortcuts keys F1',
-        hint: t('Übersicht der Tastenkürzel (auch mit F1). Ändern lassen sie sich noch nicht.'),
-        render: () => h('table', { class: 'settings-keys' }, ...hooks.shortcuts().map(([k, d]) => h('tr', {}, h('td', {}, h('kbd', {}, k)), h('td', {}, d)))),
+        hint: t('„Ändern“ anklicken und die neue Tastenkombination drücken. Änderungen gelten sofort und werden mit „Einstellungen übertragen“ mitgenommen. Die Übersicht steht auch im Menü Hilfe.'),
+        render: () => shortcutEditor(hooks.shortcutCommands(), hooks.fixedKeys()),
       },
     ],
   });

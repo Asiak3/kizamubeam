@@ -15,6 +15,7 @@ import { outputGrid } from '../images';
 import { shaperName } from '../editor/shaper';
 import type { ShaperKind } from '../shaper';
 import { t, tn } from '../i18n';
+import { withShortcut } from '../commandKeys';
 import type { Definitions } from './model';
 import type { ControlContext, ControlDefinition, ToolbarControl } from './registry';
 
@@ -366,7 +367,7 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
     ];
     const el = h('div', { class: 'field' }, h('span', { icon: 'image', class: 'muted icon-inline' }), info,
       h('button', { class: 'toggle', title: t('Helligkeit, Kontrast, Gamma, Schärfen, Bildmodus'), onclick: () => editorDialogs?.adjust() }, t('Anpassen …')),
-      h('button', { class: 'toggle', title: t('Bild in Vektoren umwandeln (Alt+T)'), onclick: () => editorDialogs?.trace() }, t('Nachzeichnen …')),
+      h('button', { class: 'toggle', title: withShortcut(t('Bild in Vektoren umwandeln'), 'trace'), onclick: () => editorDialogs?.trace() }, t('Nachzeichnen …')),
       h('button', { class: 'toggle', title: t('Hintergrund freistellen: ähnliche Farben werden transparent und nicht gelasert'), onclick: () => openBackgroundDialog(ed) }, t('Freistellen …')), ...cropBtns);
     return { el, update() {
       const imgs = ed.selImages(); el.hidden = !imgs.length;
@@ -393,7 +394,7 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
     const info = h('span', { class: 'muted' }), icon = h('span', { icon: 'gear', class: 'muted icon-inline' });
     const el = h('div', { class: 'field' }, icon, info,
       h('button', { class: 'toggle', title: t('Parameter ändern, die Kontur wird neu berechnet (Doppelklick)'), onclick: () => ed.selGens()[0] && ed.onGenEdit?.(ed.selGens()[0]) }, t('Parameter …')),
-      h('button', { class: 'toggle', title: t('In gewöhnliche Pfade umwandeln; die Parameter gehen verloren (Ctrl+Shift+C)'), onclick: () => ed.convertSelToPath() }, t('In Pfade umwandeln')));
+      h('button', { class: 'toggle', title: withShortcut(t('In gewöhnliche Pfade umwandeln; die Parameter gehen verloren'), 'tolines'), onclick: () => ed.convertSelToPath() }, t('In Pfade umwandeln')));
     return { el, update() {
       const gens = ed.selGens(); el.hidden = !gens.length;
       if (gens.length) { const gs = gens[0].shape as GenShape; info.textContent = gens.length > 1 ? t('{n} Bauteile', { n: gens.length }) : genLabel(gs); const gi = getGenerator(gs.gen)?.icon ?? ''; setIcon(icon, ICONS[gi] ? gi : 'gear'); }

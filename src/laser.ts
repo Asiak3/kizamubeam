@@ -1,6 +1,6 @@
 // Laser-Panel (Laser, Verschieben, Konsole), Geräteeinstellungen, Vorschau und G-Code-Ausgabe.
 import type { Editor } from './editor';
-import { commandMatches } from './commandKeys';
+import { onShortcutsChanged, withShortcut } from './commandKeys';
 import { escapeXml, h, numInput, setIcon, setTrustedSvg } from './dom';
 import { saveBinary, saveText } from './files';
 import { native } from './native';
@@ -510,14 +510,6 @@ export function buildLaser(ed: Editor) {
       ed.redraw();
     }
   });
-  window.addEventListener('keydown', (e) => {
-    const el = e.target as HTMLElement;
-    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
-    if (!e.defaultPrevented && commandMatches('preview', e)) {
-      e.preventDefault();
-      openPreview(ed);
-    }
-  });
 }
 
 function stateText(): [string, string] {
@@ -745,7 +737,9 @@ function laserTab(ed: Editor): HTMLElement {
     machine.send((machine.remote ? machine.fw : fw()).home);
   });
   const originB = big('origin', t('Ursprung'), t('Zum Nullpunkt fahren'), () => sendAll(moveLines(device, 'X0 Y0')));
-  const previewB = big('preview', t('Vorschau'), t('Vorschau mit Zeitschätzung (Alt+P)'), () => openPreview(ed));
+  const previewTitle = () => withShortcut(t('Vorschau mit Zeitschätzung'), 'preview');
+  const previewB = big('preview', t('Vorschau'), previewTitle(), () => openPreview(ed));
+  onShortcutsChanged(() => (previewB.title = previewTitle()));
   const saveB = big('gcode', 'G-Code', t('G-Code speichern'), () => saveGCode(ed));
   const ruidaMemB = h('button', {
     class: 'btn',

@@ -90,6 +90,7 @@
     "test:jig": "node scripts/run-ts.mjs scripts/jig-test.ts",
     "test:arcs": "node scripts/run-ts.mjs scripts/arcs-test.ts",
     "test:sync": "node scripts/run-ts.mjs scripts/sync-test.ts",
+    "test:shortcuts": "node scripts/run-ts.mjs scripts/shortcuts-test.ts",
     "test:settings": "node scripts/run-ts.mjs scripts/settings-test.ts && node scripts/settings-typography-test.mjs",
     "test:energy": "node scripts/run-ts.mjs scripts/energy-test.ts && node scripts/run-ts.mjs scripts/energy-validation-test.ts && node scripts/energy-i18n-test.mjs",
     "test:remote": "node scripts/run-ts.mjs scripts/remote-test.ts",

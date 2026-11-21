@@ -20,7 +20,7 @@ export interface Action {
   id: string;
   /** Rubrik im Anpassen-Dialog */
   cat: string;
-  /** Name in Listen und Tooltip (mit Tastenkürzel) */
+  /** Name in Listen und Tooltip; das Tastenkürzel kommt aus shortcut */
   label: string;
   /** Symbol aus icons.ts; ohne Symbol zeigt die Leiste den Kurztext */
   icon?: string;
@@ -31,6 +31,8 @@ export interface Action {
   on?: () => boolean;
   /** Symbol und Tooltip, die sich zur Laufzeit ändern */
   dyn?: () => { icon?: string; label?: string };
+  /** Aktuelles Tastenkürzel für Tooltip und Menüzeile (#453) */
+  shortcut?: () => string;
   /** Kleiner Knopf (Optionen zu einem Nachbarn) */
   small?: boolean;
   /** Knopfgruppe: zeigt die zuletzt benutzte Aktion, der Pfeil daneben klappt die übrigen auf.

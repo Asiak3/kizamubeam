@@ -6,7 +6,9 @@ description: Tutte le scorciatoie da tastiera di KizamuBeam.
 
 # Scorciatoie da tastiera
 
-Su macOS usa **⌘ Cmd** ovunque sia scritto **Ctrl**. Nell’app, **F1** (Aiuto → Scorciatoie da tastiera) mostra le scorciatoie più importanti, e i menu le mostrano accanto a ogni voce.
+Su macOS usa **⌘ Cmd** ovunque sia scritto **Ctrl**. Nell’app, **F1** (Aiuto → Scorciatoie da tastiera) mostra le scorciatoie attuali, e i menu e i suggerimenti delle barre le mostrano accanto a ogni voce.
+
+Le tabelle qui sotto elencano le scorciatoie predefinite. Si possono cambiare in **Modifica → Impostazioni → Mouse e tastiera → Scorciatoie da tastiera**: fai clic su **Modifica** accanto a un comando e premi la nuova combinazione di tasti, × rimuove la scorciatoia, **Ripristina** riporta quella predefinita. Anche i comandi senza scorciatoia predefinita (per esempio l’ordine di sovrapposizione) possono riceverne una. Se una combinazione è già in uso, la finestra chiede prima di spostarla. Esc, Invio, Spazio, Tab, i tasti freccia, Canc e Backspace mantengono il loro significato fisso. Le modifiche valgono subito e sono incluse in **File → Trasferisci impostazioni**.
 
 ## File e modifica
 

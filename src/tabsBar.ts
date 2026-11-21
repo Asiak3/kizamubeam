@@ -1,9 +1,9 @@
 // Leiste mit den offenen Projekten über der Arbeitsfläche, Tastenkürzel für Tabs und Dateien.
 import type { Editor } from './editor';
 import { $, h } from './dom';
-import { openProject, saveProject } from './files';
 import { applyNewDocDefaults } from './laser';
 import { t } from './i18n';
+import { withShortcut } from './commandKeys';
 
 /** Tab i schließen, bei ungespeicherten Änderungen erst nachfragen */
 export function closeTabAsk(ed: Editor, i = ed.tabIndex) {
@@ -61,7 +61,7 @@ export function buildTabBar(ed: Editor) {
     });
     bar.replaceChildren(
       ...tabs,
-      h('button', { class: 'ptab-new', title: t('Neues Projekt in neuem Tab (Ctrl+N)'), onclick: () => (ed.newTab(), applyNewDocDefaults()) }, '+'),
+      h('button', { class: 'ptab-new', title: withShortcut(t('Neues Projekt in neuem Tab'), 'new'), onclick: () => (ed.newTab(), applyNewDocDefaults()) }, '+'),
     );
   };
   ed.onTabsChange = render;
@@ -82,9 +82,5 @@ export function buildTabBar(ed: Editor) {
       const n = ed.tabs.length;
       return run(() => ed.switchTab((ed.tabIndex + (e.shiftKey ? n - 1 : 1)) % n));
     }
-    if (e.shiftKey) return;
-    if (k === 'n') return run(() => (ed.newTab(), applyNewDocDefaults()));
-    if (k === 'o') return run(() => void openProject(ed));
-    if (k === 's') return run(() => void saveProject(ed));
   });
 }

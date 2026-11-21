@@ -9,12 +9,12 @@ The menu captures keyboard input while open, supports arrow/submenu navigation,
 stays in the viewport and restores focus. Escape/outside click, external scroll
 or editor changes close it and remove listeners. Stale-document callbacks and
 open modal dialogs block execution. Shared command bindings drive shortcut labels
-and matching; no customizable-keybinding UI is introduced.
+and matching; since #453 they can be changed in Settings → Mouse and keyboard
+(`src/commandKeys.ts`).
 
 Independent scope for issue #144: no Shape Builder, isolation or refit commands
 are exposed until those separate features exist upstream. Existing menus/toolbars,
-project formats and machine-command semantics are preserved. `laser.ts` only
-routes its preview shortcut through the shared matcher.
+project formats and machine-command semantics are preserved.
 
 Executed: `npm run test:context-menu`, `npm run build`, `npm run i18n:check`
 (no missing keys). Browser lifecycle/keyboard/focus checks passed using

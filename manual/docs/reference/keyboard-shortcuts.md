@@ -6,7 +6,9 @@ description: All keyboard shortcuts of KizamuBeam.
 
 # Keyboard shortcuts
 
-On macOS, use **⌘ Cmd** wherever **Ctrl** is written. In the app, **F1** (Help → Keyboard Shortcuts) shows the most important shortcuts, and menus show them next to each entry.
+On macOS, use **⌘ Cmd** wherever **Ctrl** is written. In the app, **F1** (Help → Keyboard Shortcuts) shows the current shortcuts, and menus and toolbar tooltips show them next to each entry.
+
+The tables below list the defaults. You can change them under **Edit → Settings → Mouse and keyboard → Keyboard shortcuts**: click **Change** next to a command and press the new key combination, × removes the shortcut, **Reset** brings back the default. Commands without a default shortcut (for example the stacking order) can get one there too. A combination that is already in use asks before it moves. Esc, Enter, Space, Tab, the arrow keys, Delete and Backspace keep their fixed meaning. Changes apply at once and are included in **File → Transfer Settings**.
 
 ## Files and editing
 

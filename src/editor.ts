@@ -310,10 +310,10 @@ export class Editor {
   }
 
   // Befehle: Löschen, Kopieren, Einfügen, Transformieren, Formparameter
-  /** Rasterarray-Dialog öffnen (Ctrl+Shift+A, von der Oberfläche gesetzt) */
-  onGridArray: (() => void) | null = null;
   /** Datei > Importieren (von der Oberfläche gesetzt) */
   onImport: (() => void) | null = null;
+  /** Tastenkürzel ausführen (von der Oberfläche gesetzt, #453); true = Taste verarbeitet */
+  onCommandKey: ((e: KeyboardEvent) => boolean) | null = null;
 
   // QR-Codes, variabler Text, Text und Text auf Pfad
   /** Doppelklick auf einen QR-Code: Dialog zum Bearbeiten öffnen */

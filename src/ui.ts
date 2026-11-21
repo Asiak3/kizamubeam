@@ -30,8 +30,8 @@ import { openContourOffsetDialog } from './contourOffsetDialog';
 import { openWarpDialog } from './warpDialog';
 import { cropDraftEnabled, EDIT_TITLE, runImageEdit } from './imageCropUi';
 import { openVectorFitDialog } from './vectorDialog';
-import { installEditorContext } from './editorContext';
-import { commandKey, commandMatches } from './commandKeys';
+import { installEditorContext, stackingActions } from './editorContext';
+import { bindingLabel, bindings, commandFor, commandKey, onShortcutsChanged, withShortcut } from './commandKeys';
 import { openQrDialog, openVarTextDialog } from './qrDialog';
 import { openBarcodeDialog } from './barcodeDialog';
 import { askGenConvert, openGenDialog } from './generators/dialog';
@@ -159,7 +159,8 @@ export function buildUI(ed: Editor) {
     theme: () => themeMode,
     setTheme: (m) => applyTheme(ed, m),
     setLanguage: (p) => changeLanguage(ed, p),
-    shortcuts: helpRows,
+    shortcutCommands: () => shortcutCommands,
+    fixedKeys: fixedKeyRows,
   });
   buildMenu(ed);
 
@@ -178,7 +179,6 @@ export function buildUI(ed: Editor) {
   // 3D-Modelle aus der automatischen Sicherung kommen etwas später: 3D-Ansicht und Prüfung neu zeichnen
   onMeshReady(() => ed.emit('doc'));
   onImageResourceReady(() => ed.emit('doc'));
-  ed.onGridArray = () => openGridArrayDialog(ed);
   ed.onBarcodeEdit = (o) => editBarcode(ed, o);
   ed.onGenEdit = (o) => (o.shape.kind === 'gen' && o.shape.gen === PATTERN_GEN_ID ? openPatternDialog(ed, { edit: o }) : o.shape.kind === 'gen' && isContourOffsetGenerator(o.shape.gen) ? openContourOffsetDialog(ed) : o.shape.kind === 'gen' && isSlotGenerator(o.shape.gen) ? openSlotPlacementDialog(ed, o) : isSketchObj(o) ? void ed.editSketch(o) : openGenDialog(ed, '', o));
   installSketchPanel(ed);
@@ -187,14 +187,6 @@ export function buildUI(ed: Editor) {
   ed.onRelDistance = (cur) => askDistance(cur);
   installDropAndPaste(ed, $('#stage'));
   buildTabBar(ed);
-  window.addEventListener('keydown', (e) => {
-    const el = e.target as HTMLElement;
-    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
-    if (!e.defaultPrevented && commandMatches('trace', e) && ed.selImages().length) {
-      e.preventDefault();
-      openTraceDialog(ed);
-    }
-  });
 }
 
 async function beginShapeBuilder(ed: Editor): Promise<void> {
@@ -225,167 +217,167 @@ function translateStatic() {
 
 // ---------- Menü ----------
 
-/** checked: Häkchen; enabled/visible: beim Öffnen prüfen; sub: Untermenü */
-type MenuItem = [label: string, key: string, action: () => void, checked?: () => boolean, enabled?: () => boolean, visible?: () => boolean] | { sub: string; items: MenuItem[] } | 'sep';
+/** command: Kennung für das Tastenkürzel (commandKeys.ts), leer = keins; checked: Häkchen; enabled/visible: beim Öffnen prüfen; sub: Untermenü */
+type MenuItem = [label: string, command: string, action: () => void, checked?: () => boolean, enabled?: () => boolean, visible?: () => boolean] | { sub: string; items: MenuItem[] } | 'sep';
 
 function buildMenu(ed: Editor) {
   const menus: [string, MenuItem[]][] = [
     [t('Datei'), [
-      [t('Neu'), 'Ctrl+N', () => (ed.newTab(), applyNewDocDefaults())],
-      [t('Neu aus Vorlage …'), '', () => openTemplateLibrary(ed)],
-      [t('Öffnen …'), 'Ctrl+O', () => openProject(ed)],
-      [t('Speichern …'), 'Ctrl+S', () => saveProject(ed)],
+      [t('Neu'), 'new', () => (ed.newTab(), applyNewDocDefaults())],
+      [t('Neu aus Vorlage …'), 'newtemplate', () => openTemplateLibrary(ed)],
+      [t('Öffnen …'), 'open', () => openProject(ed)],
+      [t('Speichern …'), 'save', () => saveProject(ed)],
       [t('Tab schließen'), '', () => closeTabAsk(ed)],
       'sep',
       [t('Als Vorlage speichern …'), '', () => openSaveTemplateDialog(ed)],
-      [t('Vorlage ausfüllen …'), '', () => openFillDialog(ed)],
-      [t('Serie aus Tabelle (CSV) …'), '', () => openSeriesDialog(ed)],
+      [t('Vorlage ausfüllen …'), 'filltemplate', () => openFillDialog(ed)],
+      [t('Serie aus Tabelle (CSV) …'), 'series', () => openSeriesDialog(ed)],
       'sep',
-      [t('Importieren …'), 'Ctrl+I', () => importFile(ed)],
+      [t('Importieren …'), 'import', () => importFile(ed)],
       { sub: t('Exportieren'), items: [
-        [t('Als SVG exportieren …'), '', () => exportSvg(ed)],
-        [t('Als DXF exportieren …'), '', () => exportDxf(ed)],
-        [t('Als PDF exportieren …'), '', () => exportPdf(ed, 'pdf')],
-        [t('Als Illustrator-Datei (AI) exportieren …'), '', () => exportPdf(ed, 'ai')],
+        [t('Als SVG exportieren …'), 'export', () => exportSvg(ed)],
+        [t('Als DXF exportieren …'), 'export-dxf', () => exportDxf(ed)],
+        [t('Als PDF exportieren …'), 'export-pdf', () => exportPdf(ed, 'pdf')],
+        [t('Als Illustrator-Datei (AI) exportieren …'), 'export-ai', () => exportPdf(ed, 'ai')],
       ] },
       [t('Bearbeitetes Bild speichern …'), '', () => saveProcessedBitmap(ed)],
       'sep',
-      [t('Schriften …'), '', () => openFontManager(ed)],
-      [t('Erweiterungen …'), '', () => openPacksDialog(ed.doc)],
-      [t('Einstellungen übertragen …'), '', () => openSyncDialog(ed)],
+      [t('Schriften …'), 'fonts', () => openFontManager(ed)],
+      [t('Erweiterungen …'), 'packs', () => openPacksDialog(ed.doc)],
+      [t('Einstellungen übertragen …'), 'sync', () => openSyncDialog(ed)],
       [t('KI-Agenten (MCP) …'), '', () => openAgentDialog(ed)],
     ]],
     [t('Bearbeiten'), [
-      [t('Rückgängig'), 'Ctrl+Z', () => ed.doUndo()],
-      [t('Wiederholen'), 'Ctrl+Y', () => ed.doRedo()],
+      [t('Rückgängig'), 'undo', () => ed.doUndo()],
+      [t('Wiederholen'), 'redo', () => ed.doRedo()],
       'sep',
-      [t('Ausschneiden'), commandKey('cut'), () => ed.cut()],
-      [t('Kopieren'), commandKey('copy'), () => ed.copy()],
-      [t('Einfügen'), commandKey('paste'), () => ed.paste()],
-      [t('An Originalposition einfügen'), commandKey('paste-in-place'), () => ed.paste(0)],
-      [t('Duplizieren'), commandKey('duplicate'), () => ed.duplicate()],
-      [t('Löschen'), t('Entf'), () => ed.deleteSel()],
+      [t('Ausschneiden'), 'cut', () => ed.cut()],
+      [t('Kopieren'), 'copy', () => ed.copy()],
+      [t('Einfügen'), 'paste', () => ed.paste()],
+      [t('An Originalposition einfügen'), 'paste-in-place', () => ed.paste(0)],
+      [t('Duplizieren'), 'duplicate', () => ed.duplicate()],
+      [t('Löschen'), 'delete', () => ed.deleteSel()],
       'sep',
-      [t('Alles auswählen'), commandKey('selectall'), () => ed.selectAll()],
-      [t('In Pfad umwandeln'), commandKey('tolines'), () => ed.convertSelToPath()],
+      [t('Alles auswählen'), 'selectall', () => ed.selectAll()],
+      [t('In Pfad umwandeln'), 'tolines', () => ed.convertSelToPath()],
       'sep',
       [t('Sichtbar, wenn …'), '', () => openShowIfDialog(ed, ed.sel)],
       [t('Zur Bibliothek hinzufügen …'), '', () => openAddSelectionDialog(ed)],
       'sep',
-      [t('Einstellungen …'), '', () => void openSettings()],
+      [t('Einstellungen …'), 'preferences', () => void openSettings()],
     ]],
     [t('Werkzeuge'), [
       [t('Werkzeugkasten …'), '', () => openAppsPanel()],
       'sep',
-      [t('Auswählen'), 'Esc', () => ed.setTool('select')],
-      [t('Knoten bearbeiten'), 'Ctrl+`', () => ed.setTool('node')],
+      [t('Auswählen'), 'tool:select', () => ed.setTool('select')],
+      [t('Knoten bearbeiten'), 'tool:node', () => ed.setTool('node')],
       'sep',
-      [t('Linien zeichnen'), 'Ctrl+L', () => ed.setTool('line')],
-      [t('Freihand / Bleistift'), '', () => ed.setTool('pencil')],
-      [t('Shaper'), '', () => ed.setTool('shaper')],
-      [t('Kurvenpfad zeichnen'), '', () => ed.setTool('curvature')],
-      [t('Bogen zeichnen'), '', () => ed.setTool('arc')],
+      [t('Linien zeichnen'), 'tool:line', () => ed.setTool('line')],
+      [t('Freihand / Bleistift'), 'tool:pencil', () => ed.setTool('pencil')],
+      [t('Shaper'), 'tool:shaper', () => ed.setTool('shaper')],
+      [t('Kurvenpfad zeichnen'), 'tool:curvature', () => ed.setTool('curvature')],
+      [t('Bogen zeichnen'), 'tool:arc', () => ed.setTool('arc')],
       [t('Auswahl isolieren'), '', () => ed.isolateSelection(), undefined, () => canEnterIsolation(ed)],
       [t('Isolation verlassen'), '', () => ed.leaveIsolation(), undefined, () => !!ed.isolation, () => !!ed.isolation],
-      [t('Pfade vereinfachen / glätten…'), '', () => openVectorFitDialog(ed)],
-      [t('Formerstellung …'), '', () => beginShapeBuilder(ed)],
-      [t('Schlitze / Ausklinkungen platzieren …'), '', () => openSlotPlacementDialog(ed)],
-      [t('Rechteck'), 'Ctrl+R', () => ed.setTool('rect')],
-      [t('Ellipse'), 'Ctrl+E', () => ed.setTool('ellipse')],
-      [t('Polygon'), '', () => ed.setTool('polygon')],
-      [t('Text'), 'Ctrl+T', () => ed.setTool('text')],
-      [t('Messen'), '', () => ed.setTool('measure')],
+      [t('Pfade vereinfachen / glätten…'), 'vectorfit', () => openVectorFitDialog(ed)],
+      [t('Formerstellung …'), 'shape-builder', () => beginShapeBuilder(ed)],
+      [t('Schlitze / Ausklinkungen platzieren …'), 'slotplace', () => openSlotPlacementDialog(ed)],
+      [t('Rechteck'), 'tool:rect', () => ed.setTool('rect')],
+      [t('Ellipse'), 'tool:ellipse', () => ed.setTool('ellipse')],
+      [t('Polygon'), 'tool:polygon', () => ed.setTool('polygon')],
+      [t('Text'), 'tool:text', () => ed.setTool('text')],
+      [t('Messen'), 'tool:measure', () => ed.setTool('measure')],
       'sep',
       { sub: t('Boolesche Operationen'), items: [
-        [t('Vereinen'), 'Alt++', () => ed.booleanSel('union')],
-        [t('Abziehen'), 'Alt+-', () => ed.booleanSel('subtract')],
+        [t('Vereinen'), 'union', () => ed.booleanSel('union')],
+        [t('Abziehen'), 'subtract', () => ed.booleanSel('subtract')],
         [t('Vordere vom hinteren abziehen'), '', () => ed.booleanSel('subtract', 'back')],
         [t('Hintere vom vorderen abziehen'), '', () => ed.booleanSel('subtract', 'front')],
-        [t('Schnittmenge'), 'Alt+*', () => ed.booleanSel('intersect')],
+        [t('Schnittmenge'), 'intersect', () => ed.booleanSel('intersect')],
         'sep',
-        [t('Boolesche Optionen …'), '', () => openBooleanDialog(ed)],
+        [t('Boolesche Optionen …'), 'boolopts', () => openBooleanDialog(ed)],
       ] },
-      [t('Außenkontur und Inseln ableiten …'), '', () => void openOutlineDialog(ed)],
-      [t('Offset …'), 'Alt+O', () => openOffsetDialog(ed)],
-      [t('Lokaler Konturversatz …'), '', () => openContourOffsetDialog(ed)],
-      [t('Verformen …'), '', () => openWarpDialog(ed)],
+      [t('Außenkontur und Inseln ableiten …'), 'outline', () => void openOutlineDialog(ed)],
+      [t('Offset …'), 'offset', () => openOffsetDialog(ed)],
+      [t('Lokaler Konturversatz …'), 'contouroffset', () => openContourOffsetDialog(ed)],
+      [t('Verformen …'), 'warp', () => openWarpDialog(ed)],
       { sub: t('Pfad'), items: [
-        [t('Pfad schließen'), '', () => ed.closeSel()],
+        [t('Pfad schließen'), 'closepath', () => ed.closeSel()],
         [t('Pfade mit Toleranz schließen …'), '', () => openCloseDialog(ed)],
-        [t('Ausgewählte Formen verbinden'), 'Alt+J', () => ed.joinSel()],
-        [t('Zerlegen'), 'Alt+B', () => ed.breakApartSel()],
-        [t('Freihandpfad bearbeiten …'), '', () => openFreehandEditDialog(ed)],
-        [t('Lasso-Auswahl'), '', () => ed.setTool('lasso')],
-        [t('Pfadinseln trennen …'), '', () => openPathIslandsDialog(ed)],
-        [t('Richtung umkehren'), '', () => ed.reverseSel()],
-        [t('Ecken runden oder fasen …'), '', () => openCornerDialog(ed)],
+        [t('Ausgewählte Formen verbinden'), 'join', () => ed.joinSel()],
+        [t('Zerlegen'), 'breakapart', () => ed.breakApartSel()],
+        [t('Freihandpfad bearbeiten …'), 'freehand-edit', () => openFreehandEditDialog(ed)],
+        [t('Lasso-Auswahl'), 'tool:lasso', () => ed.setTool('lasso')],
+        [t('Pfadinseln trennen …'), 'path-islands', () => openPathIslandsDialog(ed)],
+        [t('Richtung umkehren'), 'reverse', () => ed.reverseSel()],
+        [t('Ecken runden oder fasen …'), 'corners', () => openCornerDialog(ed)],
         'sep',
-        [t('Formen trimmen'), 'Ctrl+K', () => ed.setTool('trim')],
-        [t('Startpunkt setzen'), '', () => ed.setTool('start')],
+        [t('Formen trimmen'), 'tool:trim', () => ed.setTool('trim')],
+        [t('Startpunkt setzen'), 'tool:start', () => ed.setTool('start')],
         'sep',
         [t('Mittelpunkte markieren'), '', () => ed.markCentersSel()],
       ] },
       { sub: t('Array'), items: [
-        [t('Rasterarray …'), 'Ctrl+Shift+A', () => openGridArrayDialog(ed)],
-        [t('Kreisarray …'), '', () => openCircularArrayDialog(ed)],
+        [t('Rasterarray …'), 'gridarray', () => openGridArrayDialog(ed)],
+        [t('Kreisarray …'), 'circarray', () => openCircularArrayDialog(ed)],
       ] },
       'sep',
       { sub: t('Textfunktionen'), items: [
-        [t('Text auf Pfad'), '', () => ed.applyPathToText()],
+        [t('Text auf Pfad'), 'textpath', () => ed.applyPathToText()],
         [t('Text vom Pfad lösen'), '', () => ed.removePathFromText()],
         'sep',
-        [t('Variabler Text …'), '', () => openVarTextDialog(ed)],
+        [t('Variabler Text …'), 'vartext', () => openVarTextDialog(ed)],
         [t('Variablen Text festschreiben'), '', () => bakeVarText(ed)],
       ] },
       { sub: t('Bild'), items: [
-        [t('Bild anpassen …'), '', () => openAdjustDialog(ed)],
-        [t('Bild nachzeichnen …'), 'Alt+T', () => openTraceDialog(ed)],
-        [t('Hintergrund entfernen …'), '', () => openBackgroundDialog(ed)],
-        [EDIT_TITLE(), '', () => runImageEdit(ed)],
+        [t('Bild anpassen …'), 'adjust', () => openAdjustDialog(ed)],
+        [t('Bild nachzeichnen …'), 'trace', () => openTraceDialog(ed)],
+        [t('Hintergrund entfernen …'), 'bgremove', () => openBackgroundDialog(ed)],
+        [EDIT_TITLE(), 'imageedit', () => runImageEdit(ed)],
         [t('Bild zuschneiden'), '', () => ed.cropImageSel(false)],
         [t('Maske auf Bild anwenden'), '', () => ed.cropImageSel(true)],
       ] },
     ]],
     [t('Anordnen'), [
-      [t('Gruppieren'), commandKey('group'), () => ed.group()],
-      [t('Gruppierung aufheben'), commandKey('ungroup'), () => ed.ungroup()],
+      [t('Gruppieren'), 'group', () => ed.group()],
+      [t('Gruppierung aufheben'), 'ungroup', () => ed.ungroup()],
       'sep',
       { sub: t('Spiegeln und drehen'), items: [
-        [t('Horizontal spiegeln'), 'Ctrl+Shift+H', () => ed.mirror(true)],
-        [t('Vertikal spiegeln'), 'Ctrl+Shift+V', () => ed.mirror(false)],
+        [t('Horizontal spiegeln'), 'mirrorh', () => ed.mirror(true)],
+        [t('Vertikal spiegeln'), 'mirrorv', () => ed.mirror(false)],
         'sep',
-        [t('90° im Uhrzeigersinn'), '.', () => ed.rotateBy(-90)],
-        [t('90° gegen Uhrzeigersinn'), ',', () => ed.rotateBy(90)],
+        [t('90° im Uhrzeigersinn'), 'rotcw', () => ed.rotateBy(-90)],
+        [t('90° gegen Uhrzeigersinn'), 'rotccw', () => ed.rotateBy(90)],
       ] },
       { sub: t('Ausrichten und verteilen'), items: [
-        [t('Links ausrichten'), 'L', () => ed.align('left')],
-        [t('Rechts ausrichten'), 'R', () => ed.align('right')],
-        [t('Oben ausrichten'), 'T', () => ed.align('top')],
-        [t('Unten ausrichten'), 'B', () => ed.align('bottom')],
-        [t('Mitten horizontal'), 'C', () => ed.align('hcenter')],
-        [t('Mitten vertikal'), 'E', () => ed.align('vcenter')],
+        [t('Links ausrichten'), 'alignl', () => ed.align('left')],
+        [t('Rechts ausrichten'), 'alignr', () => ed.align('right')],
+        [t('Oben ausrichten'), 'alignt', () => ed.align('top')],
+        [t('Unten ausrichten'), 'alignb', () => ed.align('bottom')],
+        [t('Mitten horizontal'), 'alignhc', () => ed.align('hcenter')],
+        [t('Mitten vertikal'), 'alignvc', () => ed.align('vcenter')],
         'sep',
-        [t('Horizontal verteilen'), '', () => ed.distribute(true)],
-        [t('Vertikal verteilen'), '', () => ed.distribute(false)],
+        [t('Horizontal verteilen'), 'disth', () => ed.distribute(true)],
+        [t('Vertikal verteilen'), 'distv', () => ed.distribute(false)],
       ] },
       { sub: t('Reihenfolge'), items: ([['front', t('Ganz nach vorne')], ['forward', t('Eine Ebene nach vorne')],
         ['backward', t('Eine Ebene nach hinten')], ['back', t('Ganz nach hinten')]] as const).map(([dir, label]): MenuItem =>
-        [label, '', () => ed.restack(dir), undefined, () => ed.canRestack(dir)]) },
+        [label, dir === 'front' ? 'tofront' : dir === 'back' ? 'toback' : dir, () => ed.restack(dir), undefined, () => ed.canRestack(dir)]) },
       { sub: t('Beziehungen'), items: [
-        ...REL_MODES.map((m): MenuItem => [REL_LABELS[m], '', () => ed.startRelation(m), () => ed.tool === 'relate' && ed.relMode === m]),
+        ...REL_MODES.map((m): MenuItem => [REL_LABELS[m], `rel:${m}`, () => ed.startRelation(m), () => ed.tool === 'relate' && ed.relMode === m]),
       ] },
       'sep',
-      [t('Verschachteln …'), '', () => openNestDialog(ed)],
+      [t('Verschachteln …'), 'nest', () => openNestDialog(ed)],
       'sep',
       [t('Nicht lasern'), '', () => ed.toggleNoLaser(), () => ed.sel.length > 0 && ed.sel.every((o) => o.noLaser)],
     ]],
     [t('Seiten'), [
-      [t('Neue Seite'), '', () => ed.addPage()],
+      [t('Neue Seite'), 'addpage', () => ed.addPage()],
       [t('Seite duplizieren'), '', () => ed.duplicatePage()],
       [t('Seite löschen'), '', () => ed.deletePage()],
       'sep',
-      [t('Vorherige Seite'), t('Bild ↑'), () => ed.setPage(ed.doc.page - 1)],
-      [t('Nächste Seite'), t('Bild ↓'), () => ed.setPage(ed.doc.page + 1)],
+      [t('Vorherige Seite'), 'prevpage', () => ed.setPage(ed.doc.page - 1)],
+      [t('Nächste Seite'), 'nextpage', () => ed.setPage(ed.doc.page + 1)],
       'sep',
       { sub: t('Auswahl verschieben'), items: [
         [t('Auswahl auf vorherige Seite'), '', () => ed.moveToPage(ed.sel, ed.doc.page - 1)],
@@ -393,20 +385,20 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Laser'), [
-      [t('Konstruktion prüfen'), '', () => openCheck()],
-      [t('Vorschau …'), 'Alt+P', () => openPreview(ed)],
-      [t('G-Code speichern …'), '', () => saveGCode(ed)],
+      [t('Konstruktion prüfen'), 'check', () => openCheck()],
+      [t('Vorschau …'), 'preview', () => openPreview(ed)],
+      [t('G-Code speichern …'), 'gcode', () => saveGCode(ed)],
       'sep',
-      [t('Start'), '', () => startJob(ed)],
-      [t('Rahmen'), '', () => frameJob(ed, false)],
-      [t('Kontur-Rahmen'), '', () => frameJob(ed, true)],
+      [t('Start'), 'start', () => startJob(ed)],
+      [t('Rahmen'), 'frame', () => frameJob(ed, false)],
+      [t('Kontur-Rahmen'), 'contour', () => frameJob(ed, true)],
       'sep',
-      [t('Laser einrichten …'), '', () => openSetupWizard(ed)],
+      [t('Laser einrichten …'), 'setup', () => openSetupWizard(ed)],
       { sub: t('Test und Kalibrieren'), items: [
-        [t('Materialtest …'), '', () => openMaterialTestDialog(ed)],
-        [t('Materialtest auswerten …'), '', () => openTestPhotoDialog(ed)],
-        [t('Fokustest …'), '', () => openFocusTestDialog(ed)],
-        [t('Passung kalibrieren …'), '', () => openCalibrateDialog(ed)],
+        [t('Materialtest …'), 'materialtest', () => openMaterialTestDialog(ed)],
+        [t('Materialtest auswerten …'), 'testphoto', () => openTestPhotoDialog(ed)],
+        [t('Fokustest …'), 'focustest', () => openFocusTestDialog(ed)],
+        [t('Passung kalibrieren …'), 'calibrate', () => openCalibrateDialog(ed)],
       ] },
       { sub: t('Fernsteuerung'), items: [
         [t('Host-Modus …'), '', () => openRemoteHostDialog(ed)],
@@ -415,9 +407,9 @@ function buildMenu(ed: Editor) {
         [t('Vom Host übernehmen …'), '', () => void openHostSyncDialog(ed)],
       ] },
       { sub: t('Gerät'), items: [
-        [t('Geräte …'), '', () => openDevicesDialog(ed)],
-        [t('Geräteeinstellungen …'), '', () => openDeviceDialog(ed)],
-        [t('Drehachse (Rotary) …'), '', () => openRotaryDialog()],
+        [t('Geräte …'), 'devices', () => openDevicesDialog(ed)],
+        [t('Geräteeinstellungen …'), 'devsettings', () => openDeviceDialog(ed)],
+        [t('Drehachse (Rotary) …'), 'rotary', () => openRotaryDialog()],
       ] },
       { sub: 'FluidNC', items: [
         [t('Konfiguration …'), '', () => import('./fluidncDialog').then((m) => m.openFluidConfig())],
@@ -425,13 +417,13 @@ function buildMenu(ed: Editor) {
       ] },
     ]],
     [t('Ansicht'), [
-      [t('Alle Kameraüberlagerungen anzeigen'), '', () => toggleCameraOverlays(ed), cameraOverlaysVisible],
-      [t('Ganze Seite'), 'Ctrl+0', () => ed.zoomPage()],
-      [t('Auf Auswahl zoomen'), '', () => ed.zoomSelection()],
-      [t('Vergrößern'), '+', () => ed.zoomAt(1.25)],
-      [t('Verkleinern'), '-', () => ed.zoomAt(0.8)],
+      [t('Alle Kameraüberlagerungen anzeigen'), 'camera-overlays', () => toggleCameraOverlays(ed), cameraOverlaysVisible],
+      [t('Ganze Seite'), 'zoompage', () => ed.zoomPage()],
+      [t('Auf Auswahl zoomen'), 'zoomsel', () => ed.zoomSelection()],
+      [t('Vergrößern'), 'zoomin', () => ed.zoomAt(1.25)],
+      [t('Verkleinern'), 'zoomout', () => ed.zoomAt(0.8)],
       'sep',
-      [t('Drahtgitter / Gefüllt'), 'Alt+W', () => ed.setFilled(!ed.filled)],
+      [t('Drahtgitter / Gefüllt'), 'wire', () => ed.setFilled(!ed.filled)],
       { sub: t('Mittelpunkte zeigen'), items: [
         [t('Aus|Mittelpunkte'), '', () => ed.setSnap({ centers: 'off' }), () => ed.centerMarks === 'off'],
         [t('Bei Auswahl und unter dem Mauszeiger'), '', () => ed.setSnap({ centers: 'auto' }), () => ed.centerMarks === 'auto'],
@@ -439,8 +431,8 @@ function buildMenu(ed: Editor) {
       ] },
       'sep',
       { sub: t('Gitter'), items: [
-        [t('Gitter anzeigen'), '', () => ed.setGrid({ show: !ed.grid.show }), () => ed.grid.show],
-        [t('Gitter einstellen …'), '', () => openGridDialog(ed)],
+        [t('Gitter anzeigen'), 'grid', () => ed.setGrid({ show: !ed.grid.show }), () => ed.grid.show],
+        [t('Gitter einstellen …'), 'gridsettings', () => openGridDialog(ed)],
       ] },
       { sub: t('Hilfslinien'), items: [
         [t('Hilfslinien anzeigen'), '', () => ed.setGuideLayer({ hidden: ed.guidesShown() }), () => ed.guidesShown()],
@@ -469,7 +461,7 @@ function buildMenu(ed: Editor) {
       'sep',
       [t('Fenster und Leisten zurücksetzen'), '', () => (resetLayout(), showAllBars())],
     ]],
-    [t('Hilfe'), [[t('Tastenkürzel'), 'F1', () => showHelp()], 'sep', [t('Nach Updates suchen …'), '', () => openUpdateDialog()], [t('Über KizamuBeam …'), '', () => showAbout()]]],
+    [t('Hilfe'), [[t('Tastenkürzel'), 'help', () => showHelp()], 'sep', [t('Nach Updates suchen …'), '', () => openUpdateDialog()], [t('Über KizamuBeam …'), '', () => showAbout()]]],
   ];
   const bar = $('#menubar');
   const brand = h('img', { class: 'menubar-brand', alt: 'KizamuBeam', title: 'KizamuBeam', onclick: () => showAbout() }) as HTMLImageElement;
@@ -500,7 +492,12 @@ function buildMenu(ed: Editor) {
         list.append(sub);
       } else {
         const enabled = it[4];
-        const b = h('button', { onclick: () => { if (!enabled || enabled()) { close(); it[2](); } } }, h('span', {}, it[0]), it[1] ? h('kbd', {}, it[1]) : null);
+        if (it[1]) menuCommands.add(it[1]);
+        const kbd = h('kbd');
+        const showKey = () => { kbd.textContent = commandKey(it[1]); kbd.hidden = !kbd.textContent; };
+        showKey();
+        checks.push(showKey);
+        const b = h('button', { onclick: () => { if (!enabled || enabled()) { close(); it[2](); } } }, h('span', {}, it[0]), kbd);
         if (enabled) checks.push(() => { b.disabled = !enabled(); });
         const visible = it[5];
         if (visible) checks.push(() => { b.hidden = !visible(); });
@@ -545,12 +542,6 @@ function buildMenu(ed: Editor) {
   document.addEventListener('mousedown', (e) => {
     if (openMenu && !openMenu.contains(e.target as Node)) close();
   });
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'F1') {
-      e.preventDefault();
-      showHelp();
-    }
-  });
 }
 
 /** Logo, Version, Herkunft des Namens und Lizenz */
@@ -572,31 +563,32 @@ function showAbout() {
   dlg.showModal();
 }
 
-/** Shortcut overview, shown with F1 and in Settings → Mouse and keyboard */
-function helpRows(): [string, string][] {
+/** Keys and mouse actions with a fixed meaning (shortcut overview and Settings → Mouse and keyboard) */
+function fixedKeyRows(): [string, string][] {
   return [
     ['Esc', t('Auswahlwerkzeug / Auswahl aufheben')],
-    ['Ctrl+L / R / E / T', t('Linie / Rechteck / Ellipse / Text')],
-    ['Ctrl+`', t('Knoten bearbeiten')],
+    [t('Entf'), t('Löschen')],
     [t('Klick auf Auswahl'), t('Zwischen Skalieren und Drehen wechseln')],
     [t('Shift / Ctrl beim Ziehen'), t('Proportional bzw. frei / von der Mitte')],
     [t('Pfeiltasten'), t('1 mm verschieben (Shift 10 mm, Alt 0,1 mm)')],
-    [t('. und ,'), t('90° drehen')],
-    ['L R T B C E', t('Ausrichten (mehrere Objekte gewählt)')],
     [loadRightPan() ? t('Leertaste + Ziehen, Mitteltaste, rechte Maustaste') : t('Leertaste + Ziehen, Mitteltaste'), t('Ansicht verschieben')],
     [t('Mausrad'), t('Zoomen')],
     [t('Knoten: D I L C E S'), t('Löschen, Einfügen, Gerade, Kurve, Ecke, Glatt')],
-    ['Alt+W', t('Drahtgitter / Gefüllt')],
     [t('Ctrl beim Ziehen'), t('Fangen vorübergehend umkehren (aus, wenn eingeschaltet)')],
     [t('Alt beim Ziehen'), t('Stärker fangen und Ausrichtungshilfen an anderen Objekten')],
     [t('Aus dem Lineal ziehen'), t('Hilfslinie auf eigener Ebene, wird nie gelasert (verschieben durch Ziehen, zurück ins Lineal: löschen)')],
-    ['Ctrl+I', t('Importieren (Bilder, SVG, DXF, PDF, AI, 3D-Modelle); Dateien auch auf die Arbeitsfläche ziehen oder mit Ctrl+V einfügen')],
-    ['Ctrl+Shift+A', t('Rasterarray')],
-    ['Alt++ / Alt+- / Alt+*', t('Vereinen / Abziehen / Schnittmenge')],
-    ['Alt+T', t('Bild nachzeichnen')],
-    ['Alt+P', t('Vorschau mit Zeitschätzung')],
     [t('Palette'), t('Farbe anklicken = Auswahl diesem Layer zuordnen')],
   ];
+}
+
+/** Shortcut overview (F1): every command with a shortcut, then the fixed keys */
+function helpRows(): [string, string][] {
+  const commands = shortcutCommands.filter((c) => bindings(c.id).length).map((c): [string, string] => [
+    bindings(c.id).map(bindingLabel).join(' / '),
+    // Import also explains drag and paste
+    c.id === 'import' ? t('Importieren (Bilder, SVG, DXF, PDF, AI, 3D-Modelle); Dateien auch auf die Arbeitsfläche ziehen oder mit Ctrl+V einfügen') : c.label.split(': ')[0],
+  ]);
+  return [...commands, ...fixedKeyRows()];
 }
 
 function showHelp() {
@@ -633,62 +625,62 @@ function buildBars(ed: Editor) {
     L = t('Laser');
   const tool = (id: Tool, icon: string, label: string): Action => ({ id: `tool:${id}`, cat: W, icon, label, run: () => ed.setTool(id), on: () => ed.tool === id });
   const list: Action[] = [
-    { id: 'new', cat: F, icon: 'new', label: t('Neues Projekt in neuem Tab (Ctrl+N)'), run: () => (ed.newTab(), applyNewDocDefaults()) },
+    { id: 'new', cat: F, icon: 'new', label: t('Neues Projekt in neuem Tab'), run: () => (ed.newTab(), applyNewDocDefaults()) },
     { id: 'open', cat: F, icon: 'open', label: t('Öffnen'), run: () => openProject(ed) },
     { id: 'save', cat: F, icon: 'save', label: t('Speichern'), run: () => saveProject(ed) },
-    { id: 'import', cat: F, icon: 'import', label: t('Importieren: Bilder, SVG, DXF, PDF, AI, LightBurn, 3D-Modelle (Ctrl+I)'), run: () => importFile(ed) },
+    { id: 'import', cat: F, icon: 'import', label: t('Importieren: Bilder, SVG, DXF, PDF, AI, LightBurn, 3D-Modelle'), run: () => importFile(ed) },
     { id: 'export', cat: F, icon: 'export', label: t('Als SVG exportieren'), run: () => exportSvg(ed) },
     { id: 'export-dxf', cat: F, short: 'DXF', label: t('Als DXF exportieren'), run: () => exportDxf(ed) },
     { id: 'export-pdf', cat: F, short: 'PDF', label: t('Als PDF exportieren'), run: () => exportPdf(ed, 'pdf') },
     { id: 'export-ai', cat: F, short: 'AI', label: t('Als Illustrator-Datei (AI) exportieren'), run: () => exportPdf(ed, 'ai') },
-    { id: 'undo', cat: B, icon: 'undo', label: t('Rückgängig (Ctrl+Z)'), run: () => ed.doUndo() },
-    { id: 'redo', cat: B, icon: 'redo', label: t('Wiederholen (Ctrl+Y)'), run: () => ed.doRedo() },
-    { id: 'cut', cat: B, icon: 'cut', label: t('Ausschneiden (Ctrl+X)'), run: () => ed.cut(), enabled: sel1 },
-    { id: 'copy', cat: B, icon: 'copy', label: t('Kopieren (Ctrl+C)'), run: () => ed.copy(), enabled: sel1 },
-    { id: 'paste', cat: B, icon: 'paste', label: t('Einfügen (Ctrl+V)'), run: () => ed.paste() },
-    { id: 'duplicate', cat: B, short: t('Dupl.'), label: t('Duplizieren (Ctrl+D)'), run: () => ed.duplicate(), enabled: sel1 },
-    { id: 'delete', cat: B, icon: 'delete', label: t('Löschen (Entf)'), run: () => ed.deleteSel(), enabled: sel1 },
-    { id: 'selectall', cat: B, short: t('Alle'), label: t('Alles auswählen (Ctrl+A)'), run: () => ed.selectAll() },
-    { id: 'tolines', cat: B, icon: 'tolines', label: t('In Pfad umwandeln (Ctrl+Shift+C)'), run: () => ed.convertSelToPath(), enabled: sel1 },
+    { id: 'undo', cat: B, icon: 'undo', label: t('Rückgängig'), run: () => ed.doUndo() },
+    { id: 'redo', cat: B, icon: 'redo', label: t('Wiederholen'), run: () => ed.doRedo() },
+    { id: 'cut', cat: B, icon: 'cut', label: t('Ausschneiden'), run: () => ed.cut(), enabled: sel1 },
+    { id: 'copy', cat: B, icon: 'copy', label: t('Kopieren'), run: () => ed.copy(), enabled: sel1 },
+    { id: 'paste', cat: B, icon: 'paste', label: t('Einfügen'), run: () => ed.paste() },
+    { id: 'duplicate', cat: B, short: t('Dupl.'), label: t('Duplizieren'), run: () => ed.duplicate(), enabled: sel1 },
+    { id: 'delete', cat: B, icon: 'delete', label: t('Löschen'), run: () => ed.deleteSel(), enabled: sel1 },
+    { id: 'selectall', cat: B, short: t('Alle'), label: t('Alles auswählen'), run: () => ed.selectAll() },
+    { id: 'tolines', cat: B, icon: 'tolines', label: t('In Pfad umwandeln'), run: () => ed.convertSelToPath(), enabled: sel1 },
     { id: 'closepath', cat: M, short: t('Schließen|Pfad'), label: t('Pfad schließen'), run: () => ed.closeSel(), enabled: sel1 },
-    { id: 'join', cat: M, short: t('Verbinden|Pfade'), label: t('Ausgewählte Formen verbinden (Alt+J)'), run: () => ed.joinSel(), enabled: sel2 },
-    { id: 'breakapart', cat: M, short: t('Zerlegen'), label: t('Zerlegen (Alt+B)'), run: () => ed.breakApartSel(), enabled: sel1 },
+    { id: 'join', cat: M, short: t('Verbinden|Pfade'), label: t('Ausgewählte Formen verbinden'), run: () => ed.joinSel(), enabled: sel2 },
+    { id: 'breakapart', cat: M, short: t('Zerlegen'), label: t('Zerlegen'), run: () => ed.breakApartSel(), enabled: sel1 },
     { id: 'freehand-edit', cat: W, icon:'line', label:t('Freihandpfad bearbeiten …'), run:()=>openFreehandEditDialog(ed), enabled:sel1, on:()=>ed.tool==='freehand-edit' },
     tool('lasso', 'lasso', t('Lasso-Auswahl')),
     { id: 'path-islands', cat: M, label: t('Pfadinseln trennen …'), run: () => openPathIslandsDialog(ed), enabled: sel1 },
     { id: 'reverse', cat: M, short: t('Umkehren'), label: t('Richtung umkehren'), run: () => ed.reverseSel(), enabled: sel1 },
     { id: 'corners', cat: M, short: t('Ecken'), label: t('Ecken runden oder fasen …'), run: () => openCornerDialog(ed), enabled: sel1 },
-    { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern (+)'), run: () => ed.zoomAt(1.25) },
-    { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern (-)'), run: () => ed.zoomAt(0.8) },
-    { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite (Ctrl+0)'), run: () => ed.zoomPage() },
+    { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern'), run: () => ed.zoomAt(1.25) },
+    { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern'), run: () => ed.zoomAt(0.8) },
+    { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite'), run: () => ed.zoomPage() },
     { id: 'grid', cat: V, icon: 'grid', label: t('Gitter ein-/ausblenden'), run: () => ed.setGrid({ show: !ed.grid.show }), on: () => ed.grid.show },
     { id: 'camera-overlays', cat: V, icon: 'cameraOverlay', label: t('Alle Kameraüberlagerungen anzeigen'), run: () => toggleCameraOverlays(ed), on: cameraOverlaysVisible,
       dyn: () => ({ icon: cameraOverlaysVisible() ? 'cameraOverlay' : 'cameraOverlayOff' }) },
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
     { id: 'zoomsel', cat: V, icon: 'zoomsel', label: t('Auf Auswahl zoomen'), run: () => ed.zoomSelection(), enabled: sel1 },
     { id: 'view3d', cat: V, icon: 'view3d', label: t('3D-Ansicht: Baugruppen zusammengesteckt ansehen'), run: () => toggleWindow('view3d') },
-    { id: 'wire', cat: V, short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt (Alt+W)'), run: () => ed.setFilled(!ed.filled), on: () => ed.filled },
+    { id: 'wire', cat: V, short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt'), run: () => ed.setFilled(!ed.filled), on: () => ed.filled },
     {
       id: 'theme', cat: V, icon: 'moon', label: t('Dunkles Design'), run: () => applyTheme(ed, isDark() ? 'light' : 'dark'),
       dyn: () => (isDark() ? { icon: 'sun', label: t('Helles Design') } : { icon: 'moon', label: t('Dunkles Design') }),
     },
-    { id: 'group', cat: A, icon: 'group', label: t('Gruppieren (Ctrl+G)'), run: () => ed.group(), enabled: sel2 },
-    { id: 'ungroup', cat: A, icon: 'ungroup', label: t('Gruppierung aufheben (Ctrl+U)'), run: () => ed.ungroup(), enabled: sel1 },
-    { id: 'mirrorh', cat: A, icon: 'mirrorh', label: t('Horizontal spiegeln (Ctrl+Shift+H)'), run: () => ed.mirror(true), enabled: sel1 },
-    { id: 'mirrorv', cat: A, icon: 'mirrorv', label: t('Vertikal spiegeln (Ctrl+Shift+V)'), run: () => ed.mirror(false), enabled: sel1 },
-    { id: 'rotccw', cat: A, icon: 'rotccw', label: t('90° gegen Uhrzeigersinn (,)'), run: () => ed.rotateBy(90), enabled: sel1 },
-    { id: 'rotcw', cat: A, icon: 'rotcw', label: t('90° im Uhrzeigersinn (.)'), run: () => ed.rotateBy(-90), enabled: sel1 },
-    { id: 'alignl', cat: A, icon: 'alignl', label: t('Links ausrichten (L)'), run: () => ed.align('left'), enabled: sel2 },
-    { id: 'alignhc', cat: A, icon: 'alignhc', label: t('Mitten horizontal ausrichten (C)'), run: () => ed.align('hcenter'), enabled: sel2 },
-    { id: 'alignr', cat: A, icon: 'alignr', label: t('Rechts ausrichten (R)'), run: () => ed.align('right'), enabled: sel2 },
-    { id: 'alignt', cat: A, icon: 'alignt', label: t('Oben ausrichten (T)'), run: () => ed.align('top'), enabled: sel2 },
-    { id: 'alignvc', cat: A, icon: 'alignvc', label: t('Mitten vertikal ausrichten (E)'), run: () => ed.align('vcenter'), enabled: sel2 },
-    { id: 'alignb', cat: A, icon: 'alignb', label: t('Unten ausrichten (B)'), run: () => ed.align('bottom'), enabled: sel2 },
+    { id: 'group', cat: A, icon: 'group', label: t('Gruppieren'), run: () => ed.group(), enabled: sel2 },
+    { id: 'ungroup', cat: A, icon: 'ungroup', label: t('Gruppierung aufheben'), run: () => ed.ungroup(), enabled: sel1 },
+    { id: 'mirrorh', cat: A, icon: 'mirrorh', label: t('Horizontal spiegeln'), run: () => ed.mirror(true), enabled: sel1 },
+    { id: 'mirrorv', cat: A, icon: 'mirrorv', label: t('Vertikal spiegeln'), run: () => ed.mirror(false), enabled: sel1 },
+    { id: 'rotccw', cat: A, icon: 'rotccw', label: t('90° gegen Uhrzeigersinn'), run: () => ed.rotateBy(90), enabled: sel1 },
+    { id: 'rotcw', cat: A, icon: 'rotcw', label: t('90° im Uhrzeigersinn'), run: () => ed.rotateBy(-90), enabled: sel1 },
+    { id: 'alignl', cat: A, icon: 'alignl', label: t('Links ausrichten'), run: () => ed.align('left'), enabled: sel2 },
+    { id: 'alignhc', cat: A, icon: 'alignhc', label: t('Mitten horizontal ausrichten'), run: () => ed.align('hcenter'), enabled: sel2 },
+    { id: 'alignr', cat: A, icon: 'alignr', label: t('Rechts ausrichten'), run: () => ed.align('right'), enabled: sel2 },
+    { id: 'alignt', cat: A, icon: 'alignt', label: t('Oben ausrichten'), run: () => ed.align('top'), enabled: sel2 },
+    { id: 'alignvc', cat: A, icon: 'alignvc', label: t('Mitten vertikal ausrichten'), run: () => ed.align('vcenter'), enabled: sel2 },
+    { id: 'alignb', cat: A, icon: 'alignb', label: t('Unten ausrichten'), run: () => ed.align('bottom'), enabled: sel2 },
     { id: 'disth', cat: A, icon: 'disth', label: t('Horizontal verteilen'), run: () => ed.distribute(true), enabled: sel3 },
     { id: 'distv', cat: A, icon: 'distv', label: t('Vertikal verteilen'), run: () => ed.distribute(false), enabled: sel3 },
-    tool('select', 'select', t('Auswählen (Esc)')),
-    tool('node', 'node', t('Knoten bearbeiten (Ctrl+`)')),
-    tool('line', 'line', t('Linien zeichnen (Ctrl+L)')),
+    tool('select', 'select', t('Auswählen')),
+    tool('node', 'node', t('Knoten bearbeiten')),
+    tool('line', 'line', t('Linien zeichnen')),
     { id: 'isolate', cat: W, icon: 'isolate', label: t('Auswahl isolieren / Isolation verlassen'), run: () => { if (ed.isolation) ed.leaveIsolation(); else ed.isolateSelection(); }, enabled: () => !!ed.isolation || canEnterIsolation(ed), on: () => !!ed.isolation, dyn: () => ed.isolation ? { icon: 'isolateExit', label: t('Isolation verlassen') } : { icon: 'isolate', label: t('Auswahl isolieren') } },
     { id: 'vectorfit', cat: W, icon: 'vectorfit', label: t('Ausgewählte Pfade vereinfachen / glätten…'), run: () => openVectorFitDialog(ed), enabled: () => ed.vectorFitTargets().length > 0 },
     { id: 'shape-builder', cat: W, icon: 'shapeBuilder', label: t('Formerstellung …'), run: () => beginShapeBuilder(ed), enabled: sel1, on: () => ed.tool === 'builder' },
@@ -696,11 +688,11 @@ function buildBars(ed: Editor) {
   tool('shaper', 'shaper', t('Shaper: Geste formt Grundform, umfährt zum Vereinen, kreuzt zum Abziehen')),
     tool('curvature', 'curve', t('Kurven zeichnen: Klicken setzt Ecken, Ziehen formt Kurven')),
     tool('arc', 'arc', t('Bogen zeichnen: Mitte, Radius und Winkel oder drei Punkte')),
-    tool('rect', 'rect', t('Rechteck (Ctrl+R)')),
-    tool('ellipse', 'ellipse', t('Ellipse (Ctrl+E)')),
+    tool('rect', 'rect', t('Rechteck')),
+    tool('ellipse', 'ellipse', t('Ellipse')),
     tool('polygon', 'polygon', t('Polygon')),
-    tool('text', 'text', t('Text (Ctrl+T)')),
-    tool('trim', 'trim', t('Formen trimmen (Ctrl+K): Abschnitte bis zum nächsten Schnittpunkt anklicken und entfernen')),
+    tool('text', 'text', t('Text')),
+    tool('trim', 'trim', t('Formen trimmen: Abschnitte bis zum nächsten Schnittpunkt anklicken und entfernen')),
     tool('start', 'startpoint', t('Startpunkt setzen: Knoten oder Kante anklicken, wo der Schnitt beginnt (Shift: Richtung umkehren)')),
     tool('measure', 'measure', t('Messen: Abstand, Winkel, Radius und Durchmesser')),
     ...REL_MODES.map((m): Action => ({
@@ -722,31 +714,31 @@ function buildBars(ed: Editor) {
     { id: 'vartext', cat: W, icon: 'vartext', short: t('Var. Text'), label: t('Variabler Text …'), run: () => openVarTextDialog(ed) },
     { id: 'textpath', cat: W, short: t('Auf Pfad'), label: t('Text auf Pfad'), run: () => ed.applyPathToText(), enabled: sel2 },
     {
-      id: 'union', cat: M, icon: 'union', label: t('Vereinen (Alt++): alle gewählten Formen verschmelzen, eine Gruppe oder ein Text auch mit sich selbst'),
+      id: 'union', cat: M, icon: 'union', label: t('Vereinen: alle gewählten Formen verschmelzen, eine Gruppe oder ein Text auch mit sich selbst'),
       run: () => ed.booleanSel('union'), enabled: () => sel2() || (n() === 1 && ['group', 'text'].includes(ed.sel[0].shape.kind)),
     },
     {
       id: 'subtract', cat: M, icon: 'subtract', label: t('Abziehen'), run: () => ed.booleanSel('subtract'), enabled: sel2,
-      dyn: () => ({ label: `${t('Abziehen')} (Alt+-): ${BOOL_BASE_HINT[ed.boolBase]}${ed.boolKeep ? t(' (Originale bleiben)') : ''}` }),
+      dyn: () => ({ label: `${t('Abziehen')}: ${BOOL_BASE_HINT[ed.boolBase]}${ed.boolKeep ? t(' (Originale bleiben)') : ''}` }),
     },
-    { id: 'intersect', cat: M, icon: 'intersect', label: t('Schnittmenge (Alt+*): nur die gemeinsame Fläche behalten'), run: () => ed.booleanSel('intersect'), enabled: sel2 },
+    { id: 'intersect', cat: M, icon: 'intersect', label: t('Schnittmenge: nur die gemeinsame Fläche behalten'), run: () => ed.booleanSel('intersect'), enabled: sel2 },
     { id: 'boolopts', cat: M, icon: 'settings', small: true, label: t('Boolesche Optionen: Basis und Originale behalten'), run: () => openBooleanDialog(ed) },
     { id: 'outline', cat: M, icon: 'outline', label: t('Außenkontur und Inseln ableiten …'), run: () => void openOutlineDialog(ed), enabled: sel1 },
-    { id: 'offset', cat: M, icon: 'offset', label: t('Offset (Alt+O)'), run: () => openOffsetDialog(ed), enabled: sel1 },
+    { id: 'offset', cat: M, icon: 'offset', label: t('Offset'), run: () => openOffsetDialog(ed), enabled: sel1 },
     { id: 'warp', cat: M, icon: 'warp', label: t('Verformen: Formen, Text und Bilder biegen, wölben oder perspektivisch verzerren'), run: () => openWarpDialog(ed), enabled: sel1 },
-    { id: 'gridarray', cat: M, icon: 'gridArray', label: t('Rasterarray: Auswahl in Spalten und Zeilen kopieren (Ctrl+Shift+A)'), run: () => openGridArrayDialog(ed), enabled: sel1 },
+    { id: 'gridarray', cat: M, icon: 'gridArray', label: t('Rasterarray: Auswahl in Spalten und Zeilen kopieren'), run: () => openGridArrayDialog(ed), enabled: sel1 },
     { id: 'circarray', cat: M, icon: 'circArray', label: t('Kreisarray: Auswahl im Kreis um einen Mittelpunkt kopieren'), run: () => openCircularArrayDialog(ed), enabled: sel1 },
     { id: 'nest', cat: M, icon: 'nest', label: t('Verschachteln: Auswahl mit ihren echten Konturen platzsparend auf Bett, Material oder Reststück legen'), run: () => openNestDialog(ed), enabled: sel1 },
     { id: 'hinge', cat: M, icon: 'hinge', label: t('Biegeschnitte (Living Hinge): gewählte Form mit einem Schnittmuster füllen, damit sich die Platte dort biegen lässt'), run: () => openHingeDialog(ed) },
     { id: 'patternfill', cat: M, icon: 'pattern', label: t('Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen'), run: () => openPatternDialog(ed), enabled: sel1 },
     { id: 'adjust', cat: I, icon: 'adjust', label: t('Bild anpassen …'), run: () => openAdjustDialog(ed), enabled: () => ed.selImages().length > 0 },
-    { id: 'trace', cat: I, icon: 'trace', label: t('Bild nachzeichnen (Alt+T)'), run: () => openTraceDialog(ed), enabled: () => ed.selImages().length > 0 },
+    { id: 'trace', cat: I, icon: 'trace', label: t('Bild nachzeichnen'), run: () => openTraceDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'imageedit', cat: I, label: EDIT_TITLE(), run: () => runImageEdit(ed), enabled: () => cropDraftEnabled(ed) },
     { id: 'addpage', cat: S, short: t('+ Seite'), label: t('Neue Seite'), run: () => ed.addPage() },
-    { id: 'prevpage', cat: S, icon: 'up', label: t('Vorherige Seite (Bild ↑)'), run: () => ed.setPage(ed.doc.page - 1), enabled: () => ed.doc.page > 0 },
-    { id: 'nextpage', cat: S, icon: 'down', label: t('Nächste Seite (Bild ↓)'), run: () => ed.setPage(ed.doc.page + 1), enabled: () => ed.doc.page < ed.doc.pages.length - 1 },
+    { id: 'prevpage', cat: S, icon: 'up', label: t('Vorherige Seite'), run: () => ed.setPage(ed.doc.page - 1), enabled: () => ed.doc.page > 0 },
+    { id: 'nextpage', cat: S, icon: 'down', label: t('Nächste Seite'), run: () => ed.setPage(ed.doc.page + 1), enabled: () => ed.doc.page < ed.doc.pages.length - 1 },
     { id: 'check', cat: L, icon: 'check', label: t('Konstruktion prüfen: doppelte Linien, offene Umrisse, schmale Stege, kleine Ausschnitte, Passungen, Steckbarkeit und Arbeitsbereich'), run: () => openCheck() },
-    { id: 'preview', cat: L, icon: 'preview', label: t('Vorschau (Alt+P)'), run: () => openPreview(ed) },
+    { id: 'preview', cat: L, icon: 'preview', label: t('Vorschau'), run: () => openPreview(ed) },
     { id: 'start', cat: L, icon: 'play', label: t('Job starten'), run: () => startJob(ed) },
     { id: 'frame', cat: L, icon: 'frame', label: t('Rahmen: Rechteck um den Job abfahren'), run: () => frameJob(ed, false) },
     { id: 'contour', cat: L, icon: 'contour', label: t('Kontur-Rahmen: Umriss des Jobs abfahren'), run: () => frameJob(ed, true) },
@@ -788,6 +780,7 @@ function buildBars(ed: Editor) {
     { id: 'grp:path', cat: M, label: t('Pfad-Werkzeuge (Gruppe)'), items: ['tool:trim', 'tool:start', 'closepath', 'join', 'breakapart', 'reverse', 'corners', 'vectorfit'], run: () => {} },
     { id: 'grp:contour', cat: M, label: t('Kontur (Gruppe)'), items: ['offset', 'outline', 'contouroffset'], run: () => {} },
   ];
+  for (const a of list) a.shortcut = () => commandKey(a.id);
   initToolbars(
     list,
     {
@@ -814,13 +807,40 @@ function buildBars(ed: Editor) {
   let frame = 0;
   ed.on(() => (frame ||= requestAnimationFrame(() => ((frame = 0), refreshBars()))));
   themeListeners.add(refreshBars);
-  window.addEventListener('keydown', (e) => {
-    if (e.altKey && e.key.toLowerCase() === 'o' && ed.sel.length) {
-      e.preventDefault();
-      openOffsetDialog(ed);
+  onShortcutsChanged(refreshBars);
+  // Tastenkürzel (#453): jede Aktion der Leisten, dazu die Reihenfolge und die Übersicht
+  const stack = (id: string) => () => stackingActions(ed).find((a) => a.id === id);
+  shortcutCommands = [
+    ...list.filter((a) => !a.items),
+    ...stackingActions(ed).map(({ id, label }): Action => ({ id, cat: A, label, run: () => void stack(id)()?.run(), enabled: () => stack(id)()?.enabled !== false })),
+    { id: 'help', cat: t('Hilfe'), label: t('Tastenkürzel'), run: () => showHelp() },
+  ];
+  const byId = new Map(shortcutCommands.map((a) => [a.id, a]));
+  ed.onCommandKey = (e) => {
+    const id = commandFor(e);
+    const action = id ? byId.get(id) : undefined;
+    if (!id || !action) return false;
+    // Wie bisher: Neu, Öffnen und Speichern nicht über einem offenen Dialog
+    if (OUTSIDE_DIALOGS.has(id) && document.querySelector('dialog[open]')) return false;
+    // Mit Ctrl oder Alt wie im Menü: was das Menü anbietet, läuft immer (die Befehle melden selbst, wenn die Auswahl
+    // fehlt; Alt+J verbindet auch einen einzelnen Pfad). Sonst gilt die Verfügbarkeit der Leisten: eine Taste ohne
+    // Ctrl geht dann weiter, mit Ctrl wird sie trotzdem verbraucht (kein Browser-Kürzel).
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (!(menuCommands.has(id) && (ctrl || e.altKey)) && action.enabled?.() === false) {
+      if (ctrl) e.preventDefault();
+      return ctrl;
     }
-  });
+    e.preventDefault();
+    action.run();
+    return true;
+  };
 }
+
+/** Commands that can get a shortcut, in toolbar order (Settings → Mouse and keyboard) */
+let shortcutCommands: Action[] = [];
+const OUTSIDE_DIALOGS = new Set(['new', 'open', 'save']);
+/** Commands offered by the main menu (filled by buildMenu) */
+const menuCommands = new Set<string>();
 
 function bakeVarText(ed: Editor) {
   const n = ed.bakeVarText();
@@ -1618,7 +1638,7 @@ function buildStatus(ed: Editor) {
     coords, selInfo, hint,
     h('label', { title: t('An Knoten, Mittelpunkten, Zentren, Schnittpunkten und Linien fangen (Ctrl beim Ziehen: umkehren, Alt: stärker und Ausrichtungshilfen)') }, snapObj, t('Fang')),
     h('label', { title: t('Am Raster fangen') }, snap, t('Raster'), step, 'mm'),
-    h('label', { title: t('Füll-Layer gefüllt anzeigen (Alt+W)') }, filled, t('Gefüllt')),
+    h('label', { title: withShortcut(t('Füll-Layer gefüllt anzeigen'), 'wire') }, filled, t('Gefüllt')),
     zoom,
     agentStatus(ed),
     remoteHostStatus(ed),

@@ -9,7 +9,7 @@ export const SETTINGS_KEYS = [
   'theme', 'lang', 'snap', 'grid', 'boolean', 'updateChannel', 'updateAuto', 'fontFavorites', 'fontAutoInstall', 'imagePresets', 'check',
   'nest', 'joints', 'hinges', 'slots', 'qr', 'barcode', 'printcut', 'jigfill', 'focustest', 'materialtest', 'warp', 'calib', 'view3d',
   'workpieces', 'overlap-picker', 'rightPan', 'zoomInverted', 'rememberToolOptions', 'toolOptions',
-  'selectAfterDraw', 'textDefaults', 'nudgeSteps', 'clickTolerance', 'snapTolerance', 'canvasDark', 'handleSize',
+  'selectAfterDraw', 'textDefaults', 'nudgeSteps', 'shortcuts', 'clickTolerance', 'snapTolerance', 'canvasDark', 'handleSize',
   'crosshair', 'bedCenterCross', 'importAutoSelect', 'importCenterInBed', 'importSkippedNote', 'importAutoGroup', 'svgDpi', 'dxfFallbackUnit', 'canvasFilled', 'imageSmoothing', 'curveQuality', 'cutOrderApply', 'patternfill', 'uiTypography', 'electricityTariff', 'electricityCurrency',
   'cutSelectedDefault', 'jobOriginDefault',
 ].map((k) => PRE + k);

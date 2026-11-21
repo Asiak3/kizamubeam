@@ -129,7 +129,7 @@ await test('Built-in sections: unique ids, translated labels, no own storage', (
 
 await test('Menu: Edit → Settings, overlap item gone from File', () => {
   const ui = readFileSync(new URL('../src/ui.ts', import.meta.url), 'utf8');
-  assert.ok(ui.includes("[t('Einstellungen …'), '', () => void openSettings()]"));
+  assert.ok(ui.includes("[t('Einstellungen …'), 'preferences', () => void openSettings()]"));
   assert.ok(!ui.includes('Überlappungsauswahl einstellen'));
 });
 
@@ -151,11 +151,14 @@ await test('Core settings: no split group headings inside a section', () => {
 });
 
 await test('Alt+W and tab bar new-file triggers persist/apply settings', () => {
-  const kb = readFileSync(new URL('../src/editor/keyboard.ts', import.meta.url), 'utf8');
-  assert.ok(kb.includes("if (e.altKey && k === 'w') return run(() => this.setFilled(!this.filled));"));
+  // Since #453 the keys run the toolbar actions 'wire' (Alt+W) and 'new' (Ctrl+N) from ui.ts
+  const keys = readFileSync(new URL('../src/commandKeys.ts', import.meta.url), 'utf8');
+  assert.ok(keys.includes("wire: ['Alt+W']") && keys.includes("new: ['Ctrl+N']"));
+  const ui = readFileSync(new URL('../src/ui.ts', import.meta.url), 'utf8');
+  assert.ok(ui.includes("{ id: 'wire', cat: V, short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt'), run: () => ed.setFilled(!ed.filled)"));
+  assert.ok(ui.includes("{ id: 'new', cat: F, icon: 'new', label: t('Neues Projekt in neuem Tab'), run: () => (ed.newTab(), applyNewDocDefaults()) }"));
   const tb = readFileSync(new URL('../src/tabsBar.ts', import.meta.url), 'utf8');
   assert.ok(tb.includes('onclick: () => (ed.newTab(), applyNewDocDefaults())'));
-  assert.ok(tb.includes("if (k === 'n') return run(() => (ed.newTab(), applyNewDocDefaults()));"));
 });
 
 await test('jobOriginDefault defaults to null (keep device) and validates 0..8', async () => {

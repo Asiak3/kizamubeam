@@ -85,7 +85,7 @@ assert.equal(listCalls, 1, 'Only the original offline mocked list call at panel 
 await import(`data:text/javascript;base64,${Buffer.from(setup + checks).toString('base64')}`);
 
 const ui = await readFile(new URL('../src/ui.ts', import.meta.url), 'utf8');
-assert.match(ui, /\[t\('Alle Kameraüberlagerungen anzeigen'\), '', \(\) => toggleCameraOverlays\(ed\), cameraOverlaysVisible\]/, 'Checked View menu uses shared gate');
+assert.match(ui, /\[t\('Alle Kameraüberlagerungen anzeigen'\), 'camera-overlays', \(\) => toggleCameraOverlays\(ed\), cameraOverlaysVisible\]/, 'Checked View menu uses shared gate');
 assert.ok(!ui.includes('const overlayButton'), 'No text button is appended to the menu bar');
 assert.match(ui, /'grp:zoom', 'view3d', 'camera-overlays'/, 'Overlay icon is in the main toolbar defaults');
 assert.match(ui, /icon: 'cameraOverlay'[\s\S]*?cameraOverlaysVisible\(\) \? 'cameraOverlay' : 'cameraOverlayOff'/, 'Camera-specific icon reflects the display gate');

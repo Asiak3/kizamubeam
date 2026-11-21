@@ -1,0 +1,2390 @@
+{
+ "empty Ctrl a/KeyA": {
+  "calls": [
+   "selectAll()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift a/KeyA": {
+  "calls": [
+   "onGridArray()"
+  ],
+  "prevented": true
+ },
+ "empty Meta a/KeyA": {
+  "calls": [
+   "selectAll()"
+  ],
+  "prevented": true
+ },
+ "empty Alt b/KeyB": {
+  "calls": [
+   "breakApartSel()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl c/KeyC": {
+  "calls": [
+   "copy()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift c/KeyC": {
+  "calls": [
+   "convertSelToPath()"
+  ],
+  "prevented": true
+ },
+ "empty Meta c/KeyC": {
+  "calls": [
+   "copy()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl d/KeyD": {
+  "calls": [
+   "duplicate()"
+  ],
+  "prevented": true
+ },
+ "empty Meta d/KeyD": {
+  "calls": [
+   "duplicate()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "empty Meta e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl g/KeyG": {
+  "calls": [
+   "group()"
+  ],
+  "prevented": true
+ },
+ "empty Meta g/KeyG": {
+  "calls": [
+   "group()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift h/KeyH": {
+  "calls": [
+   "mirror(true)"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "empty Meta i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "empty Alt j/KeyJ": {
+  "calls": [
+   "joinSel()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "empty Meta k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "empty Meta l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "empty Meta r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "empty Meta t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl u/KeyU": {
+  "calls": [
+   "ungroup()"
+  ],
+  "prevented": true
+ },
+ "empty Meta u/KeyU": {
+  "calls": [
+   "ungroup()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl v/KeyV": {
+  "calls": [
+   "paste()"
+  ],
+  "prevented": false
+ },
+ "empty Ctrl+Shift v/KeyV": {
+  "calls": [
+   "mirror(false)"
+  ],
+  "prevented": true
+ },
+ "empty Meta v/KeyV": {
+  "calls": [
+   "paste()"
+  ],
+  "prevented": false
+ },
+ "empty Alt w/KeyW": {
+  "calls": [
+   "setFilled(false)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift w/KeyW": {
+  "calls": [
+   "setFilled(false)"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl x/KeyX": {
+  "calls": [
+   "cut()"
+  ],
+  "prevented": true
+ },
+ "empty Meta x/KeyX": {
+  "calls": [
+   "cut()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "empty Meta y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift z/KeyZ": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "empty Meta z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Shift 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl+Alt 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "empty Meta 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "empty - +/BracketRight": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "empty Alt +/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "empty Shift +/BracketRight": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift +/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "empty - -/Slash": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "empty Alt -/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "empty Shift -/Slash": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift -/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "empty Alt */NumpadMultiply": {
+  "calls": [
+   "booleanSel(\"intersect\")"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift */NumpadMultiply": {
+  "calls": [
+   "booleanSel(\"intersect\")"
+  ],
+  "prevented": true
+ },
+ "empty - =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "empty Alt =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "empty Shift =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "empty - ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "empty Alt ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "empty Shift ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "empty - ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "empty Alt ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "empty Shift ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl `/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "empty Meta `/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "empty Ctrl Dead/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "empty Meta Dead/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "empty Alt ±/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift ±/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "empty Alt –/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift –/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "empty - +/NumpadAdd": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "empty Alt +/NumpadAdd": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "empty Shift +/NumpadAdd": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift +/NumpadAdd": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "empty - -/NumpadSubtract": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "empty Alt -/NumpadSubtract": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "empty Shift -/NumpadSubtract": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift -/NumpadSubtract": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "empty - PageUp/PageUp": {
+  "calls": [
+   "setPage(0)"
+  ],
+  "prevented": true
+ },
+ "empty Shift PageUp/PageUp": {
+  "calls": [
+   "setPage(0)"
+  ],
+  "prevented": true
+ },
+ "empty - PageDown/PageDown": {
+  "calls": [
+   "setPage(2)"
+  ],
+  "prevented": true
+ },
+ "empty Shift PageDown/PageDown": {
+  "calls": [
+   "setPage(2)"
+  ],
+  "prevented": true
+ },
+ "empty - Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "empty Alt Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "empty Shift Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "empty - Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "empty Alt Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "empty Shift Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "empty - Escape/Escape": {
+  "calls": [
+   "setSel([])"
+  ],
+  "prevented": true
+ },
+ "empty Alt Escape/Escape": {
+  "calls": [
+   "setSel([])"
+  ],
+  "prevented": true
+ },
+ "empty Shift Escape/Escape": {
+  "calls": [
+   "setSel([])"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift Escape/Escape": {
+  "calls": [
+   "setSel([])"
+  ],
+  "prevented": true
+ },
+ "empty - ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-1,0)"
+  ],
+  "prevented": true
+ },
+ "empty Alt ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-0.1,0)"
+  ],
+  "prevented": true
+ },
+ "empty Shift ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-10,0)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-10,0)"
+  ],
+  "prevented": true
+ },
+ "empty - ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-1)"
+  ],
+  "prevented": true
+ },
+ "empty Alt ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-0.1)"
+  ],
+  "prevented": true
+ },
+ "empty Shift ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-10)"
+  ],
+  "prevented": true
+ },
+ "empty Alt+Shift ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-10)"
+  ],
+  "prevented": true
+ },
+ "two Ctrl a/KeyA": {
+  "calls": [
+   "selectAll()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift a/KeyA": {
+  "calls": [
+   "onGridArray()"
+  ],
+  "prevented": true
+ },
+ "two Meta a/KeyA": {
+  "calls": [
+   "selectAll()"
+  ],
+  "prevented": true
+ },
+ "two - b/KeyB": {
+  "calls": [
+   "align(\"bottom\")"
+  ],
+  "prevented": true
+ },
+ "two Alt b/KeyB": {
+  "calls": [
+   "breakApartSel()"
+  ],
+  "prevented": true
+ },
+ "two Shift b/KeyB": {
+  "calls": [
+   "align(\"bottom\")"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift b/KeyB": {
+  "calls": [
+   "align(\"bottom\")"
+  ],
+  "prevented": true
+ },
+ "two - c/KeyC": {
+  "calls": [
+   "align(\"hcenter\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl c/KeyC": {
+  "calls": [
+   "copy()"
+  ],
+  "prevented": true
+ },
+ "two Alt c/KeyC": {
+  "calls": [
+   "align(\"hcenter\")"
+  ],
+  "prevented": true
+ },
+ "two Shift c/KeyC": {
+  "calls": [
+   "align(\"hcenter\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift c/KeyC": {
+  "calls": [
+   "convertSelToPath()"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift c/KeyC": {
+  "calls": [
+   "align(\"hcenter\")"
+  ],
+  "prevented": true
+ },
+ "two Meta c/KeyC": {
+  "calls": [
+   "copy()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl d/KeyD": {
+  "calls": [
+   "duplicate()"
+  ],
+  "prevented": true
+ },
+ "two Meta d/KeyD": {
+  "calls": [
+   "duplicate()"
+  ],
+  "prevented": true
+ },
+ "two - e/KeyE": {
+  "calls": [
+   "align(\"vcenter\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "two Alt e/KeyE": {
+  "calls": [
+   "align(\"vcenter\")"
+  ],
+  "prevented": true
+ },
+ "two Shift e/KeyE": {
+  "calls": [
+   "align(\"vcenter\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift e/KeyE": {
+  "calls": [
+   "align(\"vcenter\")"
+  ],
+  "prevented": true
+ },
+ "two Meta e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl g/KeyG": {
+  "calls": [
+   "group()"
+  ],
+  "prevented": true
+ },
+ "two Meta g/KeyG": {
+  "calls": [
+   "group()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift h/KeyH": {
+  "calls": [
+   "mirror(true)"
+  ],
+  "prevented": true
+ },
+ "two Ctrl i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "two Meta i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "two Alt j/KeyJ": {
+  "calls": [
+   "joinSel()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "two Meta k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "two - l/KeyL": {
+  "calls": [
+   "align(\"left\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "two Alt l/KeyL": {
+  "calls": [
+   "align(\"left\")"
+  ],
+  "prevented": true
+ },
+ "two Shift l/KeyL": {
+  "calls": [
+   "align(\"left\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift l/KeyL": {
+  "calls": [
+   "align(\"left\")"
+  ],
+  "prevented": true
+ },
+ "two Meta l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "two - r/KeyR": {
+  "calls": [
+   "align(\"right\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "two Alt r/KeyR": {
+  "calls": [
+   "align(\"right\")"
+  ],
+  "prevented": true
+ },
+ "two Shift r/KeyR": {
+  "calls": [
+   "align(\"right\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift r/KeyR": {
+  "calls": [
+   "align(\"right\")"
+  ],
+  "prevented": true
+ },
+ "two Meta r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "two - t/KeyT": {
+  "calls": [
+   "align(\"top\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "two Shift t/KeyT": {
+  "calls": [
+   "align(\"top\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift t/KeyT": {
+  "calls": [
+   "align(\"top\")"
+  ],
+  "prevented": true
+ },
+ "two Meta t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl u/KeyU": {
+  "calls": [
+   "ungroup()"
+  ],
+  "prevented": true
+ },
+ "two Meta u/KeyU": {
+  "calls": [
+   "ungroup()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl v/KeyV": {
+  "calls": [
+   "paste()"
+  ],
+  "prevented": false
+ },
+ "two Ctrl+Shift v/KeyV": {
+  "calls": [
+   "mirror(false)"
+  ],
+  "prevented": true
+ },
+ "two Meta v/KeyV": {
+  "calls": [
+   "paste()"
+  ],
+  "prevented": false
+ },
+ "two Alt w/KeyW": {
+  "calls": [
+   "setFilled(false)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift w/KeyW": {
+  "calls": [
+   "setFilled(false)"
+  ],
+  "prevented": true
+ },
+ "two Ctrl x/KeyX": {
+  "calls": [
+   "cut()"
+  ],
+  "prevented": true
+ },
+ "two Meta x/KeyX": {
+  "calls": [
+   "cut()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "two Meta y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift z/KeyZ": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "two Meta z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Shift 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "two Ctrl+Alt 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "two Meta 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "two - +/BracketRight": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "two Alt +/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "two Shift +/BracketRight": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift +/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "two - -/Slash": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "two Alt -/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "two Shift -/Slash": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift -/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "two Alt */NumpadMultiply": {
+  "calls": [
+   "booleanSel(\"intersect\")"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift */NumpadMultiply": {
+  "calls": [
+   "booleanSel(\"intersect\")"
+  ],
+  "prevented": true
+ },
+ "two - =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "two Alt =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "two Shift =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "two - ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "two Alt ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "two Shift ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "two - ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "two Alt ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "two Shift ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "two Ctrl `/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "two Meta `/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "two Ctrl Dead/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "two Meta Dead/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "two Alt ±/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift ±/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "two Alt –/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift –/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "two - +/NumpadAdd": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "two Alt +/NumpadAdd": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "two Shift +/NumpadAdd": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift +/NumpadAdd": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "two - -/NumpadSubtract": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "two Alt -/NumpadSubtract": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "two Shift -/NumpadSubtract": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift -/NumpadSubtract": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "two - PageUp/PageUp": {
+  "calls": [
+   "setPage(0)"
+  ],
+  "prevented": true
+ },
+ "two Shift PageUp/PageUp": {
+  "calls": [
+   "setPage(0)"
+  ],
+  "prevented": true
+ },
+ "two - PageDown/PageDown": {
+  "calls": [
+   "setPage(2)"
+  ],
+  "prevented": true
+ },
+ "two Shift PageDown/PageDown": {
+  "calls": [
+   "setPage(2)"
+  ],
+  "prevented": true
+ },
+ "two - Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "two Alt Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "two Shift Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "two - Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "two Alt Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "two Shift Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "two - Escape/Escape": {
+  "calls": [
+   "setSel([])"
+  ],
+  "prevented": true
+ },
+ "two Alt Escape/Escape": {
+  "calls": [
+   "setSel([])"
+  ],
+  "prevented": true
+ },
+ "two Shift Escape/Escape": {
+  "calls": [
+   "setSel([])"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift Escape/Escape": {
+  "calls": [
+   "setSel([])"
+  ],
+  "prevented": true
+ },
+ "two - ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-1,0)"
+  ],
+  "prevented": true
+ },
+ "two Alt ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-0.1,0)"
+  ],
+  "prevented": true
+ },
+ "two Shift ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-10,0)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-10,0)"
+  ],
+  "prevented": true
+ },
+ "two - ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-1)"
+  ],
+  "prevented": true
+ },
+ "two Alt ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-0.1)"
+  ],
+  "prevented": true
+ },
+ "two Shift ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-10)"
+  ],
+  "prevented": true
+ },
+ "two Alt+Shift ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-10)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl a/KeyA": {
+  "calls": [
+   "selectAllNodes()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift a/KeyA": {
+  "calls": [
+   "onGridArray()"
+  ],
+  "prevented": true
+ },
+ "node Meta a/KeyA": {
+  "calls": [
+   "selectAllNodes()"
+  ],
+  "prevented": true
+ },
+ "node - b/KeyB": {
+  "calls": [
+   "breakAtNodeKey()"
+  ],
+  "prevented": true
+ },
+ "node Alt b/KeyB": {
+  "calls": [
+   "breakApartSel()"
+  ],
+  "prevented": true
+ },
+ "node Shift b/KeyB": {
+  "calls": [
+   "breakAtNodeKey()"
+  ],
+  "prevented": true
+ },
+ "node - c/KeyC": {
+  "calls": [
+   "setSegmentType(true)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl c/KeyC": {
+  "calls": [
+   "copy()"
+  ],
+  "prevented": true
+ },
+ "node Shift c/KeyC": {
+  "calls": [
+   "setSegmentType(true)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift c/KeyC": {
+  "calls": [
+   "convertSelToPath()"
+  ],
+  "prevented": true
+ },
+ "node Meta c/KeyC": {
+  "calls": [
+   "copy()"
+  ],
+  "prevented": true
+ },
+ "node - d/KeyD": {
+  "calls": [
+   "deleteNodes()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl d/KeyD": {
+  "calls": [
+   "duplicate()"
+  ],
+  "prevented": true
+ },
+ "node Shift d/KeyD": {
+  "calls": [
+   "deleteNodes()"
+  ],
+  "prevented": true
+ },
+ "node Meta d/KeyD": {
+  "calls": [
+   "duplicate()"
+  ],
+  "prevented": true
+ },
+ "node - e/KeyE": {
+  "calls": [
+   "setNodeType(false)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "node Shift e/KeyE": {
+  "calls": [
+   "setNodeType(false)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "node Meta e/KeyE": {
+  "calls": [
+   "setTool(\"ellipse\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl g/KeyG": {
+  "calls": [
+   "group()"
+  ],
+  "prevented": true
+ },
+ "node Meta g/KeyG": {
+  "calls": [
+   "group()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift h/KeyH": {
+  "calls": [
+   "mirror(true)"
+  ],
+  "prevented": true
+ },
+ "node - i/KeyI": {
+  "calls": [
+   "insertNode()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "node Shift i/KeyI": {
+  "calls": [
+   "insertNode()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "node Meta i/KeyI": {
+  "calls": [
+   "onImport()"
+  ],
+  "prevented": true
+ },
+ "node Alt j/KeyJ": {
+  "calls": [
+   "joinSel()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "node Meta k/KeyK": {
+  "calls": [
+   "setTool(\"trim\")"
+  ],
+  "prevented": true
+ },
+ "node - l/KeyL": {
+  "calls": [
+   "setSegmentType(false)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "node Shift l/KeyL": {
+  "calls": [
+   "setSegmentType(false)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "node Meta l/KeyL": {
+  "calls": [
+   "setTool(\"line\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "node Meta r/KeyR": {
+  "calls": [
+   "setTool(\"rect\")"
+  ],
+  "prevented": true
+ },
+ "node - s/KeyS": {
+  "calls": [
+   "setNodeType(true)"
+  ],
+  "prevented": true
+ },
+ "node Shift s/KeyS": {
+  "calls": [
+   "setNodeType(true)"
+  ],
+  "prevented": true
+ },
+ "node - t/KeyT": {
+  "calls": [
+   "trimNodeSegment()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "node Shift t/KeyT": {
+  "calls": [
+   "trimNodeSegment()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "node Meta t/KeyT": {
+  "calls": [
+   "setTool(\"text\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl u/KeyU": {
+  "calls": [
+   "ungroup()"
+  ],
+  "prevented": true
+ },
+ "node Meta u/KeyU": {
+  "calls": [
+   "ungroup()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl v/KeyV": {
+  "calls": [
+   "paste()"
+  ],
+  "prevented": false
+ },
+ "node Ctrl+Shift v/KeyV": {
+  "calls": [
+   "mirror(false)"
+  ],
+  "prevented": true
+ },
+ "node Meta v/KeyV": {
+  "calls": [
+   "paste()"
+  ],
+  "prevented": false
+ },
+ "node Alt w/KeyW": {
+  "calls": [
+   "setFilled(false)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift w/KeyW": {
+  "calls": [
+   "setFilled(false)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl x/KeyX": {
+  "calls": [
+   "cut()"
+  ],
+  "prevented": true
+ },
+ "node Meta x/KeyX": {
+  "calls": [
+   "cut()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "node Meta y/KeyY": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift z/KeyZ": {
+  "calls": [
+   "doRedo()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "node Meta z/KeyZ": {
+  "calls": [
+   "doUndo()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Shift 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "node Ctrl+Alt 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "node Meta 0/Digit0": {
+  "calls": [
+   "zoomPage()"
+  ],
+  "prevented": true
+ },
+ "node - +/BracketRight": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "node Alt +/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "node Shift +/BracketRight": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift +/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "node - -/Slash": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "node Alt -/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "node Shift -/Slash": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift -/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "node Alt */NumpadMultiply": {
+  "calls": [
+   "booleanSel(\"intersect\")"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift */NumpadMultiply": {
+  "calls": [
+   "booleanSel(\"intersect\")"
+  ],
+  "prevented": true
+ },
+ "node - =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "node Alt =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "node Shift =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift =/Digit0": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "node - ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "node Alt ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "node Shift ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift ./Period": {
+  "calls": [
+   "rotateBy(-90)"
+  ],
+  "prevented": true
+ },
+ "node - ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "node Alt ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "node Shift ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift ,/Comma": {
+  "calls": [
+   "rotateBy(90)"
+  ],
+  "prevented": true
+ },
+ "node Ctrl `/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "node Meta `/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "node Ctrl Dead/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "node Meta Dead/Backquote": {
+  "calls": [
+   "setTool(\"node\")"
+  ],
+  "prevented": true
+ },
+ "node Alt ±/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift ±/BracketRight": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "node Alt –/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift –/Slash": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "node - +/NumpadAdd": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "node Alt +/NumpadAdd": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "node Shift +/NumpadAdd": {
+  "calls": [
+   "zoomAt(1.25)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift +/NumpadAdd": {
+  "calls": [
+   "booleanSel(\"union\")"
+  ],
+  "prevented": true
+ },
+ "node - -/NumpadSubtract": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "node Alt -/NumpadSubtract": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "node Shift -/NumpadSubtract": {
+  "calls": [
+   "zoomAt(0.8)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift -/NumpadSubtract": {
+  "calls": [
+   "booleanSel(\"subtract\")"
+  ],
+  "prevented": true
+ },
+ "node - PageUp/PageUp": {
+  "calls": [
+   "setPage(0)"
+  ],
+  "prevented": true
+ },
+ "node Shift PageUp/PageUp": {
+  "calls": [
+   "setPage(0)"
+  ],
+  "prevented": true
+ },
+ "node - PageDown/PageDown": {
+  "calls": [
+   "setPage(2)"
+  ],
+  "prevented": true
+ },
+ "node Shift PageDown/PageDown": {
+  "calls": [
+   "setPage(2)"
+  ],
+  "prevented": true
+ },
+ "node - Delete/Delete": {
+  "calls": [
+   "deleteNodes()"
+  ],
+  "prevented": true
+ },
+ "node Alt Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "node Shift Delete/Delete": {
+  "calls": [
+   "deleteNodes()"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift Delete/Delete": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "node - Backspace/Backspace": {
+  "calls": [
+   "deleteNodes()"
+  ],
+  "prevented": true
+ },
+ "node Alt Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "node Shift Backspace/Backspace": {
+  "calls": [
+   "deleteNodes()"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift Backspace/Backspace": {
+  "calls": [
+   "deleteSel()"
+  ],
+  "prevented": true
+ },
+ "node - Escape/Escape": {
+  "calls": [
+   "clearNodeSel()"
+  ],
+  "prevented": true
+ },
+ "node Alt Escape/Escape": {
+  "calls": [
+   "clearNodeSel()"
+  ],
+  "prevented": true
+ },
+ "node Shift Escape/Escape": {
+  "calls": [
+   "clearNodeSel()"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift Escape/Escape": {
+  "calls": [
+   "clearNodeSel()"
+  ],
+  "prevented": true
+ },
+ "node - ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudgeNodes(-1,0)"
+  ],
+  "prevented": true
+ },
+ "node Alt ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-0.1,0)"
+  ],
+  "prevented": true
+ },
+ "node Shift ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudgeNodes(-10,0)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift ArrowLeft/ArrowLeft": {
+  "calls": [
+   "nudge(-10,0)"
+  ],
+  "prevented": true
+ },
+ "node - ArrowUp/ArrowUp": {
+  "calls": [
+   "nudgeNodes(0,-1)"
+  ],
+  "prevented": true
+ },
+ "node Alt ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-0.1)"
+  ],
+  "prevented": true
+ },
+ "node Shift ArrowUp/ArrowUp": {
+  "calls": [
+   "nudgeNodes(0,-10)"
+  ],
+  "prevented": true
+ },
+ "node Alt+Shift ArrowUp/ArrowUp": {
+  "calls": [
+   "nudge(0,-10)"
+  ],
+  "prevented": true
+ }
+}

@@ -6,7 +6,9 @@ description: Alle Tastenkürzel von KizamuBeam.
 
 # Tastenkürzel
 
-Auf dem Mac nimmst du **⌘ Cmd** überall dort, wo **Ctrl** steht. In der App zeigt **F1** (Hilfe → Tastenkürzel) die wichtigsten Kürzel, und die Menüs zeigen sie neben jedem Eintrag.
+Auf dem Mac nimmst du **⌘ Cmd** überall dort, wo **Ctrl** steht. In der App zeigt **F1** (Hilfe → Tastenkürzel) die aktuellen Kürzel, und Menüs und Tooltips der Leisten zeigen sie neben jedem Eintrag.
+
+Die Tabellen unten nennen die Standardbelegung. Ändern lässt sie sich unter **Bearbeiten → Einstellungen → Maus und Tastatur → Tastenkürzel**: neben einem Befehl **Ändern** anklicken und die neue Tastenkombination drücken, × entfernt das Kürzel, **Zurücksetzen** holt die Standardbelegung zurück. Befehle ohne Standardkürzel (zum Beispiel die Reihenfolge) bekommen dort auch eins. Ist eine Kombination schon vergeben, fragt das Fenster, bevor es sie umhängt. Esc, Enter, Leertaste, Tab, die Pfeiltasten, Entf und Rücktaste behalten ihre feste Bedeutung. Änderungen gelten sofort und werden mit **Datei → Einstellungen übertragen** mitgenommen.
 
 ## Dateien und Bearbeiten
 
