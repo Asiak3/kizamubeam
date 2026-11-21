@@ -715,7 +715,9 @@ function editedDisplayCanvas(s: ImageShape, m: Mat, L: ImageOutput, asset: Asset
     // A completed owner keeps its canvas outside the bounded shared cache, so
     // more images than cache entries cannot evict and recompute each other.
     // Drag-only canvases are interim: idle upgrades them to full density.
-    if (state.canvas && !dragDisplays.has(state.canvas)) { displayQueue.delete(owner); return state.canvas; }
+    // Pending newer work keeps its queue entry: the interim canvas stays
+    // visible, but the queued request must still be dispatched (B-40).
+    if (state.canvas && !dragDisplays.has(state.canvas) && !state.pending) { displayQueue.delete(owner); return state.canvas; }
     if (state.pending) return state.canvas ?? null;
     // Cancelled, settled without a canvas, or only a drag canvas: queue the
     // full job below — but an Abort stays sticky (no silent requeue on the

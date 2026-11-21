@@ -29,6 +29,7 @@
     "test:core": "node scripts/core-fixtures.mjs && cd src-tauri && cargo test -p kizamubeam-core",
     "test:gcode": "node scripts/run-ts.mjs scripts/gcode-test.ts",
     "test:image-export": "node scripts/image-export-test.mjs",
+    "test:image-display-queue": "node scripts/image-display-queue-test.mjs",
     "test:paths": "node scripts/run-ts.mjs scripts/pathtools-test.ts",
     "test:vector": "node scripts/run-ts.mjs scripts/vector-fit-test.ts && node scripts/vector-offline-test.mjs",
     "test:interaction": "node scripts/vector-offline-test.mjs scripts/interaction-test.ts",
