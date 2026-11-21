@@ -1910,7 +1910,7 @@ dependencies = [
 
 [[package]]
 name = "kizamubeam"
-version = "2.9.0-rc.4"
+version = "2.9.0-rc.3"
 dependencies = [
  "dirs",
  "fontdb",
