@@ -1,0 +1,87 @@
+{
+  "box {}": {
+    "geom": "86963ebade9bfa1c",
+    "pose": "ece5c9329381771c",
+    "world": "8e79716aa6cca8cb"
+  },
+  "box {\"top\":\"closed\"}": {
+    "geom": "c2aeb150f2b369fc",
+    "pose": "ece5c9329381771c",
+    "world": "b23c77cab1a59a05"
+  },
+  "box {\"top\":\"closed\",\"width\":137.3,\"depth\":91.7,\"height\":43.1,\"finger\":7.3,\"clearance\":0.3,\"kerf\":0.15}": {
+    "geom": "8f516c6fcc0f2d7f",
+    "pose": "bb2fd8c1de10dcbe",
+    "world": "7011e297a2476a7d"
+  },
+  "box {\"sizeMode\":\"inner\",\"clearance\":-0.3,\"partLayout\":\"rows\"}": {
+    "geom": "9708379fc6b3e212",
+    "pose": "9fe4a88233944515",
+    "world": "b18dc8a38472046a"
+  },
+  "box-divided {}": {
+    "geom": "181d17d7dfcb3372",
+    "pose": "ece5c9329381771c",
+    "world": "475975137d0daf45"
+  },
+  "box-divided {\"top\":\"closed\"}": {
+    "geom": "c312331fa0a2062d",
+    "pose": "ece5c9329381771c",
+    "world": "69525177b6336095"
+  },
+  "box-divided {\"compartmentsX\":3,\"ratiosX\":\"1:2:1\",\"compartmentsY\":2,\"ratiosY\":\"1:3\"}": {
+    "geom": "e0dbb71a34883e42",
+    "pose": "cc1c6c677e1a5cf4",
+    "world": "64dbca1fe3ebf48c"
+  },
+  "box-divided {\"top\":\"closed\",\"width\":137.3,\"clearance\":0.3,\"kerf\":0.15,\"compartmentsX\":2}": {
+    "geom": "d2015049fa312fd3",
+    "pose": "f0ccd72317080c65",
+    "world": "1735d51a30011ec8"
+  },
+  "box-divided {\"clearance\":-0.3,\"compartmentsY\":3,\"partLayout\":\"rows\"}": {
+    "geom": "9db8e0d589dca748",
+    "pose": "a0490c4087f97bee",
+    "world": "39c7431f466d8261"
+  },
+  "drawer {}": {
+    "geom": "e1df170b66ece1fa",
+    "pose": "75b2250be1df75e7",
+    "world": "f904b6b10fc2b696"
+  },
+  "drawer {\"carcass\":false}": {
+    "geom": "0855cd3129654ce9",
+    "pose": "f2587d152ee842ff",
+    "world": "383ff72e0440a412"
+  },
+  "drawer {\"front\":\"inset\",\"width\":133.7,\"depth\":97.1,\"height\":61.3,\"clearance\":-0.3}": {
+    "geom": "ca371a5da46e3d3b",
+    "pose": "efa8219d9a57d12b",
+    "world": "16a1012fa3b80364"
+  },
+  "drawer {\"clearance\":0.3,\"kerf\":0,\"partLayout\":\"packed\"}": {
+    "geom": "b9f0c1d00e83a8dd",
+    "pose": "75b2250be1df75e7",
+    "world": "42bcc9d25a24b419"
+  },
+  "shelf {}": {
+    "geom": "57d4c2636ac12cd1",
+    "pose": "6a45442b26322e44",
+    "world": "150c6c0c604155c6"
+  },
+  "shelf {\"shelves\":4,\"overhang\":15,\"play\":-0.1}": {
+    "geom": "72fc80f38336a06e",
+    "pose": "68d3319c8aebd82a",
+    "world": "f989742a0faaa323"
+  },
+  "shelf {\"shelves\":1}": {
+    "geom": "9ccb1f27553db6ea",
+    "pose": "b96f4e5caeb42fe1",
+    "world": "026b24260dc45b4f"
+  },
+  "shelf {\"play\":0.3,\"kerf\":0,\"partLayout\":\"packed\"}": {
+    "geom": "e364b66d83b40bb0",
+    "pose": "6a45442b26322e44",
+    "world": "157cdd4d95ee7660"
+  }
+}
