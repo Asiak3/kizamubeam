@@ -1,0 +1,47 @@
+{
+  "box-composer #0": {
+    "geom": "07e04165a72cad83",
+    "pose": "46f494b1a4740ded",
+    "world": "62dfe560268efa1e"
+  },
+  "box-composer #1": {
+    "geom": "e6b4bf60df0e1ed7",
+    "pose": "88833726373a6092",
+    "world": "5cdeede22ab8a3ce"
+  },
+  "box-composer #2": {
+    "geom": "679f48c50d711985",
+    "pose": "962fbb8c79a60f8e",
+    "world": "c3238d088f2c0f91"
+  },
+  "box-composer #3": {
+    "geom": "34fcb3dbb7e7d11f",
+    "pose": "0d539ea80d9837ae",
+    "world": "c1e92ed20ae5381b"
+  },
+  "box-composer-advanced #0": {
+    "geom": "07e04165a72cad83",
+    "pose": "46f494b1a4740ded",
+    "world": "62dfe560268efa1e"
+  },
+  "box-composer-advanced #1": {
+    "geom": "44d41c48755a3094",
+    "pose": "d34360cd210b9906",
+    "world": "2c7f84ec36a29c7e"
+  },
+  "box-composer-advanced #2": {
+    "geom": "de4ee61a66cf30b2",
+    "pose": "72f292fd6771c591",
+    "world": "4bb0fbdf40b928cc"
+  },
+  "box-composer-advanced #3": {
+    "geom": "052c52051da94502",
+    "pose": "66b6ade56a7668ca",
+    "world": "9d877ecc6267ae25"
+  },
+  "box-composer-advanced #4": {
+    "geom": "6c7568edbfd293d8",
+    "pose": "78148ba7b40eb001",
+    "world": "59f07942dd411a6a"
+  }
+}
