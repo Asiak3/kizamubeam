@@ -4,21 +4,26 @@ use std::time::Duration;
 pub const READ_TIMEOUT_MS: u64 = 10;
 pub const WRITE_ATTEMPT_MS: u64 = 50;
 
-pub fn open(name: &str, baud: u32) -> Result<Box<dyn serialport::SerialPort>, String> {
+pub fn open(name: &str, baud: u32, dtr: Option<bool>) -> Result<Box<dyn serialport::SerialPort>, String> {
     let builder = serialport::new(name, baud).timeout(Duration::from_millis(READ_TIMEOUT_MS));
     #[cfg(windows)]
-    {
+    let mut port = {
         use std::os::windows::io::AsRawHandle;
         let port = builder.open_native().map_err(|e| e.to_string())?;
         windows_timeouts(port.as_raw_handle())?;
-        Ok(Box::new(port))
-    }
+        Box::new(port) as Box<dyn serialport::SerialPort>
+    };
     #[cfg(not(windows))]
-    {
+    let mut port = {
         // POSIX behält den kurzen Timeout; der Streamer begrenzt serielle
         // Schreibwiederholungen insgesamt auf zwei Sekunden.
-        builder.open().map_err(|e| e.to_string())
+        Box::new(builder.open().map_err(|e| e.to_string())?) as Box<dyn serialport::SerialPort>
+    };
+    // None = unverändert (heutiges Verhalten); Some setzt DTR explizit (z. B. für GRBL-Boards mit Auto-Reset).
+    if let Some(level) = dtr {
+        port.write_data_terminal_ready(level).map_err(|e| e.to_string())?;
     }
+    Ok(port)
 }
 
 #[cfg(windows)]

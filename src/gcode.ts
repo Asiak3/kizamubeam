@@ -208,6 +208,18 @@ export interface Device {
   optLessTurns: boolean;
   /** Nach dem Job zum Startpunkt zurückfahren */
   returnHome: boolean;
+  /**
+   * Verhalten am Jobende (LightBurn-Parität #12): 'start' = wie bisher returnHome
+   * (zum Startpunkt zurück, bzw. nichts wenn returnHome aus); 'origin' = immer zum
+   * Maschinennullpunkt (0,0); 'stay' = stehen bleiben; 'custom' = zu finishX/finishY.
+   * Nur Absolut- und Benutzerursprung-Modus; sonst 'start'.
+   */
+  finishMode?: 'start' | 'origin' | 'stay' | 'custom';
+  /** Ziel X/Y in mm für finishMode 'custom' */
+  finishX?: number;
+  finishY?: number;
+  /** Leerfahrt über leere Bildbereiche in mm/min; 0/unset = Eilgang wie bisher (#07) */
+  whitespaceSpeed?: number;
   homeOnConnect: boolean;
   /** Hat die Maschine Endschalter? Angabe aus dem Assistenten „Laser einrichten“; ohne gibt es dort keine Referenzfahrt */
   limitSwitches: 'yes' | 'no' | 'unknown';
@@ -236,6 +248,29 @@ export interface Device {
   zFlip: boolean;
   /** Z-Jog im Bewegen-Fenster nur nach Referenzfahrt (pro Verbindung einmal); false = lax, nur bekannte Position nötig */
   zJogStrict: boolean;
+  /**
+   * Materialhöhe in mm (RUN-26-14): Bezug für Z-Bewegungen — Endschalter löst bei Kopf-auf-Material-plus-Höhe
+   * aus, crash bei Überschreitung. 0 = kein Materialvertrag (heutiges Verhalten, keine Prüfung).
+   */
+  zMaterial?: number;
+  /**
+   * DTR-Signal an der seriellen Schnittstelle beim Verbinden setzen (RUN-26-11, Default aus).
+   * undefined = Verhalten der nativen Schicht unverändert (heute).
+   */
+  dtr?: boolean;
+  /**
+   * Startsperre (RUN-26-09, LightBurn-Parität): Start/Frame blockieren, bis der Nutzer sie löst.
+   * Default aus (heutiges Verhalten, kein Block).
+   */
+  startLocked?: boolean;
+  /**
+   * Basis-Dateiname für Uploads auf den Controller (RUN-26-08). Hinterlegtes Inkrement hängt eine
+   * Zahl an (kizamubeam_001.gcode …); ohne Inkrement wird überschrieben (heutiges Verhalten).
+   */
+  uploadName?: string;
+  uploadIncrement?: boolean;
+  /** Laufender Zähler für uploadIncrement (pro Gerät, wird bei jedem Upload erhöht) */
+  uploadCounter?: number;
   /**
    * Rotpunkt-Zeiger (Issue #213): Lage des Strahls gegenüber dem Zeigerpunkt in mm, aus der Kalibrierung
    * (Position Strahl auf Kreuz minus Position Zeiger auf Kreuz, also A−B wie in LightBurn). Nur wenn
@@ -551,6 +586,23 @@ export function jogLines(d: Device, dx: number, dy: number, f: number): string[]
 /** Z relativ verfahren (Bewegen-Fenster); nutzt denselben Jog-Befehl wie XY, nur mit Z-Buchstabe */
 export function zJogLines(d: Device, dz: number, f: number): string[] {
   return FIRMWARES[d.fw].jog(0, dz, f, 'Z');
+}
+
+/** Hold-to-Jog wird nur unterstützt, wenn die Firmware $J-Joggen nutzt (derzeit nur `grbl`).
+ *  Bei anderen Firmwares bleibt es beim Einzelschritt pro Klick (heutiges Verhalten). */
+export function jogHoldSupported(d: Device): boolean {
+  return FIRMWARES[d.fw].jog === grblJog;
+}
+
+/** Langer $J-Vorschub für Hold-to-Jog: Schrittweite mal Faktor, Drehachse wie jogLines skaliert.
+ *  Gibt relative Zeilen zurück; der Abbruch erfolgt separat per Jog-Cancel (0x85). */
+export function jogHoldLines(d: Device, dx: number, dy: number, f: number, factor = 20): string[] {
+  if (!jogHoldSupported(d)) return jogLines(d, dx, dy, f);
+  const fw = FIRMWARES[d.fw];
+  if (!rotaryOn(d)) return fw.jog(dx * factor, dy * factor, f);
+  const k = rotaryScale(d.rotary);
+  const l = Math.hypot(dx, dy * k);
+  return fw.jog(dx * factor, dy * k * factor, l > 0 ? (f * Math.hypot(dx * factor, dy * k * factor)) / l : f, d.rotary.axis);
 }
 
 /** Absolut an eine Werkstückposition fahren (Laser zur Klickposition). y = null lässt Y stehen (z. B. mit Drehachse).
@@ -1359,10 +1411,57 @@ interface ScanOptions {
   sub?: number;
   /** Zeilen liegen in einem um diesen Winkel (rad) gedrehten System */
   angle?: number;
+  /**
+   * Leerfahrt über leere Bildbereiche (RUN-26-07, LightBurn “Fast Whitespace Scan”):
+   * 0/undefined = Eilgang wie bisher; sonst Geschwindigkeit in mm/min für die Lücke.
+   * Betrifft GRBL/Marlin/FluidNC (G1 mit F); andere Firmware bekommt weiterhin Eilgang.
+   */
+  travel?: number;
 }
 
 /** Lücken bis zu dieser Länge fährt der Laser ausgeschaltet mit Arbeitsgeschwindigkeit durch */
 const GAP_RAPID = 10;
+
+/** Jobabschluss nach dem letzten Schnitt (RUN-26-12; nur Absolut-/Benutzer-Modi wirksam, sonst forced 'start') */
+export type FinishMode = 'start' | 'origin' | 'stay' | 'custom';
+
+/**
+ * Zielposition am Jobende (LightBurn-Parität #12). Gibt null zurück, wenn der
+ * Kopf stehen bleiben soll ('stay'). Ohne finishMode gilt das bisherige
+ * returnHome-Verhalten (true/absent = zum Startpunkt). Der Modus ist nur in
+ * den Absolut-/Benutzer-Modi wirksam; sonst immer 'start'.
+ */
+export function finishPosition(
+  device: { finishMode?: FinishMode; finishX?: number; finishY?: number; returnHome?: boolean; startFrom?: StartFrom },
+  start: Pt,
+): Pt | null {
+  let mode: FinishMode = device.finishMode ?? (device.returnHome === false ? 'stay' : 'start');
+  if (device.startFrom !== 'absolute' && device.startFrom !== 'user') mode = 'start';
+  switch (mode) {
+    case 'stay': return null;
+    case 'origin': return { x: 0, y: 0 };
+    case 'custom': {
+      const x = Number(device.finishX);
+      const y = Number(device.finishY);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return { x: start.x, y: start.y };
+      return { x, y };
+    }
+    case 'start':
+    default:
+      return { x: start.x, y: start.y };
+  }
+}
+
+/**
+ * Wirksame Leerfahrt für Fast Whitespace (#07): nur mit gesetzter, positiver
+ * whitespaceSpeed und nur auf GRBL/grblHAL/Marlin/FluidNC (G1 mit F).
+ * Alles andere → 0 = Eilgang wie bisher (byte-identisch).
+ */
+export function whitespaceTravel(d: Device): number {
+  const v = d.whitespaceSpeed;
+  if (!(v && Number.isFinite(v) && v > 0)) return 0;
+  return d.fw === 'grbl' || d.fw === 'grblhal' || d.fw === 'marlin' || d.fw === 'fluidnc' ? v : 0;
+}
 
 function emitScanlines(out: Moves, lines: { y: number; runs: Run[] }[], o: ScanOptions, flip: { v: boolean }) {
   const { speed: F, overscan: ov, layer } = o;
@@ -1372,6 +1471,8 @@ function emitScanlines(out: Moves, lines: { y: number; runs: Run[] }[], o: ScanO
   const mv = o.angle
     ? { push: (x: number, y: number, f: number, s: number, l: number, c = MOVE_TRAVEL, q = -1) => out.push(x * rc - y * rs, x * rs + y * rc, f, s, l, c, q) }
     : out;
+  // Fast Whitespace: Lücke mit eigener Geschwindigkeit statt Eilgang (0 = Eilgang wie bisher)
+  const gapF = o.travel && Number.isFinite(o.travel) && o.travel > 0 ? o.travel : 0;
   for (const ln of lines) {
     if (!ln.runs.length) continue;
     const rev = o.bidirectional && flip.v;
@@ -1388,7 +1489,7 @@ function emitScanlines(out: Moves, lines: { y: number; runs: Run[] }[], o: ScanO
         first = false;
       } else if (a - px > GAP_RAPID + 2 * ov) {
         mv.push(sx * (px + ov), y, F, 0, layer, MOVE_TRAVEL, sub);
-        mv.push(sx * (a - ov), y, 0, 0, layer, MOVE_TRAVEL, sub);
+        mv.push(sx * (a - ov), y, gapF, 0, layer, MOVE_TRAVEL, sub);
         mv.push(sx * a, y, F, 0, layer, MOVE_TRAVEL, sub);
       } else if (a > px) mv.push(sx * a, y, F, 0, layer, MOVE_TRAVEL, sub);
       mv.push(sx * b, y, F, s, layer, s > 0 ? MOVE_ENGRAVE : MOVE_TRAVEL, sub);
@@ -1609,7 +1710,7 @@ function countManualViolations(polys: Poly[]): number {
 }
 
 /** Bewegungen einer Bearbeitung; pass(p) setzt vor jedem Durchgang den Z-Versatz */
-function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, si: number, flip: { v: boolean }, pass: (p: number) => void, ord: OrderOpts) {
+function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, si: number, flip: { v: boolean }, pass: (p: number) => void, ord: OrderOpts, travel?: number) {
   const s = e.power / 100;
   const passes = Math.max(1, e.passes);
   if (e.mode === 'fill' && e.fillStyle === 'offset') {
@@ -1631,7 +1732,7 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, si: number
     const ov = (Math.max(0, e.overscan) / 100) * (e.speed / 60);
     for (let p = 0; p < passes; p++) {
       pass(p);
-      for (const st of sets) emitScanlines(mv, st.lines, { speed: e.speed, bidirectional: e.bidirectional, overscan: ov, layer: li, sub: si, angle: st.a }, flip);
+      for (const st of sets) emitScanlines(mv, st.lines, { speed: e.speed, bidirectional: e.bidirectional, overscan: ov, layer: li, sub: si, angle: st.a, travel }, flip);
     }
     return;
   }
@@ -2315,7 +2416,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
         if (!useZ && (L.zOffset || L.zStep)) zSkipped = true;
         for (let p = 0; p < Math.max(1, IL.passes); p++) {
           mv.zCur = useZ ? L.zOffset + p * L.zStep : 0;
-          emitScanlines(mv, lines, { speed: IL.speed, bidirectional: IL.bidirectional, overscan: ov, layer: li }, flip);
+          emitScanlines(mv, lines, { speed: IL.speed, bidirectional: IL.bidirectional, overscan: ov, layer: li, travel: whitespaceTravel(device) }, flip);
         }
         mv.zCur = 0;
       }
@@ -2328,7 +2429,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
       if (!useZ && (cut.zOffset || cut.zStep)) zSkipped = true;
       const ord: OrderOpts = { innerFirst: device.optInnerFirst, travel: device.optTravel, group: device.optGroup, cornerStart: device.optCornerStart, dirOrder: device.optDirOrder, bestStart: device.optBestStart, bestDirection: device.optBestDirection, lessTurns: device.optLessTurns };
       for (const polys of bk.cuts) {
-        emitEntry(mv, entry, polys, li, -2, flip, pass, ord);
+        emitEntry(mv, entry, polys, li, -2, flip, pass, ord, whitespaceTravel(device));
         mv.zCur = 0;
       }
     }
@@ -2343,7 +2444,7 @@ export async function buildJob(inp: JobInput): Promise<Job> {
         manualViolations += countManualViolations(polys);
       }
 
-      emitEntry(mv, e, polys, li, sub, flip, pass, orderOpts);
+      emitEntry(mv, e, polys, li, sub, flip, pass, orderOpts, whitespaceTravel(device));
       mv.zCur = 0;
     });
   }
@@ -2362,7 +2463,22 @@ export async function buildJob(inp: JobInput): Promise<Job> {
         : t('Z-Versatz übersprungen: Für dieses Gerät ist keine Z-Achse eingestellt (Geräteeinstellungen).'),
     );
   mv.zCur = 0;
-  if (mv.n && device.returnHome) mv.push(start.x, start.y, 0, 0, -1);
+  if (mv.n) {
+    const fp = finishPosition(device, start);
+    if (fp) mv.push(fp.x, fp.y, 0, 0, -1);
+  }
+  // Materialhöhen-Vertrag (#14): Z-Versätze sind relativ zur Starthöhe, positiv = Fokus
+  // tiefer = Kopf nach unten. Überschreitet der tiefste Versatz die Materialstärke,
+  // würde der Kopf ins Bett fahren — warnen statt still weiter.
+  if ((device.zMaterial ?? 0) > 0) {
+    let zMax = 0;
+    for (let i = 0; i < mv.n; i++) {
+      const zi = mv.z[i] ?? 0;
+      if (zi > zMax) zMax = zi;
+    }
+    if (zMax > (device.zMaterial ?? 0))
+      warnings.push(t('Z-Achse: tiefster Versatz {z} mm überschreitet die Materialstärke {m} mm — der Kopf könnte ins Bett fahren.', { z: num(zMax), m: num(device.zMaterial ?? 0) }));
+  }
   // Vorschau: dieselben Bahnen an ihrer Lage auf dem Bett zeigen
   if (inp.forPreview && (offset.x || offset.y)) {
     for (let i = 0; i < mv.n; i++) {
