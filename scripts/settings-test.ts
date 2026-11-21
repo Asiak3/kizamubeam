@@ -155,8 +155,8 @@ await test('Alt+W and tab bar new-file triggers persist/apply settings', () => {
   const keys = readFileSync(new URL('../src/commandKeys.ts', import.meta.url), 'utf8');
   assert.ok(keys.includes("wire: ['Alt+W']") && keys.includes("new: ['Ctrl+N']"));
   const ui = readFileSync(new URL('../src/ui.ts', import.meta.url), 'utf8');
-  assert.ok(ui.includes("{ id: 'wire', cat: V, short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt'), run: () => ed.setFilled(!ed.filled)"));
-  assert.ok(ui.includes("{ id: 'new', cat: F, icon: 'new', label: t('Neues Projekt in neuem Tab'), run: () => (ed.newTab(), applyNewDocDefaults()) }"));
+  assert.match(ui, /\{ id: 'wire', [^\n]*label: t\('Drahtgitter \/ Gefüllt'\), run: \(\) => ed\.setFilled\(!ed\.filled\)/);
+  assert.match(ui, /\{ id: 'new', [^\n]*run: \(\) => \(ed\.newTab\(\), applyNewDocDefaults\(\)\) \}/);
   const tb = readFileSync(new URL('../src/tabsBar.ts', import.meta.url), 'utf8');
   assert.ok(tb.includes('onclick: () => (ed.newTab(), applyNewDocDefaults())'));
 });

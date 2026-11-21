@@ -16,6 +16,8 @@ class FakeEl {
   constructor(tag: string) { this.tagName = tag.toUpperCase(); }
   addEventListener(type: string, fn: (...a: any[]) => void) { (this.listeners[type] ??= []).push(fn); }
   setAttribute(k: string, v: string) { this.attrs[k] = v; }
+  getAttribute(k: string) { return this.attrs[k] ?? null; }
+  hasAttribute(k: string) { return k in this.attrs; }
   append(...kids: (FakeEl | string)[]) { this.children.push(...kids); }
   replaceChildren(...kids: (FakeEl | string)[]) { this.children = [...kids]; }
   closest() { return this; }
@@ -112,6 +114,71 @@ check('dangling assigned contour is reported in the cut section', () => withDom(
   openLayerDialog(ed, 0);
   const notes = elements(dialogs[0]).filter((e) => e.className?.includes('note') || e.attrs.class?.includes('note')).map((e) => e.textContent).join(' ');
   assert.match(notes, /fehlt.*zuweisen|zuweisen.*fehlt/, 'status names problem and fix');
+}));
+
+check('sections are grouped into collapsible groups (A-13)', () => withDom((dialogs) => {
+  const ed = fixture();
+  openLayerDialog(ed, 0);
+  const els = elements(dialogs[0]);
+  const sums = els.filter((e) => e.tagName === 'SUMMARY');
+  for (const t of ['Allgemein', 'Geometrie', 'Bild', 'Bildschnitt (optional)', 'Aussehen in 3D'])
+    assert.ok(sums.some((e) => e.children.includes(t)), `group ${t}`);
+  const group = (t: string) => els.find((e) => e.tagName === 'DETAILS' &&
+    e.children.some((c) => c instanceof FakeEl && c.tagName === 'SUMMARY' && c.children.includes(t)));
+  assert.equal((group('Allgemein') as FakeEl | undefined)?.attrs.open, '', 'core group starts open');
+  assert.equal((group('Bildschnitt (optional)') as FakeEl | undefined)?.attrs.open, undefined, 'image cut starts collapsed');
+  assert.equal(sums.filter((e) => e.children.includes('Linie')).length, 1, 'line params nested once inside image cut');
+  const cut = cutCheckbox(dialogs[0]);
+  cut.checked = true; cut.fire('change');
+  assert.equal((group('Bildschnitt (optional)') as unknown as { open?: boolean })?.open, true, 'image cut opens on output check');
+}));
+
+check('alte Bildschnitt-Stege bekommen neue Defaults', () => {
+  const cut = imageCutSettings({ cut: { output: true, tabs: { enabled: true, size: 1, useCount: true, count: 2, spacing: 5, skipInner: false } } } as never);
+  assert.equal(cut.tabs.enabled, true);
+  assert.equal(cut.tabs.maxTabs, 0);
+  assert.equal(cut.tabs.minTabs, 1);
+  assert.equal(cut.tabs.tabPower, 0);
+});
+
+check('legacy image-cut defaults stay isolated until Apply and undo restores the legacy data', () => withDom((dialogs) => {
+  const ed = fixture();
+  ed.layer(0).img = { cut: { output: true, tabs: { enabled: true, size: 1, useCount: true, count: 2, spacing: 5, skipInner: false } } } as never;
+  const before = JSON.stringify(ed.layer(0));
+  openLayerDialog(ed, 0);
+  const field = (dlg: FakeEl, name: string) => {
+    const input = elements(dlg).find((e) => e.tagName === 'INPUT' && e.attrs['aria-label'] === name);
+    assert.ok(input, `missing field ${name}`);
+    return input;
+  };
+  assert.equal(Number(field(dialogs[0], 'Max. Stege je Form').value), 0);
+  assert.equal(Number(field(dialogs[0], 'Min. Stege je Form').value), 1);
+  assert.equal(Number(field(dialogs[0], 'Stegleistung (%)').value), 0);
+  const power = field(dialogs[0], 'Stegleistung (%)');
+  power.value = '25'; power.fire('blur');
+  assert.equal(JSON.stringify(ed.layer(0)), before, 'editing does not mutate the original');
+  button(dialogs[0], 'Abbrechen').fire('click');
+  assert.equal(JSON.stringify(ed.layer(0)), before, 'Cancel preserves legacy serialization');
+  assert.equal(ed.history.position, 0);
+  openLayerDialog(ed, 0);
+  const appliedPower = field(dialogs[1], 'Stegleistung (%)');
+  appliedPower.value = '25'; appliedPower.fire('blur');
+  button(dialogs[1], 'Übernehmen').fire('click');
+  assert.equal(ed.layer(0).img?.cut?.tabs.tabPower, 25);
+  assert.equal(ed.history.position, 1);
+  ed.doUndo();
+  assert.equal(JSON.stringify(ed.layer(0)), before, 'Undo restores original missing defaults');
+}));
+
+check('Pausenfelder haben zugängliche Namen', () => withDom((dialogs) => {
+  const ed = fixture();
+  openLayerDialog(ed, 0);
+  const names = elements(dialogs[0])
+    .filter((e) => e.tagName === 'INPUT' && typeof e.attrs['aria-label'] === 'string')
+    .map((e) => e.attrs['aria-label'] as string);
+  assert.ok(names.some((n) => n.includes('Startpause')), 'Startpause benannt: ' + names.join(' | '));
+  assert.ok(names.some((n) => n.includes('Endpause')), 'Endpause benannt');
+  assert.ok(names.some((n) => n.includes('Anstechleistung')), 'Anstechleistung benannt');
 }));
 
 console.log(`image cut dialog: ${checks}/${checks} passed`);

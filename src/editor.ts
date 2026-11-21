@@ -19,7 +19,7 @@ import { EditorCommands } from './editor/commands';
 import { EditorDocument, restartAutosaveTimer } from './editor/document';
 import { EditorHinges } from './editor/hinges';
 import { EditorPattern } from './editor/pattern';
-import { EditorImages, loadDxfFallbackUnit, loadImportAutoGroup, loadImportAutoSelect, loadImportCenterInBed, loadImportSkippedNote, loadSvgDpi, type SvgDpi } from './editor/imageops';
+import { EditorImages, loadDxfFallbackUnit, loadImportAutoGroup, loadImportAutoSelect, loadImportCenterInBed, loadImportCloseTolerance, loadImportHiddenLayers, loadImportSkippedNote, loadSvgDpi, type SvgDpi } from './editor/imageops';
 import { EditorImageHandles } from './editor/imageHandles';
 import { EditorJoints } from './editor/joints';
 import { EditorKeyboard, loadNudgeSteps, type NudgeSteps } from './editor/keyboard';
@@ -140,6 +140,9 @@ export class Editor {
   continuedFrom: Obj | null = null;
   nodeHover: NodeHover | null = null;
   segHover: SegHover | null = null;
+  /** S6-Follow-up: Hilfslinie aus dem Objekte-Panel hervorheben (Hover flüchtig, Pin per Klick); Index in doc.guides, nicht persistent */
+  guideHover: number | null = null;
+  guidePin: number | null = null;
   /** Ausgewählte Knoten des Knotenziels als "Unterpfad:Index" */
   nodeSel = new Set<string>();
   nodeSelObj: Obj | null = null;
@@ -207,6 +210,10 @@ export class Editor {
   svgDpi: SvgDpi = loadSvgDpi();
   /** DXF-Einheit als Fallback in mm (Opt-out, 1 = mm) */
   dxfFallbackUnitMm = loadDxfFallbackUnit();
+  /** Auto-Close-Toleranz in mm beim Import (Opt-out, 0.005; 0 = nur exakt schließen) */
+  importCloseToleranceMm = loadImportCloseTolerance();
+  /** Versteckte Ebenen/Formen importieren (Opt-out, an = heutiges Verhalten) */
+  importHiddenLayers = loadImportHiddenLayers();
   /** Klick-Toleranz ändern und merken */
   setClickTolerance(v: number) {
     if (!saveClickTolerance(v)) throw new Error(t('Einstellung konnte nicht gespeichert werden.'));
@@ -627,11 +634,13 @@ export class Editor {
   // ---------- Werkzeuge ----------
 
   setTool(t: Tool) {
+    // Re-selecting Shaper must not discard its active editing session.
+    if (t === 'shaper' && this.tool === 'shaper' && this.shaperEdit) return;
     if (t !== 'builder') this.builderSession = null;
-    // Eine neue Werkzeugwahl beendet die Nachbearbeitung der letzten Shaper-Operation
+    if (this.drag) this.cancelDrag();
+    // Erst das Verlassen des Werkzeugs beendet die Shaper-Nachbearbeitung.
     this.shaperEdit = null;
     this.shaperCloseHint = null;
-    if (this.drag) this.cancelDrag();
     if (this.draft) this.finishDraft();
     // Werkzeugwechsel verwirft einen laufenden Bogen (Esc bleibt die bewusste Abbruchtaste).
     this.arcDraft = null;

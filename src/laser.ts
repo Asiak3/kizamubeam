@@ -5,7 +5,7 @@ import { escapeXml, h, numInput, setIcon, setTrustedSvg } from './dom';
 import { saveBinary, saveText } from './files';
 import { native } from './native';
 import {
-  anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_DEVICE, DEFAULT_ROTARY, Device, DirOrder, effOrderOf, estimate, Firmware, FIRMWARES, liveStatus, formatDuration, frameGCode, isManualOrder, Job, jogLines, jogToLines, LASER_TYPES, moveLines, LaserModule, LaserType, loadDevices, Moves, newDevice, OrderOpts, OrderOverride,
+  anchorOf, BedCheck, Box, buildJob, burns, checkBed, DEFAULT_DEVICE, DEFAULT_ROTARY, Device, DirOrder, effOrderOf, estimate, Firmware, FinishMode, FIRMWARES, liveStatus, formatDuration, frameGCode, isManualOrder, Job, jogHoldLines, jogHoldSupported, jogLines, jogToLines, LASER_TYPES, moveLines, LaserModule, LaserType, loadDevices, Moves, newDevice, OrderOpts, OrderOverride,
   posShift, prepareGCode, Rotary, RotaryAxis, rotaryCirc, rotaryOn, rotaryTestLines, RuidaLaser, RuidaMagic, RuidaOrigin, sameMoves, sanitizeRuidaFilename, saveDevices, StartFrom, startHere, zJogLines,
 } from './gcode';
 import { isTauri, machine, PortInfo } from './machine';
@@ -285,6 +285,7 @@ function designOk(ed: Editor): boolean {
 /** Warum gerade kein Job oder Rahmen laufen kann (null = es geht) */
 export function runBlocker(): string | null {
   if (machine.fire.locked) return fireLockMessage();
+  if (device.startLocked) return t('Der Start ist in den Geräteeinstellungen gesperrt.');
   if (!machine.connected) return t('Nicht verbunden.');
   if (machine.running || uploading) return t('Es läuft bereits ein Auftrag.');
   if (machine.remote) {
@@ -310,6 +311,29 @@ function airOk(job: Job): boolean {
 
 /** Datei, unter der Jobs auf SD-Karte/Flash landen; wird jedes Mal überschrieben */
 const JOB_FILE = 'kizamubeam.gcode';
+
+/**
+ * Dateiname für Steuerungs-Uploads (#08): ohne Inkrement unverändert (überschreibt wie bisher),
+ * mit Inkrement Zähler-Suffix vor der Endung. Reine Vorschau ohne Nebeneffekt.
+ */
+export function suggestStoredName(base: string): string {
+  if (!device.uploadIncrement) return base;
+  const n = device.uploadCounter ?? 0;
+  const dot = base.lastIndexOf('.');
+  const stem = dot > 0 ? base.slice(0, dot) : base;
+  const ext = dot > 0 ? base.slice(dot) : '';
+  return `${stem}_${n}${ext}`;
+}
+
+/** Wie suggestStoredName, zählt den Geräte-Zähler danach hoch (persistiert via deviceChanged) */
+export function confirmStoredName(base: string): string {
+  const name = suggestStoredName(base);
+  if (device.uploadIncrement) {
+    device.uploadCounter = (device.uploadCounter ?? 0) + 1;
+    deviceChanged();
+  }
+  return name;
+}
 /** Fortschritt beim Hochladen auf die Steuerung */
 let uploading: { sent: number; total: number } | null = null;
 const uploadListeners = new Set<() => void>();
@@ -347,8 +371,9 @@ export async function uploadGCode(g: PreparedGCode, fs: FluidFs, file: string): 
 /** Job senden: vom Rechner aus oder (FluidNC, Einstellung „Job ausführen“) erst hochladen und auf der Steuerung starten */
 export async function runGCode(g: PreparedGCode): Promise<boolean> {
   if (device.runFrom === 'stream' || fw().read !== 'fluidnc') return machine.runPrepared(g);
-  if ((await uploadGCode(g, device.runFrom, JOB_FILE)) === null) return false;
-  await machine.runStored(device.runFrom, JOB_FILE);
+  const file = confirmStoredName(JOB_FILE);
+  if ((await uploadGCode(g, device.runFrom, file)) === null) return false;
+  await machine.runStored(device.runFrom, file);
   return true;
 }
 
@@ -359,7 +384,7 @@ export async function uploadJob(ed: Editor, fs: FluidFs, file: string): Promise<
   if (nothingToDo(job)) return null;
   job.warnings.forEach((w) => notify(w));
   const g = await prepareGCode(job, device, estimate(job.moves, device), undefined, (i) => ed.layer(i));
-  return uploadGCode(g, fs, file);
+  return uploadGCode(g, fs, confirmStoredName(file));
 }
 
 /** Nightly builds remind once per session that they are untested on hardware */
@@ -460,7 +485,7 @@ export async function uploadRuidaToController(ed: Editor, src?: JobSource) {
   if (!canRun()) return;
   const job = await makeJob(ed, false, src);
   if (nothingToDo(job) || (!src && !designOk(ed)) || !boundsOk(ed, job) || !airOk(job)) return;
-  const defName = sanitizeRuidaFilename(src?.name || 'KIZAMU');
+  const defName = suggestStoredName(sanitizeRuidaFilename(src?.name || 'KIZAMU'));
   const raw = prompt(t('Dateiname im Ruida-Speicher (max. 8 Zeichen, A–Z / 0–9):'), defName);
   if (!raw) return;
   const fname = sanitizeRuidaFilename(raw);
@@ -468,6 +493,7 @@ export async function uploadRuidaToController(ed: Editor, src?: JobSource) {
   const est = estimate(job.moves, device);
   const g = await prepareGCode(job, device, est, fname, src?.layer ?? ((i) => ed.layer(i)), { filename: fname, upload: true });
   const ok = await machine.runPrepared(g);
+  if (ok && fname === suggestStoredName(fname)) confirmStoredName(fname);
   if (ok && !src) ed.afterJob();
 }
 
@@ -982,14 +1008,37 @@ function moveTab(ed: Editor): HTMLElement {
     [-1, 0, '←'], [0, 0, '⌖'], [1, 0, '→'],
     [-1, -1, '↙'], [0, -1, '↓'], [1, -1, '↘'],
   ];
-  for (const [dx, dy, label] of arrows)
-    pad.append(
-      h('button', {
-        class: 'btn',
-        title: dx || dy ? t('{step} mm verfahren', { step: st.step }) : t('Zum Nullpunkt fahren'),
-        onclick: () => (dx || dy ? jog(dx, dy) : sendAll(moveLines(device, 'X0 Y0'))),
-      }, label),
-    );
+  for (const [dx, dy, label] of arrows) {
+    const b = h('button', {
+      class: 'btn',
+      title: dx || dy ? t('{step} mm verfahren', { step: st.step }) : t('Zum Nullpunkt fahren'),
+      onclick: () => (dx || dy ? jog(dx, dy) : sendAll(moveLines(device, 'X0 Y0'))),
+    }, label) as HTMLButtonElement;
+    // Hold-to-Jog (#10): Halten fährt (nur $J-Firmwares), Loslassen stoppt per Jog-Cancel.
+    // Sonst und bei kurzem Klick bleibt es beim Einzelschritt (heutiges Verhalten).
+    if (dx || dy) {
+      let timer = 0;
+      let held = false;
+      let suppress = false;
+      const stop = () => {
+        if (timer) { clearTimeout(timer); timer = 0; }
+        if (held) { held = false; b.classList.remove('held'); void machine.realtime(0x85); suppress = true; }
+      };
+      b.onpointerdown = (e) => {
+        if (e.button !== 0 && e.pointerType === 'mouse') return;
+        if (!jogHoldSupported(device) || !machine.connected) return;
+        timer = window.setTimeout(() => {
+          timer = 0; held = true; b.classList.add('held');
+          for (const l of jogHoldLines(device, dx * st.step, dy * st.step, st.speed)) machine.send(l);
+        }, 250);
+      };
+      b.onpointerup = stop;
+      b.onpointercancel = stop;
+      b.onpointerleave = () => { if (held) stop(); else if (timer) { clearTimeout(timer); timer = 0; } };
+      b.addEventListener('click', (e) => { if (suppress) { suppress = false; e.stopImmediatePropagation(); } }, true);
+    }
+    pad.append(b);
+  }
   const stepSel = h('select', { onchange: (e: Event) => (st.step = Number((e.target as HTMLSelectElement).value)) },
     ...[0.1, 1, 5, 10, 50, 100].map((v) => h('option', { value: String(v), selected: v === st.step }, `${dec(String(v))} mm`)),
   );
@@ -1197,10 +1246,20 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
     rows.push(el);
     return el;
   };
+  /** Zahleneingabe mit 0-Sinn (leer/0/ungültig = unset = heutiges Verhalten), optional gedeckelt */
+  const optNum = (label: string, get: () => number | undefined, set: (v: number | undefined) => void, title?: string, max?: number) => {
+    const el = numInput('', (v) => set(!Number.isFinite(v) || v <= 0 ? undefined : max === undefined ? v : Math.min(v, max)), title);
+    el.value = get() === undefined ? '' : String(get());
+    rows.push(h('label', { title }, label), el);
+    return el;
+  };
   const ruidaEls: HTMLElement[] = [];
   const nonRuidaEls: HTMLElement[] = [];
   newTab(t('Allgemein'));
   text(t('Name'), () => d.name, (v) => (d.name = v));
+  text(t('Dateiname für Controller-Uploads'), () => d.uploadName ?? '', (v) => (d.uploadName = v.trim() || undefined));
+  bool(t('Dateiname hochzählen'), () => d.uploadIncrement ?? false, (v) => (d.uploadIncrement = v), t('Pro Upload _2, _3 … anhängen (braucht eine Ziffer im Namen). Aus = überschreiben wie bisher.'));
+  bool(t('Start sperren'), () => d.startLocked ?? false, (v) => (d.startLocked = v), t('Start- und Rahmen-Buttons bleiben gesperrt, bis die Sperre hier aufgehoben wird.'));
   const sMaxRef: { el?: HTMLInputElement; lab?: HTMLElement } = {};
   const fwSel = h('select', {
     onchange: (e: Event) => {
@@ -1276,9 +1335,33 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   head(t('Bewegung (für die Zeitschätzung)'));
   const rapid = num(t('Eilgang (mm/min)'), () => d.rapid, (v) => (d.rapid = v));
   const accel = num(t('Beschleunigung (mm/s²)'), () => d.accel, (v) => (d.accel = v));
+  optNum(t('Leerfahrt über Leeres (mm/min)'), () => d.whitespaceSpeed, (v) => (d.whitespaceSpeed = v), t('Höhere Verfahrgeschwindigkeit über leeren Bildbereichen (nur GRBL/Marlin/FluidNC). Leer oder 0 = Eilgang wie bisher.'), 100000);
   bool(t('Nach dem Job zurück zum Start'), () => d.returnHome, (v) => (d.returnHome = v));
+  {
+    const modeLabel = t('Ziel nach dem Job');
+    const modeSel = h('select', { onchange: (e: Event) => { d.finishMode = (e.target as HTMLSelectElement).value as FinishMode; syncFinishXY(); } },
+      h('option', { value: 'start', selected: (d.finishMode ?? (d.returnHome === false ? 'stay' : 'start')) === 'start' }, t('Zum Laserstart')),
+      h('option', { value: 'origin', selected: (d.finishMode ?? '') === 'origin' }, t('Zum Ursprung (0,0)')),
+      h('option', { value: 'stay', selected: (d.finishMode ?? (d.returnHome === false ? 'stay' : '')) === 'stay' }, t('Verweilen')),
+      h('option', { value: 'custom', selected: (d.finishMode ?? '') === 'custom' }, t('Eigene XY')),
+    ) as HTMLSelectElement;
+    const xLab = h('label', {}, t('Ziel-X (mm)'));
+    const xEl = numInput('', (v) => (d.finishX = Number.isFinite(v) ? v : undefined));
+    xEl.value = d.finishX === undefined ? '' : String(d.finishX);
+    const yLab = h('label', {}, t('Ziel-Y (mm)'));
+    const yEl = numInput('', (v) => (d.finishY = Number.isFinite(v) ? v : undefined));
+    yEl.value = d.finishY === undefined ? '' : String(d.finishY);
+    const syncFinishXY = () => {
+      const show = (d.finishMode ?? (d.returnHome === false ? 'stay' : 'start')) === 'custom';
+      for (const el of [xLab, xEl, yLab, yEl]) el.style.display = show ? '' : 'none';
+    };
+    modeSel.addEventListener('change', syncFinishXY);
+    rows.push(h('label', { title: t('Wohin der Kopf nach dem Job fährt (nur Absolut- und Benutzer-Position).') }, modeLabel), modeSel, xLab, xEl, yLab, yEl);
+    syncFinishXY();
+  }
   head(t('Achsen'));
   bool(t('Motorische Z-Achse vorhanden'), () => d.zAxis, (v) => (d.zAxis = v), t('Layer dürfen den Fokus verschieben (Z-Versatz, tiefer je Durchgang). Z fährt relativ zur Höhe beim Start und am Ende zurück.'));
+  optNum(t('Materialhöhe (mm)'), () => d.zMaterial, (v) => (d.zMaterial = v), t('Vertrag für den Z-Verfahrweg: warnt, wenn der Fokus tiefer als das Material fahren würde. 0 oder leer = kein Vertrag.'));
   bool(t('Z+ fährt Richtung Material'), () => d.zFlip, (v) => (d.zFlip = v), t('Einschalten, wenn bei dieser Maschine positive Z-Werte den Tisch anheben oder den Kopf absenken'));
   bool(t('Z-Jog nur nach Referenzfahrt'), () => d.zJogStrict ?? true, (v) => (d.zJogStrict = v), t('Bewegen-Fenster: Z-Tasten bleiben gesperrt, bis einmal referenziert wurde (pro Verbindung). Aus = lax: dann genügt eine bekannte Position.'));
   rows.push(h('label', {}, t('Drehachse')), h('span', {}, h('button', { class: 'btn small', onclick: () => openRotaryDialog() }, t('Drehachse (Rotary) …'))));
@@ -1324,6 +1407,17 @@ export function openDeviceDialog(ed: Editor, target: Device = device, onDone?: (
   );
   rows.push(baudLab, baud);
   nonRuidaEls.push(baudLab, baud);
+  const dtrLab = h('label', { title: t('DTR-Signal beim Öffnen der USB-Schnittstelle. Auto = unverändert (heutiges Verhalten).') }, t('DTR-Signal'));
+  const dtrSel = h('select', { onchange: (e: Event) => {
+    const v = (e.target as HTMLSelectElement).value;
+    d.dtr = v === 'auto' ? undefined : v === 'on';
+  } },
+    h('option', { value: 'auto', selected: d.dtr === undefined }, t('Automatisch')),
+    h('option', { value: 'on', selected: d.dtr === true }, t('An')),
+    h('option', { value: 'off', selected: d.dtr === false }, t('Aus')),
+  ) as HTMLSelectElement;
+  rows.push(dtrLab, dtrSel);
+  nonRuidaEls.push(dtrLab, dtrSel);
   const hostIn = h('input', { type: 'text', value: d.host, oninput: (e: Event) => (d.host = (e.target as HTMLInputElement).value.trim()) }) as HTMLInputElement;
   const fluidDiscoverBtn = h('button', {
     class: 'btn small', title: t('FluidNC-Steuerungen im lokalen Netzwerk suchen'),

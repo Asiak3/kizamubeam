@@ -46,6 +46,17 @@ export class EditorGuides {
     if (!list) return;
     list.splice(i, 1);
     if (!list.length) delete this.doc.guides;
+    // Hervorhebung zeigt sonst auf eine andere Linie
+    this.guideHover = this.guidePin = null;
+  }
+  /** Hilfslinie i auf Weltkoordinate v (mm) setzen; ein Undo-Schritt, keine Änderung bei gleichem/ungültigem Wert */
+  setGuidePos(this: Editor, i: number, v: number) {
+    const list = this.guideList();
+    const g = list[i];
+    if (!g || !isFinite(v) || g.v === v) return;
+    this.snapshot(t('Hilfslinie'));
+    list[i] = { axis: g.axis, v };
+    this.emit('doc');
   }
   /** Ebene „Hilfslinien“ ein-/ausblenden oder sperren */
   setGuideLayer(this: Editor, patch: { hidden?: boolean; locked?: boolean }) {
@@ -65,7 +76,26 @@ export class EditorGuides {
     if (!this.doc.guides?.length) return;
     this.snapshot(t('Hilfslinien löschen'));
     delete this.doc.guides;
+    this.guideHover = this.guidePin = null;
     this.emit('doc');
+  }
+  /** S6-Follow-up: flüchtige Hervorhebung aus dem Objekte-Panel (Hover); kein Undo, keine Sicherung */
+  setGuideHover(this: Editor, i: number | null) {
+    const v = i !== null && this.guideList()[i] ? i : null;
+    if ((this.guideHover ?? null) === v) return;
+    this.guideHover = v;
+    this.redraw();
+  }
+  /** S6-Follow-up: Hervorhebung per Klick anpinnen/lösen; kein Undo, keine Sicherung */
+  toggleGuidePin(this: Editor, i: number) {
+    if (!this.guideList()[i]) return;
+    this.guidePin = this.guidePin === i ? null : i;
+    this.redraw();
+  }
+  /** Wirksame Hervorhebung (Hover schlägt Pin), als gültiger Index, sonst -1 */
+  guideHi(this: Editor): number {
+    const i = this.guideHover ?? this.guidePin ?? -1;
+    return this.guideList()[i] ? i : -1;
   }
   /** Hilfslinien über die ganze Arbeitsfläche zeichnen (Bildschirmkoordinaten) */
   renderGuides(this: Editor, ctx: CanvasRenderingContext2D) {
@@ -91,6 +121,15 @@ export class EditorGuides {
     ctx.beginPath();
     list.forEach((g, i) => i !== active && line(g));
     ctx.stroke();
+    // S6-Follow-up: aus dem Panel hervorgehobene Linie leicht betonen (kräftiger, gleiche Strichelung)
+    const hi = this.guideHi();
+    if (hi >= 0 && hi !== active) {
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      line(list[hi]);
+      ctx.stroke();
+    }
     if (active !== null && list[active]) {
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;

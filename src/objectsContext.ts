@@ -6,6 +6,7 @@ import { t } from './i18n';
 import { homeLayer, Obj } from './model';
 import { ContextAction } from './contextMenu';
 import { ContextCallbacks, editorContextGroups, MOVE_IDS, moveActions } from './editorContext';
+import { guideContextGroups } from './guideDialog';
 
 /** Panel features the menu needs but which live in dialogs or in the panel's own state */
 export interface ObjectsMenuHooks {
@@ -16,7 +17,8 @@ export interface ObjectsMenuHooks {
 export type ObjectsRowTarget =
   | { kind: 'obj'; obj: Obj; top: Obj; rename: () => void; group?: { open: boolean; toggle: () => void } }
   | { kind: 'layer'; layer: number }
-  | { kind: 'page'; page: number; rename: () => void };
+  | { kind: 'page'; page: number; rename: () => void }
+  | { kind: 'guide'; guide: number };
 
 const action = (id: string, label: string, run: ContextAction['run'], enabled = true): ContextAction => ({ id, label, run, enabled });
 
@@ -84,5 +86,6 @@ function pageGroups(ed: Editor, page: number, rename: () => void): ContextAction
 export function objectsContextGroups(ed: Editor, callbacks: ContextCallbacks, hooks: ObjectsMenuHooks, target: ObjectsRowTarget): ContextAction[][] {
   if (target.kind === 'layer') return layerGroups(ed, hooks, target.layer);
   if (target.kind === 'page') return pageGroups(ed, target.page, target.rename);
+  if (target.kind === 'guide') return guideContextGroups(ed, target.guide);
   return objectGroups(ed, callbacks, hooks, target);
 }

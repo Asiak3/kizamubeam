@@ -793,6 +793,37 @@ select:focus {
 .ot-row.sel {
   background: var(--accent-soft);
 }
+/* S6-Follow-up: angepinnte Hilfslinie in der Liste */
+.ot-guide.hi {
+  background: var(--accent-soft);
+}
+/* S6-Follow-up: Farbvorschläge im Projektfarb-Dialog */
+.tab-color-presets {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.tab-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  padding: 0;
+}
+.tab-color-swatch.cur {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.tab-color-custom {
+  width: 44px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
 .ot-row.sel-in {
   background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
 }
@@ -805,6 +836,13 @@ select:focus {
 }
 .ot-row.dragging {
   opacity: 0.5;
+}
+/* S6-Follow-up: Zeilen fremder Seiten sind blasser (Klick wechselt dorthin) */
+.ot-row.ot-foreign {
+  opacity: 0.68;
+}
+.ot-row.ot-foreign:hover {
+  opacity: 1;
 }
 .ot-row.drop-before {
   border-top-color: var(--accent);
@@ -2090,7 +2128,22 @@ table.devices .actions {
 
 /* Layer-Dialog */
 .layer-dialog {
-  width: min(400px, 96vw);
+  width: min(760px, 96vw);
+}
+/* Zwei Spalten: links Allgemein/Geometrie, rechts Linie-Füllen/Bild/Bildschnitt/3D-Look; schmal einspaltig */
+.layer-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+  align-items: start;
+}
+.layer-col {
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .layer-cols {
+    grid-template-columns: 1fr;
+  }
 }
 .layer-dialog h3 {
   display: flex;
@@ -4728,6 +4781,111 @@ input.bound {
 .ptab-new {
   padding: 0 10px;
   color: var(--muted);
+}
+/* S6: gruppierte Tabs — einzeilig, Projektkopf mit Seiten-Untertabs */
+#tabbar.grouped {
+  gap: 6px;
+}
+.pgroup {
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  flex: none;
+  max-width: 60vw;
+  /* S6-Follow-up: --pgroup-color ist die volle Projektfarbe (manuelle Wahl oder stabile Vorgabe) */
+  --pgroup-color: hsl(210 65% 55%);
+  border-radius: 4px;
+}
+.pgroup.open {
+  background: color-mix(in srgb, var(--pgroup-color) 9%, transparent);
+}
+.pgroup-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 200px;
+  padding: 0 4px 0 3px;
+  font-size: calc(12px * var(--ty-interface));
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-left: 3px solid var(--pgroup-color);
+  border-right: 1px solid var(--line);
+  border-radius: 4px 0 0 4px;
+  cursor: default;
+  user-select: none;
+}
+.pgroup.active .pgroup-head,
+.pgroup-head.active {
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: inset 0 2px 0 var(--pgroup-color);
+}
+/* S6-Follow-up: der Schließen-Knopf war in gruppierten Köpfen unsichtbar
+   (.ptab-Regeln greifen hier nicht); bei offen/aktiv/Hover zeigen */
+.pgroup-head .ptab-close {
+  visibility: hidden;
+}
+.pgroup-head:hover .ptab-close,
+.pgroup.open .pgroup-head .ptab-close,
+.pgroup.active .pgroup-head .ptab-close {
+  visibility: visible;
+}
+.pgroup-head .ptab-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.pgroup-head.changed .ptab-name::after {
+  content: ' •';
+  color: var(--accent);
+}
+.pgroup-caret {
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: calc(12px * var(--ty-interface));
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex: none;
+}
+.pgroup-caret:hover {
+  background: var(--accent-soft);
+}
+.ppage {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: calc(11px * var(--ty-interface));
+  line-height: 1;
+  padding: 0 8px;
+  border-right: 1px solid var(--line);
+  border-left: 2px solid color-mix(in srgb, var(--pgroup-color) 55%, transparent);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ppage:hover {
+  color: var(--text);
+}
+.ppage.active {
+  color: var(--text);
+  background: var(--panel);
+  box-shadow: inset 0 -2px 0 var(--pgroup-color);
+}
+/* Umbenennen direkt in der Leiste */
+.ppage-rename {
+  width: 90px;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--pgroup-color);
+  border-radius: 3px;
+  padding: 1px 4px;
 }
 /* Werkzeugkasten */
 :root {

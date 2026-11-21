@@ -482,6 +482,7 @@ class Machine {
         fw: d.fw, bedW: d.bedW, bedH: d.bedH,
         ruidaPort: d.ruidaPort || 50200, ruidaJogPort: d.ruidaJogPort || 50207,
         ruidaMagic: d.ruidaMagic || 'auto', ruidaOrigin: d.ruidaOrigin || 'top-right',
+        dtr: d.dtr ?? null,
       });
       this.connected = true;
       ++this.connectionGeneration;

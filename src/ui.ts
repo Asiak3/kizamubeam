@@ -53,6 +53,7 @@ import { openRemoteHostDialog, openRemoteJobsDialog, remoteHostStatus, startRemo
 import { openHostSyncDialog } from './remote';
 import { buildObjectsPanel } from './objectsPanel';
 import { buildTabBar, closeTabAsk } from './tabsBar';
+import { loadGroupedTabs, loadTabPages, saveGroupedTabs, saveTabPages } from './editor/tabs';
 import { buildHistoryPanel } from './historyPanel';
 import { buildLibraryPanel, openAddSelectionDialog } from './libraryPanel';
 import { buildCheckPanel, openCheck } from './checkPanel';
@@ -430,6 +431,8 @@ function buildMenu(ed: Editor) {
         [t('Immer|Mittelpunkte'), '', () => ed.setSnap({ centers: 'all' }), () => ed.centerMarks === 'all'],
       ] },
       'sep',
+      [t('Gruppierte Tabs'), '', () => { saveGroupedTabs(!loadGroupedTabs()); ed.onTabsChange?.(); }, () => loadGroupedTabs()],
+      [t('Seiten in Tabs'), '', () => { saveTabPages(!loadTabPages()); ed.onTabsChange?.(); }, () => loadTabPages()],
       { sub: t('Gitter'), items: [
         [t('Gitter anzeigen'), 'grid', () => ed.setGrid({ show: !ed.grid.show }), () => ed.grid.show],
         [t('Gitter einstellen …'), 'gridsettings', () => openGridDialog(ed)],
@@ -630,26 +633,26 @@ function buildBars(ed: Editor) {
     { id: 'save', cat: F, icon: 'save', label: t('Speichern'), run: () => saveProject(ed) },
     { id: 'import', cat: F, icon: 'import', label: t('Importieren: Bilder, SVG, DXF, PDF, AI, LightBurn, 3D-Modelle'), run: () => importFile(ed) },
     { id: 'export', cat: F, icon: 'export', label: t('Als SVG exportieren'), run: () => exportSvg(ed) },
-    { id: 'export-dxf', cat: F, short: 'DXF', label: t('Als DXF exportieren'), run: () => exportDxf(ed) },
-    { id: 'export-pdf', cat: F, short: 'PDF', label: t('Als PDF exportieren'), run: () => exportPdf(ed, 'pdf') },
-    { id: 'export-ai', cat: F, short: 'AI', label: t('Als Illustrator-Datei (AI) exportieren'), run: () => exportPdf(ed, 'ai') },
+    { id: 'export-dxf', cat: F, icon: 'dxf', short: 'DXF', label: t('Als DXF exportieren'), run: () => exportDxf(ed) },
+    { id: 'export-pdf', cat: F, icon: 'pdf', short: 'PDF', label: t('Als PDF exportieren'), run: () => exportPdf(ed, 'pdf') },
+    { id: 'export-ai', cat: F, icon: 'ai', short: 'AI', label: t('Als Illustrator-Datei (AI) exportieren'), run: () => exportPdf(ed, 'ai') },
     { id: 'undo', cat: B, icon: 'undo', label: t('Rückgängig'), run: () => ed.doUndo() },
     { id: 'redo', cat: B, icon: 'redo', label: t('Wiederholen'), run: () => ed.doRedo() },
     { id: 'cut', cat: B, icon: 'cut', label: t('Ausschneiden'), run: () => ed.cut(), enabled: sel1 },
     { id: 'copy', cat: B, icon: 'copy', label: t('Kopieren'), run: () => ed.copy(), enabled: sel1 },
     { id: 'paste', cat: B, icon: 'paste', label: t('Einfügen'), run: () => ed.paste() },
-    { id: 'duplicate', cat: B, short: t('Dupl.'), label: t('Duplizieren'), run: () => ed.duplicate(), enabled: sel1 },
+    { id: 'duplicate', cat: B, icon: 'duplicate', short: t('Dupl.'), label: t('Duplizieren'), run: () => ed.duplicate(), enabled: sel1 },
     { id: 'delete', cat: B, icon: 'delete', label: t('Löschen'), run: () => ed.deleteSel(), enabled: sel1 },
-    { id: 'selectall', cat: B, short: t('Alle'), label: t('Alles auswählen'), run: () => ed.selectAll() },
+    { id: 'selectall', cat: B, icon: 'selectall', short: t('Alle'), label: t('Alles auswählen'), run: () => ed.selectAll() },
     { id: 'tolines', cat: B, icon: 'tolines', label: t('In Pfad umwandeln'), run: () => ed.convertSelToPath(), enabled: sel1 },
-    { id: 'closepath', cat: M, short: t('Schließen|Pfad'), label: t('Pfad schließen'), run: () => ed.closeSel(), enabled: sel1 },
-    { id: 'join', cat: M, short: t('Verbinden|Pfade'), label: t('Ausgewählte Formen verbinden'), run: () => ed.joinSel(), enabled: sel2 },
-    { id: 'breakapart', cat: M, short: t('Zerlegen'), label: t('Zerlegen'), run: () => ed.breakApartSel(), enabled: sel1 },
+    { id: 'closepath', cat: M, icon: 'closepath', short: t('Schließen|Pfad'), label: t('Pfad schließen'), run: () => ed.closeSel(), enabled: sel1 },
+    { id: 'join', cat: M, icon: 'join', short: t('Verbinden|Pfade'), label: t('Ausgewählte Formen verbinden'), run: () => ed.joinSel(), enabled: sel2 },
+    { id: 'breakapart', cat: M, icon: 'breakapart', short: t('Zerlegen'), label: t('Zerlegen'), run: () => ed.breakApartSel(), enabled: sel1 },
     { id: 'freehand-edit', cat: W, icon:'line', label:t('Freihandpfad bearbeiten …'), run:()=>openFreehandEditDialog(ed), enabled:sel1, on:()=>ed.tool==='freehand-edit' },
     tool('lasso', 'lasso', t('Lasso-Auswahl')),
-    { id: 'path-islands', cat: M, label: t('Pfadinseln trennen …'), run: () => openPathIslandsDialog(ed), enabled: sel1 },
-    { id: 'reverse', cat: M, short: t('Umkehren'), label: t('Richtung umkehren'), run: () => ed.reverseSel(), enabled: sel1 },
-    { id: 'corners', cat: M, short: t('Ecken'), label: t('Ecken runden oder fasen …'), run: () => openCornerDialog(ed), enabled: sel1 },
+    { id: 'path-islands', cat: M, icon: 'islands', short: t('Pfadinseln'), label: t('Pfadinseln trennen …'), run: () => openPathIslandsDialog(ed), enabled: sel1 },
+    { id: 'reverse', cat: M, icon: 'reverse', short: t('Umkehren'), label: t('Richtung umkehren'), run: () => ed.reverseSel(), enabled: sel1 },
+    { id: 'corners', cat: M, icon: 'corners', short: t('Ecken'), label: t('Ecken runden oder fasen …'), run: () => openCornerDialog(ed), enabled: sel1 },
     { id: 'zoomin', cat: V, icon: 'zoomin', label: t('Vergrößern'), run: () => ed.zoomAt(1.25) },
     { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern'), run: () => ed.zoomAt(0.8) },
     { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite'), run: () => ed.zoomPage() },
@@ -659,7 +662,7 @@ function buildBars(ed: Editor) {
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
     { id: 'zoomsel', cat: V, icon: 'zoomsel', label: t('Auf Auswahl zoomen'), run: () => ed.zoomSelection(), enabled: sel1 },
     { id: 'view3d', cat: V, icon: 'view3d', label: t('3D-Ansicht: Baugruppen zusammengesteckt ansehen'), run: () => toggleWindow('view3d') },
-    { id: 'wire', cat: V, short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt'), run: () => ed.setFilled(!ed.filled), on: () => ed.filled },
+    { id: 'wire', cat: V, icon: 'wire', short: t('Gefüllt'), label: t('Drahtgitter / Gefüllt'), run: () => ed.setFilled(!ed.filled), on: () => ed.filled },
     {
       id: 'theme', cat: V, icon: 'moon', label: t('Dunkles Design'), run: () => applyTheme(ed, isDark() ? 'light' : 'dark'),
       dyn: () => (isDark() ? { icon: 'sun', label: t('Helles Design') } : { icon: 'moon', label: t('Dunkles Design') }),
@@ -712,7 +715,7 @@ function buildBars(ed: Editor) {
     ...GENERATORS.filter((g) => g.tile).map((g) => ({ id: g.id, cat: W, icon: g.icon, label: g.tile!.text(t).action, run: () => openGenerator(ed, g) })),
     { id: 'multilayer', cat: W, icon: 'stack', label: t('Mehrlagenarbeit aus den ausgewählten Formen erstellen oder bearbeiten'), run: () => openMultiLayerDialog(ed), enabled: sel1 },
     { id: 'vartext', cat: W, icon: 'vartext', short: t('Var. Text'), label: t('Variabler Text …'), run: () => openVarTextDialog(ed) },
-    { id: 'textpath', cat: W, short: t('Auf Pfad'), label: t('Text auf Pfad'), run: () => ed.applyPathToText(), enabled: sel2 },
+    { id: 'textpath', cat: W, icon: 'textpath', short: t('Auf Pfad'), label: t('Text auf Pfad'), run: () => ed.applyPathToText(), enabled: sel2 },
     {
       id: 'union', cat: M, icon: 'union', label: t('Vereinen: alle gewählten Formen verschmelzen, eine Gruppe oder ein Text auch mit sich selbst'),
       run: () => ed.booleanSel('union'), enabled: () => sel2() || (n() === 1 && ['group', 'text'].includes(ed.sel[0].shape.kind)),
@@ -733,8 +736,8 @@ function buildBars(ed: Editor) {
     { id: 'patternfill', cat: M, icon: 'pattern', label: t('Muster füllen: gewählte Form mit einem nahtlosen Muster aus Vektoren füllen'), run: () => openPatternDialog(ed), enabled: sel1 },
     { id: 'adjust', cat: I, icon: 'adjust', label: t('Bild anpassen …'), run: () => openAdjustDialog(ed), enabled: () => ed.selImages().length > 0 },
     { id: 'trace', cat: I, icon: 'trace', label: t('Bild nachzeichnen'), run: () => openTraceDialog(ed), enabled: () => ed.selImages().length > 0 },
-    { id: 'imageedit', cat: I, label: EDIT_TITLE(), run: () => runImageEdit(ed), enabled: () => cropDraftEnabled(ed) },
-    { id: 'addpage', cat: S, short: t('+ Seite'), label: t('Neue Seite'), run: () => ed.addPage() },
+    { id: 'imageedit', cat: I, icon: 'imageedit', short: t('Bild bearb.'), label: EDIT_TITLE(), run: () => runImageEdit(ed), enabled: () => cropDraftEnabled(ed) },
+    { id: 'addpage', cat: S, icon: 'addpage', short: t('+ Seite'), label: t('Neue Seite'), run: () => ed.addPage() },
     { id: 'prevpage', cat: S, icon: 'up', label: t('Vorherige Seite'), run: () => ed.setPage(ed.doc.page - 1), enabled: () => ed.doc.page > 0 },
     { id: 'nextpage', cat: S, icon: 'down', label: t('Nächste Seite'), run: () => ed.setPage(ed.doc.page + 1), enabled: () => ed.doc.page < ed.doc.pages.length - 1 },
     { id: 'check', cat: L, icon: 'check', label: t('Konstruktion prüfen: doppelte Linien, offene Umrisse, schmale Stege, kleine Ausschnitte, Passungen, Steckbarkeit und Arbeitsbereich'), run: () => openCheck() },
@@ -751,7 +754,7 @@ function buildBars(ed: Editor) {
     { id: 'printcut', cat: L, icon: 'printcut', short: t('Print and Cut'), label: t('Print and Cut: gedrucktes Blatt an Passermarken einmessen und passgenau schneiden'), run: () => openPrintCutDialog(ed) },
     { id: 'calibrate', cat: L, icon: 'calibrate', short: t('Passung'), label: t('Passung kalibrieren: Schnittfuge und Steckspiel für ein Material ermitteln'), run: () => openCalibrateDialog(ed) },
     { id: 'devsettings', cat: L, icon: 'devsettings', label: t('Geräteeinstellungen'), run: () => openDeviceDialog(ed) },
-    { id: 'devices', cat: L, short: t('Geräte'), label: t('Geräte …'), run: () => openDevicesDialog(ed) },
+    { id: 'devices', cat: L, icon: 'devices', short: t('Geräte'), label: t('Geräte …'), run: () => openDevicesDialog(ed) },
     { id: 'rotary', cat: L, icon: 'rotary', short: t('Rotary'), label: t('Drehachse (Rotary) …'), run: () => openRotaryDialog() },
     { id: 'slots', cat: M, icon: 'slots', label: t('Schlitze an Materialdicke anpassen …'), run: () => openSlotDialog(ed) },
     { id: 'slotplace', cat: M, icon: 'slots', label: t('Schlitze / Ausklinkungen platzieren …'), run: () => openSlotPlacementDialog(ed), enabled: () => n() === 1 },
@@ -812,7 +815,7 @@ function buildBars(ed: Editor) {
   const stack = (id: string) => () => stackingActions(ed).find((a) => a.id === id);
   shortcutCommands = [
     ...list.filter((a) => !a.items),
-    ...stackingActions(ed).map(({ id, label }): Action => ({ id, cat: A, label, run: () => void stack(id)()?.run(), enabled: () => stack(id)()?.enabled !== false })),
+    ...stackingActions(ed).map(({ id, label }): KeyCommand => ({ id, cat: A, label, run: () => void stack(id)()?.run(), enabled: () => stack(id)()?.enabled !== false })),
     { id: 'help', cat: t('Hilfe'), label: t('Tastenkürzel'), run: () => showHelp() },
   ];
   const byId = new Map(shortcutCommands.map((a) => [a.id, a]));
@@ -837,7 +840,8 @@ function buildBars(ed: Editor) {
 }
 
 /** Commands that can get a shortcut, in toolbar order (Settings → Mouse and keyboard) */
-let shortcutCommands: Action[] = [];
+let shortcutCommands: KeyCommand[] = [];
+type KeyCommand = Pick<Action, 'id' | 'cat' | 'label' | 'run' | 'enabled'>;
 const OUTSIDE_DIALOGS = new Set(['new', 'open', 'save']);
 /** Commands offered by the main menu (filled by buildMenu) */
 const menuCommands = new Set<string>();

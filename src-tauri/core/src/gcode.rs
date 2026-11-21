@@ -107,11 +107,20 @@ pub fn write(mv: &Moves, p: &Params) -> (Vec<String>, Vec<f64>) {
     let mut zk = 0;
     for i in 0..n {
         let (x, y) = (mv.x[i], mv.y[i]);
-        // Eingefügte Zeilen vor der Bewegung; danach G0/G1 wieder ausschreiben
+        // Eingefügte Zeilen vor der Bewegung; danach G0/G1 wieder ausschreiben.
+        // Anstech-Pausen ändern die Spindelleistung (M3 S…): der S-Cache muss
+        // verfallen, sonst fehlt das S der folgenden Schnittbewegung.
         while zk < p.inserts.len() && p.inserts[zk].0 == i {
+            let mut power_changed = false;
             for z in &p.inserts[zk].1 {
+                if z.starts_with("M3 S") || z.starts_with("M3 I S") {
+                    power_changed = true;
+                }
                 lines.push(z.clone());
                 times.push(if i > 0 { mv.t[i - 1] } else { 0.0 });
+            }
+            if power_changed {
+                cs = i64::MIN;
             }
             g = -1;
             zk += 1;
@@ -208,4 +217,30 @@ pub fn write_packed(body: &[u8]) -> Result<(Vec<String>, Vec<f64>), String> {
     let s = f32s(take(4 * n)?);
     let layer: Vec<i16> = take(2 * n)?.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect();
     Ok(write(&Moves { x0: p.x0, y0: p.y0, x: &x, y: &y, s: &s, f: &f, layer: &layer, t: &t }, &p))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn spindle_power_reemitted_after_m3_insert() {
+        let x = [10.0, 20.0];
+        let y = [0.0, 0.0];
+        let s = [0.5f32, 0.5];
+        let f = [1000.0f32, 1000.0];
+        let layer = [1i16, 1];
+        let t = [0.1, 0.2];
+        let mv = Moves { x0: 0.0, y0: 0.0, x: &x, y: &y, s: &s, f: &f, layer: &layer, t: &t };
+        let p = Params {
+            x0: 0.0, y0: 0.0, s_max: 1000.0, air: vec![], air_cmd: "M8".into(),
+            header: vec![], footer: vec![], total: 0.0, y_axis: "Y".into(),
+            inserts: vec![(1, vec!["M3 S800".into(), "G4 P0.2".into()])],
+        };
+        let (lines, _) = write(&mv, &p);
+        let joined = lines.join("\n");
+        let pos = joined.find("M3 S800").expect("insert present");
+        let after = &joined[pos + "M3 S800".len()..];
+        assert!(after.contains("S500"), "S nach M3-Insert erneut emittieren, got:\n{joined}");
+    }
 }

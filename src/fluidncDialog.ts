@@ -6,7 +6,7 @@ import { openText, saveText } from './files';
 import {
   deleteCmd, diffConfig, FluidFile, FluidFs, listCmd, parseEsp800, parseFileList, restoreCmds, RESTART_CMD, safeFileName, saveCmd, setCmd,
 } from './fluidnc';
-import { device, laserNotify, uploadJob } from './laser';
+import { device, laserNotify, suggestStoredName, uploadJob } from './laser';
 import { machine } from './machine';
 import { parseFluidConfig } from './setup';
 import { locale, t, tn } from './i18n';
@@ -302,9 +302,10 @@ export async function openFluidFiles(ed: Editor) {
     if (!ready()) return void (note.textContent = notReady());
     const name = safeFileName(nameIn.value);
     nameIn.value = name;
+    const shown = suggestStoredName(name);
     note.textContent = t('Lade hoch …');
     const size = await uploadJob(ed, fs, name);
-    note.textContent = size === null ? t('Hochladen fehlgeschlagen, Details stehen im Laser-Fenster.') : t('{file} hochgeladen ({size}).', { file: name, size: fmtSize(size) });
+    note.textContent = size === null ? t('Hochladen fehlgeschlagen, Details stehen im Laser-Fenster.') : t('{file} hochgeladen ({size}).', { file: shown, size: fmtSize(size) });
     if (size !== null) await load();
   }
 

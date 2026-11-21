@@ -3,7 +3,7 @@
 // never enter the mapping, while perspective does, because the full-original
 // homography from resolveImageEdits is used in both directions.
 import type { CutSettings, ImageLayer, Node, Obj, Pt } from './model';
-import { defaultCutSettings } from './model';
+import { defaultCutSettings, defaultTabs } from './model';
 import { apply, inv, type Mat } from './mat';
 import { resolveImageContour, type ImageContour } from './imageContour';
 import { resolveImageEdits } from './imageEdits';
@@ -59,7 +59,9 @@ export function imageCutSettings(L: ImageLayer | undefined): ImageCut {
   delete d.mode;
   delete d.sub;
   delete d.look;
-  return { ...d, output: false, ...L?.cut } as ImageCut;
+  // Steg-Defaults tief zusammenführen: alte Projekte ohne neue Felder bekommen sinnvolle Werte
+  const cut = L?.cut as Partial<CutSettings> | undefined;
+  return { ...d, output: false, ...cut, tabs: { ...defaultTabs(), ...cut?.tabs } } as ImageCut;
 }
 
 /** World-mm cut polygon. Boundary uses the rounded visible contour; a linked contour

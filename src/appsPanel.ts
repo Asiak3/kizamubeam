@@ -8,7 +8,7 @@ import type { Editor } from './editor';
 import { h } from './dom';
 import { t, tn } from './i18n';
 import { dockWindow, isNewWindow, showWindow } from './dock';
-import { getAction } from './toolbars';
+import { getAction, isButtonAction } from './toolbars';
 import { AppGroup, appGroups, appList, fold, isNewIn, pushRecent, searchApps } from './apps';
 import { ensurePacks, onPacksChanged, packTemplates } from './packs';
 import { startFromTemplate } from './templateDialogs';
@@ -109,7 +109,7 @@ export function buildAppsPanel(ed: Editor) {
     .map((a): Tile => {
       const act = getAction(a.id)!;
       return {
-        key: a.id, group: a.group, name: a.name, desc: a.desc, icon: act.icon, isNew: isNewIn(a.since, APP_VERSION), text: '',
+        key: a.id, group: a.group, name: a.name, desc: a.desc, icon: isButtonAction(act) ? act.icon : undefined, isNew: isNewIn(a.since, APP_VERSION), text: '',
         run: () => {
           if (act.enabled && !act.enabled()) {
             hint(ed, a.group === 'image' ? t('„{name}“: erst ein Bild auswählen.', { name: a.name }) : t('„{name}“: erst passende Objekte auswählen.', { name: a.name }));

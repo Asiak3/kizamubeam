@@ -10,13 +10,13 @@ export const SETTINGS_KEYS = [
   'nest', 'joints', 'hinges', 'slots', 'qr', 'barcode', 'printcut', 'jigfill', 'focustest', 'materialtest', 'warp', 'calib', 'view3d',
   'workpieces', 'overlap-picker', 'rightPan', 'zoomInverted', 'rememberToolOptions', 'toolOptions',
   'selectAfterDraw', 'textDefaults', 'nudgeSteps', 'shortcuts', 'clickTolerance', 'snapTolerance', 'canvasDark', 'handleSize',
-  'crosshair', 'bedCenterCross', 'importAutoSelect', 'importCenterInBed', 'importSkippedNote', 'importAutoGroup', 'svgDpi', 'dxfFallbackUnit', 'canvasFilled', 'imageSmoothing', 'curveQuality', 'cutOrderApply', 'patternfill', 'uiTypography', 'electricityTariff', 'electricityCurrency',
+  'crosshair', 'bedCenterCross', 'importAutoSelect', 'importCenterInBed', 'importSkippedNote', 'importAutoGroup', 'svgDpi', 'dxfFallbackUnit', 'importCloseTolerance', 'importHiddenLayers', 'canvasFilled', 'imageSmoothing', 'curveQuality', 'cutOrderApply', 'patternfill', 'uiTypography', 'electricityTariff', 'electricityCurrency',
   'cutSelectedDefault', 'jobOriginDefault',
 ].map((k) => PRE + k);
 /** Schlüssel mit diesem Anfang zählen auch zu den Einstellungen (letzte Werte der Generatoren und der Werkzeuge aus Erweiterungen) */
 export const SETTINGS_PREFIXES = [PRE + 'gen.', PRE + 'tool.'];
 /** Oberfläche: Fenster, Leisten, Werkzeugkasten */
-export const UI_KEYS = ['layout', 'toolbars', 'objectsPanel', 'apps'].map((k) => PRE + k);
+export const UI_KEYS = ['layout', 'toolbars', 'objectsPanel', 'apps', 'groupedTabs', 'tabPages'].map((k) => PRE + k);
 export const CAMERA_KEYS = [PRE + 'camera'];
 /** Bereiche mit eigenem Speicherort */
 export const DEVICES_KEY = PRE + 'devices';

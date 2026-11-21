@@ -3,6 +3,8 @@ import { t } from './i18n';
 import { ContextAction, showEditorMenu, closeEditorMenu } from './contextMenu';
 import { RULER } from './editor/shared';
 import { defaultLayer, homeLayer, layerLabel } from './model';
+import { openGridDialog } from './gridDialog';
+import { guideContextGroups } from './guideDialog';
 import { selectAssembly } from './asmSelect';
 import { assignLayerAsk } from './layerAssign';
 import { EDIT_TITLE, runImageEdit } from './imageCropUi';
@@ -154,11 +156,54 @@ export function installEditorContext(ed: Editor, callbacks: ContextCallbacks) {
   ed.onCanvasContext = (event) => {
     if (document.querySelector('dialog[open]') || ed.drag || ed.draft || ed.pickHandler || ed.tool === 'sketch' || ed.tool === 'builder') return;
     const { sx, sy } = ed.evPt(event);
-    if (sx < RULER || sy < RULER) return;
+    if (sx < RULER || sy < RULER) {
+      // S6: Lineal-Rechtsklick öffnet das Linealmenü statt ins Leere zu laufen.
+      openEditorContextMenu(ed, event.clientX, event.clientY, rulerContextGroups(ed, sx, sy));
+      return;
+    }
     closeEditorMenu();
+    // S6-Follow-up: Rechtsklick auf eine Hilfslinie öffnet deren Menü (Position …/Löschen),
+    // ohne die Auswahl zu verändern; gesperrte/ausgeblendete Linien melden sich nicht.
+    const gi = ed.guideAt(sx, sy);
+    if (gi >= 0) {
+      openEditorContextMenu(ed, event.clientX, event.clientY, guideContextGroups(ed, gi));
+      return;
+    }
     const hit = ed.hitTest(ed.toWorld(sx, sy));
     if (hit && !ed.sel.includes(hit)) ed.setSel([hit]);
     if (ed.tool === 'node') ed.updateNodeHover(sx, sy);
     openEditorContextMenu(ed, event.clientX, event.clientY, editorContextGroups(ed, callbacks, !hit));
   };
+}
+
+/** S6: Lineal-Kontextmenü — Raster/Fang plus Hilfslinien; kein neuer Nullpunkt-Mechanismus. */
+export function rulerContextGroups(ed: Editor, sx: number, sy: number): ContextAction[][] {
+  const action = (id: string, label: string, run: ContextAction['run'], enabled = true, checked?: boolean): ContextAction =>
+    ({ id, label, run, enabled, checked });
+  const grid: ContextAction[] = [
+    action('ruler-grid-show', t('Gitter anzeigen'), () => ed.setGrid({ show: !ed.grid.show }), true, ed.grid.show),
+    action('ruler-grid-settings', t('Gitter einstellen …'), () => openGridDialog(ed)),
+    action('ruler-snap-grid', t('Raster'), () => ed.setSnap({ grid: !ed.snapGrid }), true, ed.snapGrid),
+    action('ruler-snap-objects', t('Fang'), () => ed.setSnap({ objects: !ed.snapObjects }), true, ed.snapObjects),
+  ];
+  const guides: ContextAction[] = [
+    action('ruler-guides-show', t('Hilfslinien anzeigen'), () => ed.setGuideLayer({ hidden: ed.guidesShown() }), true, ed.guidesShown()),
+    action('ruler-guides-lock', t('Hilfslinien sperren'), () => ed.setGuideLayer({ locked: !ed.doc.guidesLocked }), true, !!ed.doc.guidesLocked),
+  ];
+  const onTop = sy < RULER && sx >= RULER;
+  const onLeft = sx < RULER && sy >= RULER;
+  if (onTop || onLeft) {
+    const axis = onTop ? 'x' : 'y';
+    const label = onTop ? t('Senkrechte Hilfslinie hier hinzufügen') : t('Waagrechte Hilfslinie hier hinzufügen');
+    guides.push(action('ruler-guide-add', label, () => {
+      const v = axis === 'x' ? ed.toWorld(sx, sy).x : ed.toWorld(sx, sy).y;
+      ed.snapshot(t('Hilfslinie'));
+      ed.pushGuide({ axis, v });
+      ed.emit('doc');
+    }));
+  }
+  if (ed.guideList().length) {
+    guides.push(action('ruler-guides-clear', t('Alle Hilfslinien löschen (rückgängig machbar)'), () => ed.clearGuides()));
+  }
+  return [grid, guides];
 }

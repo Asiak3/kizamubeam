@@ -1,9 +1,9 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, effOrderOf, flattenSub, isManualOrder, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, fireLines, frameGCode, gcodeFooter, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, OrderOpts, Rotary, rotaryMoves, rotaryTestLines, sameMoves, sharpestCorner, startHere, writeGCode, zJogLines } from '../src/gcode';
+import { buildJob, burns, dwellLines, effOrderOf, flattenSub, isManualOrder, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, fireLines, frameGCode, gcodeFooter, gcodeInserts, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, OrderOpts, Rotary, rotaryMoves, rotaryTestLines, sameMoves, sharpestCorner, startHere, writeGCode, zJogLines, addTabs, perforate, cutPath, Poly } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
-import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj } from '../src/model';
+import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj, defaultTabs, defaultLead } from '../src/model';
 import { dedupPolys } from '../src/dedup';
 
 let failed = 0;
@@ -1433,8 +1433,290 @@ await test('Ruida: Nullpunkt-Ecken, relative Referenz (current/user) und Magic 0
   assert.ok(Math.abs(dec.layers.get(0)!.minPower - 50) < 0.2);
 });
 
+// Layer-Review-Befunde (#153-Follow-up): Regressionstests für P1/P2
+await test('Anstechleistung bleibt nicht modal stehen', () => {
+  const d = newDevice({ fw: 'grbl' });
+  const mv = new Moves(0, 0);
+  mv.push(10, 0, 0, 0, 1, MOVE_TRAVEL);
+  mv.push(20, 0, 1000, 0.5, 1, MOVE_CUT);
+  mv.dwell[1] = 0.2; mv.dwellS[1] = 0.8;
+  mv.push(20, 10, 1000, 0.5, 1, MOVE_CUT);
+  mv.push(30, 10, 1000, 0, 1, MOVE_CUT);
+  const lines = writeGCode(jobOf(mv), d, estimate(mv, d)).lines;
+  const at = (l: string) => lines.indexOf(l);
+  assert.ok(at('M3 S800') > 0 && at('M4') === at('M3 S800') + 2);
+  const after = lines.slice(at('M4') + 1).join('\n');
+  assert.match(after, / S500\b/, 'Schnitt nach Anstechen meldet S500 erneut');
+  assert.match(after, / S0\b/, 'beabsichtigte S0-Bewegung meldet S0');
+});
+
+await test('Marlin: Anstechen kehrt in den Inline-Modus zurück', () => {
+  assert.deepEqual(dwellLines(0.2, 0.8, newDevice({ fw: 'marlin' })), ['M3 S204', 'G4 P200', 'M3 I S0']);
+});
+
+await test('absurde Stegzahlen terminieren', () => {
+  const sq: Poly = { pts: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], closed: true };
+  const huge = addTabs(sq, { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: 1, minTabs: 1e100 });
+  assert.ok(huge.pts.length > 0, 'terminiert trotz minTabs 1e100');
+  assert.equal(addTabs(sq, { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: NaN }), sq, 'NaN-Anzahl lässt Form unverändert');
+});
+
+await test('Perforationslücke bleibt über Steg laserlos', () => {
+  const sq: Poly = { pts: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], closed: true, off: Uint8Array.from([2, 2, 2, 2]) };
+  const perf = perforate(sq, { enabled: true, on: 1, off: 1 });
+  const off = [...(perf.off ?? [])];
+  assert.ok(off.includes(1), 'Lücken vorhanden');
+  assert.ok(off.includes(2), 'Stege bleiben in Schnittphasen');
+  // Nur stromlose Endsegmente werden gekappt; interne Lücken bleiben im Schnittweg.
+  const cut = cutPath(perf, null, false);
+  assert.ok(cut.pts.length < perf.pts.length, 'stromlose Endsegmente gekappt');
+  assert.ok(cut.pts.length > 0, 'Schnittphasen bleiben übrig');
+});
+
+for (const ramp of [false, true]) for (const optTravel of [false, true]) {
+  await test(`Perforation + powered tab: modal output, ramp=${ramp}, travel=${optTravel}`, async () => {
+    const d = newDevice({ fw: 'grbl', startFrom: 'absolute', returnHome: false, optInnerFirst: false, optTravel });
+    const job = await cutJob([square(100, 100, 20)], {
+      power: 100, minPower: 20,
+      tabs: { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: 1, tabPower: 50 },
+      perf: { enabled: true, on: 1, off: 1 },
+      ramp: { enabled: ramp, length: 1, angle: 45, ends: true },
+    }, d);
+    let x = job.moves.x0, y = job.moves.y0, s = 0, mode = -1, distance = 0, gaps = 0, tab = 0;
+    for (const line of writeGCode(job, d, estimate(job.moves, d)).lines) {
+      if (line.startsWith(';')) continue;
+      const words = new Map([...line.matchAll(/([A-Z])(-?\d+(?:\.\d+)?)/g)].map((m) => [m[1], Number(m[2])]));
+      if (words.has('S')) s = words.get('S')!;
+      if (words.has('G')) mode = words.get('G')!;
+      if (!words.has('X') && !words.has('Y')) continue;
+      const nx = words.get('X') ?? x, ny = words.get('Y') ?? y;
+      const length = Math.hypot(nx - x, ny - y);
+      if (mode === 1 && length > 0) {
+        assert.ok(length <= 1 + 1e-6, 'segments respect perforation boundaries');
+        const mid = distance + length / 2;
+        if (Math.floor(mid) % 2 === 1) {
+          assert.equal(s, 0, `gap at contour distance ${mid}`);
+          gaps++;
+        } else if (Math.abs((y + ny) / 2 - 280) < 1e-6 && (x + nx) / 2 > 119.75 && (x + nx) / 2 < 120) {
+          assert.equal(s, 500, 'powered half-tab retains reduced modal power');
+          tab += length;
+        } else assert.ok(s > 0, `cut at contour distance ${mid}`);
+        distance += length;
+      }
+      x = nx; y = ny;
+    }
+    assert.equal(gaps, 40);
+    assert.ok(Math.abs(tab - 0.25) < 1e-6, `powered overlapping half-tab: ${tab}`);
+    assert.ok(Math.abs(distance - 79) < 1e-6, 'only trailing 1 mm gap trimmed');
+  });
+}
+
+for (const returnHome of [false, true]) {
+  await test(`End pause precedes pass Z and return-home Z: returnHome=${returnHome}`, async () => {
+    const d = newDevice({ fw: 'grbl', zAxis: true, startFrom: 'absolute', returnHome });
+    const job = await cutJob([square(100, 100, 20)], {
+      passes: 2, zOffset: 1, zStep: 0.5,
+      dwell: { start: 200, end: 300, cutThrough: true, power: 70 },
+    }, d);
+    const lines = writeGCode(job, d, estimate(job.moves, d)).lines;
+    const inserts = gcodeInserts(job.moves, d);
+    for (const [at, ls] of inserts) if (ls[0] === 'G4 P0.3') {
+      const shared = inserts.filter(([i]) => i === at).flatMap(([, lines]) => lines);
+      assert.equal(shared[0], 'G4 P0.3', 'native params: outgoing pause first at shared move index');
+      assert.equal(shared[1], 'G91', 'native params: Z follows outgoing pause');
+    }
+    const pauses = lines.flatMap((l, i) => l === 'G4 P0.3' ? [i] : []);
+    assert.equal(pauses.length, 2);
+    for (const i of pauses) assert.equal(lines[i + 1], 'G91', 'outgoing pause before Z change/reset');
+    const pierces = lines.flatMap((l, i) => l === 'M3 S700' ? [i] : []);
+    assert.equal(pierces.length, 2, 'each pass has one incoming pierce');
+    for (const [pass, i] of pierces.entries()) {
+      assert.equal(lines[i + 1], 'G4 P0.2');
+      assert.equal(lines.slice(0, i).reverse().find((l) => /^G0 Z/.test(l)), pass === 0 ? 'G0 Z-1' : 'G0 Z-0.5', 'incoming pause after this pass Z change');
+      assert.match(lines[i - 1], /^G0 |^G90$/, 'incoming pause after approach (or Z when approach has zero length)');
+    }
+    if (returnHome) assert.match(lines[pauses[1] + 4], /^G0 /, 'return-home after pause and Z reset');
+  });
+}
+
+await test('Outgoing pause phase survives growth, rotary and Start Here; comparison detects it', () => {
+  const mv = new Moves(10, 20);
+  for (let i = 0; i < 1024; i++) mv.push(10 + i, 20, 1000, 0.5, 1);
+  mv.dwellTrailing = { sec: 0.3, s: 0 };
+  mv.zCur = 0.5;
+  mv.push(1040, 30, 0, 0, 1);
+  assert.equal(mv.dwellOutgoing[1024], 1, 'outgoing marker after capacity growth');
+  const d = rotDev({});
+  const rotated = rotaryMoves(mv, d, jobOf(mv).bounds).mv;
+  const resumed = startHere(rotated, 1023, 0.5);
+  assert.equal(resumed.dwellOutgoing[resumed.n - 1], 1);
+  assert.deepEqual(gcodeInserts(resumed, d).filter(([i]) => i === resumed.n - 1).map(([, , origin]) => origin), ['dwell', 'z']);
+  assert.equal(startHere(rotated, 1024, 0.5).dwellOutgoing[0], 0, 'resume drops already-passed outgoing pause');
+  const copy = rotaryMoves(mv, d, jobOf(mv).bounds).mv;
+  assert.ok(sameMoves(rotated, copy, { x: 0, y: 0 }));
+  copy.dwellOutgoing[copy.n - 1] = 0;
+  assert.ok(!sameMoves(rotated, copy, { x: 0, y: 0 }), 'pause phase changes machine output');
+  const incoming = new Moves();
+  incoming.zCur = 1;
+  incoming.push(10, 10, 1000, 0.5, 1);
+  incoming.dwell[0] = 0.2; incoming.dwellS[0] = 0.7;
+  assert.deepEqual(gcodeInserts(incoming, d).map(([, , origin]) => origin), ['z', 'dwell'], 'incoming pierce stays after shared-index Z');
+});
+
+await test('bestromter End-Steg bleibt stehen, stromloser fällt', () => {
+  const pts = [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }];
+  const p: Poly = { pts, closed: true, off: Uint8Array.from([0, 0, 0, 2]) };
+  assert.equal(cutPath(p, null, true).pts.length, 5, 'bestromter Steg bleibt');
+  assert.equal(cutPath(p, null, false).pts.length, 4, 'stromloser Steg fällt');
+});
+
+await test('NaN-Stegleistung erzeugt kein SNaN', async () => {
+  const objs: Obj[] = [{ id: 1, m: [1, 0, 0, 1, 100, 100], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } }];
+  const doc = loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} });
+  const device = newDevice({ fw: 'grbl' });
+  const base = { doc, imgLayer: () => defaultImageLayer(), device };
+  const tabs = { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: 1, tabPower: NaN };
+  const job = await buildJob({ ...base, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, tabs }) });
+  assert.ok(!writeGCode(job, device, estimate(job.moves, device)).lines.some((l) => l.includes('NaN')));
+});
+
+await test('Drehachse erhält die End-Pause', () => {
+  const d = rotDev({});
+  const mv = sampleMoves();
+  mv.dwellTrailing = { sec: 0.3, s: 0 };
+  assert.deepEqual(rotaryMoves(mv, d, jobOf(mv).bounds).mv.dwellTrailing, { sec: 0.3, s: 0 });
+});
+
+await test('Fortsetzen behält die End-Pause der Restbahn', () => {
+  const mv = sampleMoves();
+  mv.dwellTrailing = { sec: 0.3, s: 0 };
+  assert.deepEqual(startHere(mv, 1, 0.5).dwellTrailing, { sec: 0.3, s: 0 });
+});
+
+await test('Vergleich erkennt Pausenänderungen', () => {
+  const a = sampleMoves(), b = sampleMoves();
+  assert.ok(sameMoves(a, b, { x: 0, y: 0 }));
+  b.dwell[1] = 0.5;
+  assert.ok(!sameMoves(a, b, { x: 0, y: 0 }), 'Pausenunterschied');
+  const c = sampleMoves(), e = sampleMoves();
+  e.dwellTrailing = { sec: 1, s: 0 };
+  assert.ok(!sameMoves(c, e, { x: 0, y: 0 }), 'End-Pausenunterschied');
+});
+
+await test('End-Pause steht vor der Z-Rückstellung', () => {
+  const d = newDevice({ fw: 'grbl' });
+  const mv = sampleMoves();
+  mv.z[mv.n - 1] = 0.5;
+  mv.dwellTrailing = { sec: 1, s: 0 };
+  const lines = writeGCode(jobOf(mv), d, estimate(mv, d)).lines;
+  assert.ok(lines.indexOf('G4 P1') < lines.lastIndexOf('G91'), 'Pause vor Z-Rückstellung');
+});
+
+// Phase 2/3 (#153-Plan): Tab-Automatik (Max/Min/Leistung) + Lead-Vorzeichen
+await test('Pausen: G4 pro Firmware, Anstechen nur mit Strahl', () => {
+  const grbl = newDevice({ fw: 'grbl' });
+  assert.deepEqual(dwellLines(0.5, 0, grbl), ['G4 P0.5']);
+  assert.deepEqual(dwellLines(0.2, 0.8, grbl), ['M3 S800', 'G4 P0.2', 'M4']);
+  assert.deepEqual(dwellLines(0.2, 0, { ...grbl, fw: 'marlin' }), ['G4 P200']);
+  assert.deepEqual(dwellLines(0.2, 0.8, { ...grbl, fw: 'smoothie' }), ['G4 P0.2']);
+  assert.deepEqual(dwellLines(0, 0.8, grbl), []);
+});
+
+await test('Pausen aus Markierungen stehen vor der Bewegung bzw. am Jobende', () => {
+  const mv = sampleMoves();
+  mv.dwell[1] = 0.5;
+  mv.dwell[3] = 0.25;
+  mv.dwellTrailing = { sec: 1, s: 0 };
+  const g = writeGCode(jobOf(mv), newDevice({ fw: 'grbl' }), estimate(mv, newDevice({ fw: 'grbl' })));
+  const at = (l: string) => g.lines.indexOf(l);
+  assert.ok(at('G4 P0.5') > 0 && at('G4 P0.5') < at('G1 X20 S500 F1000'));
+  assert.ok(at('G4 P0.25') > at('Y10') && at('G4 P0.25') < at('G0 X0 Y0'));
+  assert.deepEqual(g.lines.slice(-3, -2), ['G4 P1']);
+  assert.ok(g.origins[g.lines.indexOf('G4 P0.5')] === 'dwell');
+});
+
+await test('Start-/End-Pause je Schnitt, Legacy ohne Pause unverändert', async () => {
+  const objs: Obj[] = [{ id: 1, m: [1, 0, 0, 1, 100, 100], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } }];
+  const doc = loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} });
+  const device = newDevice({ fw: 'grbl' });
+  const base = { doc, imgLayer: () => defaultImageLayer(), device };
+  const plainJob = await buildJob({ ...base, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const }) });
+  const plain = writeGCode(plainJob, device, estimate(plainJob.moves, device)).lines;
+  assert.ok(!plain.some((l) => l.startsWith('G4') || l.startsWith('M3 S')));
+  const job = await buildJob({ ...base, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, dwell: { start: 200, end: 300, cutThrough: true, power: 50 } }) });
+  const lines = writeGCode(job, device, estimate(job.moves, device)).lines;
+  const at = (l: string) => lines.indexOf(l);
+  assert.ok(at('M3 S500') > 0 && at('G4 P0.2') === at('M3 S500') + 1 && at('M4') === at('M3 S500') + 2);
+  assert.ok(lines.includes('G4 P0.3'));
+  assert.equal(lines.filter((l) => l === 'M3 S500').length, 1, 'nur die Start-Anstechung feuert den Strahl');
+  assert.ok(!lines[at('G4 P0.3') - 1].startsWith('M3'), 'End-Pause ohne Strahl');
+});
+
+await test('Pausendauer: Import-/API-Werte bleiben endlich und innerhalb der UI-Grenzen', async () => {
+  const objs: Obj[] = [1, 2].map((id) => ({ id, m: [1, 0, 0, 1, id * 60, 100], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } }));
+  const doc = loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} });
+  const device = newDevice({ fw: 'grbl', returnHome: false });
+  for (const duration of [NaN, Infinity, -Infinity, -1, 1e100]) {
+    const expected = Number.isFinite(duration) ? Math.min(60000, Math.max(0, duration)) / 1000 : 0;
+    const job = await buildJob({ doc, device, imgLayer: () => defaultImageLayer(), layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, dwell: { start: duration, end: duration, cutThrough: true, power: 50 } }) });
+    const mv = job.moves;
+    assert.ok([...mv.dwell.subarray(0, mv.n)].every((v) => Number.isFinite(v) && v <= 60));
+    assert.equal(mv.dwellTrailing?.sec ?? 0, expected);
+    const lines = writeGCode(job, device, estimate(mv, device)).lines;
+    const nativeInserts = gcodeInserts(mv, device).flatMap(([, ls]) => ls);
+    for (const ls of [lines, nativeInserts]) {
+      assert.ok(!ls.some((l) => /NaN|Infinity/.test(l)), `invalid duration ${duration}`);
+      assert.equal(ls.some((l) => l.startsWith('G4')), expected > 0);
+    }
+  }
+  for (const duration of [NaN, Infinity, -Infinity]) assert.deepEqual(dwellLines(duration, 0.5, device), []);
+  assert.deepEqual(dwellLines(1e100, 0, device), ['G4 P60']);
+});
+
+await test('Tabs: max klemmt, min hebt, Passform bleibt Herr', () => {
+  const sq: Poly = { pts: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], closed: true };
+  // Stege zählen als zusammenhängende 2er-Blöcke (ein Steg an der Ecke belegt zwei Kanten)
+  const runs = (p: Poly) => [...(p.off ?? [])].reduce((n, o, i, a) => n + (o === 2 && a[i - 1] !== 2 ? 1 : 0), 0);
+  assert.equal(runs(addTabs(sq, { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: 4 })), 4);
+  assert.equal(runs(addTabs(sq, { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: 4, maxTabs: 2 })), 2);
+  assert.equal(runs(addTabs(sq, { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: 1, minTabs: 3 })), 3);
+  // Passform-Regel schlägt alles: 4-mm-Umfang mit 0,5-mm-Steg trägt weniger als die geforderten 4
+  const tiny: Poly = { pts: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], closed: true };
+  const fit = addTabs(tiny, { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: 4, minTabs: 4 });
+  assert.ok(!fit.off || runs(fit) < 4);
+});
+
+await test('Tabs: Stegleistung schneidet reduziert, Legacy bleibt dunkel', async () => {
+  const objs: Obj[] = [{ id: 1, m: [1, 0, 0, 1, 100, 100], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } }];
+  const doc = loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} });
+  const device = newDevice({ fw: 'grbl' });
+  const base = { doc, imgLayer: () => defaultImageLayer(), device };
+  const tabs = { ...defaultTabs(), enabled: true, size: 0.5, useCount: true, count: 1, tabPower: 50 };
+  const job = await buildJob({ ...base, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, speed: 600, power: 100, tabs }) });
+  const lines = writeGCode(job, device, estimate(job.moves, device)).lines;
+  // modales G-Code: G1/S/F entfallen bei Wiederholung — S500 (halbe Leistung) kommt nur vom Steg
+  assert.ok(lines.some((l) => / S500\b/.test(l)), 'Stegstrecke mit halber Leistung');
+  const job0 = await buildJob({ ...base, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, speed: 600, power: 100, tabs: { ...tabs, tabPower: 0 } }) });
+  const lines0 = writeGCode(job0, device, estimate(job0.moves, device)).lines;
+  assert.ok(!lines0.some((l) => / S500\b/.test(l)), 'ohne Stegleistung kein reduzierter Schnitt');
+});
+
+await test('Lead: negativer Winkel spiegelt auf die Materialseite', () => {
+  const sq: Poly = { pts: [{ x: 0, y: 0 }, { x: 20, y: 0 }, { x: 20, y: 20 }, { x: 0, y: 20 }], closed: true };
+  const entry = (angle: number) => normalizeLayer({ ...defaultLayer(1), mode: 'line', lead: { ...defaultLead(), leadIn: true, leadOut: false, length: 5, angle, arc: false, overcut: 0 } });
+  const plus = leadMarks([[sq]], entry(90), 400);
+  const minus = leadMarks([[sq]], entry(-90), 400);
+  assert.equal(plus.length, minus.length);
+  assert.ok(plus.length > 0);
+  for (let i = 0; i < plus.length; i++) {
+    assert.equal(plus[i].pts.length, minus[i].pts.length);
+    // Ansatzpunkt auf der Kontur ist identisch, die freie Spitze liegt auf der anderen Seite
+    const a = plus[i].pts[0], b = minus[i].pts[0];
+    assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > 1e-6, 'gespiegelte Seite');
+  }
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);
 }
-

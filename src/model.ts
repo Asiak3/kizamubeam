@@ -429,6 +429,12 @@ export interface TabSettings {
   spacing: number;
   /** Formen, die in anderen Formen liegen (Löcher), bekommen keine Stege */
   skipInner: boolean;
+  /** Begrenzung der Stege je Form (0 = unbegrenzt) */
+  maxTabs: number;
+  /** Mindestzahl der Stege je Form (Passform-Regel gewinnt bei zu kleinen Formen) */
+  minTabs: number;
+  /** Leistung auf den Stegen in % (0 = Laser aus wie bisher, darüber reduzierter Schnitt) */
+  tabPower: number;
 }
 
 /**
@@ -467,6 +473,8 @@ export interface CutSettings {
   lead: LeadSettings;
   /** Nur Linie: Leistung in Ecken auf Min. Leistung absenken */
   ramp: RampSettings;
+  /** Nur Linie: Pausen am Anfang/Ende jedes Schnitts */
+  dwell: DwellSettings;
   /** Nur Linie: doppelte/überlappende Schnittlinien beim Export nur einmal schneiden (opt-in pro Bearbeitung) */
   dedup: boolean;
   /** Nur Linie: Abstand in mm, unter dem Linien als deckungsgleich gelten (wie in der Konstruktionsprüfung) */
@@ -496,7 +504,7 @@ export interface LeadSettings {
   leadOut: boolean;
   /** Länge von Anschnitt und Auslauf in mm */
   length: number;
-  /** Gerade: Winkel zur Kontur in Grad (90 = senkrecht); Bogen: Bogenwinkel */
+  /** Gerade: Winkel zur Kontur in Grad (90 = senkrecht); Vorzeichen = Seite (+ Abfallseite, − Gegenseite); Bogen: Bogenwinkel */
   angle: number;
   /** Bogen statt Gerade */
   arc: boolean;
@@ -514,12 +522,24 @@ export interface RampSettings {
   ends: boolean;
 }
 
+/** Nur Linie: Pausen am Anfang/Ende jedes Schnitts (Beruhigung, Absaugung, Anstechen) */
+export interface DwellSettings {
+  /** Pause in ms vor dem Schnitt (Anfahrberuhigung, Absaugung anlaufen lassen) */
+  start: number;
+  /** Pause in ms nach dem Schnitt */
+  end: number;
+  /** Strahl während der Startpause an (Anstechen dicker Materialien) */
+  cutThrough: boolean;
+  /** Leistung in % während Cut-Through */
+  power: number;
+}
+
 /** Sub-Layer: eigene Bearbeitung derselben Formen; Air Assist und Aussehen gelten vom Layer */
 export type SubLayer = Omit<CutSettings, 'air' | 'look' | 'sub'> & { output: boolean; name: string };
 
 export const CUT_KEYS: (keyof CutSettings)[] = [
   'mode', 'speed', 'power', 'minPower', 'passes', 'air', 'kerf', 'tabs', 'fillStyle', 'interval', 'angle', 'crossHatch', 'bidirectional', 'overscan',
-  'perf', 'lead', 'ramp', 'dedup', 'dedupTol', 'zOffset', 'zStep', 'sub', 'look',
+  'perf', 'lead', 'ramp', 'dwell', 'dedup', 'dedupTol', 'zOffset', 'zStep', 'sub', 'look',
 ];
 
 /** Felder eines Sub-Layers (alles außer Air Assist, Aussehen und weiteren Sub-Layern) */
@@ -528,6 +548,7 @@ const SUB_KEYS = CUT_KEYS.filter((k) => k !== 'air' && k !== 'look' && k !== 'su
 export const defaultPerf = (): PerfSettings => ({ enabled: false, on: 1, off: 1 });
 export const defaultLead = (): LeadSettings => ({ leadIn: false, leadOut: false, length: 2, angle: 90, arc: false, overcut: 0 });
 export const defaultRamp = (): RampSettings => ({ enabled: false, length: 1, angle: 45, ends: false });
+export const defaultDwell = (): DwellSettings => ({ start: 0, end: 0, cutThrough: false, power: 0 });
 
 export function defaultSubLayer(mode: LayerMode = 'line'): SubLayer {
   const d = defaultCutSettings(mode) as Partial<CutSettings>;
@@ -545,15 +566,16 @@ function normalizeSub(s: SubLayer): SubLayer {
   return s;
 }
 
-function fillNested(s: Pick<CutSettings, 'tabs' | 'perf' | 'lead' | 'ramp'>) {
+function fillNested(s: Pick<CutSettings, 'tabs' | 'perf' | 'lead' | 'ramp' | 'dwell'>) {
   s.tabs = { ...defaultTabs(), ...s.tabs };
   s.perf = { ...defaultPerf(), ...s.perf };
   s.lead = { ...defaultLead(), ...s.lead };
   s.ramp = { ...defaultRamp(), ...s.ramp };
+  s.dwell = { ...defaultDwell(), ...s.dwell };
 }
 
 export function defaultTabs(): TabSettings {
-  return { enabled: false, size: 0.5, useCount: true, count: 4, spacing: 50, skipInner: true };
+  return { enabled: false, size: 0.5, useCount: true, count: 4, spacing: 50, skipInner: true, maxTabs: 0, minTabs: 1, tabPower: 0 };
 }
 
 export function defaultCutSettings(mode: LayerMode = 'line'): CutSettings {
@@ -575,6 +597,7 @@ export function defaultCutSettings(mode: LayerMode = 'line'): CutSettings {
     perf: defaultPerf(),
     lead: defaultLead(),
     ramp: defaultRamp(),
+    dwell: defaultDwell(),
     dedup: false,
     dedupTol: 0.05,
     zOffset: 0,
@@ -609,7 +632,7 @@ export const isCutLayer = (L: Layer) => L.mode === 'line' || !!L.sub?.some((s) =
 
 /** Ältere Dateien kennen nicht alle Einstellungen: fehlende mit Standardwerten auffüllen */
 export function normalizeLayer(L: Layer): Layer {
-  if (L.tabs && L.fillStyle !== undefined && L.ramp && L.dedup !== undefined && L.dedupTol !== undefined && L.zStep !== undefined && (!L.sub || L.sub.every((s) => s.ramp && s.dedup !== undefined && s.dedupTol !== undefined && s.output !== undefined && s.name !== undefined))) return L;
+  if (L.tabs && L.fillStyle !== undefined && L.ramp && L.dwell && L.dedup !== undefined && L.dedupTol !== undefined && L.zStep !== undefined && (!L.sub || L.sub.every((s) => s.ramp && s.dwell && s.dedup !== undefined && s.dedupTol !== undefined && s.output !== undefined && s.name !== undefined))) return L;
   return normalizeCut(L);
 }
 
