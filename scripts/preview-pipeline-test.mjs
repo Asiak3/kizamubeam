@@ -3,7 +3,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
-const source = new URL('../src/', import.meta.url).pathname;
+import { fileURLToPath } from 'node:url';
+// fileURLToPath, not .pathname: on Windows .pathname gives /E:/… which esbuild cannot resolve
+const source = fileURLToPath(new URL('../src/', import.meta.url));
 const observers = [];
 const forbidden = [];
 const deny = (name) => () => { forbidden.push(name); throw Error(`Forbidden offline operation: ${name}`); };
@@ -94,10 +96,10 @@ let estData = { total: 10, t: [1, 5, 6, 10], cutLength: 80, rapidLength: 0 };
 const immutable = JSON.stringify({ job, device, doc: ed.doc });
 const mocks = { h, setIcon() {}, t: (s) => s, dec: (s) => s, locale: 'en', loadDevices: () => ({ devices: [device] }),
   MOVE_TRAVEL: 0, MOVE_ENGRAVE: 1, MOVE_CUT: 2,
-  buildJob: async () => job, estimate: () => estData,
+  buildJob: async () => job, estimate: () => estData, effOrderOf: () => ({}),
   rotaryOn: () => false, formatDuration: String, energyDraft: () => ({}), estimateEnergy: () => ({}),
   electricityTariffText: () => '', parseEnergyNumber: () => null, energyPreview: () => h('section'),
-  machine: { connected: false, status: {}, on: () => () => {}, send: deny('machine.send'), connect: deny('machine.connect') },
+  machine: { connected: false, status: {}, fire: { locked: false }, on: () => () => {}, send: deny('machine.send'), connect: deny('machine.connect') },
   native: new Proxy({}, { get: (_, name) => deny(`native.${String(name)}`) }), saveText: deny('saveText') };
 globalThis.__previewMocks = mocks;
 const laser = readFileSync(source + 'laser.ts', 'utf8');

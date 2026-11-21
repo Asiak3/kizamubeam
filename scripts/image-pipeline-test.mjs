@@ -7,7 +7,7 @@ const result = await build({
   bundle: true, write: false, platform: 'node', format: 'esm', logLevel: 'error',
   loader: { '.woff': 'empty', '.woff2': 'empty' },
   plugins: [{ name: 'native-test-boundary', setup(b) {
-    b.onLoad({ filter: /\/src\/native\.ts$/ }, () => ({ contents: `
+    b.onLoad({ filter: /[\\/]src[\\/]native\.ts$/ }, () => ({ contents: `
       export const hasNative = () => globalThis.pipelineNative;
       export const native = async (name, ...args) => {
         globalThis.pipelineNativeCalls.push(name);

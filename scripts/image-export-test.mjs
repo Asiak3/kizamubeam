@@ -5,8 +5,8 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 // Export tests exercise the real files.ts pipeline; only unrelated/native and
 // DOM-heavy leaf modules are stubbed so the bundle runs headless in Node.
 const stubs = [
-  [/\/src\/native\.ts$/, 'export const hasNative=()=>false;export const native=async()=>{throw Error("native")};'],
-  [/\/src\/vecexport\.ts$/, `
+  [/[\\/]src[\\/]native\.ts$/, 'export const hasNative=()=>false;export const native=async()=>{throw Error("native")};'],
+  [/[\\/]src[\\/]vecexport\.ts$/, `
     export function buildPdf(pages, opts) {
       globalThis.__pdfPages = pages; globalThis.__pdfOpts = opts;
       return new Uint8Array([37, 80, 68, 70]);

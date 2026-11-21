@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
+import { fileURLToPath } from 'node:url';
 
 const laser = readFileSync(new URL('../src/laser.ts', import.meta.url), 'utf8');
 assert.match(laser, /class: 'preview-dialog'[\s\S]*?'data-dialog-resize': 'true'/,
@@ -33,7 +34,7 @@ globalThis.ResizeObserver = class {
   observe() {}
   disconnect() { this.disconnected = true; }
 };
-const bundle = await build({ entryPoints: [new URL('../src/previewLayout.ts', import.meta.url).pathname], bundle: true, write: false, format: 'esm' });
+const bundle = await build({ entryPoints: [fileURLToPath(new URL('../src/previewLayout.ts', import.meta.url))], bundle: true, write: false, format: 'esm' });
 const { previewSplitter } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`);
 const main = new Element(); main.clientWidth = 1000;
 const side = new Element(420);
