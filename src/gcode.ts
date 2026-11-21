@@ -481,11 +481,15 @@ export function rotaryMoves(mv: Moves, d: Device, box: Box | null = null, t?: Fl
     py = mv.y0,
     pa = out.y0,
     pt = 0;
-  const emit = (x: number, y: number, a: number, f: number, s: number, layer: number, cls: number, sub = -1) => {
+  const emit = (x: number, y: number, a: number, f: number, s: number, layer: number, cls: number, sub = -1, dw = 0, dws = 0, outgoing = 0) => {
     const dx = x - px,
       l = Math.hypot(dx, y - py);
     if (f > 0 && l > 1e-9) f = Math.max(1, Math.round((f * Math.hypot(dx, a - pa)) / l));
     out.push(x, a, f, s, layer, cls, sub);
+    // Pausen sitzen nur auf Eilgang-Bewegungen (nie aufgespalten); beim Aufspalten trägt das erste Stück.
+    out.dwell[out.n - 1] = dw;
+    out.dwellS[out.n - 1] = dws;
+    out.dwellOutgoing[out.n - 1] = outgoing;
     px = x;
     py = y;
     pa = a;
@@ -518,15 +522,20 @@ export function rotaryMoves(mv: Moves, d: Device, box: Box | null = null, t?: Fl
       }
     }
     out.zCur = mv.z[i];
+    // Beim Aufspalten (nur f > 0) trägt das erste Teilstück die Pause; Eilgang wird nie aufgespalten.
+    let carried = false;
     for (let j = 1; j <= n; j++) {
       const u = j / n,
         qx = sx + (x - sx) * u,
         qy = sy + (y - sy) * u;
-      emit(qx, qy, map(qx, qy), mv.f[i], mv.s[i], mv.layer[i], mv.cls ? mv.cls[i] : MOVE_TRAVEL, mv.sub ? mv.sub[i] : -1);
+      emit(qx, qy, map(qx, qy), mv.f[i], mv.s[i], mv.layer[i], mv.cls ? mv.cls[i] : MOVE_TRAVEL, mv.sub ? mv.sub[i] : -1, carried ? 0 : mv.dwell[i], carried ? 0 : mv.dwellS[i], carried ? 0 : mv.dwellOutgoing[i]);
+      carried = true;
       tt.push(pt + (ti - pt) * u);
     }
     pt = ti;
   }
+  // Die End-Pause gehört ans Jobende, nicht an eine Koordinate: Transformation erhält sie
+  out.dwellTrailing = mv.dwellTrailing;
   return { mv: out, t: t ? Float64Array.from(tt) : undefined };
 }
 
@@ -590,6 +599,14 @@ export class Moves {
   z = new Float32Array(1024);
   /** Z-Versatz für die folgenden push-Aufrufe */
   zCur = 0;
+  /** Pause in s vor dieser Bewegung (Start-/End-Pause je Schnitt, nur Linie); 0 = keine */
+  dwell = new Float32Array(1024);
+  /** Strahlleistung 0 … 1 während der Pause (Cut-Through-Anstechen); 0 = Strahl aus */
+  dwellS = new Float32Array(1024);
+  /** End-Pause der vorherigen Kontur: vor dem Z-Wechsel, anders als eine Start-/Anstechpause. */
+  dwellOutgoing = new Uint8Array(1024);
+  /** End-Pause der zuletzt fertiggestellten Kontur (s, Leistung): hängt an der nächsten Bewegung bzw. ans Jobende */
+  dwellTrailing: { sec: number; s: number } | null = null;
   constructor(public x0 = 0, public y0 = 0) {}
   push(x: number, y: number, f: number, s: number, layer: number, cls = MOVE_TRAVEL, sub = -1) {
     if (this.n === this.x.length) {
@@ -606,9 +623,25 @@ export class Moves {
       this.cls = grow(this.cls);
       this.sub = grow(this.sub);
       this.z = grow(this.z);
+      this.dwell = grow(this.dwell);
+      this.dwellS = grow(this.dwellS);
+      this.dwellOutgoing = grow(this.dwellOutgoing);
     }
     const i = this.n++;
     this.z[i] = this.zCur;
+    this.dwell[i] = 0;
+    this.dwellS[i] = 0;
+    this.dwellOutgoing[i] = 0;
+    // Ausstehende End-Pause der vorherigen Kontur hängt sich an die nächste Bewegung (egal welche:
+    // der Kopf steht noch am Konturende). Nur das Jobende liest dwellTrailing noch aus.
+    if (this.dwellTrailing) {
+      if (this.dwellTrailing.sec > 0) {
+        this.dwell[i] = this.dwellTrailing.sec;
+        this.dwellS[i] = this.dwellTrailing.s;
+        this.dwellOutgoing[i] = 1;
+      }
+      this.dwellTrailing = null;
+    }
     this.x[i] = x;
     this.y[i] = y;
     this.f[i] = f;
@@ -643,7 +676,13 @@ export function startHere(mv: Moves, i: number, frac: number): Moves {
   for (let k = i + 1; k < mv.n; k++) {
     out.zCur = mv.z[k];
     out.push(mv.x[k], mv.y[k], mv.f[k], mv.s[k], mv.layer[k], mv.cls ? mv.cls[k] : MOVE_TRAVEL, mv.sub ? mv.sub[k] : -1);
+    // Pausen hängen an der Bewegung, vor der sie stehen; alles bis i entfällt (Anstechen inklusive).
+    // Die restliche Bahn endet weiter am Jobende, daher bleibt eine End-Pause erhalten.
+    out.dwell[out.n - 1] = mv.dwell[k];
+    out.dwellS[out.n - 1] = mv.dwellS[k];
+    out.dwellOutgoing[out.n - 1] = mv.dwellOutgoing[k];
   }
+  out.dwellTrailing = mv.dwellTrailing;
   return out;
 }
 
@@ -658,8 +697,11 @@ export function sameMoves(a: Moves, b: Moves, offset: Pt): boolean {
   if (a.n !== b.n) return false;
   const e = 1e-6;
   for (let i = 0; i < a.n; i++)
-    if (a.f[i] !== b.f[i] || a.s[i] !== b.s[i] || a.layer[i] !== b.layer[i] || a.z[i] !== b.z[i] || Math.abs(a.x[i] + offset.x - b.x[i]) > e || Math.abs(a.y[i] + offset.y - b.y[i]) > e) return false;
-  return true;
+    if (a.f[i] !== b.f[i] || a.s[i] !== b.s[i] || a.layer[i] !== b.layer[i] || a.z[i] !== b.z[i] || a.dwell[i] !== b.dwell[i] || a.dwellS[i] !== b.dwellS[i] || a.dwellOutgoing[i] !== b.dwellOutgoing[i] || Math.abs(a.x[i] + offset.x - b.x[i]) > e || Math.abs(a.y[i] + offset.y - b.y[i]) > e) return false;
+  const at = (t: { sec: number; s: number } | null) => (t && t.sec > 0 ? [t.sec, t.s] : null);
+  const ta = at(a.dwellTrailing),
+    tb = at(b.dwellTrailing);
+  return (ta === null) === (tb === null) && (!ta || !tb || (ta[0] === tb[0] && ta[1] === tb[1]));
 }
 
 export interface Box {
@@ -734,7 +776,7 @@ export interface JobInput {
 export interface Poly {
   pts: Pt[];
   closed: boolean;
-  /** Haltestege: off[i] = 1 heißt, die Strecke von pts[i] zum nächsten Punkt wird ohne Laser gefahren */
+  /** Haltestege: off[i] = 1 heißt Strecke ohne Laser (Perfo-Lücke), 2 = Haltesteg (ggf. reduzierte Leistung) */
   off?: Uint8Array;
   /** Startpunkt und Richtung vom Nutzer gesetzt: die Optimierung beginnt hier und kehrt nicht um */
   fixed?: boolean;
@@ -1246,7 +1288,7 @@ function offsetFillRings(polys: Poly[], step: number, from: Pt): Poly[] {
 export function addTabs(p: Poly, T: TabSettings): Poly {
   const P = p.pts,
     n = P.length;
-  if (!p.closed || n < 3 || T.size <= 0) return p;
+  if (!p.closed || n < 3 || !(T.size > 0)) return p;
   const cum = new Float64Array(n + 1);
   for (let i = 0; i < n; i++) {
     const a = P[i],
@@ -1255,6 +1297,12 @@ export function addTabs(p: Poly, T: TabSettings): Poly {
   }
   const total = cum[n];
   let k = T.useCount ? Math.round(T.count) : Math.max(1, Math.round(total / Math.max(0.1, T.spacing)));
+  // Optionale Begrenzung: Deckel zuerst, Boden danach; die Passform-Regel unten gewinnt immer.
+  // Zählwerte deckeln, damit die Passform-Schleife immer terminiert (Import-/API-Daten sind nicht UI-begrenzt).
+  if (T.maxTabs > 0) k = Math.min(k, Math.round(T.maxTabs));
+  if (T.minTabs > 1) k = Math.max(k, Math.round(T.minTabs));
+  if (!Number.isFinite(k)) return p;
+  if (k > 100000) k = 100000;
   // Stege dürfen höchstens die Hälfte des Umfangs ausmachen
   while (k > 0 && T.size >= (total / k) * 0.5) k--;
   if (k < 1) return p;
@@ -1277,11 +1325,12 @@ export function addTabs(p: Poly, T: TabSettings): Poly {
     while (b < cuts.length && cuts[b] <= d0) b++;
     while (l > 1e-9 && b < cuts.length && cuts[b] < d1) {
       const t = (cuts[b] - d0) / l;
-      off.push(inTab((last + cuts[b]) / 2) ? 1 : 0);
+      // Steg = 2 (ggf. reduzierte Leistung), sonst 0; 1 bleibt der Perforation vorbehalten
+      off.push(inTab((last + cuts[b]) / 2) ? 2 : 0);
       pts.push({ x: a.x + (e.x - a.x) * t, y: a.y + (e.y - a.y) * t });
       last = cuts[b++];
     }
-    off.push(inTab((last + d1) / 2) ? 1 : 0);
+    off.push(inTab((last + d1) / 2) ? 2 : 0);
   }
   return { pts, closed: true, off: Uint8Array.from(off), fixed: p.fixed, hole: p.hole, grp: p.grp };
 }
@@ -1589,17 +1638,34 @@ function emitEntry(mv: Moves, e: CutEntry, polys: Poly[], li: number, si: number
   const { cuts, lead } = lineCuts(polys, e);
   const ramp = e.ramp.enabled && e.ramp.length > 0 && e.minPower < e.power ? e.ramp : null;
   const sMin = Math.max(0, e.minPower) / 100;
+  // Start-/End-Pause je Schnitt (#153-Phasenplan): Start hängt an der ersten Schnittbewegung (nach der
+  // Anfahrbewegung), Ende an der folgenden Verfahrbewegung — bzw. ans Jobende, wenn keine mehr kommt.
+  const dw = e.dwell ?? { start: 0, end: 0, cutThrough: false, power: 0 };
+  const startSec = Number.isFinite(dw.start) ? Math.min(60000, Math.max(0, dw.start)) / 1000 : 0;
+  const endSec = Number.isFinite(dw.end) ? Math.min(60000, Math.max(0, dw.end)) / 1000 : 0;
+  const pwRaw = dw.power ?? 0;
+  const pierce = dw.cutThrough && Number.isFinite(pwRaw) ? Math.min(1, Math.max(0, pwRaw) / 100) : 0;
+  // Stegleistung: 0 = Laser aus wie bisher, darüber reduzierter Schnitt auf den Stegen (Markierung 2)
+  const tpRaw = e.tabs.tabPower ?? 0;
+  const tabP = Number.isFinite(tpRaw) ? Math.min(1, Math.max(0, tpRaw / 100)) : 0;
   for (let p = 0; p < passes; p++) {
     pass(p);
     const order = ord.innerFirst || ord.travel || ord.group || ord.cornerStart || ord.dirOrder !== 'none' || ord.bestStart || ord.bestDirection || ord.lessTurns ? orderPolys(cuts, { x: mv.lastX(), y: mv.lastY() }, ord) : cuts;
     for (const poly of order) {
-      const path = contourPath(poly, lead);
+      const path = contourPath(poly, lead, tabP > 0);
       if (path.pts.length < 2) continue;
+      // Die Anfahrbewegung übernimmt per push() automatisch eine ausstehende End-Pause der Vorkontur.
       mv.push(path.pts[0].x, path.pts[0].y, 0, 0, li, MOVE_TRAVEL, si);
+      const cutAt = mv.n;
       if (ramp) {
         const r = rampPath(path, s, sMin, ramp);
-        for (let i = 1; i < r.pts.length; i++) mv.push(r.pts[i].x, r.pts[i].y, e.speed, r.s[i - 1], li, r.s[i - 1] > 0 ? MOVE_CUT : MOVE_TRAVEL, si);
-      } else for (let i = 1; i < path.pts.length; i++) mv.push(path.pts[i].x, path.pts[i].y, e.speed, path.off[i - 1] ? 0 : s, li, path.off[i - 1] ? MOVE_TRAVEL : MOVE_CUT, si);
+        for (let i = 1; i < r.pts.length; i++) { const rs = r.s[i - 1]; const pw = rs < 0 ? s * tabP : rs; mv.push(r.pts[i].x, r.pts[i].y, e.speed, pw, li, pw > 0 ? MOVE_CUT : MOVE_TRAVEL, si); }
+      } else for (let i = 1; i < path.pts.length; i++) { const o = path.off[i - 1]; const pw = o === 2 ? s * tabP : o ? 0 : s; mv.push(path.pts[i].x, path.pts[i].y, e.speed, pw, li, pw > 0 ? MOVE_CUT : MOVE_TRAVEL, si); }
+      if (startSec > 0) {
+        mv.dwell[cutAt] = startSec;
+        mv.dwellS[cutAt] = pierce;
+      }
+      if (endSec > 0) mv.dwellTrailing = { sec: endSec, s: 0 };
     }
   }
 }
@@ -1620,9 +1686,9 @@ function lineCuts(polys: Poly[], e: Pick<LineEntry, 'tabs' | 'perf' | 'lead'>): 
 }
 
 /** Cut path of one contour as it is emitted: never start inside a tab (the laser would first run it unpowered) */
-function contourPath(poly: Poly, lead: LeadSettings | null): CutPath {
+function contourPath(poly: Poly, lead: LeadSettings | null, keepPoweredTabs = false): CutPath {
   if (poly.off?.[0]) poly = startAt(poly, Math.max(0, poly.off.indexOf(0)));
-  return cutPath(poly, lead);
+  return cutPath(poly, lead, keepPoweredTabs);
 }
 
 /** Lead-in or lead-out of one contour for the canvas: pts runs in cutting direction and touches the contour */
@@ -1656,7 +1722,7 @@ export function leadMarks(objs: Poly[][], e: LineEntry, bedH: number): LeadMark[
   const out: LeadMark[] = [];
   for (const poly of cuts) {
     if (!poly.closed) continue;
-    const path = contourPath(poly, lead);
+    const path = contourPath(poly, lead, (e.tabs.tabPower ?? 0) > 0);
     const fixed = !!poly.fixed;
     if (path.nIn) out.push({ pts: flip(path.pts.slice(0, path.nIn + 1)), out: false, fixed });
     if (path.nOut) out.push({ pts: flip(path.pts.slice(path.pts.length - path.nOut - 1)), out: true, fixed });
@@ -1667,7 +1733,7 @@ export function leadMarks(objs: Poly[][], e: LineEntry, bedH: number): LeadMark[
 /** Flatten a sub-path into a polyline with matrix m (same tolerance as the job) */
 export const flattenSub = (sp: SubPath, m: Mat): Poly => flatten(sp, m);
 
-/** Schnittweg einer Form als Punktfolge: off[k] = 1 heißt, Strecke k (pts[k] → pts[k+1]) ohne Laser */
+/** Schnittweg einer Form als Punktfolge: off[k] = 1 heißt Strecke k ohne Laser, 2 = Haltesteg (ggf. reduzierte Leistung) */
 interface CutPath {
   pts: Pt[];
   off: number[];
@@ -1694,7 +1760,7 @@ function markHoles(polys: Poly[]) {
 
 /**
  * Perforation: entlang der Form abwechselnd on mm schneiden und off mm ohne Laser fahren.
- * Vorhandene Haltestege bleiben ohne Laser.
+ * Vorhandene Haltestege bleiben erhalten (ggf. mit reduzierter Leistung).
  */
 export function perforate(p: Poly, P: PerfSettings): Poly {
   const on = Math.max(0.01, P.on),
@@ -1716,12 +1782,13 @@ export function perforate(p: Poly, P: PerfSettings): Poly {
     let u = 0;
     for (;;) {
       if (rem >= l - u - 1e-9) {
-        off.push(base || state);
+        // Perforationslücke (state 1) bleibt immer laserlos — auch über einem Steg
+        off.push(state === 1 ? 1 : base || state);
         rem -= l - u;
         break;
       }
       u += rem;
-      off.push(base || state);
+      off.push(state === 1 ? 1 : base || state);
       pts.push({ x: a.x + ((b.x - a.x) * u) / l, y: a.y + ((b.y - a.y) * u) / l });
       state ^= 1;
       rem = state ? gap : on;
@@ -1736,7 +1803,7 @@ export function perforate(p: Poly, P: PerfSettings): Poly {
  * Formen und immer auf der Abfallseite: bei Außenkonturen außen, bei Löchern innen. Strecken ohne Laser am Ende
  * (Haltesteg, Perforation) fallen weg.
  */
-export function cutPath(p: Poly, lead: LeadSettings | null): CutPath {
+export function cutPath(p: Poly, lead: LeadSettings | null, keepPoweredTabs = false): CutPath {
   const n = p.pts.length;
   const pts = p.pts.slice();
   const off: number[] = [];
@@ -1746,7 +1813,9 @@ export function cutPath(p: Poly, lead: LeadSettings | null): CutPath {
     off.push(p.off?.[n - 1] ?? 0);
   }
   const trim = () => {
-    while (off.length && off[off.length - 1]) (off.pop(), pts.pop());
+    // Nur echte laserlose Enden (Perfo-Lücke) fallen weg; ein bestromter Steg (2) bleibt
+    // stehen, ein stromloser (Legacy) wird wie bisher gekappt
+    while (off.length && (off[off.length - 1] === 1 || (off[off.length - 1] === 2 && !keepPoweredTabs))) (off.pop(), pts.pop());
   };
   if (!p.closed || !lead || n < 3) {
     trim();
@@ -1813,17 +1882,19 @@ export function cutPath(p: Poly, lead: LeadSettings | null): CutPath {
  */
 function leadPts(p: Pt, t: Pt, w: Pt, L: number, lead: LeadSettings, isIn: boolean): Pt[] {
   const sg = isIn ? -1 : 1;
+  // Vorzeichen des Winkels wählt die Seite: + Abfallseite (Standard), − Gegenseite (Material)
+  const ww = lead.angle < 0 ? { x: -w.x, y: -w.y } : w;
   if (!lead.arc) {
-    const a = (Math.min(90, Math.max(0, lead.angle)) * Math.PI) / 180;
-    return [{ x: p.x + w.x * L * Math.sin(a) + sg * t.x * L * Math.cos(a), y: p.y + w.y * L * Math.sin(a) + sg * t.y * L * Math.cos(a) }];
+    const a = (Math.min(90, Math.max(0, Math.abs(lead.angle))) * Math.PI) / 180;
+    return [{ x: p.x + ww.x * L * Math.sin(a) + sg * t.x * L * Math.cos(a), y: p.y + ww.y * L * Math.sin(a) + sg * t.y * L * Math.cos(a) }];
   }
   const th = (Math.min(180, Math.max(1, lead.angle)) * Math.PI) / 180;
   const r = L / th;
-  const c = { x: p.x + w.x * r, y: p.y + w.y * r };
+  const c = { x: p.x + ww.x * r, y: p.y + ww.y * r };
   const m = Math.max(4, Math.ceil(th / (Math.PI / 24)));
   const at = (phi: number): Pt => ({
-    x: c.x + r * (-w.x * Math.cos(phi) + sg * t.x * Math.sin(phi)),
-    y: c.y + r * (-w.y * Math.cos(phi) + sg * t.y * Math.sin(phi)),
+    x: c.x + r * (-ww.x * Math.cos(phi) + sg * t.x * Math.sin(phi)),
+    y: c.y + r * (-ww.y * Math.cos(phi) + sg * t.y * Math.sin(phi)),
   });
   const out: Pt[] = [];
   if (isIn) for (let k = m; k >= 1; k--) out.push(at((th * k) / m));
@@ -1890,7 +1961,8 @@ export function rampPath(path: CutPath, s: number, sMin: number, R: RampSettings
       l = c1 - c0;
     if (off[k] || !ramps.length || l < 1e-9 || Math.min(near(c0), near(c1), near((c0 + c1) / 2)) >= Lr) {
       outPts.push(b);
-      outS.push(off[k] ? 0 : s);
+      // Stegmarkierung (−1) übersteht die Rampe; die Leistung löst die Emission auf
+      outS.push(off[k] === 2 ? -1 : off[k] ? 0 : s);
       continue;
     }
     const n = Math.min(400, Math.max(1, Math.ceil(l / step)));
@@ -2439,7 +2511,7 @@ const num = (v: number) => {
   return Object.is(r, -0) ? '0' : String(r);
 };
 
-export type GCodeOrigin = 'header' | 'start' | 'move' | 'air' | 'z' | 'end' | 'footer' | 'meta';
+export type GCodeOrigin = 'header' | 'start' | 'move' | 'air' | 'z' | 'dwell' | 'end' | 'footer' | 'meta';
 
 export interface GCode {
   lines: string[];
@@ -2515,6 +2587,34 @@ export function gcodeFooter(d: Device): string[] {
  * dieselben Zeilen; Änderungen hier müssen dort nachgezogen werden (Vergleichstest: npm run test:core).
  */
 /**
+ * Pausenzeilen vor einer Bewegung: Strahl aus (G4) oder anstechen (M3 … G4 … M4).
+ * Marlin zählt G4 P in Millisekunden, alle anderen in Sekunden. Smoothieware feuert nur bei G1,
+ * dort gibt es daher keine Strahl-Pause (nur G4). Ruida läuft über writeRuida und sieht keine Pausen.
+ * Die Sekunden zählen in der Zeitschätzung mit (estimate addiert Pausen je Schnitt und End-Pause).
+ */
+export function dwellLines(sec: number, frac: number, d: Device): string[] {
+  if (!Number.isFinite(sec) || !(sec > 0)) return [];
+  sec = Math.min(60, sec);
+  const pause = d.fw === 'marlin' ? `G4 P${Math.max(1, Math.round(sec * 1000))}` : `G4 P${num(sec)}`;
+  if (!(frac > 0) || d.fw === 'smoothie') return [pause];
+  const s = sValue(Math.min(1, frac), d);
+  // Marlin startet sonst im Inline-Modus (M3 I): Anstechen mit konstanter Leistung,
+  // danach zurück in den Inline-Modus mit Strahl aus — wie der Kopf (M3 I S0).
+  if (d.fw === 'marlin') return [`M3 S${s}`, pause, 'M3 I S0'];
+  return [`M3 S${s}`, pause, 'M4'];
+}
+
+/** Pausen aus den Bewegungsmarkierungen (Start-/End-Pause je Schnitt): at = [Index, Zeilen davor], end = ans Jobende. */
+export function dwellInserts(mv: Moves, d: Device): { at: [number, string[]][]; end: string[] } {
+  const at: [number, string[]][] = [];
+  for (let i = 0; i < mv.n; i++) {
+    if (mv.dwell[i] > 0) at.push([i, dwellLines(mv.dwell[i], mv.dwellS[i], d)]);
+  }
+  const t = mv.dwellTrailing;
+  return { at, end: t && t.sec > 0 ? dwellLines(t.sec, t.s, d) : [] };
+}
+
+/**
  * Z-Bewegungen zwischen den Bewegungen: relativ (G91 … G90), damit die Fokushöhe beim Start als Bezug gilt.
  * at = [Index der Bewegung, Zeilen davor], end = Zeilen zurück auf die Starthöhe vor dem Ende des Jobs.
  */
@@ -2531,6 +2631,16 @@ export function zInserts(mv: Moves, d: Device): { at: [number, string[]][]; end:
     z = zi;
   }
   return { at, end: num(z) === '0' ? [] : move(-z) };
+}
+
+/** Shared TS/native ordering: outgoing end pause, Z change, incoming start/pierce pause. */
+export function gcodeInserts(mv: Moves, d: Device, zs = zInserts(mv, d), dw = dwellInserts(mv, d)): [number, string[], GCodeOrigin][] {
+  const inserts: [number, string[], GCodeOrigin][] = [
+    ...zs.at.map(([at, ls]): [number, string[], GCodeOrigin] => [at, ls, 'z']),
+    ...dw.at.map(([at, ls]): [number, string[], GCodeOrigin] => [at, ls, 'dwell']),
+  ];
+  const phase = ([at, , origin]: [number, string[], GCodeOrigin]) => origin === 'z' ? 1 : mv.dwellOutgoing[at] ? 0 : 2;
+  return inserts.sort((a, b) => a[0] - b[0] || phase(a) - phase(b));
 }
 
 /**
@@ -2552,6 +2662,8 @@ export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[
     origins.splice(at, 0, 'meta');
   }
   const zs = zInserts(mv, d);
+  const dw = dwellInserts(mv, d);
+  const inserts = gcodeInserts(mv, d, zs, dw);
   let zk = 0;
   let g = -1,
     cx = mv.x0,
@@ -2569,12 +2681,15 @@ export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[
     const x = mv.x[i],
       y = mv.y[i];
     // Z-Zeilen vor der Bewegung; danach G0/G1 wieder ausschreiben
-    for (; zk < zs.at.length && zs.at[zk][0] === i; zk++) {
-      for (const l of zs.at[zk][1]) {
+    for (; zk < inserts.length && inserts[zk][0] === i; zk++) {
+      for (const l of inserts[zk][1]) {
         lines.push(l);
         times.push(i ? est.t[i - 1] : 0);
-        origins.push('z');
+        origins.push(inserts[zk][2]);
       }
+      // Pausen mit Anstechen ändern die Spindelleistung (M3 S…): der Cache muss
+      // verfallen, sonst fehlt das S der folgenden Schnittbewegung (P1-Befund).
+      if (inserts[zk][2] === 'dwell' && inserts[zk][1].length > 1) cs = NaN;
       g = -1;
     }
     const wantAir = airLayers.has(mv.layer[i]);
@@ -2634,10 +2749,11 @@ export function gcodeLines(mv: Moves, d: Device, est: Estimate, airList: number[
     times.push(est.total);
     origins.push('air');
   }
-  for (const z of zs.end) {
+  // End-Pause zuerst am beendeten Schnitt, dann erst Z-Rückstellung und Geräteschluss
+  for (const [z, origin] of [...dw.end.map((l): [string, GCodeOrigin] => [l, 'dwell']), ...zs.end.map((l): [string, GCodeOrigin] => [l, 'z'])]) {
     lines.push(z);
     times.push(est.total);
-    origins.push('z');
+    origins.push(origin);
   }
   const foot = footerParts(d);
   let endMarked = false;
@@ -2708,7 +2824,9 @@ export async function prepareGCode(
     try {
       const { mv, t } = rotaryMoves(job.moves, d, job.bounds, est.t);
       const zs = zInserts(mv, d);
-      const params = JSON.stringify({ x0: mv.x0, y0: mv.y0, sMax: d.sMax, air: job.air, airCmd: d.airCmd || 'M8', header, footer: [...zs.end, ...gcodeFooter(d)], total: est.total, yAxis: outAxis(d), inserts: zs.at });
+      const dw = dwellInserts(mv, d);
+      const inserts = gcodeInserts(mv, d, zs, dw).map(([at, ls]) => [at, ls]);
+      const params = JSON.stringify({ x0: mv.x0, y0: mv.y0, sMax: d.sMax, air: job.air, airCmd: d.airCmd || 'M8', header, footer: [...dw.end, ...zs.end, ...gcodeFooter(d)], total: est.total, yAxis: outAxis(d), inserts });
       const buf = await native<ArrayBuffer>('gcode_prepare', packMoves(mv, t!, params));
       const head = new Uint32Array(buf, 0, 2);
       return { id: head[0], lines: null, count: head[1], times: new Float64Array(buf, 8), total: est.total };

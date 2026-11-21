@@ -2090,7 +2090,22 @@ table.devices .actions {
 
 /* Layer-Dialog */
 .layer-dialog {
-  width: min(400px, 96vw);
+  width: min(760px, 96vw);
+}
+/* Zwei Spalten: links Allgemein/Geometrie, rechts Linie-Füllen/Bild/Bildschnitt/3D-Look; schmal einspaltig */
+.layer-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+  align-items: start;
+}
+.layer-col {
+  min-width: 0;
+}
+@media (max-width: 640px) {
+  .layer-cols {
+    grid-template-columns: 1fr;
+  }
 }
 .layer-dialog h3 {
   display: flex;

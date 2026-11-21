@@ -4,7 +4,7 @@
 import './core-fixtures-env';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { applyAdjust, dither, resample } from '../src/images';
-import { DEFAULT_ROTARY, estimate, FIRMWARES, gcodeLines, Moves, newDevice, outAxis, packMoves, rotaryMoves, scanLines, zInserts } from '../src/gcode';
+import { DEFAULT_ROTARY, dwellInserts, estimate, FIRMWARES, gcodeInserts, gcodeLines, Moves, newDevice, outAxis, packMoves, rotaryMoves, scanLines, zInserts } from '../src/gcode';
 import { defaultImageLayer, defaultLayer, inv, ImageAdjust, Mat, mul } from '../src/model';
 import { ruidaLayersFromMoves, RuidaParams, writeRuida } from '../src/ruida';
 
@@ -43,7 +43,7 @@ const scans = [
 
 // G-Code: Eilgänge, Vorschübe, gleiche Punkte, negative Koordinaten, Air Assist auf Layer 1
 // withZ: Z-Versatz wechselt (wie bei „tiefer je Durchgang“), Z-Zeilen werden vor Bewegungen eingefügt
-function gcodeCase(fw: 'fluidnc' | 'smoothie', axis?: 'A', withZ = false) {
+function gcodeCase(fw: 'fluidnc' | 'smoothie' | 'marlin', axis?: 'A', withZ = false, withDwell = false) {
   const d = newDevice({ fw, ...(axis ? { rotary: { ...DEFAULT_ROTARY, enabled: true, axis, kind: 'chuck' as const, objectDiam: 70 } } : {}) });
   const mv = new Moves(1.25, -3);
   let x = 0,
@@ -62,14 +62,28 @@ function gcodeCase(fw: 'fluidnc' | 'smoothie', axis?: 'A', withZ = false) {
     if (withZ && i % 500 === 0) mv.zCur = i === 2500 ? 0.1 : (i / 500) * 0.35;
     mv.push(i === 7 ? -0.0001 : x, y, f, s, Math.floor(i / 700) % 3 === 1 ? 1 : i > 2900 ? -1 : 0);
   }
+  if (withDwell) {
+    // Pierce before equal-power cuts (S-cache), outgoing pause at a Z change,
+    // and a final pause before the Z reset; also exercised through packed Rust.
+    for (const i of [1, 501]) {
+      mv.dwell[i] = 0.2;
+      mv.dwellS[i] = 0.8;
+      mv.s[i - 1] = mv.s[i] = 0.5;
+      mv.f[i - 1] = mv.f[i] = 1200;
+    }
+    mv.dwell[1000] = 0.3;
+    mv.dwellOutgoing[1000] = 1;
+    mv.dwellTrailing = { sec: 0.3, s: 0 };
+  }
   const est = estimate(mv, d);
   // Mit Drehachse: Bewegungen wie in prepareGCode umgerechnet, Y-Richtung als A ausgegeben
   const out = rotaryMoves(mv, d).mv;
   const g = gcodeLines(out, d, est, [1], ['; Kopf', 'G21', 'G90', 'M4 S0']);
   const zs = zInserts(out, d);
+  const dw = dwellInserts(out, d);
   const params = {
-    x0: out.x0, y0: out.y0, sMax: d.sMax, air: [1], airCmd: 'M8', header: ['; Kopf', 'G21', 'G90', 'M4 S0'], footer: [...zs.end, ...FIRMWARES[fw].footer], total: est.total,
-    ...(axis ? { yAxis: outAxis(d) } : {}), ...(withZ ? { inserts: zs.at } : {}),
+    x0: out.x0, y0: out.y0, sMax: d.sMax, air: [1], airCmd: 'M8', header: ['; Kopf', 'G21', 'G90', 'M4 S0'], footer: [...dw.end, ...zs.end, ...FIRMWARES[fw].footer], total: est.total,
+    ...(axis ? { yAxis: outAxis(d) } : {}), ...((withZ || withDwell) ? { inserts: gcodeInserts(out, d, zs, dw).map(([at, ls]) => [at, ls]) } : {}),
   };
   return {
     // so, wie prepareGCode die Daten an den Rust-Kern schickt
@@ -123,7 +137,8 @@ const out = {
   adjustedNeg: arr(adjustedNeg),
   dithered,
   scans,
-  gcode: [gcodeCase('fluidnc'), gcodeCase('smoothie'), gcodeCase('fluidnc', 'A'), gcodeCase('fluidnc', undefined, true)],
+  gcode: [gcodeCase('fluidnc'), gcodeCase('smoothie'), gcodeCase('fluidnc', 'A'), gcodeCase('fluidnc', undefined, true),
+    gcodeCase('fluidnc', undefined, true, true), gcodeCase('marlin', undefined, true, true), gcodeCase('fluidnc', 'A', true, true)],
   ruida: [
     ruidaCase('absolute', 'top-right', '88', '1'),
     ruidaCase('current', 'bottom-left', '11', 'both'),
