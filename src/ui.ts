@@ -53,6 +53,7 @@ import { openRemoteHostDialog, openRemoteJobsDialog, remoteHostStatus, startRemo
 import { openHostSyncDialog } from './remote';
 import { buildObjectsPanel } from './objectsPanel';
 import { buildTabBar, closeTabAsk } from './tabsBar';
+import { loadGroupedTabs, loadTabPages, saveGroupedTabs, saveTabPages } from './editor/tabs';
 import { buildHistoryPanel } from './historyPanel';
 import { buildLibraryPanel, openAddSelectionDialog } from './libraryPanel';
 import { buildCheckPanel, openCheck } from './checkPanel';
@@ -438,6 +439,8 @@ function buildMenu(ed: Editor) {
         [t('Immer|Mittelpunkte'), '', () => ed.setSnap({ centers: 'all' }), () => ed.centerMarks === 'all'],
       ] },
       'sep',
+      [t('Gruppierte Tabs'), '', () => { saveGroupedTabs(!loadGroupedTabs()); ed.onTabsChange?.(); }, () => loadGroupedTabs()],
+      [t('Seiten in Tabs'), '', () => { saveTabPages(!loadTabPages()); ed.onTabsChange?.(); }, () => loadTabPages()],
       { sub: t('Gitter'), items: [
         [t('Gitter anzeigen'), '', () => ed.setGrid({ show: !ed.grid.show }), () => ed.grid.show],
         [t('Gitter einstellen …'), '', () => openGridDialog(ed)],

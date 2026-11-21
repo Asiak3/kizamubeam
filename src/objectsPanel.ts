@@ -2,14 +2,15 @@
 // Auswahl synchron mit der Arbeitsfläche, Umbenennen per Doppelklick, Ein-/Ausblenden, Sperren,
 // Reihenfolge und Layer per Ziehen.
 //
-// Aufbau: Ganz oben stehen die Seiten des Projekts. Unter der aktuellen Seite liefert sections() je Layer einen
-// Abschnitt mit dessen Objekten; die anderen Seiten zeigen nur ihre Objektzahl (Klick wechselt dorthin).
+// Aufbau: Ganz oben stehen alle Seiten des Projekts, jede mit ihren Layern und Objekten
+// (Klick auf eine fremde Zeile wechselt zuerst dorthin). Darunter die Hilfslinien einzeln.
 import { LINEAR_NAMES } from './barcode1d';
 import type { Editor } from './editor';
 import { genLabel, getGenerator } from './generators';
 import { ICONS } from './icons';
 import { homeLayer, isOff, layerLabel, Obj, PALETTE } from './model';
 import { openShowIfDialog } from './paramsPanel';
+import { fmtGuide, guideAxisLabel, openGuidePositionDialog } from './guideDialog';
 import { $, h } from './dom';
 import { t, tn } from './i18n';
 import { isFallbackFont, onFontLoaded } from './fonts';
@@ -90,15 +91,18 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
   /** Zeile → Objekt und oberstes Objekt */
   let rows = new Map<number, { el: HTMLElement; obj: Obj; top: Obj }>();
   let layerRows = new Map<number, HTMLElement>();
-  let pageCollapsed = false;
+  /** Eingeklappte Seiten (Objekte darunter versteckt); Standard: alle aufgeklappt */
+  const collapsedPages = new Set<number>();
+  /** Hilfslinien-Zeilen eingeklappt (nur Zählerzeile); Standard: einzeln aufgelistet */
+  let guidesCollapsed = false;
   let fromPanel = false;
   let renaming = false;
 
-  /** Layer-Abschnitte der aktuellen Seite */
-  const sections = (): Section[] => {
+  /** Layer-Abschnitte einer Objektliste (eigene oder fremde Seite) */
+  const sections = (objs: Obj[]): Section[] => {
     const by = new Map<number, Obj[]>();
-    for (let k = ed.doc.objs.length - 1; k >= 0; k--) {
-      const o = ed.doc.objs[k];
+    for (let k = objs.length - 1; k >= 0; k--) {
+      const o = objs[k];
       const L = homeLayer(o);
       let list = by.get(L);
       if (!list) by.set(L, (list = []));
@@ -141,10 +145,11 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     inp.addEventListener('dblclick', (e) => e.stopPropagation());
   };
 
-  const renderObj = (o: Obj, top: Obj, depth: number, dimmed: boolean, out: HTMLElement[]) => {
+  const renderObj = (o: Obj, top: Obj, depth: number, dimmed: boolean, page: number, out: HTMLElement[]) => {
     const isGroup = o.shape.kind === 'group';
     const expanded = isGroup && openGroups.has(o.id);
     const isTop = o === top;
+    const foreign = page !== ed.doc.page;
     const off = dimmed || isOff(o);
     const label = h('span', { class: 'ot-label' }, objLabel(o));
     const chevron = isGroup
@@ -163,10 +168,12 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     const row = h(
       'div',
       {
-        class: `ot-row ot-obj${off ? ' off' : ''}${top.locked ? ' locked' : ''}${top.noLaser ? ' nolaser' : ''}`,
+        class: `ot-row ot-obj${off ? ' off' : ''}${top.locked ? ' locked' : ''}${top.noLaser ? ' nolaser' : ''}${foreign ? ' ot-foreign' : ''}`,
         style: `padding-left:${8 + INDENT + depth * 14}px`,
-        draggable: isTop ? 'true' : 'false',
-        title: t('Klick: auswählen (Shift/Ctrl: hinzufügen) · Doppelklick auf den Namen: umbenennen · Ziehen: Reihenfolge oder Layer ändern'),
+        draggable: isTop && !foreign ? 'true' : 'false',
+        title: foreign
+          ? t('Auf einer anderen Seite · Klick: dorthin wechseln und auswählen')
+          : t('Klick: auswählen (Shift/Ctrl: hinzufügen) · Doppelklick auf den Namen: umbenennen · Ziehen: Reihenfolge oder Layer ändern'),
       },
       chevron,
       h('span', { class: 'ot-icon', icon: objIcon(o) }),
@@ -202,6 +209,8 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
         : h('span', { class: 'ot-btn ot-spacer' }),
     );
     row.dataset.id = String(o.id);
+    row.dataset.page = String(page);
+    row.dataset.kind = 'object';
     label.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       startRename(label, o.name ?? '', (v) => ed.setObjProps([o], { name: v }));
@@ -209,10 +218,10 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     rows.set(o.id, { el: row, obj: o, top });
     out.push(row);
     if (expanded && o.shape.kind === 'group')
-      for (let k = o.shape.children.length - 1; k >= 0; k--) renderObj(o.shape.children[k], top, depth + 1, off, out);
+      for (let k = o.shape.children.length - 1; k >= 0; k--) renderObj(o.shape.children[k], top, depth + 1, off, page, out);
   };
 
-  const renderSection = (sec: Section, out: HTMLElement[]) => {
+  const renderSection = (sec: Section, out: HTMLElement[], page: number) => {
     const i = sec.layer;
     const L = ed.layer(i);
     const collapsed = collapsedLayers.has(i);
@@ -250,6 +259,7 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
       }),
     );
     row.dataset.layer = String(i);
+    row.dataset.kind = 'layer';
     label.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       startRename(label, L.name, (v) => v.trim() && ed.updateLayer(i, { name: v.trim() }));
@@ -258,7 +268,7 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     out.push(row);
     if (collapsed) return;
     const list = showAll.has(i) ? sec.objs : sec.objs.slice(0, ROW_LIMIT);
-    for (const o of list) renderObj(o, o, 0, !L.show, out);
+    for (const o of list) renderObj(o, o, 0, !L.show, page, out);
     if (list.length < sec.objs.length) {
       out.push(
         h('button', { class: 'ot-more', onclick: () => (showAll.add(i), render()) },
@@ -284,12 +294,12 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
       h('span', {
         class: 'ot-chev',
         onclick: (e: Event) => {
-          if (!cur) return;
           e.stopPropagation();
-          pageCollapsed = !pageCollapsed;
+          if (collapsedPages.has(i)) collapsedPages.delete(i);
+          else collapsedPages.add(i);
           render();
         },
-      }, cur && !pageCollapsed ? '▾' : '▸'),
+      }, collapsedPages.has(i) ? '▸' : '▾'),
       h('span', { class: 'ot-icon', icon: 'new' }),
       label,
       h('span', { class: 'muted ot-n' }, String(p.objs.length)),
@@ -297,6 +307,7 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
       multi ? toggleBtn('ot-act', false, 'delete', t('Seite löschen (rückgängig machbar)'), () => ed.deletePage(i)) : h('span', { class: 'ot-btn ot-spacer' }),
     );
     row.dataset.page = String(i);
+    row.dataset.kind = 'page';
     label.addEventListener('dblclick', (e) => {
       e.stopPropagation();
       startRename(label, p.name, (v) => ed.renamePage(i, v));
@@ -304,9 +315,10 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     out.push(row);
   };
 
-  /** Eigene Ebene „Hilfslinien“: gilt für alle Seiten, wird nie gelasert; Auge und Schloss wie bei Layern */
+  /** Eigene Ebene „Hilfslinien“: gilt für alle Seiten, wird nie gelasert; Auge und Schloss wie bei Layern.
+   * Aufklappbar: jede Hilfslinie einzeln mit exakter Position (Dialog per Doppelklick, Knopf oder Rechtsklick). */
   const renderGuides = (out: HTMLElement[]) => {
-    const n = ed.guideList().length;
+    const list = ed.guideList();
     const shown = ed.guidesShown();
     const locked = !!ed.doc.guidesLocked;
     out.push(
@@ -316,11 +328,18 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
           class: `ot-row ot-layer ot-guides${shown ? '' : ' off'}`,
           title: t('Hilfslinien aus dem Lineal ziehen. Sie gelten für alle Seiten und werden nie gelasert oder exportiert. Zurück ins Lineal ziehen löscht eine Hilfslinie.'),
         },
-        h('span', { class: 'ot-chev' }),
+        h('span', {
+          class: 'ot-chev',
+          onclick: (e: Event) => {
+            e.stopPropagation();
+            guidesCollapsed = !guidesCollapsed;
+            render();
+          },
+        }, list.length && !guidesCollapsed ? '▾' : '▸'),
         h('span', { class: 'swatch ot-guide-swatch' }),
         h('span', { class: 'ot-label' }, t('Hilfslinien')),
-        h('span', { class: 'muted ot-n' }, String(n)),
-        n ? toggleBtn('ot-act', false, 'delete', t('Alle Hilfslinien löschen (rückgängig machbar)'), () => ed.clearGuides()) : h('span', { class: 'ot-btn ot-spacer' }),
+        h('span', { class: 'muted ot-n' }, String(list.length)),
+        list.length ? toggleBtn('ot-act', false, 'delete', t('Alle Hilfslinien löschen (rückgängig machbar)'), () => ed.clearGuides()) : h('span', { class: 'ot-btn ot-spacer' }),
         toggleBtn('ot-eye', shown, shown ? 'eye' : 'eyeoff', shown ? t('Hilfslinien ausblenden') : t('Hilfslinien einblenden'), () =>
           ed.setGuideLayer({ hidden: shown }),
         ),
@@ -329,6 +348,42 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
         ),
       ),
     );
+    if (guidesCollapsed) return;
+    list.forEach((g, gi) => {
+      const label = h('span', { class: 'ot-label' }, `${guideAxisLabel(g.axis)} · ${fmtGuide(g.v)} mm`);
+      const grow = h(
+        'div',
+        {
+          // S6-Follow-up: Hover hebt die Linie im Arbeitsbereich hervor, Klick pinnt die Hervorhebung an
+          class: `ot-row ot-guide${ed.guidePin === gi ? ' hi' : ''}`,
+          style: `padding-left:${8 + INDENT}px`,
+          title: t('Doppelklick: exakte Position eingeben · Rechtsklick: Menü'),
+          onmouseenter: () => ed.setGuideHover(gi),
+          onmouseleave: () => ed.setGuideHover(null),
+          onclick: () => {
+            ed.toggleGuidePin(gi);
+            render();
+          },
+        },
+        h('span', { class: 'ot-chev' }),
+        h('span', { class: 'swatch ot-guide-swatch' }),
+        label,
+        toggleBtn('ot-act', false, 'pencil', t('Position …'), () => openGuidePositionDialog(ed, gi)),
+        toggleBtn('ot-act', false, 'delete', t('Diese Hilfslinie löschen'), () => {
+          if (!ed.guideList()[gi]) return;
+          ed.snapshot(t('Hilfslinie löschen'));
+          ed.removeGuide(gi);
+          ed.emit('doc');
+        }),
+      );
+      grow.dataset.guide = String(gi);
+      grow.dataset.kind = 'guide';
+      label.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        openGuidePositionDialog(ed, gi);
+      });
+      out.push(grow);
+    });
   };
 
   const render = () => {
@@ -338,12 +393,15 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     rows = new Map();
     layerRows = new Map();
     const out: HTMLElement[] = [];
-    ed.doc.pages.forEach((_, i) => {
+    ed.doc.pages.forEach((p, i) => {
       renderPage(i, out);
-      if (i !== ed.doc.page || pageCollapsed) return;
-      const secs = sections();
-      if (!secs.length) out.push(h('div', { class: 'empty', style: `padding-left:${8 + INDENT}px` }, t('Noch keine Objekte.')));
-      for (const sec of secs) renderSection(sec, out);
+      if (collapsedPages.has(i)) return;
+      const secs = sections(p.objs);
+      if (!secs.length) {
+        if (i === ed.doc.page) out.push(h('div', { class: 'empty', style: `padding-left:${8 + INDENT}px` }, t('Noch keine Objekte.')));
+        return;
+      }
+      for (const sec of secs) renderSection(sec, out, i);
     });
     renderGuides(out);
     out.push(h('button', { class: 'ot-more', onclick: () => ed.addPage() }, t('+ Neue Seite')));
@@ -399,11 +457,13 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     if (target.closest('.ot-rename')) return;
     const row = target.closest('.ot-row') as HTMLElement | null;
     if (!row) return;
-    if (row.dataset.page) {
+    // Hilfslinien-Zeilen: Knöpfe, Doppelklick und Rechtsklick kümmern sich; kein Auswahlwechsel.
+    if (row.dataset.kind === 'guide') return;
+    if (row.dataset.kind === 'page') {
       ed.setPage(Number(row.dataset.page));
       return;
     }
-    if (row.dataset.layer) {
+    if (row.dataset.kind === 'layer') {
       const i = Number(row.dataset.layer);
       ed.currentLayer = i;
       ed.activeLayer = i;
@@ -412,6 +472,12 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     }
     const r = rows.get(Number(row.dataset.id));
     if (!r) return;
+    // Zeile einer fremden Seite: zuerst dorthin wechseln (Referenzen bleiben gültig).
+    const pg = row.dataset.page === undefined ? ed.doc.page : Number(row.dataset.page);
+    if (pg !== ed.doc.page) {
+      if (!ed.doc.pages[pg]) return;
+      ed.setPage(pg);
+    }
     const top = r.top;
     if (!ed.selectable(top)) {
       ed.hint = t('Ausgeblendete oder gesperrte Objekte lassen sich nicht auswählen.');
@@ -436,13 +502,29 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     e.preventDefault();
     const row = (e.target as HTMLElement).closest('.ot-row') as HTMLElement | null;
     if (!row || !callbacks || renaming || document.querySelector('dialog[open]') || ed.drag || ed.draft || ed.pickHandler) return;
+    if (row.dataset.kind === 'guide') {
+      const gi = Number(row.dataset.guide);
+      if (!ed.guideList()[gi]) return;
+      closeEditorMenu();
+      openEditorContextMenu(ed, e.clientX, e.clientY, objectsContextGroups(ed, callbacks, {
+        showIf: (objs) => openShowIfDialog(ed, objs),
+        layerSettings: (i) => openLayerDialog(ed, i),
+      }, { kind: 'guide', guide: gi }));
+      return;
+    }
+    // Zeile einer fremden Seite: zuerst dorthin wechseln, dann wie gewohnt Auswahl + Menü.
+    if (row.dataset.kind === 'object' && row.dataset.page !== undefined && Number(row.dataset.page) !== ed.doc.page) {
+      const pg = Number(row.dataset.page);
+      if (!ed.doc.pages[pg]) return;
+      ed.setPage(pg);
+    }
     closeEditorMenu();
     let target: ObjectsRowTarget;
-    if (row.dataset.page) {
+    if (row.dataset.kind === 'page') {
       const i = Number(row.dataset.page);
       target = { kind: 'page', page: i,
-        rename: renameRow(`[data-page="${i}"]`, () => ed.doc.pages[i]?.name ?? '', (v) => ed.renamePage(i, v)) };
-    } else if (row.dataset.layer) {
+        rename: renameRow(`[data-kind="page"][data-page="${i}"]`, () => ed.doc.pages[i]?.name ?? '', (v) => ed.renamePage(i, v)) };
+    } else if (row.dataset.kind === 'layer') {
       target = { kind: 'layer', layer: Number(row.dataset.layer) };
     } else {
       const r = rows.get(Number(row.dataset.id));
@@ -483,9 +565,10 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     const row = (e.target as HTMLElement).closest('.ot-row') as HTMLElement | null;
     if (!row || renaming) return e.preventDefault();
     dragObjs = dragLayer = dragPage = null;
-    if (row.dataset.page) {
+    if (row.dataset.kind === 'guide') return e.preventDefault();
+    if (row.dataset.kind === 'page') {
       dragPage = Number(row.dataset.page);
-    } else if (row.dataset.layer) {
+    } else if (row.dataset.kind === 'layer') {
       dragLayer = Number(row.dataset.layer);
     } else {
       const r = rows.get(Number(row.dataset.id));
@@ -502,12 +585,14 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     const row = (e.target as HTMLElement).closest('.ot-row') as HTMLElement | null;
     unmark();
     drop = null;
-    if (!row) return;
+    if (!row || row.dataset.kind === 'guide') return;
+    // Objekte fremder Seiten lassen sich hier nicht umhängen (dort nur Klick/Rechtsklick).
+    if (row.dataset.kind === 'object' && Number(row.dataset.page) !== ed.doc.page) return;
     const rect = row.getBoundingClientRect();
     const upper = e.clientY < rect.top + rect.height / 2;
-    if (dragPage !== null || row.dataset.page) {
+    if (dragPage !== null || row.dataset.kind === 'page') {
       // Seiten nur zwischen Seiten einordnen; Objekte auf eine andere Seite verschieben
-      if (!row.dataset.page || dragLayer !== null) return;
+      if (row.dataset.kind !== 'page' || dragLayer !== null) return;
       const pg = Number(row.dataset.page);
       if (dragPage !== null) {
         if (pg === dragPage) return;
@@ -520,7 +605,7 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
       // Layer nur zwischen Layern einordnen
       if (!row.dataset.layer || Number(row.dataset.layer) === dragLayer) return;
       drop = { kind: 'layer', layer: Number(row.dataset.layer), before: upper, into: false };
-    } else if (row.dataset.layer) {
+    } else if (row.dataset.kind === 'layer') {
       drop = { kind: 'layer', layer: Number(row.dataset.layer), before: false, into: true };
     } else {
       const r = rows.get(Number(row.dataset.id));
@@ -563,7 +648,7 @@ export function buildObjectsPanel(ed: Editor, callbacks?: ContextCallbacks) {
     else if (objs && d.kind === 'obj') void moveObjectsAsk(ed, objs, d.ref, d.front, homeLayer(d.ref));
     else if (objs && d.kind === 'layer') {
       // Auf einen Layer: dorthin verschieben, vor alle Objekte dieses Layers
-      const sec = sections().find((s) => s.layer === d.layer);
+      const sec = sections(ed.doc.objs).find((s) => s.layer === d.layer);
       const ref = sec?.objs.find((o) => !objs.includes(o)) ?? null;
       void moveObjectsAsk(ed, objs, ref, true, d.layer);
     }

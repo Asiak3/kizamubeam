@@ -140,6 +140,9 @@ export class Editor {
   continuedFrom: Obj | null = null;
   nodeHover: NodeHover | null = null;
   segHover: SegHover | null = null;
+  /** S6-Follow-up: Hilfslinie aus dem Objekte-Panel hervorheben (Hover flüchtig, Pin per Klick); Index in doc.guides, nicht persistent */
+  guideHover: number | null = null;
+  guidePin: number | null = null;
   /** Ausgewählte Knoten des Knotenziels als "Unterpfad:Index" */
   nodeSel = new Set<string>();
   nodeSelObj: Obj | null = null;

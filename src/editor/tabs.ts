@@ -9,6 +9,62 @@ import type { Editor } from '../editor';
 
 const TABS_KEY = 'kizamubeam.tabs';
 
+/** S6: gruppierte Tabs mit Seiten-Untertabs (S6): Opt-out, Standard an */
+const GROUPED_TABS_KEY = 'kizamubeam.groupedTabs';
+
+/** Stabile Akzentfarbe je Projekt anhand der Tab-ID, damit Seiten optisch zum Projekt gehören */
+export const projectHue = (id: number) => ((id * 47) % 360 + 360) % 360;
+
+/** S6-Follow-up: Seiten-Untertabs in der gruppierten Leiste zeigen (Opt-out, Standard an) */
+const TAB_PAGES_KEY = 'kizamubeam.tabPages';
+
+export const loadTabPages = (): boolean => {
+  try {
+    return localStorage.getItem(TAB_PAGES_KEY) !== '0';
+  } catch {
+    return true;
+  }
+};
+
+export const saveTabPages = (v: boolean) => {
+  try {
+    if (v) localStorage.removeItem(TAB_PAGES_KEY);
+    else localStorage.setItem(TAB_PAGES_KEY, '0');
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+};
+
+/** Hex-Farbe (#rrggbb) in Farbton 0–359 umrechnen, sonst null */
+export const hexHue = (hex: string): number | null => {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  if (max === min) return 0;
+  const d = max - min;
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return ((Math.round(h * 60) % 360) + 360) % 360;
+};
+
+export const loadGroupedTabs = (): boolean => {
+  try {
+    return localStorage.getItem(GROUPED_TABS_KEY) !== '0';
+  } catch {
+    return true;
+  }
+};
+
+export const saveGroupedTabs = (v: boolean) => {
+  try {
+    if (v) localStorage.removeItem(GROUPED_TABS_KEY);
+    else localStorage.setItem(GROUPED_TABS_KEY, '0');
+  } catch {
+    /* Speicher nicht verfügbar */
+  }
+};
+
 export interface ProjectTab {
   id: number;
   /** Dateiname ohne Endung; null = noch nie gespeichert oder geöffnet */
@@ -24,14 +80,26 @@ export interface ProjectTab {
   view: { zoom: number; ox: number; oy: number } | null;
   /** JSON des Dokuments eines inaktiven Tabs für die automatische Sicherung */
   json?: string;
+  /** S6: Projekt in der gruppierten Tableiste aufgeklappt (Seiten-Untertabs sichtbar) */
+  expanded?: boolean;
+  /** S6-Follow-up: manuell gewählte Projektfarbe als Hex (#rrggbb); ohne Angabe gilt projectHue(id) */
+  color?: string | null;
 }
+
+/** Wirksamer Farbton eines Projekts: manuelle Farbe schlägt die stabile Vorgabe */
+export const tabHue = (tab: ProjectTab): number =>
+  (tab.color ? hexHue(tab.color) : null) ?? projectHue(tab.id);
+
+/** Wirksame Projektfarbe als CSS-Farbe: manuelle Wahl unverfälscht, sonst stabile Vorgabe aus der Tab-ID */
+export const tabColor = (tab: ProjectTab): string =>
+  tab.color ?? `hsl(${projectHue(tab.id)} 70% 55%)`;
 
 let nextTabId = 1;
 
 /** Vergleichsschlüssel eines Dokuments: Seitenwechsel allein zählt nicht als Änderung */
 export const docKey = (d: Doc) => JSON.stringify({ ...d, page: 0 });
 
-export const makeTab = (doc: Doc, name: string | null = null, changed = false): ProjectTab => ({
+export const makeTab = (doc: Doc, name: string | null = null, changed = false, expanded = false): ProjectTab => ({
   id: nextTabId++,
   name,
   saved: changed ? '' : docKey(doc),
@@ -40,6 +108,7 @@ export const makeTab = (doc: Doc, name: string | null = null, changed = false): 
   sel: [],
   history: new History(),
   view: null,
+  expanded,
 });
 
 /** Dateiname ohne Ordner und Endung */
@@ -73,6 +142,8 @@ export class EditorTabs {
     this.doc = tab.doc;
     this.history = tab.history;
     delete tab.json;
+    // S6-Follow-up: Hervorhebung einer Hilfslinie gilt nur für das angezeigte Dokument
+    this.guideHover = this.guidePin = null;
     const ids = new Set(tab.sel);
     this.sel = this.doc.objs.filter((o) => ids.has(o.id));
     this.checkIssues = [];
@@ -99,13 +170,39 @@ export class EditorTabs {
       doc = newDoc();
       doc.bed = { ...this.doc.bed };
     }
-    const tab = makeTab(doc, name);
+    const tab = makeTab(doc, name, false, false);
     this.updateChanged();
     this.stashTab();
     this.tabs.splice(this.tabIndex + 1, 0, tab);
     this.showTab(this.tabIndex + 1);
     this.saveNow();
     return tab;
+  }
+  /** S6: Auf-/Zuklappzustand eines Projekts umschalten (session-persistent via Autosave) */
+  toggleTabExpanded(this: Editor, i: number) {
+    const tab = this.tabs[i];
+    if (!tab) return;
+    tab.expanded = !tab.expanded;
+    this.onTabsChange?.();
+    this.saveNow();
+  }
+  /** S6: Auf-/Zuklappzustand setzen */
+  setTabExpanded(this: Editor, i: number, expanded: boolean) {
+    const tab = this.tabs[i];
+    if (!tab || tab.expanded === expanded) return;
+    tab.expanded = expanded;
+    this.onTabsChange?.();
+    this.saveNow();
+  }
+  /** S6-Follow-up: manuelle Projektfarbe setzen (null = automatisch); session-persistent via Autosave */
+  setTabColor(this: Editor, i: number, color: string | null) {
+    const tab = this.tabs[i];
+    if (!tab) return;
+    const v = color && hexHue(color) !== null ? color.toLowerCase() : null;
+    if ((tab.color ?? null) === v) return;
+    tab.color = v;
+    this.onTabsChange?.();
+    this.saveNow();
   }
   /** Tab i schließen (Rückfrage bei ungespeicherten Änderungen macht die Oberfläche). Der letzte Tab wird geleert. */
   closeTab(this: Editor, i = this.tabIndex) {
@@ -181,13 +278,15 @@ export class EditorTabs {
       tabs: this.tabs.map((tab, i) => ({
         name: tab.name,
         changed: tab.changed,
+        expanded: !!tab.expanded,
+        color: tab.color ?? null,
         doc: i === this.tabIndex ? '@' : (tab.json ??= JSON.stringify(tab.doc)),
       })),
     }).replace('"doc":"@"', () => `"doc":${JSON.stringify(activeJson)}`);
   }
   /** Tabs aus der automatischen Sicherung; false, wenn keine da ist */
   restoreTabs(this: Editor, migrate: (objs: Obj[]) => void): boolean {
-    let st: { active?: number; tabs?: { name?: string | null; changed?: boolean; doc: string }[] };
+    let st: { active?: number; tabs?: { name?: string | null; changed?: boolean; expanded?: boolean; color?: string | null; doc: string }[] };
     try {
       st = JSON.parse(localStorage.getItem(TABS_KEY) ?? 'null');
     } catch {
@@ -202,7 +301,9 @@ export class EditorTabs {
         migrate(allObjs(doc));
         restoreAssets(this.assetIds(allObjs(doc)));
         restoreMeshes(this.meshIds(allObjs(doc)));
-        tabs.push(makeTab(doc, typeof raw.name === 'string' ? raw.name : null, !!raw.changed));
+        tabs.push(makeTab(doc, typeof raw.name === 'string' ? raw.name : null, !!raw.changed, !!raw.expanded));
+        if (typeof raw.color === 'string' && hexHue(raw.color) !== null)
+          tabs[tabs.length - 1].color = raw.color.toLowerCase();
       } catch {
         /* beschädigter Tab: weglassen */
       }

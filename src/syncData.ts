@@ -16,7 +16,7 @@ export const SETTINGS_KEYS = [
 /** Schlüssel mit diesem Anfang zählen auch zu den Einstellungen (letzte Werte der Generatoren und der Werkzeuge aus Erweiterungen) */
 export const SETTINGS_PREFIXES = [PRE + 'gen.', PRE + 'tool.'];
 /** Oberfläche: Fenster, Leisten, Werkzeugkasten */
-export const UI_KEYS = ['layout', 'toolbars', 'objectsPanel', 'apps'].map((k) => PRE + k);
+export const UI_KEYS = ['layout', 'toolbars', 'objectsPanel', 'apps', 'groupedTabs', 'tabPages'].map((k) => PRE + k);
 export const CAMERA_KEYS = [PRE + 'camera'];
 /** Bereiche mit eigenem Speicherort */
 export const DEVICES_KEY = PRE + 'devices';
