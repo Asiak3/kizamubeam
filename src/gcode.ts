@@ -1436,7 +1436,13 @@ export function finishPosition(
   start: Pt,
 ): Pt | null {
   let mode: FinishMode = device.finishMode ?? (device.returnHome === false ? 'stay' : 'start');
-  if (device.startFrom !== 'absolute' && device.startFrom !== 'user') mode = 'start';
+  // Querverweis: PR #466 führte finishMode ein und zwingt außerhalb der
+  // Absolut-/Benutzer-Modi auf 'start'. Ein explizites 'stay' (u. a. migriertes
+  // returnHome: false) muss dabei gewinnen — sonst fährt ein Job mit startFrom
+  // 'current' und returnHome: false zum Startpunkt zurück, statt wie bisher
+  // stehen zu bleiben (gemeldet in der Diskussion zu PR #476; Regressionstest
+  // 'Aktuell + Offset' in scripts/pointer-offset-test.ts).
+  if (mode !== 'stay' && device.startFrom !== 'absolute' && device.startFrom !== 'user') mode = 'start';
   switch (mode) {
     case 'stay': return null;
     case 'origin': return { x: 0, y: 0 };

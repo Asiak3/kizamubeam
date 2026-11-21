@@ -52,6 +52,8 @@ await test('Absolut + Offset: Bahnen unverändert (kein Eingriff in Geometrie/Ex
   assert.ok(sameMoves(a.moves, b.moves, { x: 0, y: 0 }), 'Bahnen müssen identisch sein');
 });
 
+// Querverweis: sichert das migrierte returnHome:false-Verhalten (stehen bleiben)
+// gegen das finishMode-Forcing aus PR #466 ab (Diskussion zu PR #476).
 await test('Aktuell + Offset: nur die Startreferenz verschiebt sich um +Offset', async () => {
   const pos = { x: 123, y: 77 };
   const off = { ...newDevice({ fw: 'fluidnc' }), startFrom: 'current' as const, jobOrigin: 6, returnHome: false, optInnerFirst: false, optTravel: false, pointerOffset: { x: 2.5, y: -16.5, enabled: true } };
