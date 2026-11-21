@@ -1137,26 +1137,32 @@ await test('Job-Override: ohne order gilt das Geräte-Preset (manuell warnt)', a
 
 await test('Job-Override: innerFirst-Override unterdrückt die Manuell-Warnung und sortiert um', async () => {
   const base = await cutJob([orderOuter, orderInner], {}, manualOff);
-  const over = await cutJob([orderOuter, orderInner], {}, manualOff, { innerFirst: true, travel: false, group: false, cornerStart: false });
+  const over = await cutJob([orderOuter, orderInner], {}, manualOff, { innerFirst: true, travel: false, group: false, cornerStart: false, dirOrder: 'none', bestStart: false, bestDirection: false, lessTurns: false });
   assert.ok(!over.warnings.some((w) => w.includes('Manuelle Reihenfolge')), JSON.stringify(over.warnings));
   assert.ok(!sameMoves(base.moves, over.moves, base.offset), 'Override sortiert um');
 });
 
 await test('Job-Override: effOrderOf löst Override oder Preset, isManualOrder erkennt manuell', () => {
   const dev = { ...newDevice({ fw: 'fluidnc' }), optInnerFirst: true, optTravel: false, optGroup: false };
-  assert.deepEqual(effOrderOf(dev, {}), { innerFirst: true, travel: false, group: false, cornerStart: false });
-  assert.deepEqual(effOrderOf(dev, { travel: true }), { innerFirst: true, travel: true, group: false, cornerStart: false });
-  assert.deepEqual(effOrderOf(dev, { innerFirst: null }), { innerFirst: true, travel: false, group: false, cornerStart: false });
-  assert.deepEqual(effOrderOf(dev, { cornerStart: true }), { innerFirst: true, travel: false, group: false, cornerStart: true });
-  assert.equal(isManualOrder({ innerFirst: false, travel: false, group: false, cornerStart: false }), true);
-  assert.equal(isManualOrder({ innerFirst: false, travel: false, group: false, cornerStart: true }), true);
-  assert.equal(isManualOrder({ innerFirst: true, travel: false, group: false, cornerStart: false }), false);
-  assert.equal(isManualOrder({ innerFirst: false, travel: true, group: false, cornerStart: false }), false);
+  const off = { innerFirst: true, travel: false, group: false, cornerStart: false, dirOrder: 'none', bestStart: false, bestDirection: false, lessTurns: false } as const;
+  assert.deepEqual(effOrderOf(dev, {}), off);
+  assert.deepEqual(effOrderOf(dev, { travel: true }), { ...off, travel: true });
+  assert.deepEqual(effOrderOf(dev, { innerFirst: null }), off);
+  assert.deepEqual(effOrderOf(dev, { cornerStart: true }), { ...off, cornerStart: true });
+  assert.deepEqual(effOrderOf(dev, { dirOrder: 'ltr', bestStart: true, bestDirection: true, lessTurns: true }),
+    { ...off, dirOrder: 'ltr', bestStart: true, bestDirection: true, lessTurns: true });
+  assert.equal(isManualOrder({ ...off, innerFirst: false }), true);
+  assert.equal(isManualOrder({ ...off, innerFirst: false, cornerStart: true }), true);
+  assert.equal(isManualOrder({ ...off, innerFirst: false, bestStart: true, bestDirection: true }), true);
+  assert.equal(isManualOrder(off), false);
+  assert.equal(isManualOrder({ ...off, innerFirst: false, travel: true }), false);
+  assert.equal(isManualOrder({ ...off, innerFirst: false, dirOrder: 'ltr' }), false);
+  assert.equal(isManualOrder({ ...off, innerFirst: false, lessTurns: true }), false);
   assert.equal(isManualOrder(effOrderOf(dev, {})), false);
 });
 await test('Job-Override: Override aus bildet Geräte-Preset exakt ab', async () => {
   const off = await cutJob([orderOuter, orderInner], {}, manualOff);
-  const on = await cutJob([orderOuter, orderInner], {}, { optInnerFirst: true, optTravel: true }, { innerFirst: false, travel: false, group: false, cornerStart: false });
+  const on = await cutJob([orderOuter, orderInner], {}, { optInnerFirst: true, optTravel: true }, { innerFirst: false, travel: false, group: false, cornerStart: false, dirOrder: 'none', bestStart: false, bestDirection: false, lessTurns: false });
   assert.ok(sameMoves(off.moves, on.moves, off.offset), 'Override aus = Preset aus');
   assert.deepEqual(on.warnings, off.warnings);
 });
@@ -1166,7 +1172,7 @@ await test('Job-Override: Override aus bildet Geräte-Preset exakt ab', async ()
 const cornerPts = [{ x: 150, y: 100 }, { x: 200, y: 100 }, { x: 200, y: 200 }, { x: 100, y: 200 }, { x: 100, y: 100 }];
 const cornerObj: Obj = { id: 7, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: true, nodes: cornerPts }] } };
 const cornerFixed: Obj = { id: 8, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: true, nodes: cornerPts, start: true }] } };
-const cornerOrder: OrderOpts = { innerFirst: false, travel: false, group: false, cornerStart: true };
+const cornerOrder: OrderOpts = { innerFirst: false, travel: false, group: false, cornerStart: true, dirOrder: 'none', bestStart: false, bestDirection: false, lessTurns: false };
 
 await test('Ecke-Start: geschlossene Kontur beginnt an der schärfsten Ecke', async () => {
   const plain = await cutJob([cornerObj], {}, manualOff);
@@ -1178,7 +1184,7 @@ await test('Ecke-Start: geschlossene Kontur beginnt an der schärfsten Ecke', as
 await test('Ecke-Start: gesetzter Startpunkt gewinnt über Ecke-Start', async () => {
   const job = await cutJob([cornerFixed], {}, manualOff, cornerOrder);
   assert.deepEqual(firstRapid(job.moves), [150, 300]);
-  const travel = await cutJob([cornerFixed], {}, { optInnerFirst: false, optTravel: true, optGroup: false }, { innerFirst: false, travel: true, group: false, cornerStart: true });
+  const travel = await cutJob([cornerFixed], {}, { optInnerFirst: false, optTravel: true, optGroup: false }, { innerFirst: false, travel: true, group: false, cornerStart: true, dirOrder: 'none', bestStart: false, bestDirection: false, lessTurns: false });
   assert.deepEqual(firstRapid(travel.moves), [150, 300]);
 });
 
@@ -1192,13 +1198,13 @@ await test('Ecke-Start: mit Leerweg-Optik gilt die schärfste Ecke statt des nä
   const plain = await cutJob([cornerObj], {}, travel);
   // nächster Knoten zu (0,0) ist Bett-(100,200) → Maschine (100,200)
   assert.deepEqual(firstRapid(plain.moves), [100, 200]);
-  const job = await cutJob([cornerObj], {}, travel, { innerFirst: false, travel: true, group: false, cornerStart: true });
+  const job = await cutJob([cornerObj], {}, travel, { innerFirst: false, travel: true, group: false, cornerStart: true, dirOrder: 'none', bestStart: false, bestDirection: false, lessTurns: false });
   assert.deepEqual(firstRapid(job.moves), [200, 300]);
 });
 
 await test('Ecke-Start: ohne Flag kein Verhalten (gleiche Moves und Warnungen)', async () => {
   const plain = await cutJob([cornerObj], {}, manualOff);
-  const explicit = await cutJob([cornerObj], {}, manualOff, { innerFirst: false, travel: false, group: false, cornerStart: false });
+  const explicit = await cutJob([cornerObj], {}, manualOff, { innerFirst: false, travel: false, group: false, cornerStart: false, dirOrder: 'none', bestStart: false, bestDirection: false, lessTurns: false });
   assert.ok(sameMoves(plain.moves, explicit.moves, plain.offset), 'ohne Flag identisch');
   assert.deepEqual(explicit.warnings, plain.warnings);
 });
@@ -1214,6 +1220,97 @@ await test('sharpestCorner: schärfste Ecke, Gleichstand, glatt/offen', () => {
   const poly16 = { pts: Array.from({ length: 16 }, (_, k) => ({ x: Math.cos((k * 2 * Math.PI) / 16), y: Math.sin((k * 2 * Math.PI) / 16) })), closed: true };
   assert.equal(sharpestCorner(poly16), -1);
   assert.equal(sharpestCorner({ pts: cornerPts, closed: false }), -1);
+});
+
+// ---------- Richtungsreihenfolge, Startknoten und Kurswahl (Follow-up) ----------
+
+/** Alle Schalter aus: Ausgangspunkt für die neuen Optionen */
+const orderOff: OrderOpts = { innerFirst: false, travel: false, group: false, cornerStart: false, dirOrder: 'none', bestStart: false, bestDirection: false, lessTurns: false };
+
+await test('dirOrder: ltr/rtl/ttb/btt sortiert dokument-verdrehte Quadrate', async () => {
+  // Dokumentreihenfolge Ost, Süd, West, Nord; Maschine y nach oben (Bett 400)
+  const objs = [square(300, 200, 10, 2), square(150, 300, 10, 4), square(50, 200, 10, 1), square(150, 50, 10, 3)];
+  const first = async (dirOrder: OrderOpts['dirOrder']) =>
+    firstRapid((await cutJob(objs, {}, manualOff, { ...orderOff, dirOrder })).moves);
+  assert.deepEqual(await first('ltr'), [50, 200]);
+  assert.deepEqual(await first('rtl'), [300, 200]);
+  // ttb: größtes cy (Norden, Maschinen-y 340…350), btt: kleinstes cy (Süden, 90…100)
+  assert.deepEqual(await first('ttb'), [150, 350]);
+  assert.deepEqual(await first('btt'), [150, 100]);
+});
+
+await test('dirOrder: Gleichstand zählt den niedrigsten Index zuerst', async () => {
+  // gleiche Mitte-x (155), Dokumentreihenfolge Nord vor Süd: kein cy-Tie-Break
+  const objs = [square(150, 50, 10, 3), square(150, 300, 10, 4)];
+  const rapids = rapidDests((await cutJob(objs, {}, manualOff, { ...orderOff, dirOrder: 'ltr' })).moves);
+  assert.deepEqual(rapids.slice(0, 2), [[150, 350], [150, 100]]);
+});
+
+await test('dirOrder: Gruppen-Präferenz schlägt die Richtungsnähe', async () => {
+  const g1a: Obj = { id: 11, m: [1, 0, 0, 1, 100, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const g1b: Obj = { id: 12, m: [1, 0, 0, 1, 300, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const solo: Obj = { id: 13, m: [1, 0, 0, 1, 110, 100], layer: 1, shape: { kind: 'rect', w: 10, h: 10, r: 0 } as never };
+  const grp: Obj = { id: 10, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'group', children: [g1a, g1b] } };
+  const xs = async (group: boolean) =>
+    rapidDests((await cutJob([grp, solo], {}, manualOff, { ...orderOff, dirOrder: 'ltr', group })).moves).map(([x]) => x);
+  // ohne Gruppe: rein nach x — mit Gruppe: das ferne Gruppenmitglied kommt vor dem Solo
+  assert.ok((await xs(false)).slice(0, 3).every((x, k) => Math.abs(x - [100, 110, 300][k]) <= 5), 'ltr ohne Gruppe');
+  assert.ok((await xs(true)).slice(0, 3).every((x, k) => Math.abs(x - [100, 300, 110][k]) <= 5), 'ltr mit Gruppe');
+});
+
+await test('dirOrder + travel: offene Kontur beginnt am näheren Endpunkt', async () => {
+  const lineA: Obj = { id: 31, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 50, y: 100 }, { x: 150, y: 100 }] }] } };
+  // Dokumentstart (160,130) → Maschine (160,270), Dokumentende → (160,290): näher an (150,300)
+  const lineB: Obj = { id: 32, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 160, y: 130 }, { x: 160, y: 110 }] }] } };
+  const objs = [lineB, lineA];
+  const plain = rapidDests((await cutJob(objs, {}, manualOff, { ...orderOff, dirOrder: 'ltr' })).moves);
+  assert.deepEqual(plain.slice(0, 2), [[50, 300], [160, 270]]);
+  const travel = rapidDests((await cutJob(objs, {}, manualOff, { ...orderOff, dirOrder: 'ltr', travel: true })).moves);
+  assert.deepEqual(travel.slice(0, 2), [[50, 300], [160, 290]]);
+});
+
+await test('bestStart: Start rotiert zum nächsten Knoten, Reihenfolge bleibt', async () => {
+  const objs = [square(50, 100, 10, 1), square(200, 100, 10, 2)];
+  const man = rapidDests((await cutJob(objs, {}, manualOff)).moves);
+  const best = rapidDests((await cutJob(objs, {}, manualOff, { ...orderOff, bestStart: true })).moves);
+  // Quadrat-Ursprung (Dokument (50,100)) gegen nächsten Knoten zu (0,0): (50,290)
+  assert.deepEqual(man[0], [50, 300]);
+  assert.deepEqual(best[0], [50, 290]);
+  // gleiche Sequenz: beide schneiden erst Quadrat 1, dann Quadrat 2
+  for (const r of [man, best]) {
+    assert.ok(r[0][0] >= 50 && r[0][0] <= 60 && r[0][1] >= 290 && r[0][1] <= 300, `erstes Quadrat: ${r[0]}`);
+    assert.ok(r[1][0] >= 200 && r[1][0] <= 210 && r[1][1] >= 290 && r[1][1] <= 300, `zweites Quadrat: ${r[1]}`);
+  }
+});
+
+await test('bestDirection: offene Kontur beginnt am näheren Ende', async () => {
+  const ln: Obj = { id: 33, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 300, y: 200 }, { x: 200, y: 200 }] }] } };
+  assert.deepEqual(firstRapid((await cutJob([ln], {}, manualOff)).moves), [300, 200]);
+  assert.deepEqual(firstRapid((await cutJob([ln], {}, manualOff, { ...orderOff, bestDirection: true })).moves), [200, 200]);
+});
+
+await test('lessTurns: Kursfortsetzung gewinnt gegen kürzere Anfahrt, deterministisch', async () => {
+  const line0: Obj = { id: 34, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 50, y: 100 }, { x: 100, y: 100 }] }] } };
+  const line1: Obj = { id: 35, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 100, y: 100 }, { x: 150, y: 100 }] }] } };
+  const lineA: Obj = { id: 36, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 158, y: 110 }, { x: 158, y: 130 }] }] } };
+  const lineB: Obj = { id: 37, m: [1, 0, 0, 1, 0, 0], layer: 1, shape: { kind: 'path', subs: [{ closed: false, nodes: [{ x: 164, y: 100 }, { x: 180, y: 100 }] }] } };
+  const objs = [lineB, lineA, line1, line0];
+  // Anfahrt ab (150,300) Richtung Ost: A bei (158,290) ist 12,8 mm nah, B bei (164,300) 14 mm in Kursrichtung
+  const plain = rapidDests((await cutJob(objs, {}, manualOff, { ...orderOff, travel: true })).moves);
+  assert.deepEqual(plain.slice(0, 3), [[50, 300], [100, 300], [158, 290]]);
+  const less = rapidDests((await cutJob(objs, {}, manualOff, { ...orderOff, travel: true, lessTurns: true })).moves);
+  assert.deepEqual(less.slice(0, 3), [[50, 300], [100, 300], [164, 300]]);
+  const again = rapidDests((await cutJob(objs, {}, manualOff, { ...orderOff, travel: true, lessTurns: true })).moves);
+  assert.deepEqual(again, less, 'deterministisch');
+});
+
+await test('Legacy-Defaults: ohne neue Felder byte-identische Ausgabe', async () => {
+  const objs = [orderOuter, orderInner];
+  const plain = await cutJob(objs, {}, manualOff);
+  const explicit = await cutJob(objs, {}, manualOff, { ...orderOff });
+  const d = newDevice({ fw: 'fluidnc' });
+  assert.deepEqual(writeGCode(explicit, d, estimate(explicit.moves, d)).lines, writeGCode(plain, d, estimate(plain.moves, d)).lines);
+  assert.deepEqual(explicit.warnings, plain.warnings);
 });
 
 await test('xTool status report without a state word', () => {
