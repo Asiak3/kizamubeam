@@ -46,6 +46,9 @@ jobs:
       - name: G-code regression tests
         run: npm run test:gcode
 
+      - name: Pointer-offset tests (return-home regression, discussion on #476)
+        run: npm run test:pointer
+
       - name: Contour topology tests
         run: npm run test:contour-topology
 
