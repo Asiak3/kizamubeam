@@ -620,7 +620,7 @@ export async function importBytesOrThrow(ed: Editor, name: string, bytes: Uint8A
     await insertAssetFile(ed, new TextDecoder().decode(bytes));
     return;
   }
-  const parseOpts: ImportParseOptions = { svgDpi: ed.svgDpi, dxfFallbackUnit: ed.dxfFallbackUnitMm };
+  const parseOpts: ImportParseOptions = { svgDpi: ed.svgDpi, dxfFallbackUnit: ed.dxfFallbackUnitMm, closeTolerance: ed.importCloseToleranceMm, importHiddenLayers: ed.importHiddenLayers };
   const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w, ed.importSkippedNote ?? true, parseOpts);
   if (f.kind === 'vectors') await ed.importVectors(f.res, name);
   else if (f.kind === 'pdf') await ed.importPdfPages(f.pages, name);
@@ -630,7 +630,7 @@ export async function importBytesOrThrow(ed: Editor, name: string, bytes: Uint8A
 
 /** Datei zu Objekten machen, ohne sie einzufügen (für die Bibliothek); notes: Hinweise des Imports */
 export async function fileObjs(ed: Editor, name: string, bytes: Uint8Array): Promise<{ objs: Obj[]; notes: string[] }> {
-  const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w, ed.importSkippedNote ?? true, { svgDpi: ed.svgDpi, dxfFallbackUnit: ed.dxfFallbackUnitMm });
+  const f = await parseFile(name, bytes, () => ed.doc.bed.h, () => ed.doc.bed.w, ed.importSkippedNote ?? true, { svgDpi: ed.svgDpi, dxfFallbackUnit: ed.dxfFallbackUnitMm, closeTolerance: ed.importCloseToleranceMm, importHiddenLayers: ed.importHiddenLayers });
   if (f.kind === 'image') return { objs: [await ed.imageObj(f.dataUrl, f.dpi, name)], notes: [] };
   if (f.kind === 'lbrn') {
     for (const [id, url] of Object.entries(f.res.assets)) registerAsset(id, url);

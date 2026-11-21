@@ -16,11 +16,13 @@ import { closureOf, recognizeCandidates, smoothStroke, SHAPER_MIN_CONFIDENCE, ty
 import { freehandShape } from './vector';
 import { t } from '../i18n';
 import { vectorError } from '../vectorMessages';
+import { gestureSpline, splineSamples, type GestureSpline } from '../shaperSpline';
 
 /** Nachjustierbare letzte Shaper-Operation (nicht Teil von Dokument/History). */
 export interface ShaperSession {
   /** Rohgeste in Welt-mm — Grundlage jeder Neuberechnung. */
   points: Pt[];
+  spline?: GestureSpline;
   op: 'union' | 'subtract' | 'recognize' | 'freehand';
   /** Ursprüngliche Objekte (Klon), bei Bool-Operationen die Operanden. */
   inputs: Obj[];
@@ -181,7 +183,7 @@ export class EditorShaper {
 
   /** Kapsel entlang der Geste von der Zielfläche abziehen. */
   async shaperSubtract(this: Editor, target: Obj, raw: Pt[]) {
-    const points = this.shaperPoints(raw);
+    const points = splineSamples(gestureSpline({ points: raw }, this.shaperSmoothing).path);
     const operands = [structuredClone(target)];
     const probe = this.shaperCut(structuredClone(target), points);
     if (!probe) {
@@ -244,6 +246,7 @@ export class EditorShaper {
       points: raw.map((p) => ({ ...p })), op: 'freehand', inputs: [], keep: this.boolKeep,
       resultId: obj.id, position: this.history.position, cands, pick: 'freehand', closed,
     };
+    this.shaperRebuild();
     this.emit('tool');
   }
 
@@ -263,7 +266,8 @@ export class EditorShaper {
     const s = this.shaperEdit;
     if (!this.shaperEditValid() || !s) return false;
     const res = this.doc.objs.find((o) => o.id === s.resultId)!;
-    const pts = this.shaperPoints(s.points);
+    const spline = gestureSpline(s, this.shaperSmoothing);
+    const pts = splineSamples(spline.path);
     s.closed = closureOf(s.points, this.shaperCloseGap).closed;
     let shape: Shape | null = null;
     let mat: Mat | null = null;
@@ -282,7 +286,7 @@ export class EditorShaper {
         mat = built.mat;
       } else {
         // Freihand liegt im Weltraum: erkannte Form-Matrix darf nicht hängen bleiben
-        shape = this.shaperFreehandShape(pts, s.closed);
+        shape = { kind: 'path', subs: [{ ...structuredClone(spline.path), closed: s.closed }] };
         mat = [...IDENT];
       }
     }

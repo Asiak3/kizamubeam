@@ -434,6 +434,9 @@ function sanitizeSvgText(input: string): string {
 
 export type SvgDpi = '96' | '72' | 'auto';
 
+/** Standard-Auto-Close-Toleranz beim Import in mm (bisheriges Verhalten, falls nichts eingestellt) */
+export const DEFAULT_CLOSE_TOLERANCE = 0.005;
+
 export interface ImportParseOptions {
   /** Hinweise zu übersprungenen Inhalten (z. B. Texte) in notes aufnehmen; Formen werden so oder so übersprungen */
   reportSkipped?: boolean;
@@ -441,10 +444,15 @@ export interface ImportParseOptions {
   svgDpi?: SvgDpi;
   /** DXF-Einheit in mm pro Einheit, wenn $INSUNITS fehlt oder unbekannt ist (Default 1 = mm) */
   dxfFallbackUnit?: number;
+  /** Auto-Close-Toleranz in mm beim Zusammenfügen offener Linienzüge (Default 0.005); 0 = nur exakt schließen */
+  closeTolerance?: number;
+  /** Versteckte Ebenen/Elemente mit importieren (Default true = heutiges Verhalten); aus = visibility:hidden (SVG) und gefrorene/ausgeschaltete DXF-Layer überspringen, display:none bleibt immer geskippt */
+  importHiddenLayers?: boolean;
 }
 
 export function importSvg(text: string, opts?: ImportParseOptions): ImportResult {
   const reportSkipped = opts?.reportSkipped ?? true;
+  const importHidden = opts?.importHiddenLayers ?? true;
   const safeText = sanitizeSvgText(text);
   const doc = new DOMParser().parseFromString(safeText, 'image/svg+xml');
   const root = doc.documentElement;
@@ -497,7 +505,7 @@ export function importSvg(text: string, opts?: ImportParseOptions): ImportResult
     if (['defs', 'clipPath', 'mask', 'symbol', 'metadata', 'title', 'desc', 'style', 'script', 'pattern', 'marker', 'linearGradient', 'radialGradient', 'filter', 'foreignObject'].includes(name))
       return;
     const st = styleOf(el, pst);
-    if (st.display === 'none') return;
+    if (st.display === 'none' || (!importHidden && st.visibility === 'hidden')) return;
     const mm = mul(m, parseTransform(el.getAttribute('transform')));
     const pb = new PathBuilder();
     switch (name) {
@@ -622,6 +630,7 @@ const INSUNITS_MM: Record<number, number> = { 1: 25.4, 2: 304.8, 4: 1, 5: 10, 6:
 
 export function importDxf(text: string, opts?: ImportParseOptions): ImportResult {
   const reportSkipped = opts?.reportSkipped ?? true;
+  const importHidden = opts?.importHiddenLayers ?? true;
   const fallback = opts?.dxfFallbackUnit && Number.isFinite(opts.dxfFallbackUnit) && opts.dxfFallbackUnit > 0 ? opts.dxfFallbackUnit : 1;
   const pairs = dxfPairs(text);
   if (!pairs.some(([c, v]) => c === 0 && v === 'SECTION')) throw new Error(t('Keine gültige DXF-Datei'));
@@ -629,6 +638,8 @@ export function importDxf(text: string, opts?: ImportParseOptions): ImportResult
   const layerColor = new Map<string, number>();
   // Echtfarben (Gruppencode 420, ab AutoCAD 2004) gehen vor dem Farbindex
   const layerTrue = new Map<string, [number, number, number]>();
+  // Gefrorene (Gruppe 70, Bit 0) oder ausgeschaltete (Farbe 62 negativ) Layer
+  const layerHidden = new Set<string>();
   const blocks = new Map<string, { base: Pt; ents: DxfEnt[] }>();
   const entities: DxfEnt[] = [];
   const notes: string[] = [];
@@ -669,6 +680,8 @@ export function importDxf(text: string, opts?: ImportParseOptions): ImportResult
         const tc = e.g.find(([k]) => k === 420)?.[1];
         if (name && col) layerColor.set(name, Math.abs(parseInt(col, 10)));
         if (name && tc) layerTrue.set(name, trueColor(tc));
+        const flags = parseInt(e.g.find(([k]) => k === 70)?.[1] ?? '0', 10);
+        if (name && ((Number.isFinite(flags) && (flags & 1) !== 0) || (col !== undefined && parseInt(col, 10) < 0))) layerHidden.add(name);
       }
       continue;
     }
@@ -712,6 +725,7 @@ export function importDxf(text: string, opts?: ImportParseOptions): ImportResult
       return p ? parseFloat(p[1]) : d;
     };
     const lname = e.g.find(([c]) => c === 8)?.[1] ?? '0';
+    if (!importHidden && layerHidden.has(lname)) return;
     let aci = get(62, 256);
     const tc = e.g.find(([c]) => c === 420)?.[1];
     let rgb: [number, number, number] | null = tc !== undefined ? trueColor(tc) : null;
@@ -811,7 +825,8 @@ export function importDxf(text: string, opts?: ImportParseOptions): ImportResult
   // Einheit anwenden, y bleibt nach oben (der Aufrufer spiegelt am Bett)
   for (const e of entities) emit(e, [unit, 0, 0, unit, 0, 0], null, null, 0);
   if (skipped.size && reportSkipped) notes.push(t('Übersprungen: {list}.', { list: [...skipped].map(([what, n]) => `${n}× ${what}`).join(', ') }));
-  return { items: joinPaths(items), notes, yUp: true };
+  const closeTol = opts?.closeTolerance ?? DEFAULT_CLOSE_TOLERANCE;
+  return { items: joinPaths(items, closeTol > 0 ? closeTol : 1e-9), notes, yUp: true };
 }
 
 function polyBulge(pb: PathBuilder, vs: { x: number; y: number; b: number }[], closed: boolean) {

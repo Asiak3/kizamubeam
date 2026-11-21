@@ -13,6 +13,7 @@ import { CON_GLYPHS } from './sketch';
 import { dec, t } from '../i18n';
 import type { Editor } from '../editor';
 import { RULER, HANDLE_OFF, cachedWorldPath, SNAP_COLOR } from './shared';
+import { gestureSpline } from '../shaperSpline';
 import { curvaturePreview } from './vector';
 import { arcSubPath } from './arc';
 import { GRID_MIN_PX, gridLevels, gridLines, LEVEL_ALPHA } from '../grid';
@@ -846,6 +847,41 @@ export class EditorRender {
         ctx.lineWidth = 1;
         ctx.stroke();
       }
+    }
+    // Derived Bézier curve: square anchors, round tangent controls.
+    const se = this.shaperEdit;
+    if (se && this.shaperEditValid()) {
+      const hz = this.handleSize ?? DEFAULT_HANDLE_SIZE, hh = hz / 2;
+      ctx.fillStyle = T.handleFill;
+      ctx.strokeStyle = T.sel;
+      ctx.lineWidth = 1;
+      const path = gestureSpline(se, this.shaperSmoothing).path;
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      path.nodes.forEach((n, i) => {
+        const q = this.toScreen(n);
+        if (!i) ctx.moveTo(q.x, q.y);
+        else {
+          const a = path.nodes[i - 1], c = this.toScreen(a.cout ?? a), d = this.toScreen(n.cin ?? n);
+          ctx.bezierCurveTo(c.x, c.y, d.x, d.y, q.x, q.y);
+        }
+      });
+      ctx.stroke();
+      for (const n of path.nodes) {
+        const a = this.toScreen(n);
+        for (const control of [n.cin, n.cout]) if (control) {
+          const q = this.toScreen(control);
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+          ctx.beginPath(); ctx.arc(q.x, q.y, Math.max(2, hh - 1), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+      }
+      for (const p of path.nodes) {
+        const q = this.toScreen(p);
+        ctx.fillRect(q.x - hh, q.y - hh, hz, hz);
+        ctx.strokeRect(q.x - hh + 0.5, q.y - hh + 0.5, hz - 1, hz - 1);
+      }
+      ctx.restore();
     }
     // Winkelanzeige beim Drehen
     const d = this.drag;

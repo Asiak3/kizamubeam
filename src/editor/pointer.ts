@@ -11,6 +11,8 @@ import { MAX_VECTOR_SAMPLES } from '../vectorFit';
 import { closureOf } from '../shaper';
 import { genLeaves, isMarkGroup } from './generators';
 import { HINGE_HINT_FIRST, HINGE_HINT_SECOND, LASSO_TOUCH_HINT, RULER, TOOL_HINTS } from './shared';
+import { DEFAULT_HANDLE_SIZE } from './render';
+import { deformGesture, gestureSpline, hitSpline } from '../shaperSpline';
 import { ARC_MIN_RADIUS, arcPoint, arcSpec, arcSubPath, newArcDraft, snapAngle, type ArcDraft, type ArcMode } from './arc';
 import { OVERLAP_MOVE_PX } from '../overlapPicker';
 import { hitImageCropHandle, pointerCropTo } from '../imageCropUi';
@@ -70,7 +72,7 @@ export class EditorPointer {
 
   onDown(this: Editor, e: PointerEvent) {
     // A second pointer must not replace an in-progress freehand stroke.
-    if (this.drag?.type === 'pencil' || this.drag?.type === 'shaper' || this.drag?.type === 'freehand-edit') return;
+    if (this.drag?.type === 'pencil' || this.drag?.type === 'shaper' || this.drag?.type === 'shaper-point' || this.drag?.type === 'freehand-edit') return;
     if(this.drag?.type==='lasso')return;
     const { sx, sy } = this.evPt(e);
     const wp = this.toWorld(sx, sy);
@@ -239,6 +241,32 @@ export class EditorPointer {
       }
       case 'shaper':
         e.preventDefault();
+        // Sparse Bézier anchors and tangents, never the raw mouse samples.
+        if (this.shaperEditValid()) {
+          const se = this.shaperEdit!;
+          {
+            const stol = Math.max(10, (this.handleSize ?? DEFAULT_HANDLE_SIZE) / 2 + 3) / this.view.zoom;
+            const spline = gestureSpline(se, this.shaperSmoothing);
+            const handle = hitSpline(spline.path, wp, stol);
+            if (handle) {
+              this.clearSnap();
+              const result = this.doc.objs.find((o) => o.id === se.resultId)!;
+              // Boolean operations replace their operands in the document. Keep
+              // those original contours available without snapping to the live cut.
+              const snapSet = this.buildSnap([result]);
+              const originals = buildSnapSet(se.inputs, (o) => this.layer(o.layer).show);
+              snapSet.pts.push(...originals.pts);
+              snapSet.pieces.push(...originals.pieces);
+              snapSet.boxes.push(...originals.boxes);
+              this.drag = { type: 'shaper-point', ...handle, pointerId: e.pointerId, moved: false,
+                original: structuredClone(se), shape: structuredClone(result.shape), mat: [...result.m], snapSet };
+              this.redraw();
+              return;
+            }
+          }
+        }
+        // An existing session is edit-only until the user leaves the tool.
+        if (this.shaperEdit) return;
         this.clearSnap();
         this.shaperCloseHint = null;
         this.drag = { type: 'shaper', points: [wp], pointerId: e.pointerId, overflow: false };
@@ -507,6 +535,28 @@ export class EditorPointer {
             ? t('Loslassen schließt die Kontur.')
             : t('Kontur offen: Ende zurück in den Ring am Startpunkt ziehen.');
           this.emit('tool');
+        }
+        this.redraw(); return;
+      }
+      case 'shaper-point': {
+        if (e.pointerId !== d.pointerId) return;
+        const se = this.shaperEdit;
+        if (!this.shaperEditValid() || !se) { this.drag = null; this.redraw(); return; }
+        if (!Number.isFinite(wp.x) || !Number.isFinite(wp.y)) return;
+        // Keep targets stable during rebuilds; the edited result must not snap to itself.
+        const target = this.snapPt(wp, e, { set: d.snapSet });
+        const spline = gestureSpline(se, this.shaperSmoothing);
+        const node = spline.path.nodes[d.index];
+        const handle = d.which === 'p' ? node : node?.[d.which];
+        if (!handle || (handle.x === target.x && handle.y === target.y)) { this.redraw(); return; }
+        const previous = structuredClone(se);
+        deformGesture(se, d, target, this.shaperSmoothing);
+        se.pick = 'freehand';
+        try {
+          if (this.shaperRebuild()) d.moved = true;
+          else this.shaperEdit = previous;
+        } catch {
+          this.shaperEdit = previous;
         }
         this.redraw(); return;
       }
@@ -793,6 +843,7 @@ export class EditorPointer {
     // Ignore unrelated releases before clearing the active drag. In particular,
     // a second touch/pen can otherwise make a Pencil stroke silently disappear.
     if (this.drag && 'pointerId' in this.drag && this.drag.pointerId !== e.pointerId) return;
+    if (this.drag?.type === 'shaper-point') this.onMove(e);
     if (this.tool === 'sketch') this.sketchUp();
     const d = this.drag;
     this.drag = null;
@@ -810,6 +861,7 @@ export class EditorPointer {
         if (e.pointerId !== d.pointerId || d.overflow) return;
         const p = this.evPt(e), end = this.toWorld(p.sx, p.sy);
         if (Number.isFinite(end.x) && Number.isFinite(end.y) && d.points.length < MAX_VECTOR_SAMPLES) d.points.push(end);
+        if (this.shaperEdit) return;
         void this.finishShaper(d.points);
         return;
       }
@@ -1180,7 +1232,17 @@ export class EditorPointer {
     const d = this.drag;
     if (!d) return;
     this.drag = null;
-    if (d.type === 'move' || d.type === 'scale' || d.type === 'rotate') {
+    if (d.type === 'shaper-point') {
+      if (this.shaperEditValid() && this.shaperEdit) {
+        const result = this.doc.objs.find((o) => o.id === this.shaperEdit!.resultId)!;
+        this.shaperEdit = d.original;
+        result.shape = d.shape;
+        result.m = d.mat;
+        this.touch(result.shape);
+        this.emit('doc');
+        this.emit('tool');
+      }
+    } else if (d.type === 'move' || d.type === 'scale' || d.type === 'rotate') {
       this.sel.forEach((o, i) => (o.m = d.orig[i]));
       if (d.type !== 'move' || d.moved) this.dropSnapshot();
     } else if (d.type === 'guide') {

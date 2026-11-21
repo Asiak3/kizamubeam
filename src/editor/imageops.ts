@@ -2,7 +2,7 @@
 import { allObjs, DEFAULT_ADJUST, IDENT, ImageAdjust, ImageLayer, ImageShape, inv, leaves, Mat, mul, newId, Obj, Pt, SubPath, translate } from '../model';
 import { addAsset, adjustedGray, assetImage, imageRasterGeometry, registerAsset, sourceSize } from '../images';
 import type { LbrnResult } from '../lbrn';
-import { ImportResult, SvgDpi, transformSubs } from '../importers';
+import { DEFAULT_CLOSE_TOLERANCE, ImportResult, SvgDpi, transformSubs } from '../importers';
 import { traceGray, TraceOptions } from '../trace';
 import { backgroundAlpha, BgOptions, opaqueBounds } from '../bgremove';
 import { centerlineGray } from '../centerline';
@@ -14,6 +14,8 @@ const IMPORT_AUTO_SELECT_KEY = 'kizamubeam.importAutoSelect';
 const IMPORT_CENTER_IN_BED_KEY = 'kizamubeam.importCenterInBed';
 const IMPORT_SKIPPED_NOTE_KEY = 'kizamubeam.importSkippedNote';
 const IMPORT_AUTO_GROUP_KEY = 'kizamubeam.importAutoGroup';
+const IMPORT_CLOSE_TOLERANCE_KEY = 'kizamubeam.importCloseTolerance';
+const IMPORT_HIDDEN_LAYERS_KEY = 'kizamubeam.importHiddenLayers';
 const SVG_DPI_KEY = 'kizamubeam.svgDpi';
 const DXF_FALLBACK_UNIT_KEY = 'kizamubeam.dxfFallbackUnit';
 
@@ -67,6 +69,23 @@ export function loadDxfFallbackUnit(): number {
     return Number.isFinite(v) && v > 0 ? v : 1;
   } catch {
     return 1;
+  }
+}
+/** Auto-Close-Toleranz in mm beim Import (Default 0.005 = bisheriges Verhalten, 0 = nur exakt schließen) */
+export function loadImportCloseTolerance(): number {
+  try {
+    const v = Number(JSON.parse(localStorage.getItem(IMPORT_CLOSE_TOLERANCE_KEY) ?? String(DEFAULT_CLOSE_TOLERANCE)));
+    return Number.isFinite(v) && v >= 0 && v <= 10 ? v : DEFAULT_CLOSE_TOLERANCE;
+  } catch {
+    return DEFAULT_CLOSE_TOLERANCE;
+  }
+}
+/** Versteckte Ebenen/Elemente mit importieren: an, bis in den Einstellungen abgewählt (Opt-out; Default true = heutiges Verhalten) */
+export function loadImportHiddenLayers(): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(IMPORT_HIDDEN_LAYERS_KEY) ?? 'true') !== false;
+  } catch {
+    return true;
   }
 }
 function saveImportFlag(key: string, on: boolean) {
@@ -282,6 +301,15 @@ export class EditorImages {
     if (!Number.isFinite(mmPerUnit) || mmPerUnit <= 0) throw new Error(t('Einstellung konnte nicht gespeichert werden.'));
     this.dxfFallbackUnitMm = mmPerUnit;
     saveImportValue(DXF_FALLBACK_UNIT_KEY, mmPerUnit);
+  }
+  setImportCloseTolerance(this: Editor, mm: number) {
+    if (!Number.isFinite(mm) || mm < 0 || mm > 10) throw new Error(t('Einstellung konnte nicht gespeichert werden.'));
+    this.importCloseToleranceMm = mm;
+    saveImportValue(IMPORT_CLOSE_TOLERANCE_KEY, mm);
+  }
+  setImportHiddenLayers(this: Editor, on: boolean) {
+    this.importHiddenLayers = on;
+    saveImportFlag(IMPORT_HIDDEN_LAYERS_KEY, on);
   }
 
   /**
