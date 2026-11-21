@@ -17,7 +17,7 @@ pub fn open(name: &str, baud: u32, dtr: Option<bool>) -> Result<Box<dyn serialpo
     let mut port = {
         // POSIX behält den kurzen Timeout; der Streamer begrenzt serielle
         // Schreibwiederholungen insgesamt auf zwei Sekunden.
-        Box::new(builder.open().map_err(|e| e.to_string())?) as Box<dyn serialport::SerialPort>
+        builder.open().map_err(|e| e.to_string())?
     };
     // None = unverändert (heutiges Verhalten); Some setzt DTR explizit (z. B. für GRBL-Boards mit Auto-Reset).
     if let Some(level) = dtr {
