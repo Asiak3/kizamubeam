@@ -19,6 +19,20 @@ async function test(name: string, fn: () => void | Promise<void>) {
 
 const motion = (lines: string[]) => lines.filter((l) => /^G[01]\b|^[XY]/.test(l));
 
+await test('Moves: Z-Versatz bleibt über mehrere Kapazitätsgrenzen erhalten', () => {
+  const mv = new Moves();
+  const capacity = mv.z.length;
+  const count = capacity * 2 + 1;
+  for (let i = 0; i < count; i++) {
+    mv.zCur = i < capacity ? 0 : i < capacity * 2 ? 0.5 : 1;
+    mv.push(i, 0, 1200, 0.5, 1);
+  }
+  assert.equal(mv.z.length, mv.x.length);
+  for (let i = 0; i < count; i++) {
+    assert.equal(mv.z[i], i < capacity ? 0 : i < capacity * 2 ? 0.5 : 1, `Z bei Bewegung ${i}`);
+  }
+});
+
 await test('End-Skript nach M5 und vor dem Programmende', () => {
   const endScript = 'G0 X0 Y0\n\n  M8  \n';
   assert.deepEqual(gcodeFooter({ ...newDevice({ fw: 'fluidnc' }), endScript }), ['M5', 'G0 X0 Y0', 'M8', 'M2']);

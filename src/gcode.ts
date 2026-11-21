@@ -593,6 +593,7 @@ export class Moves {
       this.layer = grow(this.layer);
       this.cls = grow(this.cls);
       this.sub = grow(this.sub);
+      this.z = grow(this.z);
     }
     const i = this.n++;
     this.z[i] = this.zCur;
