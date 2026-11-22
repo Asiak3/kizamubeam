@@ -2,8 +2,8 @@
 // in ein Bild der Plattenoberfläche gezeichnet. Der Viewer legt es auf die Seite der Platte, die beim Lasern oben
 // lag. Die Farbe hängt vom Material ab: dunkle Brandspur auf Holz, hell auf Schiefer, milchig auf Acryl.
 import type { Editor } from '../editor';
-import type { ImageShape, Mat, Obj, TextShape } from '../model';
-import { apply, inv, leaves, mul, outputLeaves } from '../model';
+import type { ImageShape, Layer, Mat, Obj, TextShape } from '../model';
+import { apply, cleanLayerType, inv, isCutLayer, leaves, mul, outputLeaves, shapeCutsThrough } from '../model';
 import { boundsOf, drawText, subsToPath2D, textOutline, worldPath } from '../geom';
 import { displayCanvas } from '../images';
 import { cross, dot } from './poses';
@@ -33,15 +33,26 @@ const LINE_MM = 0.25;
 const MAX_PX = 2048;
 const MAX_K = 10;
 
+/**
+ * Deckkraft je Layer-Art (#265), mit der Gravurfarbe des Materials multipliziert. Vorerst gleich dunkel; eigene Werte,
+ * damit Markierungen später anders aussehen können als Gravuren.
+ */
+export const ENGRAVE_TONE = 1;
+export const MARK_TONE = 1;
+const toneOf = (L: Layer) => (cleanLayerType(L.layerType) === 'mark' ? MARK_TONE : ENGRAVE_TONE);
+
 interface Mark {
   o: Obj;
   m: Mat;
-  kind: 'fill' | 'line' | 'text-fill' | 'text-line' | 'image';
+  /** outline: die ganze Kontur als Linie (Generator-Markierungen; Gravur- und Markierungs-Layer, #265) */
+  kind: 'fill' | 'line' | 'outline' | 'text-fill' | 'text-line' | 'image';
   box: [number, number, number, number];
+  /** Deckkraft der Layer-Art */
+  tone: number;
 }
 
 /** Was auf einer Seite gelasert wird und nicht selbst Platte oder Loch ist (Issue #217: hidden zählt mit) */
-function pageMarks(ed: Editor, page: number): Mark[] {
+export function pageMarks(ed: Editor, page: number): Mark[] {
   const pg = ed.doc.pages[page];
   if (!pg) return [];
   const out: Mark[] = [];
@@ -53,12 +64,21 @@ function pageMarks(ed: Editor, page: number): Mark[] {
     if (s.kind === 'image') kind = 'image';
     else if (s.kind === 'text') kind = L.mode === 'fill' ? 'text-fill' : 'text-line';
     else if (L.mode === 'fill') kind = 'fill';
+    // Markierungen eines Generators (Fensterrahmen, Schichtnummern) sind ganz Gravur, auch ihre geschlossenen Konturen
+    else if (s.kind === 'path' && s.mark) kind = 'outline';
     // Auf Schnitt-Layern sind geschlossene Formen Schnitte (Platten oder Löcher); offene Linien werden graviert
-    else if (s.kind === 'path' && (s.mark || s.subs.some((sp) => !sp.closed))) kind = 'line';
-    if (!kind) continue;
+    else if (s.kind === 'path' && s.subs.some((sp) => !sp.closed)) kind = 'line';
+    const kinds: Mark['kind'][] = kind ? [kind] : [];
+    // Gravur- und Markierungs-Layer (#265): Was sonst schneiden würde, liegt auf der Oberfläche, auch geschlossene Formen.
+    // Die ganze Kontur statt nur der offenen Linien; bei Füllen mit Linien-Sub-Layer zusätzlich zur Füllung
+    if (isCutLayer(L) && !shapeCutsThrough(o, L) && s.kind !== 'image' && s.kind !== 'text' && !(s.kind === 'path' && s.mark)) {
+      if (kind === 'line') kinds.pop();
+      kinds.push('outline');
+    }
+    if (!kinds.length) continue;
     const b = boundsOf([o], mul(m, inv(o.m)));
     if (!b) continue;
-    out.push({ o, m, kind, box: [b.x, b.y, b.x + b.w, b.y + b.h] });
+    for (const k of kinds) out.push({ o, m, kind: k, box: [b.x, b.y, b.x + b.w, b.y + b.h], tone: toneOf(L) });
   }
   return out;
 }
@@ -132,9 +152,11 @@ export function looseMarks(ed: Editor, solids: Solid[], places: Map<string, Canv
     const ext = plateExtent(s, pl);
     if (ext) boxes.push(ext.cb);
   }
-  return pageMarks(ed, page)
+  const loose = pageMarks(ed, page)
     .filter((mk) => (!only || only.has(mk.o)) && !boxes.some((b) => boxesTouch(mk.box, b)))
     .map((mk) => mk.o);
+  // Füllung und Kontur derselben Form nur einmal melden
+  return [...new Set(loose)];
 }
 
 /**
@@ -184,12 +206,14 @@ export function engravings(ed: Editor, solids: Solid[], places: Map<string, Canv
       ctx.save();
       ctx.transform(mk.m[0], mk.m[1], mk.m[2], mk.m[3], mk.m[4], mk.m[5]);
       ctx.imageSmoothingEnabled = true;
+      ctx.globalAlpha = mk.tone;
       ctx.drawImage(burnImage(cv, mc), 0, 0, sh.w, sh.h);
       ctx.restore();
     }
     // Füllungen je Layer in einem Pfad sammeln und gerade-ungerade füllen wie die Füllzeilen im G-Code: Eine Kontur
     // in einer anderen bleibt ein Loch, auch wenn beide eigene Objekte sind (z. B. das Innere eines O)
     const fills = new Map<number, Path2D>();
+    const fillTone = new Map<number, number>();
     const fillOf = (layer: number) => {
       let p = fills.get(layer);
       if (!p) fills.set(layer, (p = new Path2D()));
@@ -197,6 +221,8 @@ export function engravings(ed: Editor, solids: Solid[], places: Map<string, Canv
     };
     for (const mk of hits) {
       const sh = mk.o.shape;
+      ctx.globalAlpha = mk.tone;
+      if (mk.kind === 'fill' || mk.kind === 'text-fill') fillTone.set(mk.o.layer, mk.tone);
       if (mk.kind === 'fill') {
         // Offene Pfade werden auf Füll-Layern nicht gefüllt
         const subs = sh.kind === 'path' ? sh.subs.filter((sp) => sp.closed) : null;
@@ -209,12 +235,22 @@ export function engravings(ed: Editor, solids: Solid[], places: Map<string, Canv
         p.addPath(subsToPath2D(sh.subs.filter((sp) => !sp.closed)), new DOMMatrix(mk.m));
         ctx.lineWidth = lineW;
         ctx.stroke(p);
+      } else if (mk.kind === 'outline') {
+        const p = new Path2D();
+        if (sh.kind === 'path') p.addPath(subsToPath2D(sh.subs), new DOMMatrix(mk.m));
+        else p.addPath(worldPath(sh, mk.m));
+        ctx.lineWidth = lineW;
+        ctx.stroke(p);
       } else if (mk.kind === 'text-fill' || mk.kind === 'text-line') {
         // Schrift noch nicht geladen (text-fill) oder Linie: drawText teilt die Linienbreite selbst durch die Skalierung
         drawText(ctx, sh as TextShape, mk.m, mk.kind === 'text-fill' ? 'fill' : 'stroke', lineW);
       }
     }
-    for (const p of fills.values()) ctx.fill(p, 'evenodd');
+    for (const [layer, p] of fills) {
+      ctx.globalAlpha = fillTone.get(layer) ?? 1;
+      ctx.fill(p, 'evenodd');
+    }
+    ctx.globalAlpha = 1;
     // Gravur liegt auf der Seite, die beim Lasern nach oben zeigte; ist die Platte gespiegelt, ist das die andere
     const det = t[0] * t[3] - t[1] * t[2];
     const top = det * dot(cross(s.pose.u, s.pose.v), s.pose.n) < 0;

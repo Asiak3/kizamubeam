@@ -3,7 +3,7 @@
 // Sub-Layer bearbeiten dieselben Formen nach dem Layer (z. B. erst füllen, dann ausschneiden) und haben eigene Reiter.
 import type { Editor } from './editor';
 import { h, numInput } from './dom';
-import { CutSettings, cutSettings, defaultCutSettings, defaultSubLayer, FillStyle, LayerMode, layerLabel, PALETTE, SubLayer } from './model';
+import { cleanLayerType, CutSettings, cutSettings, cutsThrough, defaultCutSettings, defaultSubLayer, FillStyle, isCutLayer, Layer, LAYER_TYPES, LayerMode, layerLabel, layerTypeName, PALETTE, SubLayer } from './model';
 import { t } from './i18n';
 import { lookEditor } from './view3d/lookui';
 import { guessLook, lookName, resolveLook } from './view3d/looks';
@@ -99,12 +99,27 @@ export function openLayerDialog(ed: Editor, i: number) {
       h('option', { value: 'line', selected: e.mode === 'line' }, t('Linie')),
       h('option', { value: 'fill', selected: e.mode === 'fill' }, t('Füllen')),
     );
+    // Layer-Art (#265): gilt für den ganzen Layer samt Sub-Layern; Automatisch = wie bisher aus Modus und Sub-Layern
+    const working = { ...c, sub: subs } as Layer;
+    const typeSel = h('select', {
+      title: t('Was der Layer am Werkstück tut. Gravieren und Markieren schneiden nicht durch, auch geschlossene Formen nicht: In der 3D-Ansicht, der Konstruktionsprüfung und beim Verschachteln liegen sie auf dem Teil. Der G-Code bleibt gleich.'),
+      onchange: (ev: Event) => {
+        const v = cleanLayerType((ev.target as HTMLSelectElement).value);
+        if (v) c.layerType = v;
+        else delete c.layerType;
+        render();
+      },
+    },
+      h('option', { value: '', selected: !c.layerType }, t('Automatisch ({name})', { name: layerTypeName(isCutLayer(working) ? 'cut' : 'engrave') })),
+      ...LAYER_TYPES.map((k) => h('option', { value: k, selected: c.layerType === k }, layerTypeName(k))),
+    );
     const sub = tab >= 0 ? subs[tab] : null;
     generalForm.replaceChildren(
       ...(sub
         ? row(t('Name'), h('input', { type: 'text', value: sub.name ?? '', oninput: (ev: Event) => (sub.name = (ev.target as HTMLInputElement).value) }))
         : row(t('Name'), h('input', { type: 'text', value: name, oninput: (ev: Event) => (name = (ev.target as HTMLInputElement).value) }))),
       ...(vecs ? row(t('Modus'), modeSel) : []),
+      ...(vecs && !sub ? row(t('Art'), typeSel) : []),
       ...row(t('Geschwindigkeit (mm/min)'), num(() => e.speed, (v) => (e.speed = v), 1, 100000)),
       ...row(t('Max. Leistung (%)'), num(() => e.power, (v) => (e.power = v), 0, 100)),
       ...row(t('Min. Leistung (%)'), num(() => e.minPower, (v) => (e.minPower = v), 0, 100, false, t('Leistung in Ecken (Leistungsrampe) und bei Bildern in Graustufen'))),
@@ -128,6 +143,7 @@ export function openLayerDialog(ed: Editor, i: number) {
       ? fold(t('Linie'), true, t('Haltestege, doppelte Linien, Perforation, Anschnitt, Leistungsrampe und Pause'), lineSection(e))
       : fold(t('Füllen'), true, t('Füllart, Zeilenabstand und Schraffuroptionen'), fillSection(e))] : []));
     lookGroup.hidden = !!sub;
+    lookNote.hidden = cutsThrough(working);
     imageGroup.hidden = !!sub;
     imageCutGroup.hidden = !!sub;
     if (!sub) { renderImage(); renderImageCut(); }
@@ -273,11 +289,14 @@ export function openLayerDialog(ed: Editor, i: number) {
     return g ? t('Automatisch ({name})', { name: lookName(resolveLook(g)) }) : t('Automatisch (Standard der 3D-Ansicht)');
   };
   const lookTip = t('Wie Platten und Gravuren dieses Layers in der 3D-Ansicht aussehen. Automatisch: aus dem Namen des Materials der Bibliothek, sonst der Standard der 3D-Ansicht.');
+  // Gravur-, Markierungs- und Füll-Layer bilden keine Platten (#265)
+  const lookNote = h('div', { class: 'note' }, t('Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.'));
   const lookGroup = fold(t('Aussehen in 3D'), false, lookTip, h('div', {},
     h('div', { class: 'form look-form' },
       h('label', {}, t('Material')),
       lookEditor(() => c.look, (v) => (c.look = v), autoName()),
     ),
+    lookNote,
   ));
 
   // Image settings of this layer (only when it holds images). Interval, bidirectional and overscan belong to the

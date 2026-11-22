@@ -476,6 +476,15 @@ export interface Mate {
 
 export type LayerMode = 'line' | 'fill';
 
+/**
+ * Was ein Layer am Werkstück tut (#265): schneiden, gravieren oder markieren. Lesen nur die 3D-Ansicht, die Steckprüfung,
+ * die Konstruktionsprüfung und das Verschachteln; der G-Code hängt nicht davon ab. Fehlt = wie bisher aus Modus und
+ * Sub-Layern abgeleitet.
+ */
+export type LayerType = 'cut' | 'engrave' | 'mark';
+export const LAYER_TYPES: LayerType[] = ['cut', 'engrave', 'mark'];
+export const layerTypeName = (k: LayerType) => (k === 'mark' ? t('Markieren') : k === 'engrave' ? t('Gravieren') : t('Schneiden'));
+
 /** Haltestege (Tabs/Brücken): kurze Stellen, an denen der Laser aus ist, damit Teile nicht herausfallen */
 export interface TabSettings {
   enabled: boolean;
@@ -545,6 +554,8 @@ export interface CutSettings {
   sub?: SubLayer[];
   /** Aussehen des Materials in der 3D-Ansicht (Farbe, Textur, Gravurdarstellung); fehlt = automatisch */
   look?: MaterialLook;
+  /** Was der Layer am Werkstück tut (gilt für seine Sub-Layer mit); fehlt = aus Modus und Sub-Layern abgeleitet */
+  layerType?: LayerType;
 }
 
 export type FillStyle = 'scan' | 'offset';
@@ -593,15 +604,15 @@ export interface DwellSettings {
 }
 
 /** Sub-Layer: eigene Bearbeitung derselben Formen; Air Assist und Aussehen gelten vom Layer */
-export type SubLayer = Omit<CutSettings, 'air' | 'look' | 'sub'> & { output: boolean; name: string };
+export type SubLayer = Omit<CutSettings, 'air' | 'look' | 'sub' | 'layerType'> & { output: boolean; name: string };
 
 export const CUT_KEYS: (keyof CutSettings)[] = [
   'mode', 'speed', 'power', 'minPower', 'passes', 'air', 'kerf', 'tabs', 'fillStyle', 'interval', 'angle', 'crossHatch', 'bidirectional', 'overscan',
-  'perf', 'lead', 'ramp', 'dwell', 'dedup', 'dedupTol', 'zOffset', 'zStep', 'sub', 'look',
+  'perf', 'lead', 'ramp', 'dwell', 'dedup', 'dedupTol', 'zOffset', 'zStep', 'sub', 'look', 'layerType',
 ];
 
-/** Felder eines Sub-Layers (alles außer Air Assist, Aussehen und weiteren Sub-Layern) */
-const SUB_KEYS = CUT_KEYS.filter((k) => k !== 'air' && k !== 'look' && k !== 'sub') as (keyof SubLayer)[];
+/** Felder eines Sub-Layers (alles außer Air Assist, Aussehen, Layer-Art und weiteren Sub-Layern) */
+const SUB_KEYS = CUT_KEYS.filter((k) => k !== 'air' && k !== 'look' && k !== 'sub' && k !== 'layerType') as (keyof SubLayer)[];
 
 export const defaultPerf = (): PerfSettings => ({ enabled: false, on: 1, off: 1 });
 export const defaultLead = (): LeadSettings => ({ leadIn: false, leadOut: false, length: 2, angle: 90, arc: false, overcut: 0 });
@@ -688,6 +699,21 @@ export interface Layer extends CutSettings {
 /** Schneidet der Layer Linien (selbst im Modus Linie oder über einen eingeschalteten Sub-Layer)? */
 export const isCutLayer = (L: Layer) => L.mode === 'line' || !!L.sub?.some((s) => s.output && s.mode === 'line');
 
+/** Gespeicherte Layer-Art prüfen; undefined, wenn sie fehlt oder unbekannt ist */
+export const cleanLayerType = (v: unknown): LayerType | undefined => (LAYER_TYPES.includes(v as LayerType) ? (v as LayerType) : undefined);
+
+/**
+ * Schneidet der Layer durch das Material (3D-Ansicht, Steckprüfung, Konstruktionsprüfung, Verschachteln)? Wie isCutLayer, außer der Layer ist
+ * ausdrücklich Gravur oder Markierung (#265): Seine Formen liegen dann auf der Oberfläche, auch geschlossene.
+ */
+export const cutsThrough = (L: Layer) => isCutLayer(L) && (cleanLayerType(L.layerType) ?? 'cut') === 'cut';
+
+/**
+ * cutsThrough für eine Form. Auch Generator-Objekte (Zahnrad, Musterfüllung) folgen der Layer-Art; nur Teile einer
+ * Baugruppe nicht, die baut die 3D-Ansicht unabhängig vom Layer räumlich auf.
+ */
+export const shapeCutsThrough = (o: Obj, L: Layer) => (o.shape.kind === 'gen' && o.shape.asm ? isCutLayer(L) : cutsThrough(L));
+
 /** Ältere Dateien kennen nicht alle Einstellungen: fehlende mit Standardwerten auffüllen */
 export function normalizeLayer(L: Layer): Layer {
   if (L.tabs && L.fillStyle !== undefined && L.ramp && L.dwell && L.dedup !== undefined && L.dedupTol !== undefined && L.zStep !== undefined && (!L.sub || L.sub.every((s) => s.ramp && s.dwell && s.dedup !== undefined && s.dedupTol !== undefined && s.output !== undefined && s.name !== undefined))) return L;
@@ -697,7 +723,7 @@ export function normalizeLayer(L: Layer): Layer {
 /** Fehlende Bearbeitungseinstellungen mit Standardwerten auffüllen (ältere Dateien, Material-Bibliotheken, Import) */
 export function normalizeCut<T extends CutSettings>(L: T): T {
   const d = defaultCutSettings(L.mode);
-  for (const k of CUT_KEYS) if (L[k] === undefined && k !== 'sub' && k !== 'look') (L as unknown as Record<string, unknown>)[k] = d[k];
+  for (const k of CUT_KEYS) if (L[k] === undefined && k !== 'sub' && k !== 'look' && k !== 'layerType') (L as unknown as Record<string, unknown>)[k] = d[k];
   fillNested(L);
   if (L.sub !== undefined) L.sub = Array.isArray(L.sub) && L.sub.length ? L.sub.map(normalizeSub) : undefined;
   return L;

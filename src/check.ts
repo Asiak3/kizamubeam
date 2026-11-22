@@ -2,7 +2,7 @@
 // ungewollt offene oder nicht verbundene Konturen, schmale Stege, zu kleine Innenausschnitte, Objekte außerhalb
 // des Arbeitsbereichs und Import-Hinweise. Jeder Befund nennt die betroffenen Objekte, die Stellen zum Markieren
 // (Weltkoordinaten) und, wo es geht, eine Korrektur. Ohne DOM, damit es auch in den Tests läuft.
-import { IDENT, inv, isCutLayer, Layer, leaves, Mat, mul, Obj, outputLeaves, Pt, selfOutputOff, SubPath } from './model';
+import { IDENT, inv, Layer, leaves, Mat, mul, Obj, outputLeaves, Pt, selfOutputOff, shapeCutsThrough, SubPath } from './model';
 import { conditionHolds } from './params';
 import { boundsOf, shapeSubs, textOutline } from './geom';
 import { resolveImageEdits } from './imageEdits';
@@ -101,7 +101,7 @@ function collect(inp: CheckInput): Contour[] {
     const mark = o.shape.kind === 'path' && !!o.shape.mark;
     subs.forEach((sp, si) => {
       const c = makeContour(sp, m, {
-        idx: out.length, top, leaf: o, sub: si, layer: o.layer, fill, cut: !fill && !engrave.has(o.layer) && !mark,
+        idx: out.length, top, leaf: o, sub: si, layer: o.layer, fill, cut: !fill && !engrave.has(o.layer) && !mark && shapeCutsThrough(o, L),
         kerf: fill ? 0 : L.kerf, beam: L.kerf > 0 ? 2 * L.kerf : inp.settings.beam, text,
       });
       if (c) out.push(c);
@@ -184,7 +184,7 @@ function checkLooseEngravings(inp: CheckInput, out: CheckIssue[]) {
   const plates: number[][] = [];
   for (const [o, m] of leaves(inp.objs)) {
     const s = o.shape;
-    if (!isCutLayer(inp.layer(o.layer)) || s.kind === 'text' || s.kind === 'image') continue;
+    if (!shapeCutsThrough(o, inp.layer(o.layer)) || s.kind === 'text' || s.kind === 'image') continue;
     if (s.kind === 'path' && (s.mark || !s.subs.some((sp) => sp.closed))) continue;
     const x = box(o, m);
     if (x) plates.push(x.r);
@@ -198,7 +198,8 @@ function checkLooseEngravings(inp: CheckInput, out: CheckIssue[]) {
       const L = inp.layer(o.layer);
       const s = o.shape;
       if (!L.output) continue;
-      const mark = s.kind === 'image' || s.kind === 'text' || L.mode === 'fill' || (s.kind === 'path' && (s.mark || s.subs.some((sp) => !sp.closed)));
+      // Gravur- und Markierungs-Layer (#265): auch geschlossene Formen sind Gravuren
+      const mark = s.kind === 'image' || s.kind === 'text' || L.mode === 'fill' || !shapeCutsThrough(o, L) || (s.kind === 'path' && (s.mark || s.subs.some((sp) => !sp.closed)));
       if (!mark) continue;
       const x = box(o, m);
       if (!x || plates.some((p) => x.r[0] < p[2] && x.r[2] > p[0] && x.r[1] < p[3] && x.r[3] > p[1])) continue;

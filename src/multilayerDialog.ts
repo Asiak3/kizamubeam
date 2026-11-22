@@ -7,7 +7,7 @@ import { DEFAULT_LOOK, layerLook } from './view3d/looks';
 import { lookEditor } from './view3d/lookui';
 import { library } from './materials';
 import type { MultiLayerPlate, Obj } from './model';
-import { isCutLayer } from './model';
+import { cutsThrough } from './model';
 
 const rootsById = (ed: Editor) => new Map(ed.doc.pages.flatMap((p) => p.objs).map((o) => [o.id, o]));
 
@@ -15,7 +15,7 @@ const rootsById = (ed: Editor) => new Map(ed.doc.pages.flatMap((p) => p.objs).ma
 export function openMultiLayerDialog(ed: Editor) {
   const existing = ed.sel.length ? assemblyForObject(ed.doc, ed.sel[0].id) : undefined;
   const selected = existing ? existing.plates.map((p) => rootsById(ed).get(p.object)).filter((o): o is Obj => !!o) : ed.sel;
-  if (!selected.length || (!existing && (!selected.every((o) => hasClosedContour(o, (layer) => isCutLayer(ed.layer(layer)))) || selected.some((o) => assemblyForObject(ed.doc, o.id))))) {
+  if (!selected.length || (!existing && (!selected.every((o) => hasClosedContour(o, (layer) => cutsThrough(ed.layer(layer)))) || selected.some((o) => assemblyForObject(ed.doc, o.id))))) {
     ed.hint = t('Mehrlagenarbeit: geschlossene Formen oder Gruppen auswählen, die noch zu keiner Mehrlagenarbeit gehören.');
     ed.emit('tool');
     return;

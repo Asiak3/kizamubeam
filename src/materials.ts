@@ -2,7 +2,7 @@
 // Ein Eintrag hält die Bearbeitungseinstellungen eines Layers und wahlweise die Bild-Einstellungen.
 // Gespeichert wird im Browser-Speicher der App; Austausch über .kzm-Dateien (JSON, früher .lwm). LightBurn-
 // Bibliotheken (.clb) lassen sich einlesen, soweit ihre Felder hier eine Entsprechung haben.
-import { CutSettings, cutSettings, defaultCutSettings, normalizeCut, defaultImageLayer, legacyImageValues, stripImageOutput, defaultTabs, DitherMode, ImageLayer, Layer, LayerMode } from './model';
+import { cleanLayerType, CutSettings, cutSettings, defaultCutSettings, layerTypeName, normalizeCut, defaultImageLayer, legacyImageValues, stripImageOutput, defaultTabs, DitherMode, ImageLayer, Layer, LayerMode } from './model';
 import { dec, t } from './i18n';
 import { cleanLook } from './view3d/looks';
 
@@ -75,6 +75,8 @@ function sanitize(e: Partial<MaterialEntry>): MaterialEntry | null {
   normalizeCut(settings);
   settings.look = cleanLook(e.settings.look);
   if (!settings.look) delete settings.look;
+  settings.layerType = cleanLayerType(e.settings.layerType);
+  if (!settings.layerType) delete settings.layerType;
   const th = Number(e.thickness);
   return {
     id: typeof e.id === 'string' && e.id ? e.id : newEntryId(),
@@ -194,8 +196,10 @@ export const fitSummary = (f: MaterialFit) => {
     f.date,
   ].filter(Boolean).join(' · ');
 };
-export const settingsSummary = (s: CutSettings) =>
-  `${s.mode === 'fill' ? t('Füllen') : t('Linie')}, ${fmt(s.speed)} mm/min, ${fmt(s.power)} %${s.passes > 1 ? `, ${s.passes}×` : ''}`;
+export const settingsSummary = (s: CutSettings) => {
+  const type = cleanLayerType(s.layerType);
+  return `${type ? `${layerTypeName(type)}, ` : ''}${s.mode === 'fill' ? t('Füllen') : t('Linie')}, ${fmt(s.speed)} mm/min, ${fmt(s.power)} %${s.passes > 1 ? `, ${s.passes}×` : ''}`;
+};
 
 /** Neuer Eintrag aus den Einstellungen eines Layers */
 export function entryFromLayer(L: Layer, withImg: boolean): Pick<MaterialEntry, 'settings' | 'img'> {
@@ -207,7 +211,8 @@ export function entryFromLayer(L: Layer, withImg: boolean): Pick<MaterialEntry, 
  * older entries that kept image speed and power separately apply those to the layer
  */
 export function layerPatch(e: MaterialEntry, imagesOnly = false): Partial<Layer> {
-  // Ohne eigenes Aussehen im Eintrag gilt wieder das automatische (aus dem Materialnamen)
+  // Ohne eigenes Aussehen im Eintrag gilt wieder das automatische (aus dem Materialnamen). Ohne Layer-Art im Eintrag
+  // behält der Layer seine (#265)
   const p: Partial<Layer> = { look: undefined, sub: undefined, ...structuredClone(e.settings), material: e.id, name: entryLabel(e) };
   if (e.img) {
     if (imagesOnly) Object.assign(p, legacyImageValues(e.img));
@@ -218,7 +223,10 @@ export function layerPatch(e: MaterialEntry, imagesOnly = false): Partial<Layer>
 
 /** Weichen die Einstellungen des Layers vom Eintrag ab? */
 export function differsFrom(L: Layer, e: MaterialEntry): boolean {
-  if (JSON.stringify(cutSettings(L)) !== JSON.stringify(cutSettings(e.settings))) return true;
+  const own = cutSettings(L);
+  // Ein Eintrag ohne Layer-Art lässt die des Layers stehen (layerPatch), das ist keine Abweichung
+  if (!e.settings.layerType) delete own.layerType;
+  if (JSON.stringify(own) !== JSON.stringify(cutSettings(e.settings))) return true;
   return !!e.img && JSON.stringify(L.img) !== JSON.stringify(stripImageOutput(e.img));
 }
 

@@ -2,7 +2,7 @@
 // Mehrlagenarbeiten): ganz darin ein Loch, am Rand eine Kerbe, wie beim Lasern. Gemeinsam für die 3D-Ansicht (panel.ts)
 // und die Steckprüfung (asmcheck.ts), damit beide dieselbe Platte sehen (Issue #285).
 import ClipperLib from 'clipper-lib';
-import { apply, inv, isCutLayer, Layer, Mat, Obj, outputLeaves, Pt } from '../model';
+import { apply, cutsThrough, inv, Layer, Mat, Obj, outputLeaves, Pt } from '../model';
 import { region } from '../ops';
 import { Paths, SCALE } from '../clip';
 
@@ -16,11 +16,12 @@ export interface Cutter {
 }
 
 /**
- * Schneidet diese Form beim Lasern Platten aus? Layer mit Ausgabe und Schnitt; keine Texte, Bilder und Beschriftungen.
+ * Schneidet diese Form beim Lasern Platten aus? Layer mit Ausgabe und Schnitt; keine Texte, Bilder und Beschriftungen,
+ * nichts auf Gravur- und Markierungs-Layern (#265).
  * Generator-Teile (Jig, Zahnrad, Wände) sind fertige Platten und schneiden nichts in andere.
  */
 export const cutsPlates = (o: Obj, L: Layer) =>
-  L.output && isCutLayer(L) && o.shape.kind !== 'text' && o.shape.kind !== 'image' && o.shape.kind !== 'gen' && !(o.shape.kind === 'path' && o.shape.mark);
+  L.output && cutsThrough(L) && o.shape.kind !== 'text' && o.shape.kind !== 'image' && o.shape.kind !== 'gen' && !(o.shape.kind === 'path' && o.shape.mark);
 
 /** Ausdehnung von Clipper-Pfaden (µm): [x0, y0, x1, y1] */
 export function pathBox(paths: Paths): number[] {
