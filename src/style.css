@@ -5419,6 +5419,14 @@ input.jig-count {
 .slot-projection-dialog footer { flex-shrink: 0; }
 .slot-features-dialog { width: min(1400px, calc(100vw - 16px)); }
 .slot-features-dialog > [role="status"] { flex: 0 0 3.6em; min-height: 3.6em; overflow: auto; }
+.slot-features-dialog > .note.error {
+  color: var(--danger, #c0392b);
+  border: 1px solid var(--danger, #c0392b);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--danger, #c0392b) 12%, transparent);
+}
 .slot-feature-toolbar { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
 .slot-icon-button { width: 34px; height: 34px; min-width: 34px; padding: 5px; display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; }
 .slot-icon-button svg, .slot-feature-visibility svg { width: 22px; height: 22px; pointer-events: none; }

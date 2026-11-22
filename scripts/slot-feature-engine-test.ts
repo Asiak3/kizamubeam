@@ -59,6 +59,42 @@ test('manufacturing changes cutters, never nominal frames or legacy free/contour
   const guided=adoptSlotFeatureRecipe(contour); guided.groups![0].burn=.1; guided.groups![0].cornerStyle='loop';
   assert.deepEqual(cutSlots(guided),cutSlots(contour));
 });
+test('corner retains the notch through Boolean subtraction; backarc has no diagonal bridges', () => {
+  const r=adoptSlotFeatureRecipe(recipe()); r.slots=[r.slots[0]];
+  const g=r.groups![0]; Object.assign(g,{width:3.8,depth:10,clearance:0,factor:1,burn:0,cornerStyle:'corner'});
+  const area=(subs:ReturnType<typeof cutSlots>)=>Math.abs(subs.reduce((sum,sp)=>sum+sp.nodes.reduce((a,p,i)=>{
+    const q=sp.nodes[(i+1)%sp.nodes.length]; return a+(p.x*q.y-p.y*q.x)/2;
+  },0),0));
+  const plain=cutSlots(r); assert.ok(Math.abs(area(plain)-7962)<1e-7);
+  g.burn=.06;
+  const sharp=cutSlots(r); assert.ok(Math.abs(area(sharp)-(8000-3.68*9.94))<1e-7);
+  g.cornerStyle='loop'; assert.notDeepEqual(cutSlots(r),sharp);
+  g.cornerStyle='corner'; assert.deepEqual(cutSlots(r),sharp,'switching back restores the sharp notch, not the base');
+  g.cornerStyle='backarc';
+  const back=cutSlots(r);
+  assert.ok(Math.abs(area(sharp)-area(back)-2*(1-Math.PI/4)*.06**2)<.00015);
+  // All non-axis-aligned edges must belong to the circular return, not a bridge.
+  const f=projectionFrame(r.base,resolvedSlots(r)[0]);
+  const local=(p:{x:number;y:number})=>({x:(p.x-f.a.x)*f.edge.tangent.x+(p.y-f.a.y)*f.edge.tangent.y,
+    y:(p.x-f.a.x)*f.edge.normal.x+(p.y-f.a.y)*f.edge.normal.y});
+  for(const sp of back) for(let i=0;i<sp.nodes.length;i++) {
+    const p=local(sp.nodes[i]),q=local(sp.nodes[(i+1)%sp.nodes.length]);
+    if(Math.abs(p.x-q.x)<1e-7||Math.abs(p.y-q.y)<1e-7) continue;
+    const cx=(p.x+q.x)/2<1.9?0:3.8;
+    for(const a of [p,q]) assert.ok(Math.abs(Math.hypot(a.x-cx,a.y-10)-.06)<.0008);
+  }
+});
+test('diagonal relief survives recipe roundtrip and changes the Boolean cut', () => {
+  const r=adoptSlotFeatureRecipe(recipe());
+  const plain=cutSlots(r);
+  r.groups![0].burn=.1; r.groups![0].cornerStyle='diagonal';
+  const restored=readSlotRecipe({recipe:JSON.stringify(r)});
+  assert.equal(restored.groups![0].cornerStyle,'diagonal');
+  assert.deepEqual(cutSlots(restored),cutSlots(r));
+  assert.notDeepEqual(cutSlots(r),plain);
+  r.groups![0].cornerStyle='corner';
+  assert.notDeepEqual(cutSlots(restored),cutSlots(r));
+});
 test('scoped identifiers, missing groups, duplicates and budgets are validated', () => {
   const parse=(r:SlotRecipe)=>readSlotRecipe({recipe:JSON.stringify(r)});
   let r=recipe(); r.slots[0].groupId='missing'; assert.throws(()=>parse(r));

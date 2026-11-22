@@ -41,6 +41,12 @@ fit on the finite straight section — never across corners or onto curves.
 Single closed vector object, outer straight sections, rectangular cut-outs. No
 groups/assemblies, no inner-hole contours, no live editing of embedded generator
 sources, local coordinates (general scale/shear needs review). Subtraction uses
-the existing Clipper approximation. Burn/corner styles (corner/loop/backarc) and
-local burn compensation are follow-ups, not implemented. Play/factor and layer
-kerf stay separate — no hidden double compensation.
+the existing Clipper approximation. Grouped straight projections support local
+burn compensation and corner styles: `corner` (sharp), `loop` (round relief),
+`backarc` (inverted return arcs), and `diagonal` (diagonal corner relief).
+The diagonal option adds a flat-ended channel at each bottom corner, along the
+outward angle bisector. Its width is twice burn; the end centre is the nominal
+corner and the inner end overlaps the corrected cutter. At burn zero it reduces
+to `corner`. These are polygonal cutter shapes, not a guarantee of an exact
+continuous machining path. Play/factor and layer kerf stay separate — nonzero
+local burn and layer kerf cannot be combined. Material acceptance is outstanding.

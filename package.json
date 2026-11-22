@@ -112,7 +112,8 @@
     "test:pencil": "node scripts/vector-offline-test.mjs scripts/pencil-test.ts",
     "test:shaper": "node scripts/vector-offline-test.mjs scripts/shaper-test.ts",
     "test:pointer": "node scripts/run-ts.mjs scripts/pointer-offset-test.ts",
-    "test:typography": "node scripts/run-ts.mjs scripts/ui-typography-test.ts && node scripts/run-ts.mjs scripts/ui-typography-dom-test.ts && node scripts/laser-typography-css-test.mjs && node scripts/vector-offline-test.mjs scripts/ui-typography-render-test.ts"
+    "test:typography": "node scripts/run-ts.mjs scripts/ui-typography-test.ts && node scripts/run-ts.mjs scripts/ui-typography-dom-test.ts && node scripts/laser-typography-css-test.mjs && node scripts/vector-offline-test.mjs scripts/ui-typography-render-test.ts",
+    "test:paste-guard": "node scripts/run-ts.mjs scripts/paste-guard-test.ts"
   },
   "license": "GPL-3.0-or-later",
   "devDependencies": {

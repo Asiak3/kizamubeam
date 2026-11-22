@@ -53,6 +53,9 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
     const doc = ed.doc, stamp = ed.state(), tool = ed.tool, isolation = ed.isolation;
     const canvas = h('canvas', { class: 'slot-tool-canvas', 'aria-label': t('Feature-Vorschau mit Referenzen, Hilfslinien und Projektionskanten.'), tabindex: 0 });
     const info = h('p', { class: 'note', role: 'status', 'aria-live': 'polite' });
+    const setInfo = (message: string, isError = false) => {
+      info.textContent = message; info.classList.toggle('error', isError);
+    };
     const properties = h('div', { class: 'slot-feature-properties' });
     const angleHelp = t('Kreise: scharfe Ecken ab dem Mindest-Richtungswechsel. Quadrate: gerundete Ecken, deren Richtungswechsel den Mindestwert erreicht.');
     const globalAngle = h('input', { id: 'slot-corner', type: 'number', min: 1, max: 179, step: 1, value: String(recipe.settings!.cornerAngle), title: angleHelp, 'aria-describedby': 'slot-corner-help' });
@@ -120,10 +123,10 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
     }, (source, targetSelection, position) => {
       if (stale || source.kind === 'source') return;
       if (position === 'into') {
-        if (source.kind !== 'slot' || targetSelection?.kind !== 'group') { info.textContent = t('Nur Ausklinkungen können einer Gruppe zugeordnet werden.'); return; }
+        if (source.kind !== 'slot' || targetSelection?.kind !== 'group') { setInfo(t('Nur Ausklinkungen können einer Gruppe zugeordnet werden.'), true); return; }
         const slot = allSlots().find(s => s.id === source.id), group = recipe.groups!.find(g => g.id === targetSelection.id);
         if (!slot || !group || slot.groupId === group.id) return;
-        if (slot.mirror) { info.textContent = t('Spiegelungen erben die Gruppe ihrer ursprünglichen Ausklinkung.'); return; }
+        if (slot.mirror) { setInfo(t('Spiegelungen erben die Gruppe ihrer ursprünglichen Ausklinkung.'), true); return; }
         slot.groupId = group.id;
       } else {
         const order = completeOrder(source);
@@ -138,7 +141,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
     };
     const describe = (ref: SlotOrigin | null) => ref ? points().find(p => originKey(p.ref) === originKey(ref))?.label ?? originKey(ref) : t('Noch nicht gewählt');
     const choose = (parent: HTMLElement, label: string, mode: Pick, value: string) => {
-      parent.append(iconButton(`slot-choose-${mode}`, label, mode === 'edge' || mode === 'helperEdge' ? 'line' : mode === 'mirrorAxis' ? 'mirrorh' : 'origin', () => { pick = mode; mirrorParentId = null; info.textContent = label; showProperties(); updateToolbar(); properties.querySelector<HTMLSelectElement>('#slot-pick-list')?.focus(); }), h('output', {}, value));
+      parent.append(iconButton(`slot-choose-${mode}`, label, mode === 'edge' || mode === 'helperEdge' ? 'line' : mode === 'mirrorAxis' ? 'mirrorh' : 'origin', () => { pick = mode; mirrorParentId = null; setInfo(label); showProperties(); updateToolbar(); properties.querySelector<HTMLSelectElement>('#slot-pick-list')?.focus(); }), h('output', {}, value));
       choiceSelect(parent, mode);
     };
     // Keyboard alternative to canvas picking: lists the same candidates the
@@ -183,9 +186,11 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         form.append(h('label', { for: name.id }, t('Gruppenname')), name);
         for (const [key, label] of [['width', t('Nennbreite / Materialdicke (mm)')], ['depth', t('Eindringtiefe (mm)')], ['clearance', t('Spiel gesamt (mm)')], ['factor', t('Breitenfaktor')], ['burn', t('Lokale Burn-Korrektur (mm)')]] as const)
           numberField(form, `slot-group-${key}`, label, group[key], v => { group[key] = v; }, key === 'burn' ? '0.005' : '0.1');
-        const style = h('select', { id: 'slot-group-corners' }, ...(['corner', 'loop', 'backarc'] as const).map(value => h('option', { value, selected: group.cornerStyle === value }, value)));
+        const style = h('select', { id: 'slot-group-corners' }, ...(['corner', 'loop', 'backarc', 'diagonal'] as const).map(value => h('option', { value, selected: group.cornerStyle === value }, value === 'diagonal' ? t('Diagonale Eckentlastung') : value)));
         style.addEventListener('change', () => { group.cornerStyle = style.value as SlotGroup['cornerStyle']; request(); });
         form.append(h('label', { for: style.id }, t('Inneneckenstil')), style);
+        properties.append(h('p', { class: 'note' }, t('corner: scharfe Ecke ohne Entlastung. backarc: Rückbogen mit Radius Burn; bei Burn 0 wie corner.')));
+        properties.append(h('p', { class: 'note' }, t('Diagonale Eckentlastung: gerader Freischnitt auf der Winkelhalbierenden, Breite 2 × Burn. Bei Burn 0 ohne Entlastung.')));
         properties.append(h('p', { class: 'note' }, t('Gruppenmaße gelten für alle Mitglieder. Lokale Burn-Korrektur erfordert Layer-Kerf 0.')));
         appendMoveRow(form);
       } else {
@@ -235,7 +240,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
     };
     function request(): void {
       if (closed || stale) return;
-      pending = true; valid = false; apply.disabled = true; canvas.setAttribute('aria-busy', 'true'); info.textContent = t('Vorschau wird berechnet …');
+      pending = true; valid = false; apply.disabled = true; canvas.setAttribute('aria-busy', 'true'); setInfo(t('Vorschau wird berechnet …'));
       updateToolbar();
       const proposed = prepareTrial(), snapshot = structuredClone(recipe), draftSnapshot = structuredClone(drafts), helperSnapshot = structuredClone(helperDrafts), resetSnapshot = resetToSource;
       client.request(proposed, recipe.settings!.cornerAngle, reply => {
@@ -243,14 +248,14 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         pending = false; canvas.setAttribute('aria-busy', 'false');
         if (reply.error || !reply.result) {
           valid = false; apply.disabled = true;
-          info.textContent = `${reply.error ?? t('Vorschau fehlgeschlagen.')} ${t('Letzte gültige Vorschau bleibt erhalten. Richtung und Abstand prüfen oder Änderung verwerfen.')}`;
+          setInfo(`${reply.error ?? t('Vorschau fehlgeschlagen.')} ${t('Letzte gültige Vorschau bleibt erhalten. Richtung und Abstand prüfen oder Änderung verwerfen.')}`, true);
           // Keep the last valid geometry, point inventory and staged recipe visible.
           refreshTree(); updateToolbar(); scheduleDraw(); return;
         }
         valid = true; result = reply.result; lastValid = snapshot; lastDrafts = draftSnapshot; lastHelperDrafts = helperSnapshot; lastResetToSource = resetSnapshot;
         const incomplete = helperDrafts.size > 0 || [...drafts.values()].some(s => !completeSlot(s));
         apply.disabled = incomplete || (!proposed.slots.length && !proposed.helpers?.length && !editingRecipe);
-        info.textContent = incomplete ? t('Entwurf unvollständig: Referenzpunkte und Kante im Feature wählen. Entwürfe bleiben beim Wechsel erhalten.') : t('Rot: Referenzpunkt. Orange: Projektionskante mit Richtung. Gelb: Positionsmaß.');
+        setInfo(incomplete ? t('Entwurf unvollständig: Referenzpunkte und Kante im Feature wählen. Entwürfe bleiben beim Wechsel erhalten.') : t('Rot: Referenzpunkt. Orange: Projektionskante mit Richtung. Gelb: Positionsmaß.'));
         refreshTree(); updateToolbar(); scheduleDraw();
       }, proposed.slots.filter(s => visible('slot', s.id!)).map(s => s.id!));
     }
@@ -344,7 +349,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
     button('slot-zoom-in', t('Vergrößern'), 'zoomin', () => { const r = dimensions(); viewport.zoom(1.25, { x: r.w / 2, y: r.h / 2 }); scheduleDraw(); });
     button('slot-zoom-out', t('Verkleinern'), 'zoomout', () => { const r = dimensions(); viewport.zoom(0.8, { x: r.w / 2, y: r.h / 2 }); scheduleDraw(); });
     button('slot-fit', t('Ansicht einpassen'), 'zoompage', fit);
-    button('slot-mirror', t('Ausklinkung spiegeln'), 'mirrorh', () => { if (!completeSlot(currentSlot()) || pending || !valid) return; mirrorParentId = currentSlot()!.id!; pick = 'mirrorAxis'; info.textContent = t('Spiegelachse wählen: Hilfslinie oder Körperkante'); updateToolbar(); });
+    button('slot-mirror', t('Ausklinkung spiegeln'), 'mirrorh', () => { if (!completeSlot(currentSlot()) || pending || !valid) return; mirrorParentId = currentSlot()!.id!; pick = 'mirrorAxis'; setInfo(t('Spiegelachse wählen: Hilfslinie oder Körperkante')); updateToolbar(); });
     button('slot-revert', t('Ungültige Änderung verwerfen'), 'undo', () => {
       recipe = structuredClone(lastValid);
       resetToSource = lastResetToSource;
@@ -359,7 +364,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
       const id = selected.id, kind = selected.kind;
       if (kind === 'source') return;
       const references = (r: SlotOrigin | null) => r && ((r.kind === 'slot' && kind === 'slot' && r.slotId === id) || (r.kind === 'intersection' && kind === 'helper' && r.helperId === id));
-      if (allSlots().some(s => references(s.projection?.origin ?? null) || kind === 'slot' && (s.anchor?.relative?.slotId === id || s.mirror?.slotId === id) || kind === 'helper' && s.mirror?.axis.kind === 'helper' && s.mirror.axis.helperId === id) || [...recipe.helpers!, ...helperDrafts.values()].some(l => references(l.first) || references(l.second)) || (kind === 'group' && allSlots().some(s => s.groupId === id))) { info.textContent = t('Feature wird noch referenziert oder enthält Mitglieder. Bezüge zuerst ändern.'); return; }
+      if (allSlots().some(s => references(s.projection?.origin ?? null) || kind === 'slot' && (s.anchor?.relative?.slotId === id || s.mirror?.slotId === id) || kind === 'helper' && s.mirror?.axis.kind === 'helper' && s.mirror.axis.helperId === id) || [...recipe.helpers!, ...helperDrafts.values()].some(l => references(l.first) || references(l.second)) || (kind === 'group' && allSlots().some(s => s.groupId === id))) { setInfo(t('Feature wird noch referenziert oder enthält Mitglieder. Bezüge zuerst ändern.'), true); return; }
       if (kind === 'slot') drafts.delete(id);
       if (kind === 'helper') helperDrafts.delete(id);
       if (kind === 'slot') recipe.slots = recipe.slots.filter(s => s.id !== id);
@@ -388,7 +393,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         for (const edge of visible('source', 'source') ? result.edges : []) { const at = Math.max(0, Math.min(edge.length, dot(sub(p, edge.a), edge.tangent))); axes.push({ axis: { kind: 'edge', edge: edge.key }, distance: Math.hypot(p.x - edge.a.x - at * edge.tangent.x, p.y - edge.a.y - at * edge.tangent.y) }); }
         axes.sort((a, b) => a.distance - b.distance);
         if (!axes.length || axes[0].distance > tolerance) return;
-        if (axes.length > 1 && Math.abs(axes[0].distance - axes[1].distance) < 0.1 / viewport.scale) { info.textContent = t('Spiegelachse nicht eindeutig. Abseits eines Schnittpunkts wählen.'); return; }
+        if (axes.length > 1 && Math.abs(axes[0].distance - axes[1].distance) < 0.1 / viewport.scale) { setInfo(t('Spiegelachse nicht eindeutig. Abseits eines Schnittpunkts wählen.'), true); return; }
         applyMirrorAxis(axes[0].axis); return;
       }
       if (['origin', 'first', 'second'].includes(pick)) {
@@ -403,6 +408,8 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
     canvas.addEventListener('pointermove', e => { if (drag?.id === e.pointerId) { viewport.pan(e.clientX - drag.x, e.clientY - drag.y); drag.x = e.clientX; drag.y = e.clientY; scheduleDraw(); } });
     const endDrag = (e: PointerEvent) => { if (drag?.id !== e.pointerId) return; drag = null; if (canvas.hasPointerCapture(e.pointerId)) canvas.releasePointerCapture(e.pointerId); updateToolbar(); };
     canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag); canvas.addEventListener('lostpointercapture', endDrag);
+    // The middle button never triggers page autoscroll here; panning is handled via pointer events above.
+    canvas.addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
     canvas.addEventListener('wheel', e => { e.preventDefault(); if (e.ctrlKey && pinchGestureActive(canvas)) return; const r = canvas.getBoundingClientRect(); if (e.shiftKey && !e.ctrlKey) viewport.pan(-e.deltaX, -e.deltaY); else viewport.zoom(canvasWheelFactor(e, 0.005), { x: e.clientX - r.left, y: e.clientY - r.top }); scheduleDraw(); }, { passive: false });
     const disposePinch = installPinchGestures(canvas, (factor, x, y) => { viewport.zoom(factor, { x, y }); scheduleDraw(); });
     const infiniteLine = (ctx: CanvasRenderingContext2D, line: ResolvedConstructionLine) => {
@@ -460,7 +467,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         h('label', { class: 'check' }, destructive, t('Destruktiv festschreiben (Parameter entfernen)')))),
       info, h('footer', { class: 'dialog-buttons' }, h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen')), apply));
     if (!original.groups?.length && original.slots.length) title.append(iconButton('slot-open-legacy', t('Bisheriges Rezept bearbeiten'), 'open', () => { dlg.addEventListener('close', () => openProjectionLegacyDialog(ed, obj), { once: true }); dlg.close(); }));
-    const changed = () => { if (ed.doc !== doc || ed.state() !== stamp || ed.tool !== tool || ed.isolation !== isolation) { stale = true; apply.disabled = true; client.dispose(); info.textContent = t('Quelle geändert. Schlitzwerkzeug erneut öffnen.'); } };
+    const changed = () => { if (ed.doc !== doc || ed.state() !== stamp || ed.tool !== tool || ed.isolation !== isolation) { stale = true; apply.disabled = true; client.dispose(); setInfo(t('Quelle geändert. Schlitzwerkzeug erneut öffnen.'), true); } };
     ed.on(changed);
     apply.addEventListener('click', () => {
       if (!valid || pending || stale || helperDrafts.size || [...drafts.values()].some(s => !completeSlot(s))) return;
@@ -471,7 +478,7 @@ export function openSlotPlacementDialog(ed: Editor, target?: Obj): void {
         if (resetToSource && !complete.slots.length && !complete.helpers?.length) { ed.snapshot(t('Originalform wiederherstellen')); obj.shape = structuredClone(original.source); ed.touch(obj.shape); ed.emit('doc'); }
         else applySlotRecipe(ed, obj, complete, stamp, destructive.checked);
         dlg.close();
-      } catch (e) { info.textContent = e instanceof Error ? e.message : String(e); }
+      } catch (e) { setInfo(e instanceof Error ? e.message : String(e), true); }
     });
     let disposeWindow = () => {};
     dlg.addEventListener('close', () => { closed = true; client.dispose(); tree.dispose(); disposeWindow(); disposePinch(); offTypo(); ed.off(changed); if (drawing) cancelAnimationFrame(drawing); dlg.remove(); });

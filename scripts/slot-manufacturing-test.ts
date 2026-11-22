@@ -37,15 +37,29 @@ for (const mirrored of [false, true]) for (const angle of [0, 0.71, 2.2]) {
     assert.deepEqual(plain, [f.outline]); assert.notEqual(plain[0], f.outline); assert.notEqual(plain[0].nodes[0], f.outline.nodes[0]);
     const corrected = localPaths(f, manufacturedSlotPaths(f, { burn: 0.06, cornerStyle: 'corner' }));
     const b = bounds(corrected); near(b.maxX - b.minX, 3.68); near(b.maxY, 9.94); near(b.minX, 0.06); assert.ok(b.minY < -0.06);
-    for (const burn of [0, 0.06]) {
+    for (const burn of [0, 0.06, 0.5]) {
+      const corner = localPaths(f, manufacturedSlotPaths(f, { burn, cornerStyle: 'corner' }));
       const loop = localPaths(f, manufacturedSlotPaths(f, { burn, cornerStyle: 'loop' }));
       const back = localPaths(f, manufacturedSlotPaths(f, { burn, cornerStyle: 'backarc' }));
+      const diagonal = localPaths(f, manufacturedSlotPaths(f, { burn, cornerStyle: 'diagonal' }));
+      assert.equal(diagonal.length, 1, 'diagonal channels stay connected to the cutter');
+      if (burn === 0) assert.deepEqual(diagonal, corner);
+      else {
+        assert.ok(area(diagonal) > area(corner));
+        for (const [x, dir] of [[0, 1], [3.8, -1]]) {
+          assert.ok(contains(diagonal, { x: x + dir * burn / 4, y: 10 - burn / 4 }));
+          assert.ok(!contains(corner, { x: x + dir * burn / 4, y: 10 - burn / 4 }));
+          assert.ok(!contains(diagonal, { x: x - dir * 2 * burn, y: 10 + 2 * burn }));
+        }
+        const db = bounds(diagonal);
+        near(db.minX, -burn * Math.SQRT1_2, .0008);
+        near(db.maxX, 3.8 + burn * Math.SQRT1_2, .0008);
+        near(db.maxY, 10 + burn * Math.SQRT1_2, .0008);
+      }
       for (const relief of [loop, back]) {
-        assert.equal(relief.length, 1);
-        for (const x of [0, 3.8]) assert.ok(contains(relief, { x, y: 10 }), 'nominal bottom corner cleared');
-        const bb = bounds(relief), limit = 2 * burn + 0.05 + 0.001;
-        assert.ok(bb.minX >= -limit && bb.maxX <= 3.8 + limit && bb.maxY <= 10 + limit);
-        assert.ok(area(relief) > area(localPaths(f, manufacturedSlotPaths(f, { burn, cornerStyle: 'corner' }))));
+        assert.equal(relief.length, relief === back && burn > 0 ? 3 : 1,
+          'backarc preserves the two point-touching return contours without a diagonal bridge');
+        assert.ok(area(relief) >= area(corner));
         for (const sp of relief) {
           assert.ok(sp.closed && sp.nodes.length <= 128);
           sp.nodes.forEach((p, i) => {
@@ -53,6 +67,33 @@ for (const mirrored of [false, true]) for (const angle of [0, 0.71, 2.2]) {
             const q = sp.nodes[(i + 1) % sp.nodes.length]; assert.ok(Math.hypot(p.x - q.x, p.y - q.y) > 1e-8);
           });
         }
+      }
+      // loop keeps the established protruding lobe behavior
+      for (const x of [0, 3.8]) assert.ok(contains(loop, { x, y: 10 }), 'loop clears nominal bottom corner');
+      const limit = 2 * burn + 0.05 + 0.001, lb = bounds(loop);
+      assert.ok(lb.minX >= -limit && lb.maxX <= 3.8 + limit && lb.maxY <= 10 + limit);
+      assert.ok(area(loop) > area(corner));
+      if (burn === 0) {
+        assert.deepEqual(back, corner, 'backarc with zero burn stays sharp like Boxes.py');
+      } else {
+        // The return arc joins extended orthogonal walls. No diagonal bridge
+        // may be introduced to make the point-touching contours overlap.
+        for (const sp of back) for (let i = 0; i < sp.nodes.length; i++) {
+          const p = sp.nodes[i], q = sp.nodes[(i + 1) % sp.nodes.length];
+          if (Math.abs(p.x - q.x) < 1e-7 || Math.abs(p.y - q.y) < 1e-7) continue;
+          const cx = (p.x + q.x) / 2 < 1.9 ? 0 : 3.8;
+          for (const point of [p, q]) near(Math.hypot(point.x - cx, point.y - 10), burn, 0.0008);
+        }
+        const k = Math.SQRT1_2 + 0.2 * (1 - Math.SQRT1_2);
+        for (const left of [true, false]) {
+          const nubPoint = { x: left ? k * burn : 3.8 - k * burn, y: 10 - k * burn };
+          assert.ok(contains(back, nubPoint), 'backarc nub present');
+          assert.ok(!contains(corner, nubPoint), 'backarc nub adds material');
+        }
+        const bb = bounds(back);
+        assert.ok(bb.minX >= -0.001 && bb.maxX <= 3.8 + 0.001 && bb.maxY <= 10 + burn + 0.001);
+        const expected = 2 * (1 - Math.PI / 4) * burn * burn, delta = area(back) - area(corner);
+        near(delta, expected, 0.002 * burn + 0.00003);
       }
       assert.notDeepEqual(loop, back, 'relief profiles differ even with zero burn');
     }
@@ -65,7 +106,7 @@ for (const mirrored of [false, true]) for (const angle of [0, 0.71, 2.2]) {
     const shallow = structuredClone(f);
     shallow.bottomStart = { x: f.a.x + edge.normal.x * 0.1, y: f.a.y + edge.normal.y * 0.1 };
     shallow.bottomEnd = { x: f.b.x + edge.normal.x * 0.1, y: f.b.y + edge.normal.y * 0.1 };
-    for (const cornerStyle of ['corner', 'loop', 'backarc'] as const)
+    for (const cornerStyle of ['corner', 'loop', 'backarc', 'diagonal'] as const)
       assert.throws(() => manufacturedSlotPaths(shallow, { burn: 0.1, cornerStyle }), 'collapsed depth rejected');
     // Editing a returned polygon must never change a nominal datum.
     plain[0].nodes[0].x += 1; assert.equal(JSON.stringify(f), before);

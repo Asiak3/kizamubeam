@@ -36,6 +36,17 @@ export class EditorCommands {
   async onPaste(this: Editor, e: ClipboardEvent) {
     const el = e.target as HTMLElement;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+    // A modal tool dialog owns a captured document snapshot (e.g. the slot tool rejects
+    // any source change as stale). Importing clipboard content behind it would silently
+    // invalidate the tool — this includes OS-level middle-click paste on Linux, which can
+    // otherwise drop e.g. a screenshot image into the document. Same guard as file drops.
+    if (typeof document !== 'undefined' && typeof document.querySelector === 'function'
+      && document.querySelector('dialog[open]')) {
+      e.preventDefault();
+      this.hint = t('Laufende Bearbeitung beenden, bevor Dateien abgelegt werden.');
+      this.emit('view');
+      return;
+    }
     clearTimeout(this.pasteTimer);
     e.preventDefault();
     const data = e.clipboardData;

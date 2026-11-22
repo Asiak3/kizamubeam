@@ -9,7 +9,7 @@ import { curveCorner, projectedSlot, SlotProjection, SlotOrigin, straightGeometr
 import { SlotConstructionLine, ResolvedConstructionLine, resolveConstructionLine, resolveConstructionIntersection } from './slotConstruction';
 import { manufacturedSlotPaths } from './slotManufacturing';
 
-export interface SlotGroup { id: string; name: string; width: number; depth: number; clearance: number; factor: number; burn: number; cornerStyle: 'corner' | 'loop' | 'backarc' }
+export interface SlotGroup { id: string; name: string; width: number; depth: number; clearance: number; factor: number; burn: number; cornerStyle: 'corner' | 'loop' | 'backarc' | 'diagonal' }
 export interface SlotMirror { slotId: string; axis: { kind: 'helper'; helperId: string } | { kind: 'edge'; edge: string } }
 export interface PlacedSlot { x: number; y: number; angle: number; width: number; depth: number; clearance: number; factor: number; anchor?: SlotAnchor; projection?: SlotProjection; mirror?: SlotMirror; id?: string; groupId?: string; burn?: number; cornerStyle?: SlotGroup['cornerStyle'] }
 export interface SlotRecipe { source: Shape; base: SubPath[]; slots: PlacedSlot[]; settings?: { cornerAngle: number }; groups?: SlotGroup[]; helpers?: SlotConstructionLine[]; order?: { kind: 'group' | 'slot' | 'helper'; id: string }[] }
@@ -115,7 +115,7 @@ export function readSlotRecipe(p: Params): SlotRecipe {
   }
   if (r.settings) straightGeometry(r.base, r.settings.cornerAngle);
   for (const group of r.groups ?? []) {
-    if (typeof group.name !== 'string' || group.name.length > 200 || !Number.isFinite(group.burn) || group.burn < 0 || group.burn > 100 || !['corner','loop','backarc'].includes(group.cornerStyle)) throw new Error(t('Ungültige Schlitzmaße oder Korrekturwerte.'));
+    if (typeof group.name !== 'string' || group.name.length > 200 || !Number.isFinite(group.burn) || group.burn < 0 || group.burn > 100 || !['corner','loop','backarc','diagonal'].includes(group.cornerStyle)) throw new Error(t('Ungültige Schlitzmaße oder Korrekturwerte.'));
     slotOutline({ ...group, x: 0, y: 0, angle: 0 });
   }
   r.slots.forEach(s => {
