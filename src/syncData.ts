@@ -11,7 +11,7 @@ export const SETTINGS_KEYS = [
   'workpieces', 'overlap-picker', 'rightPan', 'zoomInverted', 'rememberToolOptions', 'toolOptions',
   'selectAfterDraw', 'textDefaults', 'nudgeSteps', 'shortcuts', 'clickTolerance', 'snapTolerance', 'canvasDark', 'handleSize',
   'crosshair', 'bedCenterCross', 'importAutoSelect', 'importCenterInBed', 'importSkippedNote', 'importAutoGroup', 'svgDpi', 'dxfFallbackUnit', 'importCloseTolerance', 'importHiddenLayers', 'canvasFilled', 'imageSmoothing', 'curveQuality', 'cutOrderApply', 'patternfill', 'uiTypography', 'electricityTariff', 'electricityCurrency',
-  'cutSelectedDefault', 'jobOriginDefault',
+  'cutSelectedDefault', 'jobOriginDefault', 'layerCategories',
 ].map((k) => PRE + k);
 /** Schlüssel mit diesem Anfang zählen auch zu den Einstellungen (letzte Werte der Generatoren und der Werkzeuge aus Erweiterungen) */
 export const SETTINGS_PREFIXES = [PRE + 'gen.', PRE + 'tool.'];

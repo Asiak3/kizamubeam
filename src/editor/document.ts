@@ -11,6 +11,7 @@ import { getGenerator, loadGen } from '../generators';
 import type { Editor } from '../editor';
 import { bumpShapeVersion } from './shared';
 import { docKey, makeTab } from './tabs';
+import { applyLayerDefaults } from '../layerCategories';
 
 /** Ids in the image store (hashId in images.ts) */
 const ASSET_ID = /^[0-9a-f]{16,32}$/;
@@ -227,9 +228,10 @@ export class EditorDocument {
         migrateGens(allObjs(this.doc));
         restoreAssets(this.assetIds());
         restoreMeshes(this.meshIds());
-      }
+      } else applyLayerDefaults(this.doc); // erster Start: neues Projekt mit den Layer-Vorgaben (#265)
     } catch {
       this.doc = newDoc();
+      applyLayerDefaults(this.doc);
     }
     // Ältere Sicherung ohne Tabs: ein Tab mit ungespeicherten Änderungen (außer er ist leer)
     this.tabs = [makeTab(this.doc, null, allObjs(this.doc).length > 0)];
@@ -312,6 +314,7 @@ export class EditorDocument {
     const bed = this.doc.bed;
     this.doc = newDoc();
     this.doc.bed = { ...bed };
+    applyLayerDefaults(this.doc);
     this.tab.name = null;
     this.tab.saved = docKey(this.doc);
     this.onTabsChange?.();

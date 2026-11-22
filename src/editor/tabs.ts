@@ -6,6 +6,7 @@ import { History } from '../history';
 import { restoreAssets } from '../images';
 import { t } from '../i18n';
 import type { Editor } from '../editor';
+import { applyLayerDefaults } from '../layerCategories';
 
 const TABS_KEY = 'kizamubeam.tabs';
 
@@ -169,6 +170,7 @@ export class EditorTabs {
     if (!doc) {
       doc = newDoc();
       doc.bed = { ...this.doc.bed };
+      applyLayerDefaults(doc);
     }
     const tab = makeTab(doc, name, false, false);
     this.updateChanged();
@@ -210,6 +212,7 @@ export class EditorTabs {
     if (this.tabs.length === 1) {
       const doc = newDoc();
       doc.bed = { ...this.doc.bed };
+      applyLayerDefaults(doc);
       this.tabs[0] = makeTab(doc);
       this.showTab(0);
     } else if (i === this.tabIndex) {

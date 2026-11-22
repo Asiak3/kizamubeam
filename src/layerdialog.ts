@@ -3,8 +3,9 @@
 // Sub-Layer bearbeiten dieselben Formen nach dem Layer (z. B. erst füllen, dann ausschneiden) und haben eigene Reiter.
 import type { Editor } from './editor';
 import { h, numInput } from './dom';
-import { cleanLayerType, CutSettings, cutSettings, cutsThrough, defaultCutSettings, defaultSubLayer, FillStyle, isCutLayer, Layer, LAYER_TYPES, LayerMode, layerLabel, layerTypeName, PALETTE, SubLayer } from './model';
+import { cleanLayerType, CutSettings, cutSettings, cutsThrough, defaultSubLayer, FillStyle, isCutLayer, Layer, LAYER_TYPES, LayerMode, layerLabel, layerTypeName, PALETTE, SubLayer } from './model';
 import { t } from './i18n';
+import { resetSettings } from './layerCategories';
 import { lookEditor } from './view3d/lookui';
 import { guessLook, lookName, resolveLook } from './view3d/looks';
 import { library } from './materials';
@@ -374,7 +375,8 @@ export function openLayerDialog(ed: Editor, i: number) {
         class: 'btn',
         title: t('Standardwerte für den gewählten Modus'),
         onclick: () => {
-          if (tab < 0) Object.assign(c, { ...defaultCutSettings(vecs ? c.mode : 'fill'), mode: c.mode, sub: subs });
+          // Voreinstellung der Kategorie des Layers, wenn sie diesen Modus hat (#265), sonst die des Modus
+          if (tab < 0) Object.assign(c, { ...resetSettings(i, vecs ? c.mode : 'fill'), mode: c.mode, sub: subs });
           else subs[tab] = { ...defaultSubLayer(subs[tab].mode), output: subs[tab].output, name: subs[tab].name ?? '' } as SubLayer;
           render();
         },

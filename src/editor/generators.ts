@@ -5,6 +5,7 @@ import { boundsOf, type Box } from '../geom';
 import { BuildResult, GenPart, genLabel, getGenerator, normalizeParams } from '../generators';
 import type { PlanSheet } from '../generators/types';
 import { t, tn } from '../i18n';
+import { markLayerSettings } from '../layerCategories';
 import type { Editor } from '../editor';
 import { findFreeSpot, fitsArea } from '../placement';
 import { DEFAULT_NEST_SETTINGS } from './nest';
@@ -233,13 +234,14 @@ export class EditorGenerators {
    */
   /**
    * Layer für Gravuren von Generator-Teilen (z. B. Schichtnummern): der schon dafür benutzte, sonst ein freier,
-   * der als feine Linien-Gravur eingestellt wird.
+   * der mit der Kategorie Markieren eingestellt wird (ohne Layer-Vorgaben: feine Linien-Gravur).
    */
   markLayer(this: Editor, cut: number): number {
     for (const pg of this.doc.pages) for (const [o] of leaves(pg.objs)) if (o.shape.kind === 'path' && o.shape.mark) return o.layer;
     const i = this.freeLayer(cut, true);
     if (i < 0) return cut;
-    Object.assign(this.layer(i), defaultCutSettings('line'), { mode: 'line', speed: 3000, power: 15, name: t('Beschriftung'), output: true });
+    // Kategorie Markieren der Layer-Vorgaben (#265); ohne Vorgaben Linie 3000 mm/min 15 % wie bisher
+    Object.assign(this.layer(i), markLayerSettings(), { name: t('Beschriftung'), output: true });
     return i;
   }
   /**
