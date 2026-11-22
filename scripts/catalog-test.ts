@@ -171,6 +171,81 @@ await test('fetchCatalog: merges multiple independent catalog sources and resolv
   assert.equal(await C.fetchCatalogPack(cat.packs[1]), p2);
 });
 
+await test('fetchCatalogPack: meldet Lade- und Prüffortschritt über Chunks (inkl. geteiltem UTF-8) und Fallback', async () => {
+  const text = pack('1.0.0', { description: 'Größe mit Umlauten: äöüß €' });
+  const bytes = new TextEncoder().encode(text);
+  const catText = await C.buildCatalog([['de.test.katalog.kzp', text]], '');
+  const entry = C.parseCatalog(catText).packs[0];
+
+  // Split intentionally inside a multi-byte UTF-8 sequence
+  const umlautIdx = bytes.findIndex((b) => b >= 0x80);
+  assert.ok(umlautIdx > 0, 'expected multi-byte UTF-8 byte');
+  const parts = [bytes.slice(0, umlautIdx + 1), bytes.slice(umlautIdx + 1, umlautIdx + 8), bytes.slice(umlautIdx + 8)];
+
+  const events: { phase: string; loaded: number; total: number }[] = [];
+  g.fetch = async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    body: {
+      getReader() {
+        let i = 0;
+        return {
+          async read() {
+            if (i >= parts.length) return { done: true, value: undefined };
+            return { done: false, value: parts[i++] };
+          },
+        };
+      },
+    },
+    text: async () => {
+      throw new Error('should read stream instead of text()');
+    },
+  });
+  const got = await C.fetchCatalogPack(entry, 'https://x.test/c/catalog.json', (p) => events.push({ ...p }));
+  assert.equal(got, text);
+  assert.equal(events[0].phase, 'download');
+  assert.equal(events[0].loaded, 0);
+  assert.equal(events[0].total, bytes.length);
+  const downloadLoaded = events.filter((e) => e.phase === 'download').map((e) => e.loaded);
+  assert.equal(downloadLoaded.at(-1), bytes.length);
+  for (let i = 1; i < downloadLoaded.length; i++) assert.ok(downloadLoaded[i] >= downloadLoaded[i - 1]);
+  assert.deepEqual(events.at(-1), { phase: 'verify', loaded: bytes.length, total: bytes.length });
+
+  // Older catalog entry without size: falls back to Content-Length, or 0 when absent
+  const noSizeEvents: { phase: string; loaded: number; total: number }[] = [];
+  g.fetch = async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-length' ? String(bytes.length) : null) },
+    body: {
+      getReader() {
+        let sent = false;
+        return {
+          async read() {
+            if (sent) return { done: true, value: undefined };
+            sent = true;
+            return { done: false, value: bytes };
+          },
+        };
+      },
+    },
+  });
+  await C.fetchCatalogPack({ ...entry, size: 0 }, 'https://x.test/c/catalog.json', (p) => noSizeEvents.push({ ...p }));
+  assert.equal(noSizeEvents[0].total, 0);
+  assert.equal(noSizeEvents.find((e) => e.phase === 'download' && e.loaded === bytes.length)?.total, bytes.length);
+
+  // Unknown total (no size and no Content-Length) + text() fallback
+  const fallbackEvents: { phase: string; loaded: number; total: number }[] = [];
+  g.fetch = async () => ({ ok: true, status: 200, text: async () => text });
+  await C.fetchCatalogPack({ ...entry, size: 0 }, 'https://x.test/c/catalog.json', (p) => fallbackEvents.push({ ...p }));
+  assert.deepEqual(fallbackEvents, [
+    { phase: 'download', loaded: 0, total: 0 },
+    { phase: 'download', loaded: bytes.length, total: bytes.length },
+    { phase: 'verify', loaded: bytes.length, total: bytes.length },
+  ]);
+});
+
 if (failed) {
   console.log(`\n${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

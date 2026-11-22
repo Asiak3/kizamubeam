@@ -5361,5 +5361,15 @@
   "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Arraste as alças na tela; Shift move todos os cantos juntos.",
   "Ansicht zurücksetzen": "Redefinir exibição",
   "Alle Ecken synchron": "Sincronizar todos os cantos",
-  "Einzelne Eckenradien": "Raios de canto individuais"
+  "Einzelne Eckenradien": "Raios de canto individuais",
+  "„{name}“ wird geprüft …": "Verificando “{name}” …",
+  "„{name}“ wird geladen … ({loaded} / {total} · {pct} %)": "Baixando “{name}” … ({loaded} / {total} · {pct}%)",
+  "„{name}“ wird geladen … ({loaded})": "Baixando “{name}” … ({loaded})",
+  "„{name}“ wird geladen …": "Baixando “{name}” …",
+  "Plugins werden geprüft ({step}/{total}): {name} …": "Verificando plugins ({step}/{total}): {name} …",
+  "„{name}“ wird installiert …": "Instalando “{name}” …",
+  "Wird geladen …": "Baixando …",
+  "Wird aktualisiert …": "Atualizando …",
+  "{step} von {total}: {status}": "{step} de {total}: {status}",
+  "„{name}“: Plugins werden geprüft …": "“{name}”: Verificando plugins …"
 }

@@ -4436,6 +4436,23 @@ input.bound {
   margin: 6px 0;
   padding-left: 20px;
 }
+.pack-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+.pack-progress[hidden] {
+  display: none;
+}
+.pack-progress-text {
+  color: var(--muted);
+  font-size: calc(12px * var(--ty-supporting));
+}
+.pack-progress-bar {
+  width: 100%;
+  accent-color: var(--accent);
+}
 
 /* Nachsteuern während des Jobs (Overrides), Eingänge */
 .ov-box {

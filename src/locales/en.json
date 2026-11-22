@@ -5361,5 +5361,15 @@
   "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Drag the handles on the canvas; Shift drags all corners together.",
   "Ansicht zurücksetzen": "Reset view",
   "Alle Ecken synchron": "Link all corners",
-  "Einzelne Eckenradien": "Individual corner radii"
+  "Einzelne Eckenradien": "Individual corner radii",
+  "„{name}“ wird geprüft …": "Verifying “{name}” …",
+  "„{name}“ wird geladen … ({loaded} / {total} · {pct} %)": "Downloading “{name}” … ({loaded} / {total} · {pct}%)",
+  "„{name}“ wird geladen … ({loaded})": "Downloading “{name}” … ({loaded})",
+  "„{name}“ wird geladen …": "Downloading “{name}” …",
+  "Plugins werden geprüft ({step}/{total}): {name} …": "Checking plugins ({step}/{total}): {name} …",
+  "„{name}“ wird installiert …": "Installing “{name}” …",
+  "Wird geladen …": "Downloading …",
+  "Wird aktualisiert …": "Updating …",
+  "{step} von {total}: {status}": "{step} of {total}: {status}",
+  "„{name}“: Plugins werden geprüft …": "“{name}”: Checking plugins …"
 }

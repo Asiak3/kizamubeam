@@ -82,12 +82,24 @@ export function syncPlugins() {
   if (toolsChanged) toolListeners.forEach((f) => f());
 }
 
+export interface PluginLoadProgress {
+  index: number;
+  total: number;
+  plugin: Pack['plugins'][number];
+}
+
 /**
  * Load every plugin of a pack once before it is installed (#206): start it in its own process and compute the
  * default parameters. Returns the first problem as a message, or null when all plugins answered.
  */
-export async function testLoadPlugins(pack: Pick<Pack, 'id' | 'name' | 'plugins'>): Promise<string | null> {
-  for (const m of pack.plugins) {
+export async function testLoadPlugins(
+  pack: Pick<Pack, 'id' | 'name' | 'plugins'>,
+  onProgress?: (progress: PluginLoadProgress) => void,
+): Promise<string | null> {
+  const total = pack.plugins.length;
+  for (let i = 0; i < total; i++) {
+    const m = pack.plugins[i];
+    onProgress?.({ index: i, total, plugin: m });
     if (isToolType(m.type)) {
       const why = await testLoadTool(m, pack);
       if (why) return t('Plugin „{id}“: {message}', { id: m.id, message: why });

@@ -5361,5 +5361,15 @@
   "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Trascina le maniglie sulla superficie; Maiusc muove tutti gli angoli insieme.",
   "Ansicht zurücksetzen": "Ripristina vista",
   "Alle Ecken synchron": "Sincronizza tutti gli angoli",
-  "Einzelne Eckenradien": "Raggi dei singoli angoli"
+  "Einzelne Eckenradien": "Raggi dei singoli angoli",
+  "„{name}“ wird geprüft …": "Verifica di “{name}” …",
+  "„{name}“ wird geladen … ({loaded} / {total} · {pct} %)": "Download di “{name}” … ({loaded} / {total} · {pct}%)",
+  "„{name}“ wird geladen … ({loaded})": "Download di “{name}” … ({loaded})",
+  "„{name}“ wird geladen …": "Download di “{name}” …",
+  "Plugins werden geprüft ({step}/{total}): {name} …": "Verifica dei plugin ({step}/{total}): {name} …",
+  "„{name}“ wird installiert …": "Installazione di “{name}” …",
+  "Wird geladen …": "Download in corso …",
+  "Wird aktualisiert …": "Aggiornamento in corso …",
+  "{step} von {total}: {status}": "{step} di {total}: {status}",
+  "„{name}“: Plugins werden geprüft …": "“{name}”: Verifica dei plugin …"
 }

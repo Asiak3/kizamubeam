@@ -215,11 +215,53 @@ export async function fetchCatalog(
   return { generated, packs: merged };
 }
 
+export type CatalogFetchPhase = 'download' | 'verify';
+
+export interface CatalogFetchProgress {
+  phase: CatalogFetchPhase;
+  /** Bytes loaded so far (UTF-8 bytes) */
+  loaded: number;
+  /** Expected total bytes (from catalog entry or Content-Length), 0 if unknown */
+  total: number;
+}
+
 /** Paketdatei eines Eintrags laden und gegen Prüfsumme und Kennung prüfen; liefert den Text zum Installieren */
-export async function fetchCatalogPack(e: CatalogEntry, url = e.catalogUrl ?? catalogSource): Promise<string> {
+export async function fetchCatalogPack(
+  e: CatalogEntry,
+  url = e.catalogUrl ?? catalogSource,
+  onProgress?: (progress: CatalogFetchProgress) => void,
+): Promise<string> {
+  const knownTotal = e.size > 0 ? e.size : 0;
+  onProgress?.({ phase: 'download', loaded: 0, total: knownTotal });
   const r = await fetch(new URL(e.file, url).href, { cache: 'no-cache' });
   if (!r.ok) throw new CatalogError(t('Paket nicht erreichbar ({status})', { status: r.status }));
-  const text = await r.text();
+  const headerLen = Number(r.headers?.get?.('content-length') ?? 0);
+  const total = knownTotal || (Number.isFinite(headerLen) && headerLen > 0 ? headerLen : 0);
+  let text: string;
+  let loaded = 0;
+  if (r.body && typeof r.body.getReader === 'function') {
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    const parts: string[] = [];
+    onProgress?.({ phase: 'download', loaded: 0, total });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value?.byteLength) {
+        loaded += value.byteLength;
+        parts.push(decoder.decode(value, { stream: true }));
+        onProgress?.({ phase: 'download', loaded, total: total > 0 ? Math.max(total, loaded) : 0 });
+      }
+    }
+    parts.push(decoder.decode());
+    text = parts.join('');
+  } else {
+    text = await r.text();
+    loaded = new TextEncoder().encode(text).length;
+    onProgress?.({ phase: 'download', loaded, total: total > 0 ? Math.max(total, loaded) : loaded });
+  }
+  const finalTotal = total > 0 ? Math.max(total, loaded) : loaded;
+  onProgress?.({ phase: 'verify', loaded: finalTotal, total: finalTotal });
   if ((await sha256Hex(text)) !== e.sha256) throw new CatalogError(t('Die Prüfsumme des Pakets stimmt nicht mit dem Katalog überein.'));
   const p = parsePack(text);
   if (p.id !== e.id || p.version !== e.version) throw new CatalogError(t('Das Paket passt nicht zum Eintrag im Katalog.'));

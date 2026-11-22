@@ -3,7 +3,7 @@ import { h, showDialog } from './dom';
 import { openText } from './files';
 import { entryLabel } from './materials';
 import { FIRMWARES, LaserModule, LaserType } from './gcode';
-import { Catalog, CatalogEntry, catalogState, fetchCatalog, fetchCatalogPack } from './catalog';
+import { Catalog, CatalogEntry, CatalogFetchProgress, catalogState, fetchCatalog, fetchCatalogPack } from './catalog';
 import { version as APP_VERSION } from '../package.json';
 import { lang, t, tn } from './i18n';
 import {
@@ -17,6 +17,71 @@ import { clearNetCache, netAllowed, netLog, netOff, setNetAllowed, setNetOff } f
 import { netHostList } from './plugins/netUi';
 
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** Bytegröße lesbar formatieren (B, KB, MB) */
+export function formatPackBytes(bytes: number, locale = lang): string {
+  if (bytes < 1024) return `${Math.max(0, Math.round(bytes)).toLocaleString(locale)} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toLocaleString(locale, { maximumFractionDigits: kb < 100 ? 1 : 0 })} KB`;
+  const mb = kb / 1024;
+  return `${mb.toLocaleString(locale, { maximumFractionDigits: mb < 10 ? 1 : 0 })} MB`;
+}
+
+/** Fortschrittstext und Verhältnis (0..1 oder null für unbestimmt) beim Laden eines Katalogpakets */
+export function catalogFetchStatus(name: string, progress: CatalogFetchProgress, locale = lang): { text: string; ratio: number | null } {
+  if (progress.phase === 'verify') return { text: t('„{name}“ wird geprüft …', { name }), ratio: 1 };
+  if (progress.total > 0 && progress.loaded > 0) {
+    const ratio = Math.max(0, Math.min(1, progress.loaded / progress.total));
+    const pct = Math.min(100, Math.round(ratio * 100));
+    return {
+      text: t('„{name}“ wird geladen … ({loaded} / {total} · {pct} %)', {
+        name,
+        loaded: formatPackBytes(progress.loaded, locale),
+        total: formatPackBytes(progress.total, locale),
+        pct,
+      }),
+      ratio,
+    };
+  }
+  if (progress.loaded > 0) {
+    return {
+      text: t('„{name}“ wird geladen … ({loaded})', { name, loaded: formatPackBytes(progress.loaded, locale) }),
+      ratio: null,
+    };
+  }
+  return { text: t('„{name}“ wird geladen …', { name }), ratio: null };
+}
+
+interface ProgressBox {
+  el: HTMLElement;
+  show: (label: string, ratio?: number | null) => void;
+  hide: () => void;
+}
+
+function createProgressBox(): ProgressBox {
+  const text = h('div', { class: 'pack-progress-text', 'aria-live': 'polite' });
+  const bar = h('progress', { class: 'pack-progress-bar', max: 1, value: 0 }) as HTMLProgressElement;
+  const el = h('div', { class: 'pack-progress', hidden: true }, text, bar);
+  return {
+    el,
+    show(label: string, ratio?: number | null) {
+      el.hidden = false;
+      text.textContent = label;
+      if (typeof ratio === 'number' && Number.isFinite(ratio)) {
+        bar.max = 1;
+        bar.value = Math.max(0, Math.min(1, ratio));
+      } else {
+        bar.removeAttribute('value');
+      }
+    },
+    hide() {
+      el.hidden = true;
+      text.textContent = '';
+      bar.max = 1;
+      bar.value = 0;
+    },
+  };
+}
 
 /** Eintrag der Auswahl „Neues Gerät aus Vorlage“; Vorlagen aus Erweiterungen nennen das Paket, die Quelle steht im Tooltip */
 export function presetOption(p: PresetListEntry, i: number) {
@@ -127,28 +192,54 @@ export async function installPackFile(name: string, text: string, fromCatalog = 
   }[kind];
   return new Promise((resolve) => {
     let result: Pack | null = null;
+    const progress = createProgressBox();
     const err = h('p', { class: 'error' });
     const ok = h('button', { class: 'btn primary' }, kind === 'update' ? t('Aktualisieren') : t('Installieren')) as HTMLButtonElement;
+    const cancel = h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen')) as HTMLButtonElement;
     // Unsigned program code: the user confirms the source before Install becomes available
     let trust: HTMLElement | null = null;
+    let trustBox: HTMLInputElement | null = null;
     if (p.plugins.length && !fromCatalog) {
       const box = h('input', { type: 'checkbox' }) as HTMLInputElement;
+      trustBox = box;
       box.onchange = () => (ok.disabled = !box.checked);
       ok.disabled = true;
       trust = h('label', { class: 'check' }, box, ' ', t('Ich vertraue der Quelle dieser Erweiterung'));
     }
+    let busy = false;
     ok.onclick = async () => {
+      if (busy) return;
+      busy = true;
       ok.disabled = true;
+      cancel.disabled = true;
+      if (trustBox) trustBox.disabled = true;
+      err.textContent = '';
       try {
         // Atomic: the new version is only written after its plugins started and answered
-        const bad = p.plugins.length ? (err.textContent = t('Plugins werden geprüft …'), await testLoadPlugins(p)) : null;
-        err.textContent = '';
-        if (bad) throw new Error(bad);
+        if (p.plugins.length) {
+          const totalSteps = p.plugins.length + 1;
+          const bad = await testLoadPlugins(p, ({ index, total, plugin }) => {
+            const pName = pluginText(plugin.texts, lang, 'name') ?? plugin.id;
+            const label = total > 1
+              ? t('Plugins werden geprüft ({step}/{total}): {name} …', { step: index + 1, total, name: pName })
+              : t('Plugins werden geprüft …');
+            progress.show(label, total > 1 ? index / totalSteps : null);
+          });
+          if (bad) throw new Error(bad);
+          progress.show(t('„{name}“ wird installiert …', { name: p.name }), p.plugins.length / totalSteps);
+        } else {
+          progress.show(t('„{name}“ wird installiert …', { name: p.name }), null);
+        }
         result = await installPack(text, { verified: fromCatalog });
+        progress.show(t('„{name}“ wird installiert …', { name: p.name }), 1);
         dlg.close();
       } catch (e) {
+        progress.hide();
         err.textContent = errText(e);
-        ok.disabled = false;
+        busy = false;
+        ok.disabled = trustBox ? !trustBox.checked : false;
+        cancel.disabled = false;
+        if (trustBox) trustBox.disabled = false;
       }
     };
     const dlg = h('dialog', { class: 'packs-dialog' },
@@ -169,9 +260,13 @@ export async function installPackFile(name: string, text: string, fromCatalog = 
         netHostList(x),
       ]),
       trust,
+      progress.el,
       err,
-      h('div', { class: 'dialog-buttons' }, ok, h('button', { class: 'btn', onclick: () => dlg.close() }, t('Abbrechen'))),
+      h('div', { class: 'dialog-buttons' }, ok, cancel),
     ) as HTMLDialogElement;
+    dlg.addEventListener('cancel', (ev) => {
+      if (busy) ev.preventDefault();
+    });
     showDialog(dlg, () => resolve(result));
   });
 }
@@ -196,7 +291,7 @@ type Filter = 'all' | 'content' | 'plugins' | 'templates' | 'materials' | 'asset
 const hasContent = (devices: number, templates: number, materials: number, assets: number) => devices + templates + materials + assets > 0;
 
 /** Window „Extensions“: installed packs and the catalogue, with a search and a filter for content or plugins (#206) */
-export async function openPacksDialog(doc?: Doc) {
+export async function openPacksDialog(doc?: Doc, opts?: { loadCatalog?: () => Promise<Catalog> }) {
   await ensurePacks();
   const list = h('div', { class: 'pack-list' });
   const catalogPanel = h('div', { class: 'pack-panel' });
@@ -295,6 +390,7 @@ export async function openPacksDialog(doc?: Doc) {
     );
   };
   const showInstalledDetails = (ip: InstalledPack) => {
+    detailsAction = null;
     const { pack } = ip;
     details.replaceChildren(
       h('h4', {}, pack.name),
@@ -318,8 +414,10 @@ export async function openPacksDialog(doc?: Doc) {
       'newer-installed': t('Neuere Version installiert'),
       'needs-app': e.minApp ? t('Braucht KizamuBeam {version}', { version: e.minApp }) : t('Braucht eine neuere Version von KizamuBeam'),
     }[st];
-    const action = h('button', { class: 'btn primary', disabled: st !== 'install' && st !== 'update' }, label) as HTMLButtonElement;
-    action.onclick = () => fromCatalog(e, action);
+    const canAct = st === 'install' || st === 'update';
+    const action = h('button', { class: 'btn primary', disabled: !canAct || isBusy() }, busyId === e.id ? t('Wird geladen …') : label) as HTMLButtonElement;
+    action.onclick = () => void fromCatalog(e);
+    detailsAction = { id: e.id, button: action, label, canAct };
     details.replaceChildren(
       h('h4', {}, name),
       h('div', { class: 'muted' }, `${e.version}${e.author ? ` · ${e.author}` : ''}`),
@@ -348,6 +446,7 @@ export async function openPacksDialog(doc?: Doc) {
         : t('Noch keine Erweiterungen installiert. Eine Erweiterung (.kzp) bringt Gerätevorlagen, Vorlagen oder Materialien mit, ohne dass KizamuBeam neu installiert werden muss.')));
   };
   const install = async () => {
+    if (isBusy()) return;
     const r = await openText(t('KizamuBeam-Erweiterung'), [PACK_EXT]);
     if (!r) return;
     if (await installPackFile(r[0], r[1])) (fill(), fillCatalog());
@@ -356,14 +455,40 @@ export async function openPacksDialog(doc?: Doc) {
   // ---------- Katalog ----------
   const catList = h('div', { class: 'pack-list' });
   const catStatus = h('p', { class: 'note' });
+  const catalogProgress = createProgressBox();
+  const reloadBtn = h('button', { class: 'btn small' }, t('Neu laden')) as HTMLButtonElement;
   const updateAll = h('button', { class: 'btn small primary', hidden: true }) as HTMLButtonElement;
+  const installFileBtn = h('button', { class: 'btn', onclick: install }, t('Installieren …')) as HTMLButtonElement;
+  const closeBtn = h('button', { class: 'btn' }, t('Schließen')) as HTMLButtonElement;
   let catalog: Catalog | null = null;
   let view: 'catalog' | 'installed' | 'updates' = 'catalog';
+  let busyId: string | null = null;
+  let busyAll = false;
+  let loadingCatalog = false;
+  let selectedCatalogId: string | null = null;
+  type CatalogActionBtn = { id: string; button: HTMLButtonElement; label: string; canAct: boolean };
+  const catalogActions = new Map<string, CatalogActionBtn>();
+  let detailsAction: CatalogActionBtn | null = null;
+  const isBusy = () => busyId !== null || busyAll;
+  const syncBusy = () => {
+    const busy = isBusy();
+    reloadBtn.disabled = busy || loadingCatalog;
+    installFileBtn.disabled = busy;
+    closeBtn.disabled = busy;
+    updateAll.disabled = busy || loadingCatalog;
+    updateAll.textContent = busyAll ? t('Wird aktualisiert …') : t('Alle aktualisieren ({n})', { n: updates().length });
+    const apply = (item: CatalogActionBtn) => {
+      item.button.disabled = !item.canAct || busy;
+      item.button.textContent = busyId === item.id ? t('Wird geladen …') : item.label;
+    };
+    for (const item of catalogActions.values()) apply(item);
+    if (detailsAction) apply(detailsAction);
+  };
   const stateOf = (e: CatalogEntry) => catalogState(e, allPacks().find((x) => x.pack.id === e.id)?.pack, APP_VERSION);
   const updates = () => (catalog?.packs ?? []).filter((e) => stateOf(e) === 'update');
   const catalogTab = h('button', { class: 'tab', type: 'button' }, t('Katalog')) as HTMLButtonElement;
-  const installedTab = h('button', { class: 'tab', type: 'button' }) as HTMLButtonElement;
-  const updatesTab = h('button', { class: 'tab', type: 'button' }) as HTMLButtonElement;
+  const installedTab = h('button', { class: 'tab', type: 'button' }, t('Installiert')) as HTMLButtonElement;
+  const updatesTab = h('button', { class: 'tab', type: 'button' }, t('Updates')) as HTMLButtonElement;
   const catalogHeading = h('h4', {}, t('Katalog'));
   const tabs = h('div', { class: 'tab-bar pack-tabs', role: 'tablist' }, catalogTab, installedTab, updatesTab);
   const categoryButtons: { filter: Filter; button: HTMLButtonElement }[] = [];
@@ -411,50 +536,91 @@ export async function openPacksDialog(doc?: Doc) {
     view = 'updates';
     fillCatalog();
   };
-  const fromCatalog = async (e: CatalogEntry, btn: HTMLButtonElement) => {
-    btn.disabled = true;
+  const fromCatalog = async (e: CatalogEntry) => {
+    if (isBusy()) return;
+    busyId = e.id;
+    err.textContent = '';
+    const name = localText(e.name);
+    syncBusy();
     try {
-      const text = await fetchCatalogPack(e);
+      const text = await fetchCatalogPack(e, undefined, (progress) => {
+        const s = catalogFetchStatus(name, progress);
+        catalogProgress.show(s.text, s.ratio);
+      });
+      catalogProgress.hide();
       if (await installPackFile(e.file, text, true)) fill();
     } catch (x) {
       err.textContent = errText(x);
+    } finally {
+      busyId = null;
+      catalogProgress.hide();
+      syncBusy();
+      fillCatalog();
     }
-    fillCatalog();
   };
   /** Update every pack with a newer catalogue version; each one only after its check and test load */
   updateAll.onclick = async () => {
-    updateAll.disabled = true;
+    if (isBusy()) return;
+    const listToUpdate = updates();
+    if (!listToUpdate.length) return;
+    busyAll = true;
     err.textContent = '';
+    syncBusy();
     const failed: string[] = [];
     let done = 0;
-    for (const e of updates()) {
-      try {
-        const text = await fetchCatalogPack(e);
-        const p = parsePack(text);
-        const why = p.plugins.map((x) => pluginConflict(p, x.id)).find(Boolean) ?? (p.plugins.length ? await testLoadPlugins(p) : null);
-        if (why) throw new Error(why);
-        await installPack(text, { verified: true });
-        done++;
-      } catch (x) {
-        failed.push(`${localText(e.name)}: ${errText(x)}`);
+    const total = listToUpdate.length;
+    try {
+      for (let i = 0; i < total; i++) {
+        const e = listToUpdate[i];
+        const name = localText(e.name);
+        const step = i + 1;
+        const stepText = (status: string) => t('{step} von {total}: {status}', { step, total, status });
+        try {
+          const text = await fetchCatalogPack(e, undefined, (progress) => {
+            const s = catalogFetchStatus(name, progress);
+            const sub = progress.phase === 'verify' ? 0.75 : s.ratio !== null ? s.ratio * 0.7 : 0;
+            catalogProgress.show(stepText(s.text), (i + sub) / total);
+          });
+          const p = parsePack(text);
+          const why = p.plugins.map((x) => pluginConflict(p, x.id)).find(Boolean)
+            ?? (p.plugins.length
+              ? await testLoadPlugins(p, ({ index, total: pluginTotal }) => {
+                  const sub = 0.75 + (index / Math.max(1, pluginTotal)) * 0.15;
+                  catalogProgress.show(stepText(t('„{name}“: Plugins werden geprüft …', { name })), (i + sub) / total);
+                })
+              : null);
+          if (why) throw new Error(why);
+          catalogProgress.show(stepText(t('„{name}“ wird installiert …', { name })), (i + 0.9) / total);
+          await installPack(text, { verified: true });
+          done++;
+          catalogProgress.show(stepText(t('„{name}“ wird installiert …', { name })), (i + 1) / total);
+        } catch (x) {
+          failed.push(`${name}: ${errText(x)}`);
+        }
       }
+    } finally {
+      busyAll = false;
+      catalogProgress.hide();
+      catStatus.textContent = tn('{n} Erweiterung aktualisiert.', '{n} Erweiterungen aktualisiert.', done);
+      err.textContent = failed.join('\n');
+      syncBusy();
+      fill();
+      fillCatalog();
     }
-    updateAll.disabled = false;
-    catStatus.textContent = tn('{n} Erweiterung aktualisiert.', '{n} Erweiterungen aktualisiert.', done);
-    err.textContent = failed.join('\n');
-    fill();
-    fillCatalog();
   };
   const fillCatalog = () => {
     catList.replaceChildren();
+    catalogActions.clear();
     const n = updates().length;
     updateAll.hidden = n < 2;
-    updateAll.textContent = t('Alle aktualisieren ({n})', { n });
     if (!catalog) {
+      detailsAction = null;
       syncView();
+      syncBusy();
       return;
     }
     let first: { card: HTMLElement; entry: CatalogEntry } | null = null;
+    let kept: { card: HTMLElement; entry: CatalogEntry } | null = null;
     for (const e of catalog.packs) {
       if (view === 'updates' && stateOf(e) !== 'update') continue;
       const name = localText(e.name);
@@ -468,8 +634,9 @@ export async function openPacksDialog(doc?: Doc) {
         'newer-installed': t('Neuere Version installiert'),
         'needs-app': e.minApp ? t('Braucht KizamuBeam {version}', { version: e.minApp }) : t('Braucht eine neuere Version von KizamuBeam'),
       }[st];
-      const btn = h('button', { class: 'btn small' + (st === 'install' || st === 'update' ? ' primary' : ''), disabled: st !== 'install' && st !== 'update' }, label) as HTMLButtonElement;
-      btn.onclick = () => fromCatalog(e, btn);
+      const canAct = st === 'install' || st === 'update';
+      const btn = h('button', { class: 'btn small' + (canAct ? ' primary' : ''), disabled: !canAct || isBusy() }, busyId === e.id ? t('Wird geladen …') : label) as HTMLButtonElement;
+      catalogActions.set(e.id, { id: e.id, button: btn, label, canAct });
       const kinds = e.plugins ? [badge(t('Plugins'), 'plugins', (e.runtimes ?? []).map((r) => (r === 'js' ? 'JavaScript' : 'WebAssembly')).join(', '))] : [];
       if (e.network?.length) kinds.push(badge(t('Netzwerk'), 'network', e.network.join(', ')));
       const card = h('div', { class: 'pack-card', tabIndex: 0 },
@@ -481,27 +648,45 @@ export async function openPacksDialog(doc?: Doc) {
         ),
         btn,
       );
+      btn.onclick = (ev) => {
+        ev.stopPropagation();
+        selectCard(card, catList);
+        selectedCatalogId = e.id;
+        showCatalogDetails(e);
+        void fromCatalog(e);
+      };
       card.onclick = () => {
         selectCard(card, catList);
+        selectedCatalogId = e.id;
         showCatalogDetails(e);
       };
       catList.append(card);
       first ??= { card, entry: e };
+      if (e.id === selectedCatalogId) kept = { card, entry: e };
     }
-    if (first) {
-      selectCard(first.card, catList);
-      showCatalogDetails(first.entry);
-    } else details.replaceChildren();
+    const pick = kept ?? first;
+    if (pick) {
+      selectCard(pick.card, catList);
+      selectedCatalogId = pick.entry.id;
+      showCatalogDetails(pick.entry);
+    } else {
+      detailsAction = null;
+      details.replaceChildren();
+    }
     if (!catalog.packs.length) catList.append(h('p', { class: 'note' }, t('Der Katalog enthält noch keine Pakete.')));
     else if (!catList.children.length) catList.append(h('p', { class: 'note' }, view === 'updates' && !search.value.trim()
       ? t('{n} Aktualisierungen verfügbar.', { n: 0 })
       : t('Keine Treffer.')));
     syncView();
+    syncBusy();
   };
   const loadCatalog = async () => {
+    if (isBusy()) return;
+    loadingCatalog = true;
+    syncBusy();
     catStatus.textContent = t('Katalog wird geladen …');
     try {
-      catalog = await fetchCatalog();
+      catalog = await (opts?.loadCatalog ?? fetchCatalog)();
       // Installed files the signed catalogue lists exactly count as checked
       for (const ip of allPacks()) {
         const e = catalog.packs.find((x) => x.id === ip.pack.id);
@@ -512,10 +697,13 @@ export async function openPacksDialog(doc?: Doc) {
     } catch (e) {
       catalog = null;
       catStatus.textContent = t('Katalog nicht verfügbar: {message}', { message: errText(e) });
+    } finally {
+      loadingCatalog = false;
     }
     fill();
     fillCatalog();
   };
+  reloadBtn.onclick = () => void loadCatalog();
   const refilter = () => (fill(), fillCatalog());
   search.addEventListener('input', refilter);
   const dlg = h('dialog', { class: 'packs-dialog' },
@@ -523,22 +711,28 @@ export async function openPacksDialog(doc?: Doc) {
     h('div', { class: 'pack-filter' }, search),
     tabs,
     workspace,
+    catalogProgress.el,
     err,
     h('div', { class: 'dialog-buttons' },
       hasPackFolder() ? h('button', { class: 'btn', onclick: () => openPackFolder().catch((e) => (err.textContent = errText(e))) }, t('Ordner zeigen')) : null,
-      h('button', { class: 'btn', onclick: install }, t('Installieren …')),
+      installFileBtn,
       h('span', { class: 'param-spacer' }),
-      h('button', { class: 'btn', onclick: () => dlg.close() }, t('Schließen')),
+      closeBtn,
     ),
   ) as HTMLDialogElement;
+  closeBtn.onclick = () => dlg.close();
+  dlg.addEventListener('cancel', (ev) => {
+    if (isBusy()) ev.preventDefault();
+  });
   installedPanel.append(h('h4', {}, t('Installiert')), list, netSwitch());
   catalogPanel.append(
-    h('div', { class: 'pack-section-heading' }, catalogHeading, h('div', {}, h('button', { class: 'btn small', onclick: loadCatalog }, t('Neu laden')), ' ', updateAll)),
+    h('div', { class: 'pack-section-heading' }, catalogHeading, h('div', {}, reloadBtn, ' ', updateAll)),
     catStatus,
     catList,
   );
   fill();
   syncView();
+  syncBusy();
   showDialog(dlg);
   void loadCatalog();
 }
