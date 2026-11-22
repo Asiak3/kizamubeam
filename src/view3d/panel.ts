@@ -5,7 +5,7 @@
 // Gezeigt wird die Auswahl (eine gewählte Baugruppe immer ganz), ohne Auswahl alles auf der Seite.
 import type { Editor } from '../editor';
 import type { GenShape, Mat, Obj } from '../model';
-import { IDENT, inv, isCutLayer, leaves, mul, visibleLeaves } from '../model';
+import { IDENT, inv, leaves, mul, shapeCutsThrough, visibleLeaves } from '../model';
 import { boundsOf } from '../geom';
 import { region } from '../ops';
 import ClipperLib from 'clipper-lib';
@@ -113,7 +113,7 @@ function collectMultiLayers(ed: Editor, selected: Obj[] | null, fallback: Materi
       const paths: Paths = [];
       for (const [leaf, m] of leaves([root.o])) {
         used.add(leaf.id);
-        if (!isCutLayer(ed.layer(leaf.layer)) || leaf.shape.kind === 'text' || leaf.shape.kind === 'image') continue;
+        if (!shapeCutsThrough(leaf, ed.layer(leaf.layer)) || leaf.shape.kind === 'text' || leaf.shape.kind === 'image') continue;
         if (leaf.shape.kind === 'path' && leaf.shape.mark) continue;
         paths.push(...region({ ...leaf, m: mul(delta, m) }));
       }
@@ -170,7 +170,8 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
   const flats = new Map<number, { paths: Paths; sheet: Paths; names: { label: string; box: number[]; layer: number; id: number }[] }>();
   const flat = (o: Obj, m: Obj['m'], thick: number) => {
     const L = ed.layer(o.layer);
-    if (!isCutLayer(L) || o.shape.kind === 'text' || o.shape.kind === 'image') return;
+    // Gravur- und Markierungs-Layer (#265) bilden keine Platten, ihre Formen werden graviert (engrave.ts)
+    if (!shapeCutsThrough(o, L) || o.shape.kind === 'text' || o.shape.kind === 'image') return;
     // Beschriftung eines Generator-Teils (Schichtnummer) ist Gravur, auch wenn sie geschlossen ist
     if (o.shape.kind === 'path' && o.shape.mark) return;
     const paths = region({ ...o, m });
@@ -282,7 +283,7 @@ export function collectScene(ed: Editor, th: number, marks = true, fallback: Mat
 }
 
 /** Darf ein Objekt als Platte (bzw. als Loch darin) erscheinen? Nur geschlossene Konturen auf Schnitt-Layern. */
-const cutShape = (ed: Editor, o: Obj) => isCutLayer(ed.layer(o.layer)) && o.shape.kind !== 'text' && o.shape.kind !== 'image' && !(o.shape.kind === 'gen' && o.shape.asm);
+const cutShape = (ed: Editor, o: Obj) => shapeCutsThrough(o, ed.layer(o.layer)) && o.shape.kind !== 'text' && o.shape.kind !== 'image' && !(o.shape.kind === 'gen' && o.shape.asm);
 
 /** Punkt in der Fläche (Gerade-Ungerade über alle Konturen) */
 const inRegion = (paths: Paths, pt: { X: number; Y: number }) => paths.filter((p) => ClipperLib.Clipper.PointInPolygon(pt, p) !== 0).length % 2 === 1;

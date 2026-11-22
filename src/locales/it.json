@@ -5351,5 +5351,8 @@
   "Feste Tasten und Maus": "Tasti fissi e mouse",
   "„{key}“ ist schon „{command}“ zugewiesen.": "«{key}» è già assegnato a «{command}».",
   "Dort behalten": "Lascialo lì",
-  "Hierher übernehmen": "Usalo qui"
+  "Hierher übernehmen": "Usalo qui",
+  "Markieren": "Marca",
+  "Was der Layer am Werkstück tut. Gravieren und Markieren schneiden nicht durch, auch geschlossene Formen nicht: In der 3D-Ansicht, der Konstruktionsprüfung und beim Verschachteln liegen sie auf dem Teil. Der G-Code bleibt gleich.": "Cosa fa il layer sul pezzo. Incidi e Marca non tagliano il materiale, nemmeno le forme chiuse: nella vista 3D, in «Controlla progetto» e nel nesting restano sul pezzo. Il G-code non cambia.",
+  "Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.": "Questo layer non forma piastre: le sue forme vengono incise sulle piastre sottostanti, con l’aspetto del loro materiale."
 }

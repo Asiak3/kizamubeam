@@ -595,6 +595,22 @@ test('Schnittreihenfolge (#153): deckungsgleiche Konturen sind Doppellinien, kei
   assert.ok(!kinds(xs).includes('order'));
 });
 
+test('Layer-Art (#265): Markierungs-Layer schneiden nicht, ihre Formen sind Gravuren', () => {
+  layers[12] = { ...defaultLayer(12), mode: 'line', layerType: 'mark' };
+  layers[13] = { ...defaultLayer(13), mode: 'line', layerType: 'cut' };
+  const plate = rect(50, 50, 10, 10);
+  // Zu kleiner Kreis: als Schnitt ein zu kleiner Ausschnitt, als Markierung nichts
+  assert.deepEqual(kinds(run([plate, ellipse(0.12, 30, 30, 13)])), ['hole'], 'Art Schneiden wie ohne Art');
+  assert.deepEqual(run([plate, ellipse(0.12, 30, 30, 12)]), [], 'Markierung');
+  // Geschlossene Markierung neben jedem Teil trifft die Arbeitsfläche; auf dem Teil nicht
+  const far = rect(20, 20, 200, 200, 12);
+  const xs = run([plate, rect(10, 10, 20, 20, 12), far]);
+  assert.deepEqual(kinds(xs), ['engrave']);
+  assert.deepEqual(xs[0].objs, [far]);
+  // Eine Markierung allein ist kein Teil: ohne Teile keine Meldung, wie bei anderen Gravuren
+  assert.deepEqual(run([far]), []);
+});
+
 if (failed) {
   console.log(`${failed} Test(s) fehlgeschlagen`);
   process.exit(1);

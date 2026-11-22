@@ -62,6 +62,7 @@
     "test:params": "node scripts/run-ts.mjs scripts/params-test.ts",
     "test:templates": "node scripts/run-ts.mjs scripts/templates-test.ts",
     "test:3d": "node scripts/run-ts.mjs scripts/view3d-test.ts",
+    "test:layer-type": "node scripts/run-ts.mjs scripts/layer-type-test.ts",
     "test:nest": "node scripts/run-ts.mjs scripts/nest-test.ts",
     "test:boolean": "node scripts/run-ts.mjs scripts/boolean-test.ts",
     "test:pattern": "node scripts/run-ts.mjs scripts/pattern-test.ts",

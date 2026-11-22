@@ -5351,5 +5351,8 @@
   "Feste Tasten und Maus": "Teclas fijas y ratón",
   "„{key}“ ist schon „{command}“ zugewiesen.": "«{key}» ya está asignado a «{command}».",
   "Dort behalten": "Mantenerlo allí",
-  "Hierher übernehmen": "Usarlo aquí"
+  "Hierher übernehmen": "Usarlo aquí",
+  "Markieren": "Marcar",
+  "Was der Layer am Werkstück tut. Gravieren und Markieren schneiden nicht durch, auch geschlossene Formen nicht: In der 3D-Ansicht, der Konstruktionsprüfung und beim Verschachteln liegen sie auf dem Teil. Der G-Code bleibt gleich.": "Lo que hace la capa en la pieza. Grabar y Marcar no atraviesan el material, tampoco las formas cerradas: en la vista 3D, en «Revisar diseño» y al anidar quedan sobre la pieza. El G-code no cambia.",
+  "Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.": "Esta capa no forma placas: sus formas se graban sobre las placas de debajo, con el aspecto del material de estas."
 }
