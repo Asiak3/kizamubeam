@@ -1,4 +1,5 @@
 import type { Estimate, Job, Moves } from './gcode';
+import { dwellSeconds } from './gcode';
 import { t } from './i18n';
 
 export type OperatingRule = 'job' | 'laser' | 'air';
@@ -98,17 +99,24 @@ export interface EnergyComponent {
   kWh: number | null;
 }
 export function estimateEnergy(moves: Moves, timing: Estimate, air: Job['air'], settings: EnergySettings) {
-  const durations = { job: timing.total, laser: 0, air: 0 };
+  // Pausen stehen in der Zeitschätzung, zählen aber nicht in der Energie: Anstechleistung im
+  // Stillstand und Grundverbrauch während Pausen sind nicht modelliert (Energie bleibt bewegungsbasiert).
+  let dwellSum = 0;
+  const durations = { job: 0, laser: 0, air: 0 };
   const airLayers = new Set(air);
   const laserValid = settings.laserWatts.every(validWatts);
   let laserWs = 0;
   for (let i = 0; i < moves.n; i++) {
-    const seconds = timing.t[i] - (i ? timing.t[i - 1] : 0);
+    const dw = dwellSeconds(moves, i, timing);
+    const seconds = Math.max(0, timing.t[i] - (i ? timing.t[i - 1] : 0) - dw);
+    dwellSum += dw;
     const power = moves.f[i] > 0 ? moves.s[i] : 0;
     if (power > 0) durations.laser += seconds;
     if (airLayers.has(moves.layer[i])) durations.air += seconds;
     if (laserValid) laserWs += seconds * laserElectricalWatts(power, settings.laserWatts as [number, number, number]);
   }
+  dwellSum += dwellSeconds(moves, moves.n, timing);
+  durations.job = Math.max(0, timing.total - dwellSum);
   const components: EnergyComponent[] = [
     { name: 'base', included: true, kWh: validWatts(settings.baseWatts) ? settings.baseWatts * durations.job / 3600000 : null },
     { name: 'laser', included: true, kWh: laserValid ? laserWs / 3600000 : null },

@@ -2,8 +2,9 @@
 // Aufruf: npm run test:preview-playback
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { Moves } from '../src/gcode';
+import { estimate, Moves, newDevice } from '../src/gcode';
 import { advancePlayback, analyzePlayback, computeFactors, PROCESS_CUT, PROCESS_ENGRAVE, PROCESS_TRAVEL, type PlaybackAnalysis, type PlaybackSettings } from '../src/previewPlayback';
+import { drawPreviewHead } from '../src/previewRender';
 
 let failed = 0;
 async function test(name: string, fn: () => void | Promise<void>) {
@@ -258,6 +259,98 @@ await test('Glättungsfaktoren wirken auf die Abspielzeit', () => {
   near(a.factors.engrave, 2);
   near(a.factors.cut, 2);
   near(advancePlayback(mv, est, a, 0, 2, false).time, 4);
+});
+
+await test('Pausen laufen in der Vorschau in Echtzeit', () => {
+  const mv = new Moves();
+  mv.push(1, 0, 1000, 0.5, 0, PROCESS_CUT);
+  mv.push(2, 0, 1000, 0.5, 0, PROCESS_CUT);
+  mv.push(3, 0, 1000, 0.5, 0, PROCESS_CUT);
+  mv.dwell[1] = 2;
+  // Bewegung je 2 s, Pause (2 s) vor Bewegung 1: dwell [2,4], Bewegung [4,6]
+  const est = { t: Float64Array.from([2, 6, 8]), total: 8, cutLength: 0, rapidLength: 0 };
+  const a = analyzePlayback(mv, est, settings());
+  // Mitten in der Pause: 1 echte Sekunde rückt genau 1 s vor, trotz Schnittfaktor 10
+  near(advancePlayback(mv, est, a, 2.5, 1, false).time, 3.5);
+  // 0,6 echte Sekunden ab 3,5: 0,5 s Pause + 0,1 s Bewegung im Faktor 10
+  near(advancePlayback(mv, est, a, 3.5, 0.6, false).time, 5);
+});
+
+await test('Endpause verbraucht Echtzeit auch nach der letzten Bewegung', () => {
+  const mv = new Moves();
+  mv.push(10, 0, 600, 0.5, 1, PROCESS_CUT);
+  mv.dwellTrailing = { sec: 5, s: 0 };
+  const est = estimate(mv, newDevice({ fw: 'grbl' }));
+  const a = analyzePlayback(mv, est, settings());
+  const end = est.t[0];
+  near(advancePlayback(mv, est, a, end + 1, 0.01, false).time, end + 1.01);
+  near(advancePlayback(mv, est, a, end - 0.1, 0.11, false).time, end + 0.1);
+  near(advancePlayback(mv, est, a, est.total - 0.01, 1, false).time, est.total);
+});
+
+await test('Ruida spielt keine nicht ausgegebenen Schnittpausen ab', () => {
+  const mv = new Moves();
+  mv.push(10, 0, 600, 0.5, 1, PROCESS_CUT);
+  const device = newDevice({ fw: 'ruida' });
+  const plain = estimate(mv, device);
+  const a0 = analyzePlayback(mv, plain, settings());
+  const expected = advancePlayback(mv, plain, a0, 0, 0.05, false).time;
+  mv.dwell[0] = 2;
+  mv.dwellTrailing = { sec: 3, s: 0 };
+  const est = estimate(mv, device);
+  near(est.total, plain.total);
+  const a = analyzePlayback(mv, est, settings());
+  near(advancePlayback(mv, est, a, 0, 0.05, false).time, expected);
+});
+
+await test('Canvas-Renderer zeichnet Pausen, Bewegung und Ende mit Zoom, Offset und DPR 2', () => {
+  const mv = new Moves();
+  mv.x0 = 7;
+  mv.y0 = 3;
+  mv.push(17, 7, 600, 0.5, 1, PROCESS_CUT);
+  mv.dwell[0] = 2;
+  mv.dwellTrailing = { sec: 3, s: 0 };
+  const view = { z: 2.5, ox: 11, oy: 73 };
+  for (const fw of ['grbl', 'ruida'] as const) {
+    const est = estimate(mv, newDevice({ fw }));
+    const dwell = fw === 'ruida' ? 0 : 2;
+    const cases = [
+      { name: 'hold', time: dwell / 2, i: 0, point: [57, 131] },
+      { name: 'midmotion', time: dwell + (est.t[0] - dwell) / 2, i: 0, point: [82, 121] },
+      { name: 'end', time: est.t[0], i: 0, point: [107, 111] },
+      { name: 'trailing/end', time: est.total, i: mv.n, point: [107, 111] },
+    ];
+    for (const sample of cases) {
+      const lines: number[][] = [];
+      const arcs: number[][] = [];
+      const strokes: string[] = [];
+      const transforms: number[][] = [];
+      let matrix = [1, 0, 0, 1, 0, 0];
+      // Canvas double applies only the Canvas 2D matrix; world projection is production code.
+      const point = (x: number, y: number) => [matrix[0] * x + matrix[2] * y + matrix[4], matrix[1] * x + matrix[3] * y + matrix[5]];
+      const context = {
+        strokeStyle: '', lineWidth: 0,
+        setTransform(...values: number[]) { matrix = values; transforms.push(values); },
+        beginPath() {},
+        moveTo(x: number, y: number) { lines.push(point(x, y)); },
+        lineTo(x: number, y: number) { lines.push(point(x, y)); },
+        arc(x: number, y: number, radius: number) { arcs.push([...point(x, y), radius * matrix[0]]); },
+        stroke() { strokes.push(this.strokeStyle); },
+      };
+      const before = JSON.stringify({ view, est, x: [...mv.x], y: [...mv.y], dwell: [...mv.dwell] });
+      drawPreviewHead(context as unknown as CanvasRenderingContext2D, mv, est, sample.i, sample.time, view, 2, () => '#123456');
+      assert.deepEqual(arcs, [[...sample.point, 10]], `${fw} ${sample.name}: head in device pixels`);
+      assert.ok(transforms.every(t => JSON.stringify(t) === '[2,0,0,2,0,0]'), 'DPR must be applied exactly once');
+      if (sample.i < mv.n) {
+        assert.deepEqual(lines, [[57, 131], sample.point], `${fw} ${sample.name}: partial cut`);
+        assert.deepEqual(strokes, ['#123456', '#e02020']);
+      } else {
+        assert.deepEqual(lines, []);
+        assert.deepEqual(strokes, ['#e02020']);
+      }
+      assert.equal(JSON.stringify({ view, est, x: [...mv.x], y: [...mv.y], dwell: [...mv.dwell] }), before, 'render must not mutate its inputs');
+    }
+  }
 });
 
 if (failed) {

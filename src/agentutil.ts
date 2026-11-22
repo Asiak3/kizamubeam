@@ -5,7 +5,7 @@ import { hasPlaceholders } from './params';
 import { barcodeData } from './barcode';
 import type { Editor } from './editor';
 import { boundsOf, Box, shapeSubs, subsToD, textOutline } from './geom';
-import { apply, CutSettings, IDENT, isOff, layerLabel, Mat, mul, Obj } from './model';
+import { apply, CutSettings, IDENT, isOff, layerLabel, Mat, mul, Obj, rectCorners } from './model';
 import { shapeCenters } from './arcs';
 import { library } from './materials';
 import { genLabel } from './generators';
@@ -91,9 +91,13 @@ export function describe(ed: Editor, o: Obj, parent: Mat, detail: boolean): Reco
     sy = Math.hypot(m[2], m[3]);
   if (Math.abs(sx - 1) > 1e-6 || Math.abs(sy - 1) > 1e-6) out.scale = { x: r3(sx), y: r3(sy) };
   switch (s.kind) {
-    case 'rect':
+    case 'rect': {
+      const c = rectCorners(s);
+      const mixed = !(c[0] === c[1] && c[0] === c[2] && c[0] === c[3]);
       Object.assign(out, { width: r3(s.w * sx), height: r3(s.h * sy), cornerRadius: r3(s.r * Math.min(sx, sy)) });
+      if (mixed) (out as Record<string, unknown>).cornerRadii = c.map((v) => r3(v * Math.min(sx, sy)));
       break;
+    }
     case 'ellipse':
       Object.assign(out, { rx: r3(s.rx * sx), ry: r3(s.ry * sy) });
       break;

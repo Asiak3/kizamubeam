@@ -1,6 +1,6 @@
 // Editor: Projekt-Parameter anlegen, ändern, umbenennen und löschen. Nach jeder Änderung werden Texte und
 // QR-Codes mit Platzhaltern und Bauteile mit Formeln (GenShape.bind) auf allen Seiten neu berechnet.
-import { about, allObjs, GenShape, leaves, mul, Obj, OBJ_BIND_KEYS, ObjBindKey, ObjBinds, rotate, scale, translate } from '../model';
+import { about, allObjs, clampRectCorners, GenShape, leaves, mul, Obj, OBJ_BIND_KEYS, ObjBindKey, ObjBinds, rotate, scale, translate } from '../model';
 import { boundsOf } from '../geom';
 import { buildGen, genReady, genUpgrading, getGenerator, resolveBinds } from '../generators';
 import type { Issue } from '../generators';
@@ -228,7 +228,17 @@ export class EditorParams {
       (s as unknown as Record<string, unknown>)[key] = v;
       touched = true;
     };
-    if (s.kind === 'rect') setShape('r', ((v) => (v === undefined ? v : Math.max(0, v)))(val('r')));
+    if (s.kind === 'rect') {
+      const rv = val('r');
+      if (rv !== undefined) {
+        const clamped = clampRectCorners([rv, rv, rv, rv], s.w, s.h)[0];
+        setShape('r', clamped);
+        if (s.corners !== undefined) {
+          delete s.corners;
+          touched = true;
+        }
+      }
+    }
     if (s.kind === 'polygon') setShape('sides', ((v) => (v === undefined ? v : Math.max(3, Math.min(64, Math.round(v)))))(val('sides')));
     if (s.kind === 'text') {
       setShape('size', ((v) => (v === undefined ? v : Math.max(0.1, v)))(val('size')));

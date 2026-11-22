@@ -97,6 +97,7 @@ const immutable = JSON.stringify({ job, device, doc: ed.doc });
 const mocks = { h, setIcon() {}, t: (s) => s, dec: (s) => s, locale: 'en', loadDevices: () => ({ devices: [device] }),
   MOVE_TRAVEL: 0, MOVE_ENGRAVE: 1, MOVE_CUT: 2,
   buildJob: async () => job, estimate: () => estData, effOrderOf: () => ({}),
+  dwellSeconds: (mv, i) => { const s = mv.dwell?.[i] ?? 0; return Number.isFinite(s) && s > 0 ? s : 0; },
   rotaryOn: () => false, formatDuration: String, energyDraft: () => ({}), estimateEnergy: () => ({}),
   electricityTariffText: () => '', parseEnergyNumber: () => null, energyPreview: () => h('section'),
   machine: { connected: false, status: {}, fire: { locked: false }, on: () => () => {}, send: deny('machine.send'), connect: deny('machine.connect') },
@@ -105,11 +106,11 @@ globalThis.__previewMocks = mocks;
 const laser = readFileSync(source + 'laser.ts', 'utf8');
 const imports = new Map();
 for (const match of laser.matchAll(/import\s*\{([^}]+)\}\s*from\s*'([^']+)'/g)) imports.set(match[2], match[1].split(',').map((name) => name.trim()).filter(Boolean));
-imports.get('./gcode')?.push('MOVE_TRAVEL', 'MOVE_ENGRAVE', 'MOVE_CUT');
+imports.get('./gcode')?.push('MOVE_TRAVEL', 'MOVE_ENGRAVE', 'MOVE_CUT', 'dwellSeconds');
 const bundle = await build({ stdin: { contents: laser, resolveDir: source, sourcefile: 'preview-pipeline-entry.ts', loader: 'ts' }, bundle: true, write: false, format: 'esm', platform: 'node',
   plugins: [{ name: 'offline-preview-boundaries', setup(b) {
     b.onResolve({ filter: /.*/ }, (args) => {
-      if (args.path === './previewLayout' || args.path === './previewPlayback') return;
+      if (args.path === './previewLayout' || args.path === './previewPlayback' || args.path === './previewRender') return;
       if (imports.has(args.path)) return { path: args.path, namespace: 'offline' };
       if (args.path === '../package.json') return { path: args.path, namespace: 'offline' };
       if (args.path === './setupWizard' || args.path === './fluidncDialog') return { path: args.path, namespace: 'blocked' };

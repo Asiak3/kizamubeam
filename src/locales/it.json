@@ -58,7 +58,7 @@
   "Unbenanntes Zubehör": "Accessorio senza nome",
   "Nicht einbezogen": "Non incluso",
   "Unbekannt — gültige elektrische Leistung und Betriebsregel eingeben": "Sconosciuto — inserire una potenza elettrica e una regola di funzionamento valide",
-  "Modellschätzung, keine Messung. Verwendet die geschätzte XY-Bewegungszeit und die vorgegebene Laserleistung, nicht die tatsächliche dynamische Laserleistung. Skripte, Z-Bewegungen, Verweilzeiten, Controller-Verzögerungen sowie Vor- und Nachlaufzeiten sind ausgeschlossen. Die Luftunterstützungszeit folgt der Layer-Umschaltung des Auftrags, einschließlich Leerfahrten auf diesen Layern.": "Stima del modello, non una misura. Usa il tempo stimato del movimento XY e la potenza comandata, non l'uscita dinamica reale del laser. Sono esclusi script, movimenti Z, soste, ritardi del controller e tempo prima/dopo il lavoro. Il tempo dell'aria segue i cambi di livello del lavoro, inclusi gli spostamenti su quei livelli.",
+  "Modellschätzung, keine Messung. Verwendet die geschätzte XY-Bewegungszeit und die vorgegebene Laserleistung, nicht die tatsächliche dynamische Laserleistung. Skripte, Z-Bewegungen, Controller-Verzögerungen sowie Vor- und Nachlaufzeiten sind ausgeschlossen; eingestellte Pausen je Schnitt sind in der Zeitschätzung enthalten. Die Luftunterstützungszeit folgt der Layer-Umschaltung des Auftrags, einschließlich Leerfahrten auf diesen Layern.": "Stima del modello, non una misura. Usa il tempo stimato del movimento XY e la potenza comandata, non l'uscita dinamica reale del laser. Sono esclusi script, movimenti Z, ritardi del controller e tempo prima/dopo il lavoro; le pause configurate per taglio sono incluse nella stima del tempo. Il tempo dell'aria segue i cambi di livello del lavoro, inclusi gli spostamenti su quei livelli.",
   "Erhaltene Originale können doppelt geschnitten werden.": "Gli originali conservati potrebbero essere tagliati due volte.",
   "Verbindet nahe Enden. Eine Änderung setzt die Inselauswahl zurück.": "Collega le estremità vicine. La modifica azzera la selezione delle isole.",
   "Nur Außenkontur": "Solo contorno esterno",
@@ -4885,6 +4885,7 @@
   "Arbeitsfläche und Fangen": "Area di lavoro e aggancio",
   "Fangen": "Aggancio",
   "An Objekten fangen": "Aggancia agli oggetti",
+  "Fangen ein-/ausschalten (Objekt- und Rasterfang bleiben getrennt einstellbar)": "Attivare/disattivare lo snap (lo snap a oggetti e alla griglia resta regolabile separatamente)",
   "Fang Knoten Mittelpunkte Schnittpunkte": "aggancio nodi punti medi intersezioni",
   "Vereinen Abziehen Schnittmenge": "unisci sottrai intersezione",
   "Maus und Tastatur": "Mouse e tastiera",
@@ -5354,5 +5355,11 @@
   "Hierher übernehmen": "Usalo qui",
   "Markieren": "Marca",
   "Was der Layer am Werkstück tut. Gravieren und Markieren schneiden nicht durch, auch geschlossene Formen nicht: In der 3D-Ansicht, der Konstruktionsprüfung und beim Verschachteln liegen sie auf dem Teil. Der G-Code bleibt gleich.": "Cosa fa il layer sul pezzo. Incidi e Marca non tagliano il materiale, nemmeno le forme chiuse: nella vista 3D, in «Controlla progetto» e nel nesting restano sul pezzo. Il G-code non cambia.",
-  "Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.": "Questo layer non forma piastre: le sue forme vengono incise sulle piastre sottostanti, con l’aspetto del loro materiale."
+  "Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.": "Questo layer non forma piastre: le sue forme vengono incise sulle piastre sottostanti, con l’aspetto del loro materiale.",
+  "Einpassen": "Adatta",
+  "Zoomfaktor": "Livello di zoom",
+  "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Trascina le maniglie sulla superficie; Maiusc muove tutti gli angoli insieme.",
+  "Ansicht zurücksetzen": "Ripristina vista",
+  "Alle Ecken synchron": "Sincronizza tutti gli angoli",
+  "Einzelne Eckenradien": "Raggi dei singoli angoli"
 }

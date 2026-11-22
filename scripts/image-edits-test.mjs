@@ -12,7 +12,8 @@ const result = await build({ absWorkingDir: root, entryPoints: ['scripts/image-e
       'export const t = s => s; export const conditionHolds = () => true; export const cleanLook = () => undefined;' }));
   } }] });
 for (const input of Object.keys(result.metafile.inputs)) {
-  if (!['scripts/image-edits-test.ts', 'src/imageEdits.ts', 'src/imageGeometry.ts', 'src/mat.ts', 'src/model.ts',
+  if (!['scripts/image-edits-test.ts', 'src/imageEdits.ts', 'src/imageGeometry.ts', 'src/mat.ts', 'src/model.ts', 'src/previewZoom.ts',
+    'src/radiusDrag.ts',
     'model-services:./i18n', 'model-services:./params', 'model-services:./view3d/looks'].includes(input)) {
     throw new Error(`Unexpected image edits dependency: ${input}`);
   }

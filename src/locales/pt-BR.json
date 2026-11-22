@@ -58,7 +58,7 @@
   "Unbenanntes Zubehör": "Acessório sem nome",
   "Nicht einbezogen": "Não incluído",
   "Unbekannt — gültige elektrische Leistung und Betriebsregel eingeben": "Desconhecido — informe potência elétrica e regra de funcionamento válidas",
-  "Modellschätzung, keine Messung. Verwendet die geschätzte XY-Bewegungszeit und die vorgegebene Laserleistung, nicht die tatsächliche dynamische Laserleistung. Skripte, Z-Bewegungen, Verweilzeiten, Controller-Verzögerungen sowie Vor- und Nachlaufzeiten sind ausgeschlossen. Die Luftunterstützungszeit folgt der Layer-Umschaltung des Auftrags, einschließlich Leerfahrten auf diesen Layern.": "Estimativa do modelo, não uma medição. Usa o tempo estimado de movimento XY e a potência comandada, não a saída dinâmica real do laser. Scripts, movimentos Z, pausas, atrasos do controlador e tempo antes/depois do trabalho são excluídos. O tempo de ar segue a troca de camadas do trabalho, incluindo deslocamentos nessas camadas.",
+  "Modellschätzung, keine Messung. Verwendet die geschätzte XY-Bewegungszeit und die vorgegebene Laserleistung, nicht die tatsächliche dynamische Laserleistung. Skripte, Z-Bewegungen, Controller-Verzögerungen sowie Vor- und Nachlaufzeiten sind ausgeschlossen; eingestellte Pausen je Schnitt sind in der Zeitschätzung enthalten. Die Luftunterstützungszeit folgt der Layer-Umschaltung des Auftrags, einschließlich Leerfahrten auf diesen Layern.": "Estimativa do modelo, não uma medição. Usa o tempo estimado de movimento XY e a potência comandada, não a saída dinâmica real do laser. Scripts, movimentos Z, atrasos do controlador e tempo antes/depois do trabalho são excluídos; as pausas configuradas por corte estão incluídas na estimativa de tempo. O tempo de ar segue a troca de camadas do trabalho, incluindo deslocamentos nessas camadas.",
   "{n} Konturen über Objekt {id}: Layer {layer}, Modus {mode}, Kerf {kerf} mm, Geschwindigkeit {speed}, Leistung {power} %.": "{n} contornos via objeto {id}: layer {layer}, modo {mode}, kerf {kerf} mm, velocidade {speed}, potência {power}%.",
   "Verbleibende offene Quellreste und ihre geänderte Kerf-Wirkung müssen ausdrücklich bestätigt werden.": "Os fragmentos restantes da fonte abertos e o comportamento alterado do kerf precisam ser confirmados explicitamente.",
   "Achtung: Verbleibende Quellreste werden offene Linien. Darauf wirkt kein Layer-Kerf; die gemeinsame Ergebniskontur bleibt geschlossen. Diese Änderung muss bestätigt werden.": "Atenção: os fragmentos restantes da fonte viram linhas abertas. O kerf do Layer não se aplica a elas; o contorno comum resultante permanece fechado. Essa alteração precisa ser confirmada.",
@@ -4705,6 +4705,7 @@
   "Arbeitsfläche und Fangen": "Área de trabalho e encaixe",
   "Fangen": "Encaixe",
   "An Objekten fangen": "Encaixar em objetos",
+  "Fangen ein-/ausschalten (Objekt- und Rasterfang bleiben getrennt einstellbar)": "Ativar/desativar o encaixe (o encaixe a objetos e à grade permanece ajustável separadamente)",
   "Fang Knoten Mittelpunkte Schnittpunkte": "encaixe nós pontos médios interseções",
   "Vereinen Abziehen Schnittmenge": "união subtração interseção",
   "Maus und Tastatur": "Mouse e teclado",
@@ -5354,5 +5355,11 @@
   "Hierher übernehmen": "Usar aqui",
   "Markieren": "Mark",
   "Was der Layer am Werkstück tut. Gravieren und Markieren schneiden nicht durch, auch geschlossene Formen nicht: In der 3D-Ansicht, der Konstruktionsprüfung und beim Verschachteln liegen sie auf dem Teil. Der G-Code bleibt gleich.": "What the layer does to the workpiece. Engrave and Mark do not cut through, not even closed shapes: in the 3D view, Check Design and nesting they lie on the part. The G-code stays the same.",
-  "Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.": "This layer forms no plates: its shapes are engraved on the plates below, in the look of their material."
+  "Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.": "This layer forms no plates: its shapes are engraved on the plates below, in the look of their material.",
+  "Einpassen": "Ajustar",
+  "Zoomfaktor": "Nível de zoom",
+  "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Arraste as alças na tela; Shift move todos os cantos juntos.",
+  "Ansicht zurücksetzen": "Redefinir exibição",
+  "Alle Ecken synchron": "Sincronizar todos os cantos",
+  "Einzelne Eckenradien": "Raios de canto individuais"
 }

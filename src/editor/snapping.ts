@@ -41,6 +41,40 @@ export function saveSnapTolerance(v: SnapTolerance): boolean {
   }
 }
 
+/** Vorheriger Fang-Zustand für den Hauptschalter (wird beim Ausschalten gemerkt) */
+export const SNAP_PREV_KEY = 'kizamubeam.snapPrev';
+const snapPrevByEditor = new WeakMap<Editor, { grid: boolean; objects: boolean }>();
+
+/** Fang an/aus als Ganzes: an, sobald Raster oder Objekte fangen */
+export function isSnapOn(ed: Editor): boolean {
+  return ed.snapObjects || ed.snapGrid;
+}
+/** Fang-Hauptschalter: alles aus (vorherigen Stand merken) bzw. vorherigen Stand oder Standard wiederherstellen */
+export function toggleSnapMaster(ed: Editor) {
+  if (isSnapOn(ed)) {
+    const prev = { grid: ed.snapGrid, objects: ed.snapObjects };
+    snapPrevByEditor.set(ed, prev);
+    try {
+      localStorage.setItem(SNAP_PREV_KEY, JSON.stringify(prev));
+    } catch {
+      /* Speicher nicht verfügbar */
+    }
+    ed.setSnap({ grid: false, objects: false });
+    return;
+  }
+  let prev: { grid?: unknown; objects?: unknown } | null = null;
+  try {
+    const raw = snapPrevByEditor.get(ed) ?? JSON.parse(localStorage.getItem(SNAP_PREV_KEY) ?? 'null');
+    if (raw && typeof raw === 'object') prev = raw;
+  } catch {
+    /* Standardwerte */
+  }
+  ed.setSnap({
+    grid: typeof prev?.grid === 'boolean' ? prev.grid : false,
+    objects: typeof prev?.objects === 'boolean' ? prev.objects : true,
+  });
+}
+
 type Mods = { altKey: boolean; ctrlKey: boolean; metaKey: boolean };
 
 export class EditorSnapping {

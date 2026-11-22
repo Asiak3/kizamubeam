@@ -37,8 +37,66 @@ export interface SubPath {
   start?: boolean;
 }
 
+export type RectCorners = [number, number, number, number];
+
+/** Reihenfolge der Einzelradien: [oben-links, oben-rechts, unten-rechts, unten-links] in lokalen mm (y nach unten). */
+export type RectShape = { kind: 'rect'; w: number; h: number; r: number; corners?: RectCorners };
+
+/** Effektive Einzelradien eines Rechtecks: corners oder viermal der gemeinsame Radius. */
+export function rectCorners(s: Pick<RectShape, 'r' | 'corners'>): RectCorners {
+  const c = s.corners;
+  if (c && c.length === 4 && c.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0))
+    return [c[0], c[1], c[2], c[3]];
+  const r = typeof s.r === 'number' && Number.isFinite(s.r) && s.r > 0 ? s.r : 0;
+  return [r, r, r, r];
+}
+
+/** True, wenn alle vier Ecken denselben Radius haben (gemeinsamer Radius, Checkbox an). */
+export function isRectSynced(s: Pick<RectShape, 'r' | 'corners'>): boolean {
+  const c = rectCorners(s);
+  return c[0] === c[1] && c[0] === c[2] && c[0] === c[3];
+}
+
+/** Einzelradien auf 0..min(|w|,|h|)/2 klemmen; ungültige werden 0. */
+export function clampRectCorners(corners: readonly number[], w: number, h: number): RectCorners {
+  const limit = Math.min(Math.abs(w), Math.abs(h)) / 2;
+  const lim = Number.isFinite(limit) && limit > 0 ? limit : 0;
+  const cl = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(lim, Math.max(0, v)) : 0);
+  return [cl(corners[0]), cl(corners[1]), cl(corners[2]), cl(corners[3])];
+}
+
+/** Rechteck normalisieren: r und corners endlich/clampen; einheitliche corners fallen weg (r trägt sie). */
+export function normalizeRect(s: RectShape): void {
+  const w = s.w, h = s.h;
+  const r = typeof s.r === 'number' && Number.isFinite(s.r) && s.r >= 0 ? s.r : 0;
+  if (s.corners !== undefined) {
+    if (!Array.isArray(s.corners) || s.corners.length !== 4) {
+      delete s.corners;
+      s.r = clampRectCorners([r, r, r, r], w, h)[0];
+      return;
+    }
+    const c = clampRectCorners(s.corners, w, h);
+    if (c[0] === c[1] && c[0] === c[2] && c[0] === c[3]) {
+      delete s.corners;
+      s.r = c[0];
+    } else {
+      s.corners = c;
+      // r bleibt für ältere Versionen lesbar (erste Ecke als Vertreter).
+      s.r = c[0];
+    }
+  } else {
+    s.r = clampRectCorners([r, r, r, r], w, h)[0];
+  }
+}
+
+/** Alle Rechtecke eines Objektbaums normalisieren (Datei-Migration alter Dokumente mit nur r). */
+export function normalizeRectsDeep(o: Obj): void {
+  if (o.shape.kind === 'rect') normalizeRect(o.shape);
+  else if (o.shape.kind === 'group') o.shape.children.forEach(normalizeRectsDeep);
+}
+
 export type Shape =
-  | { kind: 'rect'; w: number; h: number; r: number }
+  | RectShape
   | { kind: 'ellipse'; rx: number; ry: number }
   | { kind: 'polygon'; sides: number; r: number; star: boolean; inner: number }
   /** mark: Gravur eines Generator-Teils („Baugruppe/Teil“), wird mit dem Teil neu berechnet */
@@ -807,6 +865,7 @@ export function loadDoc(raw: unknown): Doc {
   d.bed ??= { w: 400, h: 400 };
   d.layers ??= {};
   migrateImageOutput(d.layers as Record<number, Layer>, pages);
+  for (const p of pages) for (const o of p.objs) normalizeRectsDeep(o);
   const mla = Array.isArray(d.multiLayerAssemblies) ? d.multiLayerAssemblies : [];
   const seen = new Set<number>();
   const cleanAssemblies: MultiLayerAssembly[] = [];

@@ -1,7 +1,7 @@
 // Tests der Maschinenausgabe: Start-/End-Skripte, „Start Here“, Vorschau gegen Job. Aufruf: npm run test:gcode
 import './core-fixtures-env';
 import { strict as assert } from 'node:assert';
-import { buildJob, burns, dwellLines, effOrderOf, flattenSub, isManualOrder, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, fireLines, frameGCode, gcodeFooter, gcodeInserts, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, OrderOpts, Rotary, rotaryMoves, rotaryTestLines, sameMoves, sharpestCorner, startHere, writeGCode, zJogLines, addTabs, perforate, cutPath, Poly } from '../src/gcode';
+import { buildJob, burns, dwellLines, effOrderOf, flattenSub, isManualOrder, leadMarks, checkBed, DEFAULT_ROTARY, Device, estimate, fireLines, frameGCode, gcodeFooter, gcodeInserts, jogLines, jogToLines, META_PREFIX, moveLines as rapidTo, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL, Moves, newDevice, OrderOpts, prepareGCode, Rotary, rotaryMoves, rotaryTestLines, sameMoves, sharpestCorner, startHere, writeGCode, zJogLines, addTabs, perforate, cutPath, Poly } from '../src/gcode';
 import { emptyStatus, parseStatus, WorkOffset } from '../src/machine';
 import { defaultImageLayer, defaultLayer, imageOutput, defaultSubLayer, Layer, loadDoc, normalizeLayer, Obj, defaultTabs, defaultLead } from '../src/model';
 import { dedupPolys } from '../src/dedup';
@@ -1652,6 +1652,23 @@ await test('Start-/End-Pause je Schnitt, Legacy ohne Pause unverändert', async 
   assert.ok(!lines[at('G4 P0.3') - 1].startsWith('M3'), 'End-Pause ohne Strahl');
 });
 
+await test('Zeitschätzung enthält Pausen je Schnitt', async () => {
+  const objs: Obj[] = [1, 2].map((id) => ({ id, m: [1, 0, 0, 1, id * 60, 100], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } }));
+  const doc = loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} });
+  // An den Kontur-/Anfahr-Ecken wird bereits angehalten: hier nur die additive Pausenzeit prüfen.
+  const device = { ...newDevice({ fw: 'grbl' }), returnHome: false, junction: 0 };
+  const base = { doc, imgLayer: () => defaultImageLayer(), device };
+  const plain = await buildJob({ ...base, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const }) });
+  const paused = await buildJob({ ...base, layer: (i: number) => ({ ...defaultLayer(i), mode: 'line' as const, dwell: { start: 200, end: 300, cutThrough: false, power: 0 } }) });
+  const e0 = estimate(plain.moves, device);
+  const e1 = estimate(paused.moves, device);
+  // zwei Konturen × (0,2 s Start + 0,3 s Ende)
+  assert.ok(Math.abs(e1.total - e0.total - 1.0) < 1e-6, `Pausensumme fehlt: ${e0.total} → ${e1.total}`);
+  for (let i = 1; i < paused.moves.n; i++) assert.ok(e1.t[i] >= e1.t[i - 1], 'Zeitmarken monoton');
+  // End-Pause der letzten Kontur steckt hinter der letzten Bewegung im Total
+  assert.ok(Math.abs(e1.total - e1.t[paused.moves.n - 1] - 0.3) < 1e-6);
+});
+
 await test('Pausendauer: Import-/API-Werte bleiben endlich und innerhalb der UI-Grenzen', async () => {
   const objs: Obj[] = [1, 2].map((id) => ({ id, m: [1, 0, 0, 1, id * 60, 100], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } }));
   const doc = loadDoc({ bed: { w: 400, h: 400 }, objs, layers: {} });
@@ -1713,6 +1730,41 @@ await test('Lead: negativer Winkel spiegelt auf die Materialseite', () => {
     // Ansatzpunkt auf der Kontur ist identisch, die freie Spitze liegt auf der anderen Seite
     const a = plus[i].pts[0], b = minus[i].pts[0];
     assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > 1e-6, 'gespiegelte Seite');
+  }
+});
+
+await test('Ruida exportiert und schätzt denselben Auftrag trotz Schnittpausen', async () => {
+  const doc = loadDoc({ bed: { w: 400, h: 400 }, objs: [{ id: 1, m: [1, 0, 0, 1, 60, 100], layer: 1, shape: { kind: 'rect', w: 20, h: 20, r: 0 } }], layers: {} });
+  const device = { ...newDevice({ fw: 'ruida' }), returnHome: false };
+  const layer = (i: number) => ({ ...defaultLayer(i), mode: 'line' as const });
+  const options = { doc, device, layer, imgLayer: () => defaultImageLayer() };
+  const plain = await buildJob(options);
+  const paused = await buildJob({ ...options, layer: (i: number) => ({ ...layer(i), dwell: { start: 2000, end: 3000, cutThrough: false, power: 0 } }) });
+  const before = estimate(plain.moves, device);
+  const after = estimate(paused.moves, device);
+  const rd0 = await prepareGCode(plain, device, before, undefined, layer);
+  const rd1 = await prepareGCode(paused, device, after, undefined, layer);
+  assert.ok(rd0.ruida && rd1.ruida, 'Test verwendet den tatsächlichen TypeScript-Ruida-Export');
+  assert.deepEqual(rd1.ruida, rd0.ruida);
+  assert.equal(after.total, before.total, 'Bytegleiche Ruida-Aufträge dürfen keine Phantompausen enthalten');
+  assert.deepEqual(after.t, before.t);
+});
+
+await test('Dwell erzwingt Stillstand an kollinearen und null-langen Übergängen', () => {
+  const device = { ...newDevice({ fw: 'grbl' }), accel: 10 };
+  for (const zeroLength of [false, true]) {
+    const moves = new Moves();
+    moves.push(10, 0, 600, 0.5, 1, MOVE_CUT);
+    if (zeroLength) moves.push(10, 0, 600, 0.5, 1, MOVE_CUT);
+    moves.push(20, 0, 600, 0.5, 1, MOVE_CUT);
+    moves.dwell[1] = 2;
+    const first = new Moves();
+    first.push(10, 0, 600, 0.5, 1, MOVE_CUT);
+    const second = new Moves();
+    second.x0 = 10;
+    second.push(20, 0, 600, 0.5, 1, MOVE_CUT);
+    const expected = estimate(first, device).total + 2 + estimate(second, device).total;
+    assert.ok(Math.abs(estimate(moves, device).total - expected) < 1e-9, 'Pause muss beide Bewegungen bis zum Stillstand planen');
   }
 });
 

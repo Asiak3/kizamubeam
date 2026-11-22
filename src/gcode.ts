@@ -2539,6 +2539,15 @@ export interface Estimate {
   total: number;
   cutLength: number;
   rapidLength: number;
+  /** false für Firmware ohne Schnittpausen; ältere Schätzungen enthalten Pausen. */
+  dwellIncluded?: boolean;
+}
+
+/** Ausgeführte Pause vor Bewegung i; i === n bezeichnet die Endpause. */
+export function dwellSeconds(mv: Moves, i: number, timing?: Pick<Estimate, 'dwellIncluded'>): number {
+  if (timing?.dwellIncluded === false) return 0;
+  const sec = (i === mv.n ? mv.dwellTrailing?.sec : mv.dwell[i]) ?? 0;
+  return Number.isFinite(sec) && sec > 0 ? sec : 0;
 }
 
 /**
@@ -2547,6 +2556,7 @@ export interface Estimate {
  */
 export function estimate(mv: Moves, d: Device): Estimate {
   const n = mv.n;
+  const timing = { dwellIncluded: d.fw !== 'ruida' };
   const a = Math.max(1, d.accel);
   const rapid = Math.max(1, d.rapid) / 60;
   const len = new Float64Array(n),
@@ -2588,13 +2598,16 @@ export function estimate(mv: Moves, d: Device): Estimate {
   }
   // v[i] = Geschwindigkeit am Anfang von Strecke i
   const v = new Float64Array(n + 1);
-  for (let i = 0; i < n; i++) v[i] = Math.min(vj[i], vmax[i], i > 0 ? vmax[i - 1] : 0);
+  for (let i = 0; i < n; i++) v[i] = dwellSeconds(mv, i, timing) > 0 ? 0 : Math.min(vj[i], vmax[i], i > 0 ? vmax[i - 1] : 0);
   v[n] = 0;
   for (let i = n - 1; i >= 0; i--) v[i] = Math.min(v[i], Math.sqrt(v[i + 1] ** 2 + 2 * a * len[i]));
   for (let i = 0; i < n; i++) v[i + 1] = Math.min(v[i + 1], Math.sqrt(v[i] ** 2 + 2 * a * len[i]));
   const t = new Float64Array(n);
   let total = 0;
   for (let i = 0; i < n; i++) {
+    // Pausen stehen vor der Bewegung (Start-/Endpause je Schnitt): echte Maschinenzeit,
+    // daher Teil der Schätzung. Der Kopf steht, die Bewegung folgt erst danach.
+    total += dwellSeconds(mv, i, timing);
     const l = len[i];
     if (l > 1e-9) {
       const v0 = v[i],
@@ -2609,7 +2622,9 @@ export function estimate(mv: Moves, d: Device): Estimate {
     }
     t[i] = total;
   }
-  return { t, total, cutLength, rapidLength };
+  // End-Pause am Jobende: keine Koordinate mehr danach, aber reale Maschinenzeit.
+  total += dwellSeconds(mv, n, timing);
+  return { t, total, cutLength, rapidLength, ...timing };
 }
 
 export function formatDuration(sec: number): string {

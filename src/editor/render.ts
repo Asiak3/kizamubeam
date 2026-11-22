@@ -847,6 +847,16 @@ export class EditorRender {
         ctx.lineWidth = 1;
         ctx.stroke();
       }
+      const rr = this.rectRadiusScreen();
+      if (rr) {
+        ctx.fillStyle = T.handleFill;
+        ctx.strokeStyle = T.sel;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(rr.x, rr.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     }
     // Derived Bézier curve: square anchors, round tangent controls.
     const se = this.shaperEdit;

@@ -28,6 +28,7 @@ import { isSlotGenerator } from './slotPlacement';
 import { isContourOffsetGenerator } from './contourOffset';
 import { openContourOffsetDialog } from './contourOffsetDialog';
 import { openWarpDialog } from './warpDialog';
+import { ZOOM_STEP, clampPan, imageOrigin, panBy, resetZoomView, zoomAtCursor, zoomPercent, type ZoomView } from './previewZoom';
 import { cropDraftEnabled, EDIT_TITLE, runImageEdit } from './imageCropUi';
 import { openVectorFitDialog } from './vectorDialog';
 import { installEditorContext, stackingActions } from './editorContext';
@@ -54,6 +55,7 @@ import { openHostSyncDialog } from './remote';
 import { buildObjectsPanel } from './objectsPanel';
 import { buildTabBar, closeTabAsk } from './tabsBar';
 import { loadGroupedTabs, loadTabPages, saveGroupedTabs, saveTabPages } from './editor/tabs';
+import { isSnapOn, toggleSnapMaster } from './editor/snapping';
 import { buildHistoryPanel } from './historyPanel';
 import { buildLibraryPanel, openAddSelectionDialog } from './libraryPanel';
 import { buildCheckPanel, openCheck } from './checkPanel';
@@ -657,6 +659,7 @@ function buildBars(ed: Editor) {
     { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern'), run: () => ed.zoomAt(0.8) },
     { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite'), run: () => ed.zoomPage() },
     { id: 'grid', cat: V, icon: 'grid', label: t('Gitter ein-/ausblenden'), run: () => ed.setGrid({ show: !ed.grid.show }), on: () => ed.grid.show },
+    { id: 'snap-toggle', cat: V, icon: 'snap', label: t('Fangen ein-/ausschalten (Objekt- und Rasterfang bleiben getrennt einstellbar)'), run: () => toggleSnapMaster(ed), on: () => isSnapOn(ed) },
     { id: 'camera-overlays', cat: V, icon: 'cameraOverlay', label: t('Alle Kameraüberlagerungen anzeigen'), run: () => toggleCameraOverlays(ed), on: cameraOverlaysVisible,
       dyn: () => ({ icon: cameraOverlaysVisible() ? 'cameraOverlay' : 'cameraOverlayOff' }) },
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
@@ -789,7 +792,7 @@ function buildBars(ed: Editor) {
     {
       main: [
         'new', 'open', 'save', 'import', 'export', SEP, 'undo', 'redo', SEP, 'cut', 'copy', 'paste', 'delete', SEP,
-        'grp:zoom', 'view3d', 'camera-overlays', SEP, 'devsettings', 'check', 'preview', SEP,
+        'grp:zoom', 'view3d', 'camera-overlays', 'snap-toggle', SEP, 'devsettings', 'check', 'preview', SEP,
         'group', 'ungroup', 'isolate', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
@@ -1350,8 +1353,47 @@ function openAdjustDialog(ed: Editor, layer?: number) {
   const view = h('canvas', { class: 'adjust-preview', width: 420, height: 300 }) as HTMLCanvasElement;
   let showOrig = false,
     oneToOne = false;
+  let zoom: ZoomView = resetZoomView();
+  let panning: { x: number; y: number; ox: number; oy: number } | null = null;
+  const comparisonMode = () => oneToOne || showOrig;
+  let srcW = 1, srcH = 1;
+  const viewSize = () => ({ w: view.clientWidth || 420, h: view.clientHeight || 300 });
+  const zoomLabel = h('span', { class: 'slider-val', role: 'status', 'aria-live': 'polite', title: t('Zoomfaktor') }, '100 %');
+  const syncZoomLabel = () => {
+    zoomLabel.textContent = showOrig ? '100 %' : oneToOne ? '1:1' : `${zoomPercent(zoom)} %`;
+    for (const button of zoomBar.querySelectorAll('button')) button.disabled = comparisonMode();
+    if (comparisonMode()) panning = null;
+    view.style.cursor = comparisonMode() ? 'default' : panning ? 'grabbing' : 'grab';
+  };
+  const zoomBtnStyle = 'min-height: 24px; min-width: 24px';
+  const zoomBar = h('div', { class: 'adjust-zoom', style: 'display: flex; gap: 4px; align-items: center; margin-top: 4px' },
+    h('button', {
+      class: 'btn', style: zoomBtnStyle, title: t('Verkleinern'),
+      onclick: () => {
+        if (comparisonMode()) return;
+        const v = viewSize();
+        zoom = zoomAtCursor(zoom, v.w / 2, v.h / 2, 1 / ZOOM_STEP, srcW, srcH, v.w, v.h);
+        syncZoomLabel(); drawPreview();
+      },
+    }, '−'),
+    h('button', {
+      class: 'btn', style: zoomBtnStyle, title: t('Vergrößern'),
+      onclick: () => {
+        if (comparisonMode()) return;
+        const v = viewSize();
+        zoom = zoomAtCursor(zoom, v.w / 2, v.h / 2, ZOOM_STEP, srcW, srcH, v.w, v.h);
+        syncZoomLabel(); drawPreview();
+      },
+    }, '+'),
+    h('button', {
+      class: 'btn', style: 'min-height: 24px', title: t('Ansicht zurücksetzen'),
+      onclick: () => { if (comparisonMode()) return; zoom = resetZoomView(); syncZoomLabel(); drawPreview(); },
+    }, t('Einpassen')),
+    zoomLabel,
+  );
   let timer = 0;
   const drawPreview = () => {
+    syncZoomLabel();
     clearTimeout(timer);
     timer = window.setTimeout(() => {
       const ctx = view.getContext('2d')!;
@@ -1368,6 +1410,7 @@ function openAdjustDialog(ed: Editor, layer?: number) {
       if (!src) return;
       const sw = (src as HTMLCanvasElement).width || (src as HTMLImageElement).naturalWidth,
         sh = (src as HTMLCanvasElement).height || (src as HTMLImageElement).naturalHeight;
+      if (!showOrig) { srcW = sw; srcH = sh; }
       if (oneToOne && !showOrig) {
         // Mitte des Bildes, ein Bildschirmpunkt je Laserpunkt
         ctx.imageSmoothingEnabled = false;
@@ -1377,12 +1420,39 @@ function openAdjustDialog(ed: Editor, layer?: number) {
         ctx.drawImage(src, Math.max(0, (sw - cw) / 2), Math.max(0, (sh - ch) / 2), Math.min(sw, cw), Math.min(sh, ch), Math.max(0, (cw - sw) / 2), Math.max(0, (ch - sh) / 2), Math.min(sw, cw), Math.min(sh, ch));
         return;
       }
-      const k = Math.min(W / sw, H / sh);
+      if (!showOrig) zoom = clampPan(zoom, sw, sh, W, H);
+      const o = imageOrigin(sw, sh, W, H, showOrig ? resetZoomView() : zoom);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(src, (W - sw * k) / 2, (H - sh * k) / 2, sw * k, sh * k);
+      ctx.drawImage(src, o.x, o.y, sw * o.scale, sh * o.scale);
     }, 40);
   };
+  // Rad = Zoom auf Cursor, Ziehen = Pan, Doppelklick (links wie Mitte) = Fit.
+  view.style.touchAction = 'none';
+  view.style.cursor = 'grab';
+  view.addEventListener('wheel', (e: WheelEvent) => {
+    if (comparisonMode()) return;
+    e.preventDefault();
+    const r = view.getBoundingClientRect();
+    zoom = zoomAtCursor(zoom, e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP, srcW, srcH, r.width || 420, r.height || 300);
+    syncZoomLabel(); drawPreview();
+  }, { passive: false });
+  view.addEventListener('pointerdown', (e: PointerEvent) => {
+    if ((e.button !== 0 && e.button !== 1) || comparisonMode()) return;
+    try { view.setPointerCapture(e.pointerId); } catch { /* Kopf-Test */ }
+    view.style.cursor = 'grabbing';
+    panning = { x: e.clientX, y: e.clientY, ox: zoom.ox, oy: zoom.oy };
+  });
+  view.addEventListener('pointermove', (e: PointerEvent) => {
+    if (!panning) return;
+    const v = viewSize();
+    zoom = panBy({ z: zoom.z, ox: panning.ox + (e.clientX - panning.x), oy: panning.oy + (e.clientY - panning.y) }, 0, 0, srcW, srcH, v.w, v.h);
+    syncZoomLabel(); drawPreview();
+  });
+  const endPan = () => { panning = null; view.style.cursor = comparisonMode() ? 'default' : 'grab'; };
+  view.addEventListener('pointerup', endPan);
+  view.addEventListener('pointercancel', endPan);
+  view.addEventListener('dblclick', () => { if (comparisonMode()) return; zoom = resetZoomView(); syncZoomLabel(); drawPreview(); });
   const setAdj = (patch: Partial<ImageAdjust>) => {
     Object.assign(adj, patch);
     ed.setImageAdjust(targets, patch, false);
@@ -1446,6 +1516,7 @@ function openAdjustDialog(ed: Editor, layer?: number) {
       { class: 'adjust-body' },
       h('div', { class: 'adjust-left' },
         view,
+        zoomBar,
         h('div', { class: 'checks' }, chk(t('Original zeigen'), (v) => (showOrig = v)), chk(t('Ausschnitt 1:1'), (v) => (oneToOne = v))),
       ),
       h('div', { class: 'adjust-right' },

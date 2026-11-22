@@ -1,6 +1,7 @@
 import type { Editor } from '../editor';
 import { ICONS } from '../icons';
-import type { BarcodeShape, GenShape, ImageShape, Obj, ObjBindKey, TextShape } from '../model';
+import type { BarcodeShape, GenShape, ImageShape, Obj, ObjBindKey, RectCorners, TextShape } from '../model';
+import { rectCorners } from '../model';
 import { evaluate, formatNumber, namesIn } from '../params';
 import { isFallbackFont, onFontListChanged, refreshFonts, requestLocalFonts, systemFonts } from '../fonts';
 import { openFontManager } from '../fontManager';
@@ -179,12 +180,165 @@ export function createEditorToolbarControls(ed: Editor, refresh: () => void): {
     } };
   });
   register('rectangle', t('Radius'), () => ed.tool === 'rect' || ed.sel.some((o) => o.shape.kind === 'rect'), () => {
-    const fRad = numInput('small', plain(['r'], (v) => ed.updateShapes('rect', { r: Math.max(0, v) })), t('Eckenradius (mm)'), formula('r'));
-    const el = h('label', {}, t('Radius'), fRad);
-    return { el, update() {
-      const rect = ed.sel.find((o) => o.shape.kind === 'rect');
-      el.hidden = !(rect || ed.tool === 'rect');
-      bindField(fRad, 'r', f2(rect && rect.shape.kind === 'rect' ? rect.shape.r : ed.rectRadius), (o) => o.shape.kind === 'rect');
+    // Gemeinsamer Radius + Dropdown mit Synchron-Checkbox und vier Einzelradien (wie die Bild-Abrundung).
+    let unlocked = false;
+    let open = false;
+    const rects = () => ed.sel.filter((o) => o.shape.kind === 'rect');
+    const tuples = (): RectCorners[] => rects()
+      .map((o) => (o.shape.kind === 'rect' ? rectCorners(o.shape) : [0, 0, 0, 0] as RectCorners));
+    const sameTuple = (): RectCorners | null => {
+      const ts = tuples();
+      if (!ts.length) return null;
+      const [a, b, c, d] = ts[0];
+      return ts.every((x) => x[0] === a && x[1] === b && x[2] === c && x[3] === d) ? ts[0] : null;
+    };
+    const sameBind = (): string | null | undefined => {
+      const list = rects();
+      if (!list.length) return undefined;
+      const src = list[0].bind?.['r'];
+      return list.every((o) => o.bind?.['r'] === src) ? src ?? null : undefined;
+    };
+    const commitCommon = (v: number) => {
+      unlocked = false;
+      ed.updateShapes('rect', { r: Math.max(0, v) });
+    };
+    const fRad = numInput('small', plain(['r'], commitCommon), t('Eckenradius (mm)'), formula('r'));
+    const syncBox = h('input', { type: 'checkbox' }) as HTMLInputElement;
+    const fCorners = [1, 2, 3, 4].map((n, i) => {
+      const label = t('Ecke {number} (mm)', { number: String(n) });
+      const inp = numInput('small', (v) => {
+        unlocked = true;
+        const patch: (number | undefined)[] = [undefined, undefined, undefined, undefined];
+        patch[i] = Math.max(0, v);
+        ed.dropObjBind(ed.sel, ['r']);
+        ed.updateShapes('rect', { corners: patch });
+        refresh();
+      }, label) as HTMLInputElement;
+      inp.placeholder = t('Individuell');
+      return inp;
+    });
+    const syncLabel = h('label', { class: 'check' }, syncBox, t('Alle Ecken synchron'));
+    const toggle = h('button', {
+      class: 'toggle', title: t('Einzelne Eckenradien'), 'aria-label': t('Einzelne Eckenradien'), 'aria-haspopup': 'dialog', 'aria-expanded': 'false',
+      onclick: (e: Event) => {
+        e.stopPropagation();
+        open = !open;
+        refresh();
+        if (!open) toggle.focus();
+      },
+    }, '▾') as HTMLButtonElement;
+    fCorners.forEach((inp, i) => {
+      inp.id = `rect-corner-${i}`;
+    });
+    const rows = fCorners.map((inp, i) => h('div', { class: 'form' }, h('label', { for: `rect-corner-${i}` }, t('Ecke {number} (mm)', { number: String(i + 1) })), inp));
+    const pop = h('div', { class: 'toolbar-popup rect-corners-pop', role: 'dialog', 'aria-label': t('Einzelne Eckenradien') }, syncLabel, ...rows);
+    const el = h('span', { class: 'field rect-radius-wrap' }, h('label', {}, t('Radius'), fRad), toggle);
+    const positionPop = () => {
+      const anchor = toggle.getBoundingClientRect();
+      const { width, height } = pop.getBoundingClientRect();
+      const clamp = (v: number, max: number) => Math.max(4, Math.min(v, max - 4));
+      const below = anchor.bottom + 4;
+      const top = below + height > window.innerHeight - 4 && anchor.top - height - 4 >= 4
+        ? anchor.top - height - 4 : below;
+      pop.style.left = `${clamp(anchor.left, window.innerWidth - width)}px`;
+      pop.style.top = `${clamp(top, window.innerHeight - height)}px`;
+    };
+    function refresh() {
+      const list = rects();
+      el.hidden = !(list.length || ed.tool === 'rect');
+      if (el.hidden) open = false;
+      const same = sameTuple();
+      const uniform = same !== null && same[0] === same[1] && same[0] === same[2] && same[0] === same[3];
+      const synced = uniform && !unlocked;
+      syncBox.checked = synced;
+      syncBox.disabled = !list.length;
+      toggle.classList.toggle('on', open);
+      toggle.setAttribute('aria-expanded', String(open));
+      if (open) {
+        // The scrollable toolbar would clip a child popup below the row.
+        if (!pop.isConnected) document.body.append(pop);
+        positionPop();
+      } else pop.remove();
+      const bs = sameBind();
+      fCorners.forEach((inp, i) => {
+        inp.disabled = synced || !list.length;
+        if (document.activeElement === inp) return;
+        if (same) setVal(inp, f2(same[i]));
+        else if (!list.length) setVal(inp, f2(ed.rectRadius));
+        else setVal(inp, '');
+      });
+      if (document.activeElement === fRad) return;
+      if (!list.length) {
+        bindField(fRad, 'r', f2(ed.rectRadius), (o) => o.shape.kind === 'rect');
+        fRad.placeholder = '';
+        return;
+      }
+      fRad.placeholder = uniform ? '' : t('Individuell');
+      if (bs === undefined) {
+        // Unterschiedliche Formeln/Bindungen: gemischt anzeigen.
+        fRad.classList.remove('bound');
+        setVal(fRad, '');
+      } else if (uniform && same) {
+        bindField(fRad, 'r', f2(same[0]), (o) => o.shape.kind === 'rect');
+      } else if (bs) {
+        bindField(fRad, 'r', '', (o) => o.shape.kind === 'rect');
+      } else {
+        fRad.classList.remove('bound');
+        setVal(fRad, '');
+      }
+    }
+    syncBox.addEventListener('change', () => {
+      if (syncBox.checked) {
+        // Synchronisieren: gemeinsamer Wert aus dem Radius-Feld, sonst erste Ecke.
+        const raw = fRad.value.trim() !== '' ? fRad.value.replace(',', '.') : NaN;
+        const parsed = Number(raw);
+        const same = sameTuple();
+        const target = Number.isFinite(parsed) && parsed >= 0 ? parsed : same ? same[0] : 0;
+        commitCommon(target);
+      } else {
+        unlocked = true;
+        refresh();
+      }
+    });
+    const onDoc = (e: Event) => {
+      if (!open) return;
+      if (e.target instanceof Node && pop.contains(e.target)) return;
+      if (e.target === toggle) return;
+      open = false;
+      refresh();
+    };
+    document.addEventListener('pointerdown', onDoc, true);
+    const onKey = (e: KeyboardEvent) => {
+      if (open && e.key === 'Escape') {
+        open = false;
+        refresh();
+        toggle.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    const onLayout = (e: Event) => {
+      if (!open || (e.target instanceof Node && pop.contains(e.target))) return;
+      if (toggle.getClientRects().length) positionPop();
+      else { open = false; refresh(); }
+    };
+    window.addEventListener('resize', onLayout);
+    window.addEventListener('scroll', onLayout, true);
+    let lastKey = '';
+    const trackedUpdate = () => {
+      const key = rects().map((o) => o.id).join(',') + `|${ed.tool}`;
+      if (key !== lastKey) {
+        lastKey = key;
+        unlocked = false;
+        open = false;
+      }
+      refresh();
+    };
+    return { el, update: trackedUpdate, dispose() {
+      pop.remove();
+      document.removeEventListener('pointerdown', onDoc, true);
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', onLayout);
+      window.removeEventListener('scroll', onLayout, true);
     } };
   });
   register('polygon', t('Ecken'), () => ed.tool === 'polygon' || ed.sel.some((o) => o.shape.kind === 'polygon'), () => {

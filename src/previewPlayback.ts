@@ -1,6 +1,6 @@
 // Reine Abspiellogik der Vorschau: Prozessarten, Glättung, Pausen und Zeitmarken.
 // Bewusst ohne DOM, damit die Berechnung unabhängig prüfbar bleibt.
-import { MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL } from './gcode';
+import { dwellSeconds, MOVE_CUT, MOVE_ENGRAVE, MOVE_TRAVEL } from './gcode';
 import type { Estimate, Moves } from './gcode';
 
 /** 0 = reine Verfahrbewegung; 1 = Gravieren (Füllen, Bild); 2 = Schneiden (Linien) */
@@ -172,6 +172,15 @@ export interface AdvanceResult {
   paused: boolean;
 }
 
+/** Anteil der aktuellen Bewegung für die Kopfinterpolation der Vorschau. */
+export function segmentFraction(mv: Moves, est: Estimate, i: number, time: number): number {
+  const t0 = i ? est.t[i - 1] : 0,
+    t1 = est.t[i];
+  const dw = dwellSeconds(mv, i, est);
+  const tm = Math.min(t1, t0 + dw);
+  return t1 > tm ? Math.min(1, Math.max(0, (time - tm) / (t1 - tm))) : time >= tm ? 1 : 0;
+}
+
 /**
  * Simulationszeit um echte Sekunden weiterrücken. Jede Bewegung läuft mit dem Faktor ihrer effektiven
  * Prozessart; mit pauseOnChange endet der Schritt genau am Wechsel der Prozessart.
@@ -195,13 +204,28 @@ export function advancePlayback(
   for (let guard = 0; remaining > 1e-9 && t < total && guard < 20000; guard++) {
     const i = segmentAt(mv, est, t);
     if (i >= mv.n) {
-      t = total;
+      t = Math.min(total, t + remaining);
       break;
     }
     const t0 = i ? est.t[i - 1] : 0;
     const t1 = Math.min(total, est.t[i]);
     if (!(t1 > t0)) {
       t = Math.max(t, t1);
+      continue;
+    }
+    // Pause vor der Bewegung läuft in Echtzeit (Faktor 1): der Kopf steht still,
+    // egal wie schnell die Vorschau die Bewegung abspielt.
+    const dw = dwellSeconds(mv, i, est);
+    const tDwellEnd = Math.min(t1, t0 + dw);
+    if (t < tDwellEnd) {
+      const needDwell = tDwellEnd - t;
+      if (needDwell > remaining) {
+        t += remaining;
+        remaining = 0;
+        break;
+      }
+      t = tDwellEnd;
+      remaining -= needDwell;
       continue;
     }
     const f = factorAt(i);

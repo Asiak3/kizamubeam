@@ -58,7 +58,7 @@
   "Unbenanntes Zubehör": "Unnamed accessory",
   "Nicht einbezogen": "Not included",
   "Unbekannt — gültige elektrische Leistung und Betriebsregel eingeben": "Unknown — enter valid electrical power and operating rule",
-  "Modellschätzung, keine Messung. Verwendet die geschätzte XY-Bewegungszeit und die vorgegebene Laserleistung, nicht die tatsächliche dynamische Laserleistung. Skripte, Z-Bewegungen, Verweilzeiten, Controller-Verzögerungen sowie Vor- und Nachlaufzeiten sind ausgeschlossen. Die Luftunterstützungszeit folgt der Layer-Umschaltung des Auftrags, einschließlich Leerfahrten auf diesen Layern.": "Model estimate, not a measurement. Uses estimated XY motion time and commanded laser power, not actual dynamic laser output. Scripts, Z moves, dwell, controller delays and pre-run/post-run time are excluded. Air-assist time follows job layer switching, including travel on those layers.",
+  "Modellschätzung, keine Messung. Verwendet die geschätzte XY-Bewegungszeit und die vorgegebene Laserleistung, nicht die tatsächliche dynamische Laserleistung. Skripte, Z-Bewegungen, Controller-Verzögerungen sowie Vor- und Nachlaufzeiten sind ausgeschlossen; eingestellte Pausen je Schnitt sind in der Zeitschätzung enthalten. Die Luftunterstützungszeit folgt der Layer-Umschaltung des Auftrags, einschließlich Leerfahrten auf diesen Layern.": "Model estimate, not a measurement. Uses estimated XY motion time and commanded laser power, not actual dynamic laser output. Scripts, Z moves, controller delays and pre-run/post-run time are excluded; configured pauses per cut are included in the time estimate. Air-assist time follows job layer switching, including travel on those layers.",
   "{n} Konturen über Objekt {id}: Layer {layer}, Modus {mode}, Kerf {kerf} mm, Geschwindigkeit {speed}, Leistung {power} %.": "{n} contours via object {id}: layer {layer}, mode {mode}, kerf {kerf} mm, speed {speed}, power {power}%.",
   "Verbleibende offene Quellreste und ihre geänderte Kerf-Wirkung müssen ausdrücklich bestätigt werden.": "Remaining open source fragments and their changed kerf behavior must be explicitly confirmed.",
   "Achtung: Verbleibende Quellreste werden offene Linien. Darauf wirkt kein Layer-Kerf; die gemeinsame Ergebniskontur bleibt geschlossen. Diese Änderung muss bestätigt werden.": "Warning: remaining source fragments become open lines. Layer kerf does not apply to them; the common result contour remains closed. This change must be confirmed.",
@@ -4709,6 +4709,7 @@
   "Arbeitsfläche und Fangen": "Workspace and snapping",
   "Fangen": "Snapping",
   "An Objekten fangen": "Snap to objects",
+  "Fangen ein-/ausschalten (Objekt- und Rasterfang bleiben getrennt einstellbar)": "Toggle snapping on/off (object and grid snap stay adjustable separately)",
   "Fang Knoten Mittelpunkte Schnittpunkte": "snap nodes midpoints intersections",
   "Vereinen Abziehen Schnittmenge": "union subtract intersect",
   "Maus und Tastatur": "Mouse and keyboard",
@@ -5354,5 +5355,11 @@
   "Hierher übernehmen": "Use it here",
   "Markieren": "Mark",
   "Was der Layer am Werkstück tut. Gravieren und Markieren schneiden nicht durch, auch geschlossene Formen nicht: In der 3D-Ansicht, der Konstruktionsprüfung und beim Verschachteln liegen sie auf dem Teil. Der G-Code bleibt gleich.": "What the layer does to the workpiece. Engrave and Mark do not cut through, not even closed shapes: in the 3D view, Check Design and nesting they lie on the part. The G-code stays the same.",
-  "Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.": "This layer forms no plates: its shapes are engraved on the plates below, in the look of their material."
+  "Dieser Layer bildet keine Platten: Seine Formen werden auf die Platten darunter graviert, im Aussehen von deren Material.": "This layer forms no plates: its shapes are engraved on the plates below, in the look of their material.",
+  "Einpassen": "Fit",
+  "Zoomfaktor": "Zoom level",
+  "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Drag the handles on the canvas; Shift drags all corners together.",
+  "Ansicht zurücksetzen": "Reset view",
+  "Alle Ecken synchron": "Link all corners",
+  "Einzelne Eckenradien": "Individual corner radii"
 }

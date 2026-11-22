@@ -6,7 +6,7 @@ const PRE = 'kizamubeam.';
 
 /** Allgemeine Einstellungen: Aussehen, Sprache, Fangen, Raster, zuletzt benutzte Werte der Dialoge */
 export const SETTINGS_KEYS = [
-  'theme', 'lang', 'snap', 'grid', 'boolean', 'updateChannel', 'updateAuto', 'fontFavorites', 'fontAutoInstall', 'imagePresets', 'check',
+  'theme', 'lang', 'snap', 'snapPrev', 'grid', 'boolean', 'updateChannel', 'updateAuto', 'fontFavorites', 'fontAutoInstall', 'imagePresets', 'check',
   'nest', 'joints', 'hinges', 'slots', 'qr', 'barcode', 'printcut', 'jigfill', 'focustest', 'materialtest', 'warp', 'calib', 'view3d',
   'workpieces', 'overlap-picker', 'rightPan', 'zoomInverted', 'rememberToolOptions', 'toolOptions',
   'selectAfterDraw', 'textDefaults', 'nudgeSteps', 'shortcuts', 'clickTolerance', 'snapTolerance', 'canvasDark', 'handleSize',
