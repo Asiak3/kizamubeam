@@ -30,6 +30,7 @@ import { electricityTariffText, energyDraft, estimateEnergy, parseEnergyNumber }
 import { energyPreview, energySettingsRows, saveEnergySettings } from './energyUi';
 import { previewSplitter } from './previewLayout';
 import { advancePlayback, analyzePlayback, computeFactors, DEFAULT_TARGET, MAX_MARKERS, MAX_TARGET, MIN_TARGET } from './previewPlayback';
+import { drawPreviewHead, previewX, previewY } from './previewRender';
 import type { PlaybackSettings } from './previewPlayback';
 import { fireLockMessage } from './fire';
 import { fireControls, fireSettings, installFireOverlay } from './fireUi';
@@ -2171,8 +2172,8 @@ export async function openPreview(ed: Editor, src?: JobSource) {
     view = { z, ox: (W - (bx1 - bx0) * z) / 2 - bx0 * z, oy: (H + (by1 - by0) * z) / 2 + by0 * z };
     accN = 0;
   };
-  const sx = (x: number) => x * view.z + view.ox;
-  const sy = (y: number) => view.oy - y * view.z;
+  const sx = (x: number) => previewX(x, view);
+  const sy = (y: number) => previewY(y, view);
 
   const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
   const css = getComputedStyle(document.documentElement);
@@ -2273,36 +2274,7 @@ export async function openPreview(ed: Editor, src?: JobSource) {
     const c = cv.getContext('2d')!;
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.drawImage(acc, 0, 0);
-    // Laserkopf mit Teilstück der aktuellen Bewegung
-    let hx = mv.x0,
-      hy = mv.y0;
-    if (i < mv.n) {
-      const t0 = i ? est.t[i - 1] : 0,
-        t1 = est.t[i];
-      const f = t1 > t0 ? Math.min(1, Math.max(0, (time - t0) / (t1 - t0))) : 1;
-      const ax = i ? mv.x[i - 1] : mv.x0,
-        ay = i ? mv.y[i - 1] : mv.y0;
-      hx = ax + (mv.x[i] - ax) * f;
-      hy = ay + (mv.y[i] - ay) * f;
-      c.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (mv.f[i] > 0 && mv.s[i] > 0) {
-        c.strokeStyle = colorOf(mv.layer[i]);
-        c.lineWidth = Math.max(1, Math.min(3, view.z * 0.1));
-        c.beginPath();
-        c.moveTo(sx(ax), sy(ay));
-        c.lineTo(sx(hx), sy(hy));
-        c.stroke();
-      }
-    } else if (mv.n) {
-      hx = mv.x[mv.n - 1];
-      hy = mv.y[mv.n - 1];
-    }
-    c.setTransform(dpr, 0, 0, dpr, 0, 0);
-    c.strokeStyle = '#e02020';
-    c.lineWidth = 1.5;
-    c.beginPath();
-    c.arc(sx(hx), sy(hy), 5, 0, Math.PI * 2);
-    c.stroke();
+    drawPreviewHead(c, mv, est, i, time, view, dpr, colorOf);
     timeTxt.textContent = `${formatDuration(time)} / ${formatDuration(est.total)}`;
     slider.value = String(est.total ? Math.round((time / est.total) * 1000) : 1000);
   };

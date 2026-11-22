@@ -47,6 +47,44 @@ await test('real estimator durations and G-code air switches agree without mutat
   assert.deepEqual(switches.slice(0, 2), ['M8', 'M9']);
   assert.equal(JSON.stringify(moves), before);
 });
+await test('Pausen zählen in der Energie nicht mit', () => {
+  const mk = () => {
+    const mv = new Moves();
+    mv.push(10, 0, 0, 0, 1);
+    // Richtungsumkehr erzwingt bereits Stillstand; die Pause ändert keine Beschleunigungszeit.
+    mv.push(0, 0, 1200, 0.5, 1);
+    return mv;
+  };
+  const still = mk();
+  const paused = mk();
+  paused.dwell[1] = 10;
+  paused.dwellTrailing = { sec: 5, s: 0 };
+  const device = newDevice({ fw: 'fluidnc' });
+  const e0 = estimate(still, device);
+  const e1 = estimate(paused, device);
+  assert.ok(e1.total > e0.total, 'Zeitschätzung enthält die Pausen');
+  const r0 = estimateEnergy(still, e0, [1], settings);
+  const r1 = estimateEnergy(paused, e1, [1], settings);
+  // Float32-Pausen heben sich bis auf Rundung (1e-15) wieder auf
+  for (const k of ['job', 'laser', 'air'] as const) near(r1.durations[k], r0.durations[k]);
+  near(r1.total!, r0.total!);
+});
+
+await test('Ruida ignores unexecuted dwell in both timing and energy', () => {
+  const moves = new Moves();
+  moves.push(10, 0, 600, 0.5, 1);
+  const device = newDevice({ fw: 'ruida' });
+  const before = estimate(moves, device);
+  const e0 = estimateEnergy(moves, before, [1], settings);
+  moves.dwell[0] = 2;
+  moves.dwellTrailing = { sec: 3, s: 0 };
+  const after = estimate(moves, device);
+  const e1 = estimateEnergy(moves, after, [1], settings);
+  near(after.total, before.total);
+  for (const k of ['job', 'laser', 'air'] as const) near(e1.durations[k], e0.durations[k]);
+  near(e1.total!, e0.total!);
+});
+
 await test('unknown, invalid, empty and valid zero stay distinct; no incomplete total', () => {
   for (const text of ['', ' ', '-1', 'Infinity', 'NaN', '1w', '0.3EUR']) assert.equal(parseEnergyNumber(text), null);
   assert.equal(parseEnergyNumber('0'), 0);

@@ -129,6 +129,6 @@ export function energyPreview(result: ReturnType<typeof estimateEnergy>, tariff:
     ...(tariff === null ? [h('div', { class: 'note' }, t('Legen Sie in den allgemeinen Einstellungen einen gültigen Stromtarif fest, um Kosten anzuzeigen.'))] : []),
     h('p', { class: 'note energy-caveat' }, t('Modellschätzung, keine Messung. Tatsächlicher Verbrauch und Kosten können abweichen.')),
     h('details', { class: 'energy-help' }, h('summary', {}, t('Berechnung und Grenzen')),
-      h('p', { class: 'note' }, t('Modellschätzung, keine Messung. Verwendet die geschätzte XY-Bewegungszeit und die vorgegebene Laserleistung, nicht die tatsächliche dynamische Laserleistung. Skripte, Z-Bewegungen, Verweilzeiten, Controller-Verzögerungen sowie Vor- und Nachlaufzeiten sind ausgeschlossen. Die Luftunterstützungszeit folgt der Layer-Umschaltung des Auftrags, einschließlich Leerfahrten auf diesen Layern.')),
+      h('p', { class: 'note' }, t('Modellschätzung, keine Messung. Verwendet die geschätzte XY-Bewegungszeit und die vorgegebene Laserleistung, nicht die tatsächliche dynamische Laserleistung. Skripte, Z-Bewegungen, Controller-Verzögerungen sowie Vor- und Nachlaufzeiten sind ausgeschlossen; eingestellte Pausen je Schnitt sind in der Zeitschätzung enthalten. Die Luftunterstützungszeit folgt der Layer-Umschaltung des Auftrags, einschließlich Leerfahrten auf diesen Layern.')),
       h('p', { class: 'note' }, t('Unbekannt — gültige elektrische Leistung und Betriebsregel eingeben'))));
 }
