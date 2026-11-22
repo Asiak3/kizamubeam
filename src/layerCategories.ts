@@ -7,8 +7,9 @@
 //
 // Ohne gespeicherte Vorgaben ändert sich nichts gegenüber bisher (npm run test:layer-categories prüft das mit Hashes).
 // Lädt keine Oberflächen-Module (läuft im Editor und in den Tests).
-import { cleanLayerType, CutSettings, cutSettings, defaultCutSettings, defaultLayer, Doc, isCutLayer, Layer, LayerMode, LayerType, layerTypeName, LAYER_TYPES, normalizeCut } from './model';
+import { cleanLayerType, CUT_KEYS, CutSettings, cutSettings, defaultCutSettings, defaultLayer, Doc, isCutLayer, Layer, LayerMode, LayerType, layerTypeName, LAYER_TYPES, leaves, normalizeCut } from './model';
 import { cleanLook } from './view3d/looks';
+import type { Editor } from './editor';
 
 export const LAYER_CATEGORIES_KEY = 'kizamubeam.layerCategories';
 
@@ -182,4 +183,82 @@ export function resetSettings(index: number, mode: LayerMode, d: LayerDefaults |
   delete s.sub;
   delete s.layerType;
   return s;
+}
+
+/** Kennung für eine eigene Kategorie (nie eine der eingebauten) */
+export const newCategoryId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/**
+ * Kategorie-Einstellungen aus Bearbeitungseinstellungen (aktiver Layer, Eintrag der Bibliothek): vollständige Kopie
+ * ohne Layer-Art, dazu die Art (gespeichert oder die, die der Layer ohnehin hätte).
+ */
+export function categoryFrom(s: CutSettings): Pick<LayerCategory, 'type' | 'cut'> {
+  const cut = cleanCut(s, defaultCutSettings(s.mode === 'fill' ? 'fill' : 'line'));
+  return { type: cleanLayerType(s.layerType) ?? impliedType(cut as Layer), cut };
+}
+
+/** Gleiche Vorgaben (nach der Prüfung)? Dann muss nichts gespeichert werden. */
+export const sameLayerDefaults = (a: LayerDefaults, b: LayerDefaults) =>
+  JSON.stringify(sanitizeLayerDefaults(a)) === JSON.stringify(sanitizeLayerDefaults(b));
+
+/** Layer, auf denen auf irgendeiner Seite Bilder liegen (die Bilder nutzen Geschwindigkeit und Leistung des Layers) */
+export function imageLayers(doc: Doc): Set<number> {
+  const out = new Set<number>();
+  for (const p of doc.pages) for (const [o] of leaves(p.objs)) if (o.shape.kind === 'image') out.add(o.layer);
+  return out;
+}
+
+/**
+ * „Auf dieses Projekt anwenden“: Layer 00–29 bekommen die Einstellungen ihrer Kategorie. Ein Layer, dessen Werte sich
+ * dadurch ändern, bekommt wieder seinen Standardnamen (C03) und verliert die Verbindung zum Bibliothekseintrag (Name
+ * und Werte stammen nicht mehr von dort). Ausgabe, Sichtbarkeit, Reihenfolge, Bild-Einstellungen, Sperre und (wenn die
+ * Kategorie keines hat) das Aussehen in 3D bleiben. Ein Layer mit unveränderten Werten bleibt ganz, wie er ist.
+ * Fehlende Layer kommen nur dazu, wenn sie von den Standardwerten abweichen (wie bei neuen Projekten). Layer in skip
+ * (z. B. mit Bildern) und T1/T2 bleiben unverändert. Gibt die geänderten Layer zurück.
+ */
+export function applyCategoriesToLayers(layers: Record<number, Layer>, d: LayerDefaults, skip: ReadonlySet<number> = new Set()): number[] {
+  const changed: number[] = [];
+  for (let i = 0; i < CATEGORY_LAYERS; i++) {
+    if (skip.has(i)) continue;
+    const C = categoryLayer(i, categoryOf(i, d));
+    const L = layers[i];
+    if (!L) {
+      if (sameCut(C, normalizeCut(defaultLayer(i)))) continue;
+      layers[i] = C;
+      changed.push(i);
+      continue;
+    }
+    // Aussehen in 3D beschreibt das Material des Projekts: ohne eigenes Aussehen der Kategorie bleibt das des Layers
+    const target = cutSettings(C);
+    if (!target.look && L.look) target.look = structuredClone(L.look);
+    if (JSON.stringify(target) === JSON.stringify(cutSettings(L))) continue;
+    const next = target as unknown as Record<string, unknown>;
+    const own = L as unknown as Record<string, unknown>;
+    for (const k of CUT_KEYS) {
+      if (next[k] === undefined) delete own[k];
+      else own[k] = next[k];
+    }
+    L.name = defaultLayer(i).name;
+    delete L.material;
+    changed.push(i);
+  }
+  return changed;
+}
+
+/**
+ * Knopf „Auf dieses Projekt anwenden“: applyCategoriesToLayers als ein Undo-Schritt (ohne Änderung keiner). Layer mit
+ * Bildern bleiben, wie sie sind. changed = geänderte Layer, skipped = Layer mit Bildern, die sich sonst geändert hätten.
+ */
+export function applyCategoriesToProject(ed: Editor, d: LayerDefaults, undoLabel: string): { changed: number[]; skipped: number[] } {
+  const clean = sanitizeLayerDefaults(d);
+  const skip = imageLayers(ed.doc);
+  const all = applyCategoriesToLayers(structuredClone(ed.doc.layers), clean);
+  const changed = all.filter((i) => !skip.has(i));
+  const skipped = all.filter((i) => skip.has(i));
+  if (changed.length) {
+    ed.snapshot(undoLabel);
+    applyCategoriesToLayers(ed.doc.layers, clean, skip);
+    ed.emit('doc');
+  }
+  return { changed, skipped };
 }

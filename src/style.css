@@ -974,6 +974,67 @@ table.layers select {
   gap: 4px;
   margin: 6px 0;
 }
+/* Zahnrad für die Layer-Vorgaben rechts in der Knopfleiste von Schnitte / Layer (#265); gleiche Höhe wie die Nachbarn */
+.layer-tools .layer-gear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 3px 6px;
+}
+.layer-gear svg {
+  width: 16px;
+  height: 16px;
+}
+/* Dialog Layer-Vorgaben: Layer 00–29 in zwei Spalten, Kategorien als Liste mit Editor */
+.layer-defaults-dialog {
+  width: min(720px, 96vw);
+  max-height: 92vh;
+  overflow-y: auto;
+}
+.ld-layers {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+.ld-cats {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+.ld-cats .form {
+  grid-template-columns: 1fr 140px;
+}
+.ld-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 2px;
+  border: 1px solid var(--line);
+  background: var(--field);
+}
+.ld-list button {
+  font: inherit;
+  text-align: left;
+  padding: 3px 6px;
+  border: none;
+  border-radius: 2px;
+  background: none;
+  color: var(--text);
+}
+.ld-list button.on {
+  background: var(--accent-soft);
+}
+@media (max-width: 640px) {
+  .ld-cats {
+    grid-template-columns: 1fr;
+  }
+}
 .layer-tools button,
 .btn {
   font: inherit;

@@ -54,7 +54,7 @@ Object.assign(globalThis, {
 const { Editor } = await import('../src/editor');
 const { docKey } = await import('../src/editor/tabs');
 const { defaultCutSettings, defaultLayer, defaultSubLayer, normalizeLayer } = await import('../src/model');
-const { builtinCategory, categoryLayer, categoryName, categoryOf, defaultLayerDefaults, LAYER_CATEGORIES_KEY, loadLayerDefaults, resetSettings, sanitizeLayerDefaults, saveLayerDefaults } = await import('../src/layerCategories');
+const { applyCategoriesToLayers, applyCategoriesToProject, builtinCategory, categoryFrom, categoryLayer, categoryName, categoryOf, defaultLayerDefaults, isBuiltinCategory, LAYER_CATEGORIES_KEY, loadLayerDefaults, newCategoryId, resetSettings, sameLayerDefaults, sanitizeLayerDefaults, saveLayerDefaults } = await import('../src/layerCategories');
 
 const FIXTURES = new URL('./layer-categories-fixtures.json', import.meta.url);
 const write = process.argv.includes('--write');
@@ -289,6 +289,91 @@ test('categoryOf falls back to the standard category', () => {
   assert.equal(categoryOf(9, d).id, 'cut');
   assert.deepEqual(categoryLayer(0, builtinCategory('engrave')), defaultLayer(0));
   assert.deepEqual(categoryLayer(4, builtinCategory('cut')), defaultLayer(4));
+});
+
+// ---------- Dialog „Layer-Vorgaben“ (PR 3) ----------
+/** Der Knopf „Auf dieses Projekt anwenden“ (gleiche Funktion wie im Dialog); true = etwas geändert */
+const applyToProject = (ed: Ed, d: LayerDefaults) => applyCategoriesToProject(ed, d, 'apply').changed.length > 0;
+
+test('"Apply to this project" sets the settings and the standard name, keeps output, order, image settings, lock and 3D look', () => {
+  stored = null;
+  reset();
+  const ed = editor();
+  busy(ed);
+  Object.assign(ed.layer(3), { name: 'Pappel 3 mm Schneiden', output: false, show: false, priority: 2, locked: true, material: 'm1', look: { id: 'birch' }, img: { dpi: 254 } });
+  ed.layer(30).speed = 77;
+  const before = JSON.stringify(ed.doc);
+  assert.equal(applyToProject(ed, custom()), true);
+  const L = ed.doc.layers;
+  assert.deepEqual([L[3].speed, L[3].power, L[3].mode], [450, 80, 'line']);
+  assert.deepEqual([L[3].name, L[3].output, L[3].show, L[3].priority, L[3].locked], ['C03', false, false, 2, true], 'changed values: standard name');
+  assert.deepEqual(L[3].look, { id: 'birch' }, 'the category has no look: the layer keeps its own');
+  assert.equal((L[3].img as { dpi?: number }).dpi, 254);
+  assert.equal(L[3].material, undefined, 'values no longer come from the library entry');
+  assert.deepEqual([L[2].speed, L[2].power, L[2].layerType], [3000, 15, 'mark']);
+  assert.deepEqual([L[5].mode, L[5].layerType, L[5].sub?.[0].speed], ['fill', 'engrave', 900]);
+  assert.equal(L[30].speed, 77, 'tool layers stay');
+  assert.equal(normalizeLayer(structuredClone(L[3])).dedupTol, L[3].dedupTol, 'layer complete');
+  assert.deepEqual(applyCategoriesToLayers(structuredClone(ed.doc.layers), sanitizeLayerDefaults(custom())), [], 'second time: nothing to change');
+  assert.equal(applyToProject(ed, custom()), false, 'no undo step without a change');
+  ed.doUndo();
+  assert.equal(JSON.stringify(ed.doc), before, 'one undo step back');
+});
+
+test('"Apply to this project": unchanged layers keep name and library link, layers with images stay', () => {
+  stored = null;
+  reset();
+  const ed = editor();
+  busy(ed);
+  // Layer 1: same values as its category (Cut 450), name and link from the library stay
+  Object.assign(ed.layer(1), { speed: 450, name: 'Pappel 3 mm Schneiden', material: 'm1' });
+  // Layer 4: an image on the second page; its speed is also the image speed
+  ed.layer(4).speed = 3000;
+  ed.doc.pages.push({ name: 'P2', objs: [{ id: 9002, m: [1, 0, 0, 1, 0, 0], layer: 4, shape: { kind: 'group', children: [{ id: 9003, m: [1, 0, 0, 1, 0, 0], layer: 4, shape: { kind: 'image', w: 10, h: 10, src: '' } }] } } as never] });
+  const l4 = JSON.stringify(ed.doc.layers[4]);
+  const r = applyCategoriesToProject(ed, custom(), 'apply');
+  assert.deepEqual([ed.doc.layers[1].name, ed.doc.layers[1].material], ['Pappel 3 mm Schneiden', 'm1']);
+  assert.equal(JSON.stringify(ed.doc.layers[4]), l4, 'image layer untouched');
+  assert.ok(r.skipped.includes(4) && !r.changed.includes(4) && !r.changed.includes(1));
+  assert.ok(r.changed.includes(3));
+});
+
+test('"Apply to this project" with the built-in defaults changes nothing in a new project', () => {
+  stored = null;
+  reset();
+  const ed = editor();
+  const before = JSON.stringify(ed.doc);
+  assert.equal(applyToProject(ed, defaultLayerDefaults()), false);
+  assert.equal(JSON.stringify(ed.doc), before);
+  // A layer that only differs in settings goes back to the category values, a sub-layer goes away
+  ed.layer(4).speed = 999;
+  ed.layer(4).sub = [defaultSubLayer('fill')];
+  assert.equal(applyToProject(ed, defaultLayerDefaults()), true);
+  assert.deepEqual(ed.doc.layers[4], normalizeLayer(defaultLayer(4)));
+});
+
+test('categoryFrom copies all settings and the type', () => {
+  const line = categoryFrom({ ...defaultLayer(1), tabs: { ...defaultLayer(1).tabs, enabled: true } });
+  assert.equal(line.type, 'cut');
+  assert.equal(line.cut.tabs.enabled, true);
+  assert.equal(line.cut.layerType, undefined);
+  assert.equal((line.cut as unknown as Record<string, unknown>).name, undefined, 'only cut settings');
+  assert.equal(categoryFrom(defaultLayer(0)).type, 'engrave');
+  const marked = categoryFrom({ ...defaultLayer(1), layerType: 'mark' });
+  assert.deepEqual([marked.type, marked.cut.layerType], ['mark', undefined]);
+  const both = categoryFrom({ ...defaultLayer(0), sub: [defaultSubLayer('line')] });
+  assert.deepEqual([both.type, both.cut.sub?.length], ['cut', 1]);
+});
+
+test('sameLayerDefaults and new category ids', () => {
+  assert.ok(sameLayerDefaults(defaultLayerDefaults(), sanitizeLayerDefaults({})));
+  assert.ok(!sameLayerDefaults(defaultLayerDefaults(), custom()));
+  const off = defaultLayerDefaults();
+  off.apply = false;
+  assert.ok(!sameLayerDefaults(defaultLayerDefaults(), off));
+  const ids = new Set(Array.from({ length: 50 }, () => newCategoryId()));
+  assert.equal(ids.size, 50);
+  for (const id of ids) assert.ok(!isBuiltinCategory(id));
 });
 
 if (failed) {

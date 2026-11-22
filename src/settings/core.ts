@@ -31,6 +31,8 @@ import { shortcutEditor, type ShortcutCommand } from '../shortcutsSettings';
 import type { SvgDpi } from '../importers';
 import { typographySettingsFields } from './typography';
 import { electricityCurrencyField, electricityTariffField } from '../energyUi';
+import { defaultLayerDefaults, loadLayerDefaults, saveLayerDefaults } from '../layerCategories';
+import { openLayerDefaultsDialog } from '../layerDefaultsDialog';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 
@@ -314,6 +316,25 @@ export function registerCoreSettings(ed: Editor, hooks: CoreSettingsHooks) {
         ],
         get: () => { const v = loadJobOriginDefault(); return v === null ? '' : String(v); },
         set: (v) => saveJobOriginDefault(v === '' ? null : Number(v)),
+      },
+      {
+        kind: 'toggle', id: 'workspace.layerDefaultsApply', group: t('Layer-Vorgaben'), label: t('Layer-Vorgaben auf neue Projekte anwenden'), def: true,
+        keywords: t('Layer Kategorien Standard Vorgabe Schneiden Gravieren Markieren'),
+        hint: t('Neue Projekte bekommen die Layer ihrer Kategorien. Geöffnete Dateien bleiben, wie sie sind.'),
+        get: () => loadLayerDefaults()?.apply ?? true,
+        // Frisch laden: Der Dialog (Knopf darunter) kann die Vorgaben inzwischen geändert haben. Ohne gespeicherte
+        // Vorgaben und eingeschaltet bleibt alles wie bisher, dann wird nichts angelegt
+        set: (v) => {
+          const d = loadLayerDefaults();
+          if (d) saveLayerDefaults({ ...d, apply: v });
+          else if (!v) saveLayerDefaults({ ...defaultLayerDefaults(), apply: false });
+        },
+      },
+      {
+        kind: 'action', id: 'workspace.layerDefaults', group: t('Layer-Vorgaben'), label: t('Kategorien und Zuordnung'),
+        keywords: t('Layer Kategorien Standard Vorgabe Schneiden Gravieren Markieren'),
+        hint: t('Kategorien (Schneiden, Gravieren, Markieren und eigene) bearbeiten und den Layern 00–29 zuordnen. Auch über das Zahnrad im Fenster Schnitte / Layer.'),
+        button: t('Öffnen …'), run: () => openLayerDefaultsDialog(ed),
       },
     ],
   });

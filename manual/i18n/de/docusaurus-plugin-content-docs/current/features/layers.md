@@ -83,3 +83,13 @@ Ein Doppelklick auf einen Layer öffnet seine **Layer-Einstellungen**. Welche Fe
 ## Material-Bibliothek
 
 Das Fenster **Material** speichert bewährte Einstellungen je Material und Dicke und überträgt sie mit einem Klick auf einen Layer. Siehe [Materialien und Tests](materials-tests.md).
+
+## Layer-Vorgaben
+
+Das Zahnrad rechts in der Knopfleiste von **Schnitte / Layer** (auch unter **Bearbeiten → Einstellungen … → Arbeitsfläche und Fangen**) öffnet die **Layer-Vorgaben**: mit welchen Einstellungen jeder Layer 00–29 beginnt.
+
+- **Kategorien**: *Schneiden*, *Gravieren* und *Markieren* sind eingebaut (zurücksetzen ja, löschen nein); eigene legst du mit **Neu** oder **Duplizieren** an. Jede Kategorie hat eine Art, einen Modus (Linie, Füllen oder Füllen + Linie als Sub-Layer), Geschwindigkeit, Leistung, Durchgänge und die übrigen allgemeinen Einstellungen. **Vom aktiven Layer** und **Aus der Bibliothek** übernehmen alle Einstellungen auf einmal, auch Haltestege, Perforation und Füllart.
+- **Layer**: für jeden Layer 00–29 eine Kategorie wählen. Mit **Auf neue Projekte anwenden** beginnt jedes neue Projekt (Neu, neuer Reiter, Schließen des letzten Reiters, erster Start) mit diesen Layern. Geöffnete Dateien ändern sich nie.
+- **Auf dieses Projekt anwenden** setzt die Layer des offenen Projekts als ein Undo-Schritt auf ihre Kategorien und nennt die geänderten benutzten Layer. Ein Layer, dessen Werte sich ändern, bekommt wieder seinen Standardnamen (C03) und verliert die Verbindung zum Bibliothekseintrag. Layer mit Bildern bleiben, wie sie sind.
+
+Die Vorgaben werden mit deinen Einstellungen gespeichert, nicht im Projekt, und mit **Einstellungen übertragen** mitgenommen.

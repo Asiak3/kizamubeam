@@ -83,3 +83,13 @@ Double-click a layer to open its **Cut Settings**. Which fields appear depends o
 ## Material library
 
 The **Material** window stores proven settings per material and thickness and applies them to a layer with one click. See [Materials and tests](materials-tests.md).
+
+## Layer defaults
+
+The gear at the right of the button row in **Cuts / Layers** (also under **Edit → Settings … → Workspace and snapping**) opens **Layer defaults**: which settings each layer 00–29 starts with.
+
+- **Categories**: *Cut*, *Engrave* and *Mark* are built in (they can be reset but not deleted); add your own with **New** or **Duplicate**. Each category has a type, a mode (line, fill, or fill + line as a sub-layer), speed, power, passes and the other common settings. **From active layer** and **From library** copy all settings at once, including tabs, perforation and fill style.
+- **Layers**: pick a category for each layer 00–29. With **Apply to new projects** switched on, every new project (New, a new tab, closing the last tab, first launch) starts with these layers. Opened files never change.
+- **Apply to this project** sets the layers of the open project to their categories as one undo step and names the used layers that changed. A layer whose values change gets its standard name back (C03) and loses the link to its library entry. Layers that hold images are left as they are.
+
+The defaults are stored with your settings, not in the project, and travel with **Transfer Settings**.

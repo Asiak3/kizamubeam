@@ -44,6 +44,7 @@ import { openPacksDialog } from './packsDialog';
 import { openGridDialog } from './gridDialog';
 import { applyNewDocDefaults, buildLaser, frameJob, isPositionPick, openDeviceDialog, openDevicesDialog, openPreview, openRotaryDialog, saveGCode, startJob, togglePositionPick } from './laser';
 import { openLayerDialog, setAdjustOpener } from './layerdialog';
+import { openLayerDefaultsDialog } from './layerDefaultsDialog';
 import { imageLayerFields, liveLayerRaster } from './imageLayerFields';
 import { openMaterialTestDialog } from './materialtest';
 import { openTestPhotoDialog } from './testphotoDialog';
@@ -1155,8 +1156,11 @@ function buildLayers(ed: Editor) {
     const used = ed.layerOrder();
     if (ed.activeLayer === null || !used.includes(ed.activeLayer)) ed.activeLayer = used[0] ?? null;
     root.replaceChildren();
+    // Zahnrad für die Layer-Vorgaben (#265): rechts in der Knopfleiste, im leeren Projekt allein darin
+    const gear = () => h('button', { type: 'button', class: 'layer-gear', title: t('Layer-Vorgaben …'), 'aria-label': t('Layer-Vorgaben …'), icon: 'gear', onclick: () => openLayerDefaultsDialog(ed) });
     if (!used.length) {
       root.append(h('div', { class: 'empty' }, t('Noch keine Objekte. Zeichne links eine Form oder einen Text, oder importiere ein Bild (Ctrl+I). Die Farbe unten bestimmt den Layer.')));
+      root.append(h('div', { class: 'layer-tools' }, gear()));
       return;
     }
     const table = h(
@@ -1219,6 +1223,7 @@ function buildLayers(ed: Editor) {
         h('button', { title: t('Nach unten (später ausgeben)'), onclick: () => ed.moveLayer(a, 1) }, '▼'),
         h('button', { onclick: () => ed.selectLayer(a) }, t('Formen auswählen')),
         h('button', { title: t('Alle Einstellungen dieses Layers (Doppelklick auf den Layer)'), onclick: () => openLayerDialog(ed, a) }, t('Einstellungen …')),
+        gear(),
       ),
     );
     const L = ed.layer(a);

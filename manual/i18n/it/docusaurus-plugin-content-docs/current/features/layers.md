@@ -83,3 +83,13 @@ Un doppio clic su un livello apre le sue **Impostazioni di taglio**. I campi vis
 ## Libreria dei materiali
 
 La finestra **Materiale** conserva impostazioni collaudate per materiale e spessore e le applica a un livello con un clic. Vedi [Materiali e test](materials-tests.md).
+
+## Impostazioni predefinite dei livelli
+
+L’ingranaggio a destra nella fila di pulsanti di **Tagli / Livello** (anche in **Modifica → Impostazioni … → Area di lavoro e aggancio**) apre le **Impostazioni predefinite dei livelli**: con quali impostazioni inizia ogni livello 00–29.
+
+- **Categorie**: *Taglia*, *Incidi* e *Marca* sono integrate (si possono ripristinare ma non eliminare); le tue le crei con **Nuovo** o **Duplica**. Ogni categoria ha un tipo, una modalità (linea, riempimento o riempimento + linea come sotto-livello), velocità, potenza, passate e le altre impostazioni comuni. **Dal livello attivo** e **Dalla libreria** copiano tutte le impostazioni in una volta, anche linguette, perforazione e stile di riempimento.
+- **Livelli**: scegli una categoria per ogni livello 00–29. Con **Applica ai nuovi progetti** attivo, ogni nuovo progetto (Nuovo, nuova scheda, chiusura dell’ultima scheda, primo avvio) inizia con questi livelli. I file aperti non cambiano mai.
+- **Applica a questo progetto** imposta i livelli del progetto aperto sulle loro categorie in un solo passo di annullamento ed elenca i livelli usati che sono cambiati. Un livello i cui valori cambiano riprende il nome standard (C03) e perde il collegamento alla voce della libreria. I livelli con immagini restano come sono.
+
+Le impostazioni predefinite vengono salvate con le tue impostazioni, non nel progetto, e si trasferiscono con **Trasferisci impostazioni**.
