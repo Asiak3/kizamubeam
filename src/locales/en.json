@@ -4709,6 +4709,7 @@
   "Arbeitsfläche und Fangen": "Workspace and snapping",
   "Fangen": "Snapping",
   "An Objekten fangen": "Snap to objects",
+  "Fangen ein-/ausschalten (Objekt- und Rasterfang bleiben getrennt einstellbar)": "Toggle snapping on/off (object and grid snap stay adjustable separately)",
   "Fang Knoten Mittelpunkte Schnittpunkte": "snap nodes midpoints intersections",
   "Vereinen Abziehen Schnittmenge": "union subtract intersect",
   "Maus und Tastatur": "Mouse and keyboard",

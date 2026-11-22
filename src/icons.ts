@@ -106,6 +106,7 @@ export const ICONS: Record<string, string> = {
   offset: svg('<rect x="8" y="8" width="8" height="8" rx="1"/><rect x="3.5" y="3.5" width="17" height="17" rx="5" stroke-dasharray="2.2 1.8"/>'),
   nest: svg('<rect x="2.5" y="2.5" width="19" height="19" rx="1" stroke-dasharray="2 1.6"/><path d="M5 5h7v4H9v4H5z"/><path d="M19 19h-7v-4h3v-4h4z"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>'),
   grid: svg('<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18" stroke-dasharray="1.6 1.4"/>'),
+  snap: svg('<path d="M10 4.5h2a7.5 7.5 0 0 1 0 15h-2" stroke-width="3" stroke-linecap="butt"/><path d="m7.6 5.8-1.7 1.6m-1.5 2.2-.4 2.1m.4 2.4.8 2m1.3 1.4 1.1.9" stroke-width="2" stroke-linecap="butt"/>'),
   gridArray: svg('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-dasharray="2 1.5"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-dasharray="2 1.5"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-dasharray="2 1.5"/>'),
   circArray: svg('<circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="4.5" r="2.5"/><circle cx="19.5" cy="12" r="2.5" stroke-dasharray="1.8 1.4"/><circle cx="12" cy="19.5" r="2.5" stroke-dasharray="1.8 1.4"/><circle cx="4.5" cy="12" r="2.5" stroke-dasharray="1.8 1.4"/>'),
   warp: svg('<path d="M3 9q9-6 18 0v9q-9-6-18 0z"/><path d="M8 9.5v5M12 8v5M16 9.5v5" stroke-dasharray="1.6 1.4"/>'),

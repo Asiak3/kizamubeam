@@ -54,6 +54,7 @@ import { openHostSyncDialog } from './remote';
 import { buildObjectsPanel } from './objectsPanel';
 import { buildTabBar, closeTabAsk } from './tabsBar';
 import { loadGroupedTabs, loadTabPages, saveGroupedTabs, saveTabPages } from './editor/tabs';
+import { isSnapOn, toggleSnapMaster } from './editor/snapping';
 import { buildHistoryPanel } from './historyPanel';
 import { buildLibraryPanel, openAddSelectionDialog } from './libraryPanel';
 import { buildCheckPanel, openCheck } from './checkPanel';
@@ -657,6 +658,7 @@ function buildBars(ed: Editor) {
     { id: 'zoomout', cat: V, icon: 'zoomout', label: t('Verkleinern'), run: () => ed.zoomAt(0.8) },
     { id: 'zoompage', cat: V, icon: 'zoompage', label: t('Ganze Seite'), run: () => ed.zoomPage() },
     { id: 'grid', cat: V, icon: 'grid', label: t('Gitter ein-/ausblenden'), run: () => ed.setGrid({ show: !ed.grid.show }), on: () => ed.grid.show },
+    { id: 'snap-toggle', cat: V, icon: 'snap', label: t('Fangen ein-/ausschalten (Objekt- und Rasterfang bleiben getrennt einstellbar)'), run: () => toggleSnapMaster(ed), on: () => isSnapOn(ed) },
     { id: 'camera-overlays', cat: V, icon: 'cameraOverlay', label: t('Alle Kameraüberlagerungen anzeigen'), run: () => toggleCameraOverlays(ed), on: cameraOverlaysVisible,
       dyn: () => ({ icon: cameraOverlaysVisible() ? 'cameraOverlay' : 'cameraOverlayOff' }) },
     { id: 'gridsettings', cat: V, icon: 'settings', small: true, label: t('Gitter einstellen …'), run: () => openGridDialog(ed) },
@@ -789,7 +791,7 @@ function buildBars(ed: Editor) {
     {
       main: [
         'new', 'open', 'save', 'import', 'export', SEP, 'undo', 'redo', SEP, 'cut', 'copy', 'paste', 'delete', SEP,
-        'grp:zoom', 'view3d', 'camera-overlays', SEP, 'devsettings', 'check', 'preview', SEP,
+        'grp:zoom', 'view3d', 'camera-overlays', 'snap-toggle', SEP, 'devsettings', 'check', 'preview', SEP,
         'group', 'ungroup', 'isolate', 'grp:transform', 'tolines', SEP, 'grp:align', SEP, 'theme',
       ],
       tools: [
