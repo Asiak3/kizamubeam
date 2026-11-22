@@ -184,7 +184,7 @@ export async function openOutlineDialog(ed: Editor): Promise<void> {
     document.body.append(dlg); dlg.show(); attached = true;
     clearTimeout(busyTimer);
     if (busyShown) { ed.hint = prevHint; ed.emit('tool'); }
-    mode.focus();
+    mode.focus({ preventScroll: true });
     ed.outlinePreview = preview; ed.on(changed);
     ed.canvas.addEventListener('pointerleave', leave);
     disposeWindow = movableToolWindow(dlg, title, () => {});

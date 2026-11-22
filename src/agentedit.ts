@@ -1006,7 +1006,10 @@ export const EDIT_TOOLS: ToolDef[] = [
         setVar(s, a);
       } else if (s.kind === 'rect') {
         const r = optNum(a, 'cornerRadius', { min: 0 });
-        if (r !== undefined) s.r = Math.min(r / (Math.min(Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3])) || 1), Math.min(s.w, s.h) / 2);
+        if (r !== undefined) {
+          s.r = Math.min(r / (Math.min(Math.hypot(m[0], m[1]), Math.hypot(m[2], m[3])) || 1), Math.min(s.w, s.h) / 2);
+          delete s.corners;
+        }
       } else if (s.kind === 'polygon') {
         s.sides = optNum(a, 'sides', { min: 3, max: 200, int: true }) ?? s.sides;
         if (a.star !== undefined) s.star = a.star === true;

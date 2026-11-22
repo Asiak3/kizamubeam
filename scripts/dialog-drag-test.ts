@@ -1,7 +1,7 @@
 // Tests für verschiebbare Dialoge (src/dialogDrag.ts): npm run test:dialog-drag
 import assert from 'node:assert/strict';
 import {
-  clampDialogPos, fitDialog, loadPositions, loadSizes, positionKey, resetDialogPositions, savePosition, saveSize, sizeKey,
+  clampDialogPos, fitDialog, loadPositions, loadSizes, positionKey, resetDialogPositions, resetViewportScroll, savePosition, saveSize, sizeKey,
 } from '../src/dialogDrag';
 
 const test = (name: string, fn: () => void) => {
@@ -148,4 +148,25 @@ test('Zurücksetzen vergisst Positionen und Größen', () => {
   saveSize(s, 'settings-dialog', { w: 900, h: 700 });
   resetDialogPositions(s);
   assert.deepEqual([loadPositions(s), loadSizes(s)], [{}, {}]);
+});
+
+test('Modeless Öffnen hinterlässt keinen Dokument-Scroll (Bild bearbeiten)', () => {
+  // Chrome scrollt bei show() die Einfügeposition am Body-Ende ins Bild: der Viewport stünde danach
+  // um eine Dialoghöhe verschoben (Menü oben abgeschnitten, Palette versetzt). onOpen hebt das auf.
+  const scrollingElement = { scrollTop: 320, scrollLeft: 0 };
+  const body = { scrollTop: 0, scrollLeft: 40 };
+  (globalThis as { document?: unknown }).document = { scrollingElement, body };
+  try {
+    resetViewportScroll();
+  } finally {
+    delete (globalThis as { document?: unknown }).document;
+  }
+  assert.deepEqual(
+    [scrollingElement.scrollTop, scrollingElement.scrollLeft, body.scrollTop, body.scrollLeft],
+    [0, 0, 0, 0],
+  );
+});
+
+test('Ohne DOM wirft das Zurücksetzen nicht', () => {
+  resetViewportScroll();
 });

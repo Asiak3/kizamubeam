@@ -5352,5 +5352,11 @@
   "Feste Tasten und Maus": "Teclas fixas e mouse",
   "„{key}“ ist schon „{command}“ zugewiesen.": "“{key}” já está atribuído a “{command}”.",
   "Dort behalten": "Manter lá",
-  "Hierher übernehmen": "Usar aqui"
+  "Hierher übernehmen": "Usar aqui",
+  "Einpassen": "Ajustar",
+  "Zoomfaktor": "Nível de zoom",
+  "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Arraste as alças na tela; Shift move todos os cantos juntos.",
+  "Ansicht zurücksetzen": "Redefinir exibição",
+  "Alle Ecken synchron": "Sincronizar todos os cantos",
+  "Einzelne Eckenradien": "Raios de canto individuais"
 }

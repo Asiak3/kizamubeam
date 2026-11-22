@@ -439,6 +439,12 @@ select:focus {
   min-width: 24px;
   min-height: 24px;
 }
+.toolbar-popup.rect-corners-pop {
+  position: fixed;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 6px;
+}
 .toolbar-popup.toolbar-menu {
   min-width: 220px;
   width: max-content;
@@ -1329,6 +1335,14 @@ dialog::backdrop {
    malt und klickt sonst durch den Dialog (Titel-Tooltip, Übernehmen blockiert) */
 .image-crop-dialog {
   z-index: 40;
+}
+/* Unten angedockt und sichtbar: bottom verankert wirklich am Viewport. margin-bottom allein trägt
+   nicht (statische Position am Body-Ende): der Dialog stünde unsichtbar unterhalb des Fensters und
+   Chrome scrollte beim Öffnen/Fokussieren das ganze Dokument (Menü oben abgeschnitten, Palette
+   versetzt). 40 px Abstand wie bisher, rechts neben der Andockleiste. */
+.offset-dialog.array-dialog.image-crop-dialog {
+  margin-bottom: 0;
+  bottom: 40px;
 }
 /* Manual layer assignment for groups on several layers (#255) */
 .layer-assign-map th,

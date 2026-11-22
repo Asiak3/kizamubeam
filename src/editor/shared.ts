@@ -41,6 +41,8 @@ export type Drag =
   | { type: 'scale'; handle: number; box: Box; orig: Mat[] }
   | { type: 'image-crop'; mode: 'crop'; handle: import('./imageHandles').ImageCropHandle }
   | { type: 'image-crop'; mode: 'perspective'; handle: number }
+  | { type: 'image-crop'; mode: 'rounding'; handle: number }
+  | { type: 'rect-radius'; obj: Obj; radius: number; corners: [number, number, number, number] | null; moved: boolean; redo: import('../history').HistoryEntry[] }
   | { type: 'rotate'; center: Pt; a0: number; orig: Mat[]; angle: number }
   | { type: 'pivot' }
   | { type: 'marquee'; start: Pt; end: Pt; base: Obj[]; mode: 'set' | 'add' | 'toggle' | 'remove' }

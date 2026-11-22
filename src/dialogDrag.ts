@@ -11,6 +11,9 @@
 // Zeichenfläche, #411). Die Größe wird je Dialog gemerkt (eigener Schlüssel, nicht je Gruppe) und
 // immer auf das Fenster begrenzt: wird es kleiner, rückt der Dialog erst nach und schrumpft dann mit;
 // wird es wieder größer, kehrt die gemerkte Größe zurück. Doppelklick auf den Griff: Standardgröße.
+//
+// Modeless show() scrollt außerdem das Dokument (Einfügeposition am Body-Ende); onOpen hebt diesen
+// Viewport-Scroll auf, weil das feste App-Layout nie Dokument-Scroll erwartet.
 
 export interface DlgPos {
   x: number;
@@ -175,6 +178,20 @@ function headerOf(dlg: HTMLDialogElement): HTMLElement | null {
 /** Schlüssel einmal beim ersten Öffnen festhalten, bevor der Schließen-Knopf den Titeltext ergänzt */
 function keyOf(dlg: HTMLDialogElement, bar: HTMLElement): string {
   return (dlg.dataset.dlgPos ??= positionKey(Array.from(dlg.classList), bar.textContent || ''));
+}
+
+/**
+ * Viewport-Scroll aufheben, den ein modeless show() hinterlässt (siehe onOpen).
+ * Nur setzen, nie lesen: mit einfachen Attrappen testbar, ohne echtes DOM.
+ */
+export function resetViewportScroll(): void {
+  const scroller = typeof document === 'undefined' ? null
+    : (document.scrollingElement as { scrollTop: number; scrollLeft: number } | null);
+  const body = typeof document === 'undefined' ? null
+    : (document.body as { scrollTop: number; scrollLeft: number } | null);
+  for (const el of [scroller, body]) {
+    if (el) { el.scrollTop = 0; el.scrollLeft = 0; }
+  }
 }
 
 /**
@@ -465,6 +482,15 @@ function onDoubleClick(e: MouseEvent) {
 }
 
 function onOpen(dlg: HTMLDialogElement) {
+  // Modeless show() scrollt das Dokument (Chrome holt die Einfügeposition am Body-Ende ins Bild):
+  // danach stünde die ganze Oberfläche verschoben (Menü oben abgeschnitten, Palette versetzt,
+  // Dialog bündig am unteren Rand). Die App füllt genau das Fenster und erwartet nie
+  // Dokument-Scroll; Top-Layer-Dialoge sind viewport-fixiert und bleiben dabei stehen.
+  // Zuerst, damit alle Maße unten im Endzustand gelesen werden.
+  resetViewportScroll();
+  // Spätes Nachholen (z. B. Autofokus per requestAnimationFrame) fängt den nächsten Frame noch ab:
+  // alles läuft vor dem ersten Paint, es gibt kein Flackern.
+  requestAnimationFrame(() => resetViewportScroll());
   const bar = headerOf(dlg);
   if (!bar) return;
   fitBar(dlg, bar);

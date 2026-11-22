@@ -41,13 +41,16 @@ await test('rounding draft clones radii; Apply serializes once and Undo restores
   assert.deepEqual((ed.doc.objs[0].shape as any).edit.cornerRadii, requested);
 });
 
-await test('rounding tab never dispatches perspective handles or key nudges', () => {
+await test('rounding tab dispatches radius grips and key nudges without changing perspective', () => {
   const { ed, o } = fixture();
   assert.equal(ui.startImageEditForSel(ed, 'rounding' as any), null);
   const p = ui.perspectiveCornerScreens(ed, o.id)[0].screen;
-  assert.equal(ui.hitImageCropHandle(ed, p.x, p.y), null);
-  assert.equal(ui.handleImageCropKey(ed, { key: 'ArrowLeft' }), false);
+  assert.deepEqual(ui.hitImageCropHandle(ed, p.x, p.y), { mode: 'rounding', index: 0 });
+  assert.equal(ui.handleImageCropKey(ed, { key: 'ArrowLeft' }), true);
+  assert.equal(ui.handleImageCropKey(ed, { key: 'ArrowRight' }), true);
+  assert.equal(ed.imageDraft().cornerRadii[0], .5);
   assert.equal(ui.pointerCropTo(ed, p.x + 10, p.y), null);
+  assert.equal(ed.imageDraft().cornerRadii[0], 5);
   assert.deepEqual(ed.imageDraft().quad[0], { x: 0, y: 0 });
   assert.equal(ui.handleImageCropKey(ed, { key: 'Escape' }), true);
   assert.equal(ed.history.position, 0);
@@ -79,7 +82,7 @@ await test('common radius, individual radius and isolated resets preserve full d
   assert.deepEqual((o.shape as any).edit.cornerRadii, [1, 2, 3, 4, 11, 12, 13, 14]);
 });
 
-await test('number overlay follows final world contour with zoom, offsets, reflection and dpr2', () => {
+await test('number overlay follows final world contour radii with zoom, offsets, reflection and dpr2', () => {
   const { ed, o } = fixture([3, 4, 5, 6]);
   o.m = [-1.4, .3, .6, 1.8, 30, 40];
   ed.startImageEdit(o.id, 'rounding');
@@ -89,8 +92,13 @@ await test('number overlay follows final world contour with zoom, offsets, refle
   ui.renderImageCropOverlay(ed, ctx as any);
   const contour = imageDraftContour(ed, o.id)!;
   assert.ok(contour.ok);
+  const corners = contour.contour.corners;
+  const cx = corners.reduce((sum, c) => sum + c.vertex.x, 0) / corners.length;
+  const cy = corners.reduce((sum, c) => sum + c.vertex.y, 0) / corners.length;
   assert.deepEqual(drawn, contour.contour.corners.map((c, i) => {
-    const p = ed.toScreen(c.vertex); return [String(i + 1), p.x, p.y];
+    const dx = cx - c.vertex.x, dy = cy - c.vertex.y, len = Math.hypot(dx, dy);
+    const p = ed.toScreen({ x: c.vertex.x + dx / len * c.requested, y: c.vertex.y + dy / len * c.requested });
+    return [String(i + 1), p.x, p.y];
   }));
   assert.equal(drawn.length, 4);
   assert.deepEqual((o.shape as any).edit.cornerRadii, [3, 4, 5, 6]);
@@ -100,6 +108,7 @@ class FakeEl {
   tagName: string; attrs: Record<string, string> = {}; style: Record<string, string> = {};
   children: unknown[] = []; listeners: Record<string, ((...args: any[]) => void)[]> = {};
   textContent = ''; value = ''; placeholder = ''; validationMessage = ''; modeless = false; modal = false; closed = false;
+  checked = false; disabled = false;
   constructor(tag: string) { this.tagName = tag.toUpperCase(); }
   addEventListener(type: string, fn: (...args: any[]) => void) { (this.listeners[type] ??= []).push(fn); }
   setAttribute(key: string, value: string) { this.attrs[key] = value; }
@@ -142,6 +151,55 @@ function button(dlg: FakeEl, title: string): FakeEl {
   assert.ok(el, `missing button ${title}`); return el;
 }
 function input(el: FakeEl, value: string) { el.focus(); el.value = value; el.fire('input'); }
+function linkCorners(dlg: FakeEl, checked: boolean) {
+  const toggle = byId(dlg, 'imground-linked');
+  toggle.checked = checked;
+  toggle.fire('change');
+}
+
+await test('radius display rounds to two decimal places without changing draft precision', () => withDom(dialogs => {
+  const { ed, o } = fixture([123.4567, 123.4567, 123.4567, 123.4567]);
+  ui.runImageEdit(ed, 'rounding'); const dlg = dialogs[0];
+  assert.equal(byId(dlg, 'imground-common').value, '123.46');
+  assert.equal(byId(dlg, 'imground-0').value, '123.46');
+  assert.match(byId(dlg, 'imground-effective-0').textContent, /123\.46/);
+  assert.equal(imageDraftEdit(ed, o.id)?.cornerRadii?.[0], 123.4567);
+  const common = byId(dlg, 'imground-common');
+  input(common, '3.14159');
+  common.fire('blur');
+  assert.equal(common.value, '3.14');
+  assert.deepEqual(imageDraftEdit(ed, o.id)?.cornerRadii, Array(4).fill(3.14159));
+}));
+
+await test('linked by default; unlink moves one corner and relinking adopts corner one', () => withDom(dialogs => {
+  const { ed, o } = fixture([2, 2, 2, 2]);
+  ui.runImageEdit(ed, 'rounding'); const dlg = dialogs[0];
+  const field = byId(dlg, 'imground-0');
+  assert.equal(byId(dlg, 'imground-linked').checked, true);
+  assert.equal(field.disabled, true);
+  const drag = (index: number, pixels: number) => {
+    const grip = ui.roundingHandleScreens(ed, o.id)[index];
+    assert.ok(ui.hitImageCropHandle(ed, grip.screen.x, grip.screen.y));
+    const corner = ed.toScreen(grip.anchor);
+    const dx = grip.screen.x - corner.x, dy = grip.screen.y - corner.y;
+    const len = Math.hypot(dx, dy);
+    assert.equal(ui.pointerCropTo(ed, grip.screen.x + pixels * dx / len, grip.screen.y + pixels * dy / len), null);
+  };
+  drag(0, 8);
+  const common = ed.imageDraft().cornerRadii[0];
+  assert.ok(common > 2);
+  assert.deepEqual(ed.imageDraft().cornerRadii, Array(4).fill(common));
+  linkCorners(dlg, false);
+  assert.equal(field.disabled, false);
+  drag(0, 4);
+  const first = ed.imageDraft().cornerRadii[0];
+  assert.ok(first > common);
+  assert.deepEqual(ed.imageDraft().cornerRadii, [first, common, common, common]);
+  linkCorners(dlg, true);
+  assert.equal(field.disabled, true);
+  assert.deepEqual(ed.imageDraft().cornerRadii, Array(4).fill(first));
+  assert.equal(ed.history.position, 0);
+}));
 
 await test('real modeless DOM: third tab, live fields, effective/requested feedback, Apply and Undo', () => withDom(dialogs => {
   const { ed, o } = fixture();
@@ -156,6 +214,7 @@ await test('real modeless DOM: third tab, live fields, effective/requested feedb
   assert.deepEqual(imageDraftEdit(ed, o.id)?.cornerRadii, [100, 100, 100, 100]);
   assert.match(byId(dlg, 'imground-effective-0').textContent, /25.*100/);
   assert.ok(elements(dlg).some(e => e.attrs.role === 'status' && e.textContent.length > 0));
+  linkCorners(dlg, false);
   input(byId(dlg, 'imground-1'), '8');
   assert.deepEqual(imageDraftEdit(ed, o.id)?.cornerRadii, [100, 8, 100, 100]);
   assert.equal((o.shape as any).edit, undefined); assert.equal(ed.history.position, 0);
@@ -179,6 +238,7 @@ await test('real DOM follows 4→8→4 corners, preserves unused requests and re
   ed.setImageEditOrder('perspectiveFirst');
   button(dlg, ui.ROUNDING_TAB_TITLE()).fire('click');
   assert.equal(elements(dlg).filter(e => /^imground-\d+$/.test(e.attrs.id ?? '')).length, 8);
+  linkCorners(dlg, false);
   input(byId(dlg, 'imground-7'), '18');
   assert.equal(ed.resetImagePerspectiveDraft(), null);
   assert.equal(elements(dlg).filter(e => /^imground-\d+$/.test(e.attrs.id ?? '')).length, 4);
@@ -198,6 +258,7 @@ await test('real DOM follows 4→8→4 corners, preserves unused requests and re
 
 await test('rounding DOM rejects negative and empty radii with named accessible feedback', () => withDom(dialogs => {
   const { ed, o } = fixture(); ui.runImageEdit(ed, 'rounding'); const dlg = dialogs[0];
+  linkCorners(dlg, false);
   const field = byId(dlg, 'imground-0');
   for (const value of ['-1', '']) {
     input(field, value);
@@ -241,6 +302,7 @@ await test('requested world-mm radii survive both edit orders, draft geometry ch
 
 await test('invalid rounding text blocks Apply and Enter, stays visible and focuses its field', () => withDom(dialogs => {
   const { ed, o } = fixture(); ui.runImageEdit(ed, 'rounding'); const dlg = dialogs[0];
+  linkCorners(dlg, false);
   const field = byId(dlg, 'imground-0');
   assert.equal(field.attrs.min, '0'); assert.equal(field.attrs.step, '0.1');
   input(byId(dlg, 'imground-common'), '1000');
@@ -267,6 +329,7 @@ await test('invalid rounding text blocks Apply and Enter, stays visible and focu
 
 await test('reset and tab replacement clear invalid rounding state, while Escape still cancels', () => withDom(dialogs => {
   const { ed, o } = fixture(); ui.runImageEdit(ed, 'rounding'); const dlg = dialogs[0];
+  linkCorners(dlg, false);
   input(byId(dlg, 'imground-0'), '-1');
   button(dlg, 'Eckenabrundung zurücksetzen').focus();
   button(dlg, 'Eckenabrundung zurücksetzen').fire('click');
@@ -292,6 +355,7 @@ await test('reset and tab replacement clear invalid rounding state, while Escape
 await test('replacing invalid fields by reset or tab switch allows one clean Apply', () => withDom(dialogs => {
   for (const action of ['reset', 'tab']) {
     const { ed, o } = fixture([2, 3, 4, 5]); ui.runImageEdit(ed, 'rounding'); const dlg = dialogs.at(-1)!;
+    linkCorners(dlg, false);
     input(byId(dlg, 'imground-0'), '-1');
     if (action === 'reset') button(dlg, 'Eckenabrundung zurücksetzen').fire('click');
     else {

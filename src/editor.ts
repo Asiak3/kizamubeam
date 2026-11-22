@@ -1,7 +1,7 @@
 import { installPinchGestures } from './canvasZoom';
 // Editor: Zustand, Ansicht, Auswahl und Werkzeugwahl. Die übrigen Bereiche liegen in src/editor/
 // und werden unten in die Klasse eingehängt.
-import { Doc, Mat, newDoc, Obj, Pt, Shape, SubPath, TextShape, visibleLeaves, VarText } from './model';
+import { Doc, Mat, apply, newDoc, Obj, Pt, Shape, SubPath, TextShape, visibleLeaves, VarText } from './model';
 import { defaultVarText, setVarTextSource } from './vartext';
 import { setParamSource } from './params';
 import type { Issue } from './generators';
@@ -599,6 +599,30 @@ export class Editor {
       if (Math.abs(hs[i].x - sx) <= tol && Math.abs(hs[i].y - sy) <= tol) return i;
     }
     return -1;
+  }
+  /** Genau ein wählbares Rechteck: Ziel des Eckenradius-Griffs (Zahlenfeld bleibt Quelle der Wahrheit). */
+  rectRadiusTarget(): Obj | null {
+    if (this.sel.length !== 1 || this.rotateMode || this.tool !== 'select') return null;
+    const o = this.sel[0];
+    if (o.shape.kind !== 'rect' || !this.selectable(o)) return null;
+    return o;
+  }
+  /** Griffposition in Bildschirmpixeln: auf der Diagonalen im Abstand des Radius von der Ecke. */
+  rectRadiusScreen(): Pt | null {
+    const o = this.rectRadiusTarget();
+    if (!o || o.shape.kind !== 'rect') return null;
+    const s = o.shape;
+    const limit = Math.min(Math.abs(s.w), Math.abs(s.h)) / 2;
+    const corners = s.corners ?? [s.r, s.r, s.r, s.r];
+    const r = Math.max(0, Math.min(Math.max(...corners), Number.isFinite(limit) ? limit : 0));
+    return this.toScreen(apply(o.m, r, r));
+  }
+  /** 24px-Trefferfläche für den Eckenradius-Griff. */
+  hitRectRadius(sx: number, sy: number): boolean {
+    const p = this.rectRadiusScreen();
+    if (!p) return false;
+    const tol = Math.max(12, this.handleSize / 2 + 1);
+    return Math.abs(p.x - sx) <= tol && Math.abs(p.y - sy) <= tol;
   }
   /** Bereich knapp außerhalb der Eckgriffe: dort dreht Ziehen die Auswahl auch im Skaliermodus. */
   hitRotateZone(sx: number, sy: number): boolean {

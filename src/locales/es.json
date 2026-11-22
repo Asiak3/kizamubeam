@@ -5352,5 +5352,11 @@
   "Feste Tasten und Maus": "Teclas fijas y ratón",
   "„{key}“ ist schon „{command}“ zugewiesen.": "«{key}» ya está asignado a «{command}».",
   "Dort behalten": "Mantenerlo allí",
-  "Hierher übernehmen": "Usarlo aquí"
+  "Hierher übernehmen": "Usarlo aquí",
+  "Einpassen": "Ajustar",
+  "Zoomfaktor": "Nivel de zoom",
+  "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Arrastra los tiradores en el lienzo; Mayús mueve todas las esquinas a la vez.",
+  "Ansicht zurücksetzen": "Restablecer vista",
+  "Alle Ecken synchron": "Sincronizar todas las esquinas",
+  "Einzelne Eckenradien": "Radios de esquina individuales"
 }

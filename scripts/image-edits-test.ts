@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import { DEFAULT_ADJUST, loadDoc, type ImageShape, type Pt } from '../src/model';
 import { resolveImageEdits, resetImageCrop, resetImagePerspective } from '../src/imageEdits';
 import { createImageGeometry, type ImageQuad } from '../src/imageGeometry';
+import { backingSize, clampPan, clampZoom, fitScale, imageOrigin, panBy, resetZoomView, zoomAtCursor, zoomPercent, ZOOM_MAX, ZOOM_MIN } from '../src/previewZoom';
+import { addCornerRadii, clampImageRadius, clampRectRadius, pointerCornerRadius, rectRadiusFromLocal } from '../src/radiusDrag';
 import { apply, inv, mul, rotate, translate, type Mat } from '../src/mat';
 
 const crop = { left: 0.1, top: 0.2, right: 0.9, bottom: 0.8 };
@@ -146,4 +148,77 @@ test('source/local roundtrip composes with external Mat rotation, shear and tran
     const placed = apply(world, local.x, local.y);
     near(result.geometry.localToSource(apply(undo, placed.x, placed.y)), source);
   }
+});
+
+test('Vorschau-Fit: skaliert das Bild vollständig in die Ansicht', () => {
+  assert.equal(fitScale(800, 600, 420, 300), 0.5);
+  assert.equal(fitScale(100, 100, 420, 300), 3);
+  assert.equal(fitScale(0, 100, 420, 300), 1);
+});
+
+test('Vorschau-Zoom: klemmt auf 1..8 und meldet Prozent (100 % = Fit)', () => {
+  assert.equal(clampZoom(0.2), ZOOM_MIN);
+  assert.equal(clampZoom(99), ZOOM_MAX);
+  assert.equal(clampZoom(Number.NaN), ZOOM_MIN);
+  assert.equal(zoomPercent(resetZoomView()), 100);
+  assert.equal(zoomPercent({ z: 2, ox: 0, oy: 0 }), 200);
+});
+
+test('Vorschau-Zoom: Bildpunkt unter dem Cursor bleibt unter dem Cursor', () => {
+  const view = { z: 1, ox: 0, oy: 0 };
+  const cx = 300, cy = 100;
+  const before = imageOrigin(800, 600, 420, 300, view);
+  const ix = (cx - before.x) / before.scale, iy = (cy - before.y) / before.scale;
+  const next = zoomAtCursor(view, cx, cy, 2, 800, 600, 420, 300);
+  assert.ok(next.z > view.z);
+  const after = imageOrigin(800, 600, 420, 300, next);
+  assert.ok(Math.abs((cx - after.x) / after.scale - ix) < 1e-9);
+  assert.ok(Math.abs((cy - after.y) / after.scale - iy) < 1e-9);
+  assert.deepEqual(zoomAtCursor(next, cx, cy, 1, 800, 600, 420, 300), next);
+});
+
+test('Vorschau-Pan: klemmt an den Bildgrenzen, Reset stellt Fit wieder her', () => {
+  const view = { z: 2, ox: 0, oy: 0 };
+  const moved = panBy(view, 1e6, -1e6, 800, 600, 420, 300);
+  const again = panBy(view, 1e6, -1e6, 800, 600, 420, 300);
+  assert.deepEqual(moved, again);
+  assert.ok(Math.abs(moved.ox) <= 2000 && Math.abs(moved.oy) <= 2000);
+  const clamped = clampPan({ z: 2, ox: 1e6, oy: 1e6 }, 800, 600, 420, 300);
+  assert.equal(clamped.z, 2);
+  assert.ok(clamped.ox > 0 && clamped.oy > 0);
+  assert.deepEqual(panBy(view, 0, 0, 800, 600, 420, 300), view);
+  assert.deepEqual(resetZoomView(), { z: 1, ox: 0, oy: 0 });
+});
+
+test('Vorschau-Backing: DPR 2 und 3 ergeben scharfe Gerätepixel', () => {
+  assert.deepEqual(backingSize(420, 300, 2), { w: 840, h: 600 });
+  assert.deepEqual(backingSize(420, 300, 3), { w: 1260, h: 900 });
+  assert.deepEqual(backingSize(420, 300, Number.NaN), { w: 420, h: 300 });
+});
+
+test('Radien: Rechteck klemmt auf 0..min(w,h)/2, Bild verlangt >= 0', () => {
+  assert.equal(clampRectRadius(5, 100, 60), 5);
+  assert.equal(clampRectRadius(40, 100, 60), 30);
+  assert.equal(clampRectRadius(-3, 100, 60), 0);
+  assert.equal(clampRectRadius(Number.NaN, 100, 60), 0);
+  assert.equal(clampRectRadius(5, 0, 60), 0);
+  assert.equal(clampImageRadius(2.5), 2.5);
+  assert.equal(clampImageRadius(-1), null);
+  assert.equal(clampImageRadius(Number.NaN), null);
+});
+
+test('Radien: Zeigerabstand und Formlokal bestimmen den Radius', () => {
+  assert.equal(pointerCornerRadius({ x: 3, y: 4 }, { x: 0, y: 0 }), 5);
+  assert.equal(pointerCornerRadius({ x: 0, y: 0 }, { x: 0, y: 0 }), 0);
+  assert.equal(rectRadiusFromLocal(10, 20, 100, 60), 10);
+  assert.equal(rectRadiusFromLocal(-5, 3, 100, 60), 0);
+  assert.equal(rectRadiusFromLocal(100, 100, 100, 60), 30);
+});
+
+test('Radien: Delta einzeln oder gemeinsam, nie negativ, ein Schritt', () => {
+  assert.deepEqual(addCornerRadii([1, 2, 3, 4], 4, 1, 0.5), [1, 2.5, 3, 4]);
+  assert.deepEqual(addCornerRadii([1, 2, 3, 4], 4, null, 1), [2, 3, 4, 5]);
+  assert.deepEqual(addCornerRadii([0.2, 0, 0, 0], 4, 0, -1), [0, 0, 0, 0]);
+  assert.deepEqual(addCornerRadii([1, 1, 1, 1], 4, 9, 5), [1, 1, 1, 1]);
+  assert.deepEqual(addCornerRadii([1, 1, 1, 1], 4, null, Number.NaN), [1, 1, 1, 1]);
 });

@@ -1,5 +1,6 @@
 // Geometrie: Formen in Pfade umwandeln, Begrenzungsrahmen, Text-Layout, Treffertest.
 import { apply, IDENT, inv, mul, Mat, Node, Obj, Pt, Shape, SubPath, TextShape } from './model';
+import { clampRectCorners, rectCorners } from './model';
 import { fitText, loadedFont, onFontLoaded, textLines, textToSubs, wrapParagraph, wrapWidth } from './fonts';
 import { bezierPt, segments } from './curves';
 import { shownText } from './vartext';
@@ -75,25 +76,50 @@ export function shapeSubs(s: Shape): SubPath[] {
       return [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: s.w, y: 0 }, { x: s.w, y: s.h }, { x: 0, y: s.h }] }];
     case 'rect': {
       const { w, h } = s;
-      const r = Math.max(0, Math.min(s.r, Math.abs(w) / 2, Math.abs(h) / 2));
-      if (r <= 0)
+      const [tl, tr, br, bl] = clampRectCorners(rectCorners(s), w, h);
+      if (tl <= 0 && tr <= 0 && br <= 0 && bl <= 0)
         return [{ closed: true, nodes: [{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }] }];
-      const k = r * K;
-      return [
-        {
-          closed: true,
-          nodes: [
-            { x: r, y: 0, cin: { x: r - k, y: 0 } },
-            { x: w - r, y: 0, cout: { x: w - r + k, y: 0 } },
-            { x: w, y: r, cin: { x: w, y: r - k } },
-            { x: w, y: h - r, cout: { x: w, y: h - r + k } },
-            { x: w - r, y: h, cin: { x: w - r + k, y: h } },
-            { x: r, y: h, cout: { x: r - k, y: h } },
-            { x: 0, y: h - r, cin: { x: 0, y: h - r + k } },
-            { x: 0, y: r, cout: { x: 0, y: r - k } },
-          ],
-        },
-      ];
+      // Kantenpunkte je Ecke (Umlauf oben-links → oben-rechts → unten-rechts → unten-links, y nach unten).
+      const S0 = { x: tl, y: 0 }, E0 = { x: w - tr, y: 0 };
+      const S1 = { x: w, y: tr }, E1 = { x: w, y: h - br };
+      const S2 = { x: w - br, y: h }, E2 = { x: bl, y: h };
+      const S3 = { x: 0, y: h - bl }, E3 = { x: 0, y: tl };
+      const kTL = tl * K, kTR = tr * K, kBR = br * K, kBL = bl * K;
+      const at = (p: Pt, extra?: Partial<Node>): Node => ({ ...p, ...extra });
+      // Je Ecke: Austritt der Vorgängerkante (cout) und Eintritt der Folgekante (cin) für den Viertelkreis.
+      const nodes: Node[] = [];
+      const push = (p: Node) => {
+        const last = nodes[nodes.length - 1];
+        if (last && Math.abs(last.x - p.x) < 1e-12 && Math.abs(last.y - p.y) < 1e-12
+          && !last.cin && !last.cout && !p.cin && !p.cout) return;
+        nodes.push(p);
+      };
+      push(at({ ...S0 }, tl > 0 ? { cin: { x: S0.x - kTL, y: 0 } } : {}));
+      push(at({ ...E0 }, tr > 0 ? { cout: { x: E0.x + kTR, y: 0 } } : {}));
+      push(at({ ...S1 }, tr > 0 ? { cin: { x: w, y: S1.y - kTR } } : {}));
+      push(at({ ...E1 }, br > 0 ? { cout: { x: w, y: E1.y + kBR } } : {}));
+      push(at({ ...S2 }, br > 0 ? { cin: { x: S2.x + kBR, y: h } } : {}));
+      push(at({ ...E2 }, bl > 0 ? { cout: { x: E2.x - kBL, y: h } } : {}));
+      push(at({ ...S3 }, bl > 0 ? { cin: { x: 0, y: S3.y + kBL } } : {}));
+      push(at({ ...E3 }, tl > 0 ? { cout: { x: 0, y: E3.y - kTL } } : {}));
+      // Zusammenfallende Eckpunkte (Radius 0) zu einem scharfen Knoten vereinen.
+      const merged: Node[] = [];
+      for (const n of nodes) {
+        const last = merged[merged.length - 1];
+        if (last && Math.abs(last.x - n.x) < 1e-12 && Math.abs(last.y - n.y) < 1e-12) {
+          last.cin = n.cin ?? last.cin;
+          last.cout = n.cout ?? last.cout;
+          if (!last.cin && !last.cout) { last.cin = undefined; last.cout = undefined; }
+        } else merged.push({ ...n });
+      }
+      if (merged.length > 1) {
+        const first = merged[0], last = merged[merged.length - 1];
+        if (Math.abs(first.x - last.x) < 1e-12 && Math.abs(first.y - last.y) < 1e-12) {
+          first.cin = last.cin ?? first.cin;
+          merged.pop();
+        }
+      }
+      return [{ closed: true, nodes: merged }];
     }
     case 'ellipse': {
       const { rx, ry } = s;

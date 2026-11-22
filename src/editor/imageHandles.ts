@@ -233,6 +233,24 @@ export class EditorImageHandles {
     return null;
   }
 
+  /** Eckenradius stufen (Ziehen/Tastatur): Delta in mm auf eine oder alle Ecken, kein Snapshot. */
+  bumpImageCornerRadius(this: Editor, index: number | null, delta: number): string | null {
+    const d = draftOf(this);
+    if (!d) return errCrop(t('Kein Entwurf aktiv. Ursache: Nichts zum Anwenden. Behebung: Entwurf starten.'));
+    if (!Number.isFinite(delta) || delta === 0) return null;
+    const result = imageDraftContour(this, d.objId);
+    if (!result?.ok) return t('Bildkontur ungültig. Zuschnitt oder Perspektive anpassen.');
+    const count = result.contour.corners.length;
+    if (index !== null && (!Number.isInteger(index) || index < 0 || index >= count))
+      return t('Ecke nicht mehr sichtbar. Eine sichtbare Ecke wählen.');
+    const cur = Array.from({ length: Math.max(d.cornerRadii.length, count) }, (_, i) =>
+      d.cornerRadii[i] ?? result.contour.corners[i]?.requested ?? 0);
+    const next = cur.map((r, i) => (i < count && (index === null || i === index) ? Math.max(0, r + delta) : r));
+    d.cornerRadii = next;
+    this.emit('tool');
+    return null;
+  }
+
   resetImageRoundingDraft(this: Editor): string | null {
     const d = draftOf(this);
     if (!d) return errCrop(t('Kein Entwurf aktiv. Ursache: Nichts zum Zurücksetzen. Behebung: Entwurf starten.'));

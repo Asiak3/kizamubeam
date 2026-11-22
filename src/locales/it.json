@@ -5352,5 +5352,11 @@
   "Feste Tasten und Maus": "Tasti fissi e mouse",
   "„{key}“ ist schon „{command}“ zugewiesen.": "«{key}» è già assegnato a «{command}».",
   "Dort behalten": "Lascialo lì",
-  "Hierher übernehmen": "Usalo qui"
+  "Hierher übernehmen": "Usalo qui",
+  "Einpassen": "Adatta",
+  "Zoomfaktor": "Livello di zoom",
+  "Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.": "Trascina le maniglie sulla superficie; Maiusc muove tutti gli angoli insieme.",
+  "Ansicht zurücksetzen": "Ripristina vista",
+  "Alle Ecken synchron": "Sincronizza tutti gli angoli",
+  "Einzelne Eckenradien": "Raggi dei singoli angoli"
 }

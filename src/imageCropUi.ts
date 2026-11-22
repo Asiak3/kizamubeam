@@ -12,6 +12,7 @@ import { imageEditOrder } from './imageEdits';
 import type { Obj, Pt } from './model';
 import type { ImageCrop } from './imageGeometry';
 import { imageDraftContour, type ImageCropHandle, type ImageEditTab } from './editor/imageHandles';
+import { pointerCornerRadius } from './radiusDrag';
 
 export const EDIT_TITLE = () => t('Bild bearbeiten …');
 export const ORDER_TITLE = () => t('Reihenfolge');
@@ -23,6 +24,9 @@ export const PERSP_TAB_TITLE = () => t('Perspektive');
 export const ROUNDING_TAB_TITLE = () => t('Ecken abrunden');
 
 const pending = new WeakMap<object, ImageCropHandle | number>();
+/** Griffzustand Abrunden: Anker + angeforderte Radien beim Greifen (absolutes Ziehen, ein Undo bei Übernehmen). */
+const roundGrab = new WeakMap<object, { index: number; all: boolean; anchor: Pt; radius: number; radii: number[] }>();
+const linkedRounding = new WeakSet<object>();
 const draftApplyGuards = new WeakMap<object, () => boolean>();
 
 /** Trefferradius in px: 24px-Ziel (Durchmesser), visuell weiter 8px-Quadrate. */
@@ -113,6 +117,24 @@ function currentQuad(ed: any, o: Obj): [Pt, Pt, Pt, Pt] {
   return [{ x: 0, y: 0 }, { x: s.w, y: 0 }, { x: s.w, y: s.h }, { x: 0, y: s.h }];
 }
 
+export interface RoundingScreen { index: number; world: Pt; anchor: Pt; screen: Pt; }
+
+/** Abrundungs-Griffe: auf der Diagonalen Ecke→Mittelpunkt im Abstand des angeforderten Radius. */
+export function roundingHandleScreens(ed: any, id: number): RoundingScreen[] {
+  const result = imageDraftContour(ed, id);
+  if (!result?.ok) return [];
+  const corners = result.contour.corners;
+  const cx = corners.reduce((sum, c) => sum + c.vertex.x, 0) / corners.length;
+  const cy = corners.reduce((sum, c) => sum + c.vertex.y, 0) / corners.length;
+  return corners.map((corner, index) => {
+    const anchor = corner.vertex;
+    const dx = cx - anchor.x, dy = cy - anchor.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const r = Math.max(0, corner.requested);
+    const world = { x: anchor.x + (dx / len) * r, y: anchor.y + (dy / len) * r };
+    return { index, world, anchor: { ...anchor }, screen: ed.toScreen(world) };
+  });
+}
 /** Originalachse (mm) → perspektivisch verzerrte Lokalkoordinate (mm). Ohne Perspektive Identität. */
 export function warpLocal(ed: any, o: Obj, p: Pt): Pt {
   try {
@@ -146,10 +168,26 @@ export function perspectiveCornerScreens(ed: any, id: number): CornerScreen[] {
 }
 
 /** Overlay-Treffertest unter Rotation/Zoom/Offset (echte View-Transformation). */
-export function hitImageCropHandle(ed: any, sx: number, sy: number): { mode: 'crop'; handle: ImageCropHandle } | { mode: 'perspective'; index: number } | null {
+export function hitImageCropHandle(ed: any, sx: number, sy: number, opt: { all?: boolean } = {}): { mode: 'crop'; handle: ImageCropHandle } | { mode: 'perspective'; index: number } | { mode: 'rounding'; index: number } | null {
   const d = ed.imageDraft?.();
-  if (!d || d.tab === 'rounding') return null;
+  if (!d) return null;
   const R = IMAGE_HANDLE_HIT_R;
+  if (d.tab === 'rounding') {
+    const o = imgOf(ed, d.objId);
+    if (!o) return null;
+    let best: RoundingScreen | null = null; let bd = Infinity;
+    for (const p of roundingHandleScreens(ed, d.objId)) {
+      const dist = Math.hypot(p.screen.x - sx, p.screen.y - sy);
+      if (dist < bd) { bd = dist; best = p; }
+    }
+    if (!best || bd > R) return null;
+    const result = imageDraftContour(ed, d.objId);
+    const radii = result?.ok ? result.contour.corners.map((c) => c.requested) : [];
+    roundGrab.set(ed as object, { index: best.index, all: !!opt.all || linkedRounding.has(ed), anchor: best.anchor,
+      radius: pointerCornerRadius(best.world, best.anchor), radii });
+    pending.set(ed as object, best.index);
+    return { mode: 'rounding', index: best.index };
+  }
   if (d.tab === 'crop') {
     let best: HandleScreen | null = null; let bd = Infinity;
     for (const p of cropHandleScreens(ed, d.objId)) {
@@ -178,7 +216,25 @@ export function screenToImageLocal(ed: any, o: Obj, sx: number, sy: number): Pt 
 export function pointerCropTo(ed: any, sx: number, sy: number, opt: { aspectLock?: boolean; snap?: boolean; event?: unknown } = {}): string | null {
   const d = ed.imageDraft?.();
   if (!d) return t('Kein Entwurf aktiv. Ursache: Nichts zum Anwenden. Behebung: Entwurf starten.');
-  if (d.tab === 'rounding') return null;
+  if (d.tab === 'rounding') {
+    const o = imgOf(ed, d.objId);
+    if (!o) return t('Bild nicht mehr vorhanden. Ursache: Das Bild wurde gelöscht. Behebung: Entwurf abbrechen.');
+    const grab = roundGrab.get(ed as object);
+    if (!grab) return null;
+    // Kontur und angeforderte Radien liegen nach allen Objekttransformationen in Welt-mm.
+    const w = ed.toWorld(sx, sy);
+    const r = pointerCornerRadius(w, grab.anchor);
+    if (grab.all) {
+      const delta = r - grab.radius;
+      const count = grab.radii.length;
+      for (let i = 0; i < count; i++) {
+        const err = ed.setImageCornerRadius(i, Math.max(0, grab.radii[i] + delta));
+        if (err) return err;
+      }
+      return null;
+    }
+    return ed.setImageCornerRadius(grab.index, r);
+  }
   const o = imgOf(ed, d.objId);
   if (!o) return t('Bild nicht mehr vorhanden. Ursache: Das Bild wurde gelöscht. Behebung: Entwurf abbrechen.');
   // Griffe und Speicherung leben im verzerrten Ergebnis-Frame – nur der Zuschnitt
@@ -237,7 +293,15 @@ export function handleImageCropKey(ed: any, e: { key: string; shiftKey?: boolean
     else if (typeof document !== 'undefined') document.querySelector('dialog.image-crop-dialog')?.closest('dialog')?.close();
     return true;
   }
-  if (d.tab === 'rounding') return false;
+  if (d.tab === 'rounding') {
+    if (k !== 'arrowleft' && k !== 'arrowright' && k !== 'arrowup' && k !== 'arrowdown') return false;
+    const p = pending.get(ed as object);
+    const idx = typeof p === 'number' ? p : 0;
+    const delta = k === 'arrowleft' || k === 'arrowdown' ? -0.5 : 0.5;
+    const err = ed.bumpImageCornerRadius(e.shiftKey || linkedRounding.has(ed) ? null : idx, delta);
+    if (err) showImageError(ed, err);
+    return true;
+  }
   const step = e.shiftKey ? 10 : 1;
   const dx = k === 'arrowleft' ? -step : k === 'arrowright' ? step : 0;
   const dy = k === 'arrowup' ? -step : k === 'arrowdown' ? step : 0;
@@ -267,12 +331,13 @@ export function renderImageCropOverlay(ed: any, ctx: CanvasRenderingContext2D): 
   if (d.tab === 'rounding') {
     const result = imageDraftContour(ed, d.objId);
     if (!result?.ok) return;
+    const handles = roundingHandleScreens(ed, d.objId);
     ctx.save();
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     result.contour.corners.forEach((corner, index) => {
-      const p = ed.toScreen(corner.vertex);
+      const p = handles[index]?.screen ?? ed.toScreen(corner.vertex);
       ctx.fillStyle = '#24272d';
       ctx.beginPath(); ctx.arc(p.x, p.y, 12, 0, Math.PI * 2); ctx.fill();
       ctx.fillStyle = '#ffffff';
@@ -340,6 +405,7 @@ export function openImageCropDialog(ed: any): void {
   if (!dg) return;
   const o = imgOf(ed, dg.objId);
   if (!o || document.querySelector('dialog.image-crop-dialog[open]')) return;
+  linkedRounding.add(ed);
   const s: any = o.shape;
   let applied = false;
   const roundingErrors = new Map<HTMLInputElement, string>();
@@ -388,7 +454,7 @@ export function openImageCropDialog(ed: any): void {
   const selectTab = (tab: ImageEditTab) => {
     ed.setImageEditTab(tab);
     renderTabs(); renderBody();
-    document.getElementById?.(`imgedit-tab-${tab}`)?.focus();
+    document.getElementById?.(`imgedit-tab-${tab}`)?.focus({ preventScroll: true });
   };
   const renderTabs = () => {
     const d = ed.imageDraft?.();
@@ -417,13 +483,14 @@ export function openImageCropDialog(ed: any): void {
     if (!result?.ok) { renderBody(); return; }
     const { corners, limited } = result.contour;
     if (!roundingCtl || roundingCtl.length !== corners.length) { renderBody(); return; }
-    const common = corners.every(c => c.requested === corners[0].requested) ? String(corners[0].requested) : '';
+    const common = corners.every(c => c.requested === corners[0].requested) ? radiusText(corners[0].requested) : '';
     if (commonRadius && (replaceInputs || commonRadius !== document.activeElement && !roundingErrors.has(commonRadius))) commonRadius.value = common;
     corners.forEach((corner, index) => {
       const control = roundingCtl![index];
-      if (replaceInputs || control.input !== document.activeElement && !roundingErrors.has(control.input)) control.input.value = String(corner.requested);
+      control.input.disabled = linkedRounding.has(ed);
+      if (replaceInputs || control.input !== document.activeElement && !roundingErrors.has(control.input)) control.input.value = radiusText(corner.requested);
       control.effective.textContent = corner.radius < corner.requested
-        ? t('Wirksam: {effective} mm; angefordert: {requested} mm', { effective: String(round2(corner.radius)), requested: String(corner.requested) }) : '';
+        ? t('Wirksam: {effective} mm; angefordert: {requested} mm', { effective: radiusText(corner.radius), requested: radiusText(corner.requested) }) : '';
     });
     if (roundingStatus) roundingStatus.textContent = limited
       ? t('Radien auf die verfügbaren Kanten begrenzt. Angeforderte Werte bleiben erhalten.') : '';
@@ -439,7 +506,7 @@ export function openImageCropDialog(ed: any): void {
       const result = imageDraftContour(ed, o.id);
       if (!result?.ok) { bodyBox.replaceChildren(h('p', { class: 'note' }, t('Bildkontur ungültig. Zuschnitt oder Perspektive anpassen.'))); return; }
       const field = (id: string, radius: number, index: number | null) => h('input', {
-        type: 'number', id, value: String(radius), min: '0', step: '0.1', 'aria-describedby': 'imgedit-error', style: 'min-height: 24px; min-width: 0; width: 100%',
+        type: 'number', id, value: radiusText(radius), min: '0', step: '0.1', 'aria-describedby': 'imgedit-error', style: 'min-height: 24px; min-width: 0; width: 100%',
         oninput: (e: Event) => {
           const input = e.target as HTMLInputElement;
           const err = ed.setImageCornerRadius(index, input.value.trim() === '' ? NaN : Number(input.value));
@@ -448,9 +515,27 @@ export function openImageCropDialog(ed: any): void {
           if (err) roundingErrors.set(input, err); else roundingErrors.delete(input);
           showErr(err);
         },
+        onblur: (e: Event) => {
+          const input = e.target as HTMLInputElement;
+          if (!roundingErrors.has(input) && input.value !== '') input.value = radiusText(Number(input.value));
+        },
       }) as HTMLInputElement;
       commonRadius = field('imground-common', 0, null);
       commonRadius.placeholder = t('Individuell');
+      const linkCorners = h('input', { type: 'checkbox', id: 'imground-linked', onchange: (e: Event) => {
+        const input = e.target as HTMLInputElement;
+        if (input.checked) {
+          const current = imageDraftContour(ed, o.id);
+          if (!current?.ok) { input.checked = false; return; }
+          clearRoundingErrors();
+          linkedRounding.add(ed);
+          const err = ed.setImageCornerRadius(null, current.contour.corners[0].requested);
+          if (err) { linkedRounding.delete(ed); input.checked = false; }
+          showErr(err);
+        } else linkedRounding.delete(ed);
+        refreshRounding(true);
+      } });
+      linkCorners.checked = linkedRounding.has(ed);
       roundingStatus = h('p', { class: 'note', role: 'status', 'aria-live': 'polite' });
       roundingCtl = result.contour.corners.map((corner, index) => ({
         input: field(`imground-${index}`, corner.requested, index),
@@ -458,6 +543,8 @@ export function openImageCropDialog(ed: any): void {
       }));
       bodyBox.replaceChildren(
         h('p', { class: 'note' }, t('Abrundung nach Zuschnitt und Perspektive. Radien bleiben beim Skalieren in mm erhalten.')),
+        h('p', { class: 'note' }, t('Griffe auf der Arbeitsfläche ziehen, Shift zieht alle Ecken gemeinsam.')),
+        h('label', { class: 'check', for: 'imground-linked' }, linkCorners, t('Alle Ecken synchron')),
         h('div', { class: 'form' }, h('label', { for: 'imground-common' }, t('Alle sichtbaren Ecken (mm)')), commonRadius),
         ...roundingCtl.map((control, index) => {
           control.input.setAttribute('aria-describedby', `imground-effective-${index} imgedit-error`);
@@ -495,7 +582,7 @@ export function openImageCropDialog(ed: any): void {
       h('label', { for: 'imgcrop-b' }, t('Unten')), fB,
       h('label', { for: 'imgcrop-unit' }, t('Einheit')), unit,
     ));
-    requestAnimationFrame(() => (fL as HTMLInputElement).focus());
+    requestAnimationFrame(() => (fL as HTMLInputElement).focus({ preventScroll: true }));
   };
   // Order switch above the tabs: draft-only, no snapshot, no close, no value loss.
   const initialOrder = (ed.imageDraft?.()?.order === 'perspectiveFirst') ? 'perspectiveFirst' : 'cropFirst';
@@ -511,7 +598,7 @@ export function openImageCropDialog(ed: any): void {
   renderBody();
   const canApplyDraft = () => {
     const invalid = roundingErrors.keys().next().value;
-    if (invalid) { showErr(roundingErrors.get(invalid)!); invalid.focus(); return false; }
+    if (invalid) { showErr(roundingErrors.get(invalid)!); invalid.focus({ preventScroll: true }); return false; }
     return true;
   };
   const applyDraft = () => {
@@ -564,6 +651,7 @@ export function openImageCropDialog(ed: any): void {
   try { ed.on(syncDraft); } catch { /* Kopf-Test ohne Emitter */ }
   draftApplyGuards.set(ed, canApplyDraft);
   dlg.addEventListener('close', () => {
+    linkedRounding.delete(ed);
     draftApplyGuards.delete(ed);
     try { ed.off(syncDraft); } catch { /* Kopf-Test ohne Emitter */ }
     if (!applied && ed.imageDraft?.()) ed.cancelImageDraft();
@@ -572,7 +660,7 @@ export function openImageCropDialog(ed: any): void {
   dlg.addEventListener('keydown', (e) => {
     e.stopPropagation();
     if (e.key === 'Escape') { e.preventDefault(); dlg.close(); }
-    else if (e.key === 'Enter' && (e.target as HTMLElement)?.tagName === 'INPUT') {
+    else if (e.key === 'Enter' && (e.target as HTMLElement)?.tagName === 'INPUT' && (e.target as HTMLInputElement).type !== 'checkbox') {
       e.preventDefault();
       applyDraft();
     }
@@ -585,4 +673,9 @@ export function openImageCropDialog(ed: any): void {
 
 function round2(v: number): number {
   return Math.round(v * 100) / 100;
+}
+
+/** Display only; keep the draft radius at its original precision. */
+function radiusText(radius: number): string {
+  return String(Number(radius.toFixed(2)));
 }

@@ -1,5 +1,5 @@
 // Editor: Befehle: Löschen, Kopieren, Einfügen, Transformieren, Formparameter.
-import { about, clone, cloneObjs, homeLayer, Mat, mul, Pt, rotate, scale, translate, visibleLeaves } from '../model';
+import { about, clampRectCorners, clone, cloneObjs, homeLayer, Mat, mul, Pt, rectCorners, rotate, scale, translate, visibleLeaves } from '../model';
 import type { Editor } from '../editor';
 import { t } from '../i18n';
 import { genLeaves } from './generators';
@@ -142,8 +142,54 @@ export class EditorCommands {
     this.transformSel(about(rotate((-deg * Math.PI) / 180), c.x, c.y), t('Drehen'));
   }
   /** Formparameter (Eckenradius, Seiten …) der Auswahl ändern */
-  updateShapes(this: Editor, kind: 'rect' | 'polygon', patch: Record<string, number | boolean>) {
-    if (kind === 'rect' && typeof patch.r === 'number') this.rectRadius = patch.r;
+  updateShapes(this: Editor, kind: 'rect' | 'polygon', patch: Record<string, number | boolean | readonly (number | null | undefined)[]>) {
+    if (kind === 'rect') {
+      if (Array.isArray(patch.corners)) {
+        const raw = (patch.corners as readonly unknown[]).slice(0, 4);
+        // Leereinträge (null/undefined/keine Zahl) behalten den bisherigen Wert je Objekt.
+        const set = [0, 1, 2, 3].map((i) => {
+          const v = raw[i];
+          return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : undefined;
+        });
+        if (set.every((v) => v === undefined)) return;
+        const fullSet = set.every((v) => v !== undefined);
+        if (fullSet) {
+          const u = set as number[];
+          if (u[0] === u[1] && u[0] === u[2] && u[0] === u[3]) this.rectRadius = u[0];
+        }
+        this.saveToolOptions();
+        const objs = this.sel.filter((o) => o.shape.kind === kind);
+        if (!objs.length) return;
+        this.snapshot(t('Form-Eigenschaften'));
+        const results: number[][] = [];
+        objs.forEach((o) => {
+          if (o.shape.kind !== 'rect') return;
+          const base = rectCorners(o.shape);
+          const next: [number, number, number, number] = [0, 1, 2, 3].map((i) =>
+            set[i] !== undefined ? set[i] as number : base[i]) as [number, number, number, number];
+          const clamped = clampRectCorners(next, o.shape.w, o.shape.h);
+          if (clamped[0] === clamped[1] && clamped[0] === clamped[2] && clamped[0] === clamped[3]) {
+            delete o.shape.corners;
+            o.shape.r = clamped[0];
+          } else {
+            o.shape.corners = clamped;
+            o.shape.r = clamped[0];
+          }
+          results.push([...clamped]);
+          this.touch(o.shape);
+        });
+        // Alle Rechtecke nachher einheitlich rund: Werkzeug-Default nachführen.
+        if (results.length && results.every((c) => c[0] === results[0][0] && c[1] === results[0][1] && c[2] === results[0][2] && c[3] === results[0][3])
+          && results[0][0] === results[0][1] && results[0][0] === results[0][2] && results[0][0] === results[0][3]) {
+          this.rectRadius = results[0][0];
+          this.saveToolOptions();
+        }
+        this.emit('doc');
+        this.emit('sel');
+        return;
+      }
+      if (typeof patch.r === 'number') this.rectRadius = patch.r;
+    }
     if (kind === 'polygon') {
       if (typeof patch.sides === 'number') this.polySides = patch.sides;
       if (typeof patch.star === 'boolean') this.polyStar = patch.star;
@@ -153,7 +199,13 @@ export class EditorCommands {
     if (!objs.length) return;
     this.snapshot(t('Form-Eigenschaften'));
     objs.forEach((o) => {
-      Object.assign(o.shape, patch);
+      if (o.shape.kind === 'rect' && typeof patch.r === 'number') {
+        const r = clampRectCorners([patch.r, patch.r, patch.r, patch.r], o.shape.w, o.shape.h)[0];
+        delete o.shape.corners;
+        o.shape.r = r;
+      } else {
+        Object.assign(o.shape, patch);
+      }
       this.touch(o.shape);
     });
     this.emit('doc');
